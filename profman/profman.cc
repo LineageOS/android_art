@@ -21,8 +21,10 @@
 #include <sys/param.h>
 #include <unistd.h>
 
+#include <cstdint>
 #include <fstream>
 #include <iostream>
+#include <ostream>
 #include <set>
 #include <string>
 #include <string_view>
@@ -33,6 +35,7 @@
 #include "android-base/stringprintf.h"
 #include "android-base/strings.h"
 
+#include "base/array_ref.h"
 #include "base/dumpable.h"
 #include "base/logging.h"  // For InitLogging.
 #include "base/mem_map.h"
@@ -47,10 +50,13 @@
 #include "dex/art_dex_file_loader.h"
 #include "dex/bytecode_utils.h"
 #include "dex/class_accessor-inl.h"
+#include "dex/class_reference.h"
 #include "dex/code_item_accessors-inl.h"
 #include "dex/dex_file.h"
 #include "dex/dex_file_loader.h"
+#include "dex/dex_file_structs.h"
 #include "dex/dex_file_types.h"
+#include "dex/method_reference.h"
 #include "dex/type_reference.h"
 #include "profile/profile_boot_info.h"
 #include "profile/profile_compilation_info.h"
@@ -134,8 +140,10 @@ NO_RETURN static void Usage(const char *fmt, ...) {
   UsageError("  --generate-test-profile-seed=<number>: seed for random number generator used when");
   UsageError("      generating random test profiles. Defaults to using NanoTime.");
   UsageError("");
-  UsageError("  --create-profile-from=<filename>: creates a profile from a list of classes and");
-  UsageError("      methods.");
+  UsageError("  --create-profile-from=<filename>: creates a profile from a list of classes,");
+  UsageError("      methods and inline caches.");
+  UsageError("  --generate-boot-android-profile: Generate a 012 version profile based on input");
+  UsageError("      profile. Requires --create-profile-from");
   UsageError("");
   UsageError("  --dex-location=<string>: location string to use with corresponding");
   UsageError("      apk-fd to find dex files");
@@ -194,12 +202,14 @@ static constexpr uint16_t kDefaultTestProfileClassPercentage = 5;
 // Separators used when parsing human friendly representation of profiles.
 static const std::string kMethodSep = "->";  // NOLINT [runtime/string] [4]
 static const std::string kMissingTypesMarker = "missing_types";  // NOLINT [runtime/string] [4]
+static const std::string kMegamorphicTypesMarker = "megamorphic_types";  // NOLINT [runtime/string] [4]
 static const std::string kInvalidClassDescriptor = "invalid_class";  // NOLINT [runtime/string] [4]
 static const std::string kInvalidMethod = "invalid_method";  // NOLINT [runtime/string] [4]
 static const std::string kClassAllMethods = "*";  // NOLINT [runtime/string] [4]
 static constexpr char kAnnotationStart = '{';
 static constexpr char kAnnotationEnd = '}';
 static constexpr char kProfileParsingInlineChacheSep = '+';
+static constexpr char kProfileParsingInlineChacheTargetSep = '[';
 static constexpr char kProfileParsingTypeSep = ',';
 static constexpr char kProfileParsingFirstCharInSignature = '(';
 static constexpr char kMethodFlagStringHot = 'H';
@@ -275,6 +285,7 @@ class ProfMan final {
       dump_only_(false),
       dump_classes_and_methods_(false),
       generate_boot_image_profile_(false),
+      generate_boot_android_profile_(false),
       generate_boot_profile_(false),
       dump_output_to_fd_(File::kInvalidFd),
       test_profile_num_dex_(kDefaultTestProfileNumDex),
@@ -323,6 +334,8 @@ class ProfMan final {
         generate_boot_profile_ = true;
       } else if (option == "--generate-boot-image-profile") {
         generate_boot_image_profile_ = true;
+      } else if (option == "--generate-boot-android-profile") {
+        generate_boot_android_profile_ = true;
       } else if (StartsWith(option, "--method-threshold=")) {
         ParseUintOption(raw_option,
                         "--method-threshold=",
@@ -745,6 +758,84 @@ class ProfMan final {
     return dump_only_;
   }
 
+  // Creates the inline-cache portion of a text-profile line. If there is no
+  // inline-caches this will be and empty string. Otherwise it will be '@'
+  // followed by an IC description matching the format described by ProcessLine
+  // below. Note that this will collapse all ICs with the same receiver type.
+  std::string GetInlineCacheLine(const ProfileCompilationInfo& profile_info,
+                                 std::vector<std::unique_ptr<const DexFile>>* dex_files,
+                                 const dex::MethodId& id,
+                                 const DexFile* dex_file,
+                                 uint16_t dex_method_idx) {
+    auto method_info = profile_info.GetHotMethodInfo(MethodReference(dex_file, dex_method_idx));
+    if (method_info == nullptr || method_info->inline_caches->empty()) {
+      return "";
+    }
+    const ProfileCompilationInfo::InlineCacheMap* inline_caches = method_info->inline_caches;
+    struct IcLineInfo {
+      bool is_megamorphic_ = false;
+      bool is_missing_types_ = false;
+      std::set<TypeReference> classes_;
+    };
+    std::unordered_map<dex::TypeIndex, IcLineInfo> ics;
+    CodeItemInstructionAccessor accessor(
+        *dex_file,
+        dex_file->GetCodeItem(dex_file->FindCodeItemOffset(*dex_file->FindClassDef(id.class_idx_),
+                                                            dex_method_idx)));
+    for (const auto& [pc, ic_data] : *inline_caches) {
+      const Instruction& inst = accessor.InstructionAt(pc);
+      const dex::MethodId& target = dex_file->GetMethodId(inst.VRegB());
+      if (ic_data.classes.empty() && !ic_data.is_megamorphic && !ic_data.is_missing_types) {
+        continue;
+      }
+      auto val = ics.find(target.class_idx_);
+      if (val == ics.end()) {
+        val = ics.insert({ target.class_idx_, {} }).first;
+      }
+      if (ic_data.is_megamorphic) {
+        val->second.is_megamorphic_ = true;
+      }
+      if (ic_data.is_missing_types) {
+        val->second.is_missing_types_ = true;
+      }
+      for (auto cls : ic_data.classes) {
+        auto it = std::find_if(dex_files->begin(), dex_files->end(), [&](const auto& d) {
+          return method_info->dex_references[cls.dex_profile_index].MatchesDex(&*d);
+        });
+        if (it == dex_files->end()) {
+          val->second.is_missing_types_ = true;
+          continue;
+        }
+        val->second.classes_.insert({ it->get(), cls.type_index });
+      }
+    }
+    if (ics.empty()) {
+      return "";
+    }
+    std::ostringstream dump_ic;
+    dump_ic << kProfileParsingInlineChacheSep;
+    for (const auto& [target, dex_data] : ics) {
+      dump_ic << kProfileParsingInlineChacheTargetSep;
+      dump_ic << dex_file->GetTypeDescriptor(dex_file->GetTypeId(target));
+      if (dex_data.is_missing_types_) {
+        dump_ic << kMissingTypesMarker;
+      } else if (dex_data.is_megamorphic_) {
+        dump_ic << kMegamorphicTypesMarker;
+      } else {
+        bool first = true;
+        for (const auto& klass : dex_data.classes_) {
+          if (!first) {
+            dump_ic << kProfileParsingTypeSep;
+          }
+          first = false;
+          dump_ic << klass.dex_file->GetTypeDescriptor(
+              klass.dex_file->GetTypeId(klass.TypeIndex()));
+        }
+      }
+    }
+    return dump_ic.str();
+  }
+
   bool GetClassNamesAndMethods(int fd,
                                std::vector<std::unique_ptr<const DexFile>>* dex_files,
                                std::set<std::string>* out_lines) {
@@ -786,11 +877,10 @@ class ProfMan final {
           if (post_startup_methods.find(dex_method_idx) != post_startup_methods.end()) {
             flags_string += kMethodFlagStringPostStartup;
           }
-          out_lines->insert(flags_string +
-                            type_string +
-                            kMethodSep +
-                            method_name +
-                            signature_string);
+          std::string inline_cache_string =
+              GetInlineCacheLine(profile_info, dex_files, id, dex_file.get(), dex_method_idx);
+          out_lines->insert(flags_string + type_string + kMethodSep + method_name +
+                            signature_string + inline_cache_string);
         }
       }
     }
@@ -920,7 +1010,14 @@ class ProfMan final {
   // Return true if the definition or a reference of the class was found in any
   // of the dex_files.
   bool FindClass(const std::vector<std::unique_ptr<const DexFile>>& dex_files,
-                 const std::string& klass_descriptor,
+                 const std::string_view& klass_descriptor,
+                 /*out*/ TypeReference* class_ref) {
+    return FindClass(
+        ArrayRef<const std::unique_ptr<const DexFile>>(dex_files), klass_descriptor, class_ref);
+  }
+
+  bool FindClass(ArrayRef<const std::unique_ptr<const DexFile>> dex_files,
+                 const std::string_view& klass_descriptor,
                  /*out*/TypeReference* class_ref) {
     constexpr uint16_t kInvalidTypeIndex = std::numeric_limits<uint16_t>::max() - 1;
     for (const std::unique_ptr<const DexFile>& dex_file_ptr : dex_files) {
@@ -938,7 +1035,7 @@ class ProfMan final {
         }
       }
 
-      const dex::TypeId* type_id = dex_file->FindTypeId(klass_descriptor.c_str());
+      const dex::TypeId* type_id = dex_file->FindTypeId(klass_descriptor);
       if (type_id == nullptr) {
         continue;
       }
@@ -1008,47 +1105,159 @@ class ProfMan final {
     return dex_file->GetIndexForMethodId(*method_id);
   }
 
+  template <typename Visitor>
+  void VisitAllInstructions(const TypeReference& class_ref, uint16_t method_idx, Visitor visitor) {
+    const DexFile* dex_file = class_ref.dex_file;
+    uint32_t offset =
+        dex_file->FindCodeItemOffset(*dex_file->FindClassDef(class_ref.TypeIndex()), method_idx);
+    for (const DexInstructionPcPair& inst :
+         CodeItemInstructionAccessor(*dex_file, dex_file->GetCodeItem(offset))) {
+      if (!visitor(inst)) {
+        break;
+      }
+    }
+  }
+
+  // Get dex-pcs of any virtual + interface invokes referencing a method of the
+  // 'target' type in the given method.
+  void GetAllInvokes(const TypeReference& class_ref,
+                     uint16_t method_idx,
+                     dex::TypeIndex target,
+                     /*out*/ std::vector<uint32_t>* dex_pcs) {
+    const DexFile* dex_file = class_ref.dex_file;
+    VisitAllInstructions(class_ref, method_idx, [&](const DexInstructionPcPair& inst) -> bool {
+      switch (inst->Opcode()) {
+        case Instruction::INVOKE_INTERFACE:
+        case Instruction::INVOKE_INTERFACE_RANGE:
+        case Instruction::INVOKE_VIRTUAL:
+        case Instruction::INVOKE_VIRTUAL_RANGE: {
+          const dex::MethodId& meth = dex_file->GetMethodId(inst->VRegB());
+          if (meth.class_idx_ == target) {
+            dex_pcs->push_back(inst.DexPc());
+          }
+          break;
+        }
+        default:
+          break;
+      }
+      return true;
+    });
+  }
+
   // Given a method, return true if the method has a single INVOKE_VIRTUAL in its byte code.
   // Upon success it returns true and stores the method index and the invoke dex pc
   // in the output parameters.
   // The format of the method spec is "inlinePolymorphic(LSuper;)I+LSubA;,LSubB;,LSubC;".
-  //
-  // TODO(calin): support INVOKE_INTERFACE and the range variants.
   bool HasSingleInvoke(const TypeReference& class_ref,
                        uint16_t method_index,
-                       /*out*/uint32_t* dex_pc) {
-    const DexFile* dex_file = class_ref.dex_file;
-    uint32_t offset = dex_file->FindCodeItemOffset(
-        *dex_file->FindClassDef(class_ref.TypeIndex()),
-        method_index);
-    const dex::CodeItem* code_item = dex_file->GetCodeItem(offset);
-
+                       /*out*/ uint32_t* dex_pc) {
     bool found_invoke = false;
-    for (const DexInstructionPcPair& inst : CodeItemInstructionAccessor(*dex_file, code_item)) {
+    bool found_multiple_invokes = false;
+    VisitAllInstructions(class_ref, method_index, [&](const DexInstructionPcPair& inst) -> bool {
       if (inst->Opcode() == Instruction::INVOKE_VIRTUAL ||
-          inst->Opcode() == Instruction::INVOKE_VIRTUAL_RANGE) {
+          inst->Opcode() == Instruction::INVOKE_VIRTUAL_RANGE ||
+          inst->Opcode() == Instruction::INVOKE_INTERFACE ||
+          inst->Opcode() == Instruction::INVOKE_INTERFACE_RANGE) {
         if (found_invoke) {
           LOG(ERROR) << "Multiple invoke INVOKE_VIRTUAL found: "
-                     << dex_file->PrettyMethod(method_index);
+                     << class_ref.dex_file->PrettyMethod(method_index);
           return false;
         }
         found_invoke = true;
         *dex_pc = inst.DexPc();
       }
-    }
+      return true;
+    });
     if (!found_invoke) {
-      LOG(ERROR) << "Could not find any INVOKE_VIRTUAL: " << dex_file->PrettyMethod(method_index);
+      LOG(ERROR) << "Could not find any INVOKE_VIRTUAL/INTERFACE: "
+                 << class_ref.dex_file->PrettyMethod(method_index);
     }
-    return found_invoke;
+    return found_invoke && !found_multiple_invokes;
   }
+
+  struct InlineCacheSegment {
+   public:
+    using IcArray =
+        std::array<std::string_view, ProfileCompilationInfo::kIndividualInlineCacheSize + 1>;
+    static void SplitInlineCacheSegment(std::string_view ic_line,
+                                        /*out*/ std::vector<InlineCacheSegment>* res) {
+      if (ic_line[0] != kProfileParsingInlineChacheTargetSep) {
+        // single target
+        InlineCacheSegment out;
+        Split(ic_line, kProfileParsingTypeSep, &out.inline_caches_);
+        res->push_back(out);
+        return;
+      }
+      std::vector<std::string_view> targets_and_resolutions;
+      // Avoid a zero-length entry.
+      for (std::string_view t :
+           SplitString(ic_line.substr(1), kProfileParsingInlineChacheTargetSep)) {
+        InlineCacheSegment out;
+        DCHECK_EQ(t[0], 'L') << "Target is not a class? " << t;
+        size_t recv_end = t.find_first_of(';');
+        out.receiver_ = t.substr(0, recv_end + 1);
+        Split(t.substr(recv_end + 1), kProfileParsingTypeSep, &out.inline_caches_);
+        res->push_back(out);
+      }
+    }
+
+    bool IsSingleReceiver() const {
+      return !receiver_.has_value();
+    }
+
+    const std::string_view& GetReceiverType() const {
+      DCHECK(!IsSingleReceiver());
+      return *receiver_;
+    }
+
+    const IcArray& GetIcTargets() const {
+      return inline_caches_;
+    }
+
+    size_t NumIcTargets() const {
+      return std::count_if(
+          inline_caches_.begin(), inline_caches_.end(), [](const auto& x) { return !x.empty(); });
+    }
+
+    std::ostream& Dump(std::ostream& os) const {
+      if (!IsSingleReceiver()) {
+        os << "[" << GetReceiverType();
+      }
+      bool first = true;
+      for (std::string_view target : inline_caches_) {
+        if (target.empty()) {
+          break;
+        } else if (!first) {
+          os << ",";
+        }
+        first = false;
+        os << target;
+      }
+      return os;
+    }
+
+   private:
+    std::optional<std::string_view> receiver_;
+    // Max number of ics in the profile file. Don't need to store more than this
+    // (although internally we can have as many as we want). If we fill this up
+    // we are megamorphic.
+    IcArray inline_caches_;
+
+    friend std::ostream& operator<<(std::ostream& os, const InlineCacheSegment& ics);
+  };
 
   // Process a line defining a class or a method and its inline caches.
   // Upon success return true and add the class or the method info to profile.
+  // Inline caches are identified by the type of the declared receiver type.
   // The possible line formats are:
   // "LJustTheClass;".
   // "LTestInline;->inlinePolymorphic(LSuper;)I+LSubA;,LSubB;,LSubC;".
   // "LTestInline;->inlinePolymorphic(LSuper;)I+LSubA;,LSubB;,invalid_class".
   // "LTestInline;->inlineMissingTypes(LSuper;)I+missing_types".
+  // // Note no ',' after [LTarget;
+  // "LTestInline;->multiInlinePolymorphic(LSuper;)I+[LTarget1;LResA;,LResB;[LTarget2;LResC;,LResD;".
+  // "LTestInline;->multiInlinePolymorphic(LSuper;)I+[LTarget1;LResA;,invalid_class[LTarget2;LResC;,LResD;".
+  // "LTestInline;->multiInlinePolymorphic(LSuper;)I+[LTarget1;missing_types[LTarget2;LResC;,LResD;".
   // "{annotation}LTestInline;->inlineNoInlineCaches(LSuper;)I".
   // "LTestInline;->*".
   // "invalid_class".
@@ -1153,20 +1362,17 @@ class ProfMan final {
 
     // Process the method.
     std::string method_spec;
-    std::vector<std::string> inline_cache_elems;
 
     // If none of the flags are set, default to hot.
     is_hot = is_hot || (!is_hot && !is_startup && !is_post_startup);
 
     std::vector<std::string> method_elems;
-    bool is_missing_types = false;
+    // Lifetime of segments is same as method_elems since it contains pointers into the string-data
+    std::vector<InlineCacheSegment> segments;
     Split(method_str, kProfileParsingInlineChacheSep, &method_elems);
     if (method_elems.size() == 2) {
       method_spec = method_elems[0];
-      is_missing_types = method_elems[1] == kMissingTypesMarker;
-      if (!is_missing_types) {
-        Split(method_elems[1], kProfileParsingTypeSep, &inline_cache_elems);
-      }
+      InlineCacheSegment::SplitInlineCacheSegment(method_elems[1], &segments);
     } else if (method_elems.size() == 1) {
       method_spec = method_elems[0];
     } else {
@@ -1180,21 +1386,58 @@ class ProfMan final {
     }
 
     std::vector<ProfileMethodInfo::ProfileInlineCache> inline_caches;
-    if (is_missing_types || !inline_cache_elems.empty()) {
-      uint32_t dex_pc;
-      if (!HasSingleInvoke(class_ref, method_index, &dex_pc)) {
-        return false;
-      }
-      std::vector<TypeReference> classes(inline_cache_elems.size(),
-                                         TypeReference(/* dex_file= */ nullptr, dex::TypeIndex()));
-      size_t class_it = 0;
-      for (const std::string& ic_class : inline_cache_elems) {
-        if (!FindClass(dex_files, ic_class, &(classes[class_it++]))) {
-          LOG(ERROR) << "Could not find class: " << ic_class;
+    for (const InlineCacheSegment& segment : segments) {
+      std::vector<uint32_t> dex_pcs;
+      if (segment.IsSingleReceiver()) {
+        DCHECK_EQ(segments.size(), 1u);
+        dex_pcs.resize(1, -1);
+        // TODO This single invoke format should really be phased out and removed.
+        if (!HasSingleInvoke(class_ref, method_index, &dex_pcs[0])) {
           return false;
         }
+      } else {
+        // Get the type-ref the method code will use.
+        std::string receiver_str(segment.GetReceiverType());
+        const dex::TypeId* type_id = class_ref.dex_file->FindTypeId(receiver_str.c_str());
+        if (type_id == nullptr) {
+          LOG(WARNING) << "Could not find class: " << segment.GetReceiverType() << " in dex-file "
+                       << class_ref.dex_file << ". Ignoring IC group: '" << segment << "'";
+          continue;
+        }
+        dex::TypeIndex target_index = class_ref.dex_file->GetIndexForTypeId(*type_id);
+
+        GetAllInvokes(class_ref, method_index, target_index, &dex_pcs);
       }
-      inline_caches.emplace_back(dex_pc, is_missing_types, classes);
+      bool missing_types = segment.GetIcTargets()[0] == kMissingTypesMarker;
+      bool megamorphic_types = segment.GetIcTargets()[0] == kMegamorphicTypesMarker;
+      std::vector<TypeReference> classes(
+          missing_types || megamorphic_types ? 0u : segment.NumIcTargets(),
+          TypeReference(/* dex_file= */ nullptr, dex::TypeIndex()));
+      if (!missing_types && !megamorphic_types) {
+        size_t class_it = 0;
+        for (const std::string_view& ic_class : segment.GetIcTargets()) {
+          if (ic_class.empty()) {
+            break;
+          }
+          if (!FindClass(dex_files, ic_class, &(classes[class_it++]))) {
+            LOG(segment.IsSingleReceiver() ? ERROR : WARNING)
+                << "Could not find class: " << ic_class << " in " << segment;
+            if (segment.IsSingleReceiver()) {
+              return false;
+            } else {
+              // Be a bit more forgiving with profiles from servers.
+              missing_types = true;
+              classes.clear();
+              break;
+            }
+          }
+        }
+        // Make sure we are actually the correct size
+        classes.resize(class_it, TypeReference(nullptr, dex::TypeIndex()));
+      }
+      for (size_t dex_pc : dex_pcs) {
+        inline_caches.emplace_back(dex_pc, missing_types, classes, megamorphic_types);
+      }
     }
     MethodReference ref(class_ref.dex_file, method_index);
     if (is_hot) {
@@ -1340,7 +1583,7 @@ class ProfMan final {
     OpenApkFilesFromLocations(&dex_files);
 
     // Process the lines one by one and add the successful ones to the profile.
-    ProfileCompilationInfo info;
+    ProfileCompilationInfo info(/*for_boot_image=*/ ShouldCreateBootAndroidProfile());
 
     for (const auto& line : *user_lines) {
       ProcessLine(dex_files, line, &info);
@@ -1356,6 +1599,10 @@ class ProfMan final {
 
   bool ShouldCreateBootImageProfile() const {
     return generate_boot_image_profile_;
+  }
+
+  bool ShouldCreateBootAndroidProfile() const {
+    return generate_boot_android_profile_;
   }
 
   bool ShouldCreateBootProfile() const {
@@ -1526,6 +1773,7 @@ class ProfMan final {
   bool dump_only_;
   bool dump_classes_and_methods_;
   bool generate_boot_image_profile_;
+  bool generate_boot_android_profile_;
   bool generate_boot_profile_;
   int dump_output_to_fd_;
   BootImageOptions boot_image_options_;
@@ -1541,6 +1789,10 @@ class ProfMan final {
   std::string boot_profile_out_path_;
   std::string preloaded_classes_out_path_;
 };
+
+std::ostream& operator<<(std::ostream& os, const ProfMan::InlineCacheSegment& ics) {
+  return ics.Dump(os);
+}
 
 // See ProfileAssistant::ProcessingResult for return codes.
 static int profman(int argc, char** argv) {
