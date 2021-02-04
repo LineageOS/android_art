@@ -17,6 +17,7 @@
 #include "hidden_api.h"
 
 #include <nativehelper/scoped_local_ref.h>
+#include <atomic>
 
 #include "art_field-inl.h"
 #include "art_method-inl.h"
@@ -41,6 +42,8 @@ namespace hiddenapi {
 static constexpr uint64_t kHideMaxtargetsdkPHiddenApis = 149997251;
 static constexpr uint64_t kHideMaxtargetsdkQHiddenApis = 149994052;
 static constexpr uint64_t kAllowTestApiAccess = 166236554;
+
+static constexpr uint64_t kMaxLogWarnings = 100;
 
 // Set to true if we should always print a warning in logcat for all hidden API accesses, not just
 // conditionally and unconditionally blocked. This can be set to true for developer preview / beta
@@ -244,9 +247,17 @@ void MemberSignature::Dump(std::ostream& os) const {
 void MemberSignature::WarnAboutAccess(AccessMethod access_method,
                                       hiddenapi::ApiList list,
                                       bool access_denied) {
+  static std::atomic<uint64_t> log_warning_count_ = 0;
+  if (log_warning_count_ > kMaxLogWarnings) {
+    return;
+  }
   LOG(WARNING) << "Accessing hidden " << (type_ == kField ? "field " : "method ")
                << Dumpable<MemberSignature>(*this) << " (" << list << ", " << access_method
                << (access_denied ? ", denied)" : ", allowed)");
+  if (log_warning_count_ >= kMaxLogWarnings) {
+    LOG(WARNING) << "Reached maximum number of hidden api access warnings.";
+  }
+  ++log_warning_count_;
 }
 
 bool MemberSignature::Equals(const MemberSignature& other) {

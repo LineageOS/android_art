@@ -16,6 +16,7 @@
 
 #include "common_compiler_test.h"
 
+#include <android-base/unique_fd.h>
 #include <type_traits>
 
 #include "arch/instruction_set_features.h"
@@ -24,6 +25,7 @@
 #include "base/callee_save_type.h"
 #include "base/casts.h"
 #include "base/enums.h"
+#include "base/memfd.h"
 #include "base/utils.h"
 #include "class_linker.h"
 #include "compiled_method-inl.h"
@@ -44,6 +46,84 @@
 
 namespace art {
 
+class CommonCompilerTestImpl::CodeAndMetadata {
+ public:
+  CodeAndMetadata(CodeAndMetadata&& other) = default;
+
+  CodeAndMetadata(ArrayRef<const uint8_t> code,
+                  ArrayRef<const uint8_t> vmap_table,
+                  InstructionSet instruction_set) {
+    const uint32_t code_size = code.size();
+    CHECK_NE(code_size, 0u);
+    const uint32_t vmap_table_offset = vmap_table.empty() ? 0u
+        : sizeof(OatQuickMethodHeader) + vmap_table.size();
+    OatQuickMethodHeader method_header(vmap_table_offset, code_size);
+    const size_t code_alignment = GetInstructionSetAlignment(instruction_set);
+    DCHECK_ALIGNED_PARAM(kPageSize, code_alignment);
+    code_offset_ = RoundUp(vmap_table.size() + sizeof(method_header), code_alignment);
+    const uint32_t capacity = RoundUp(code_offset_ + code_size, kPageSize);
+
+    // Create a memfd handle with sufficient capacity.
+    android::base::unique_fd mem_fd(art::memfd_create("test code", /*flags=*/ 0));
+    CHECK_GE(mem_fd.get(), 0);
+    int err = ftruncate(mem_fd, capacity);
+    CHECK_EQ(err, 0);
+
+    // Map the memfd contents for read/write.
+    std::string error_msg;
+    rw_map_ = MemMap::MapFile(capacity,
+                              PROT_READ | PROT_WRITE,
+                              MAP_SHARED,
+                              mem_fd,
+                              /*start=*/ 0,
+                              /*low_4gb=*/ false,
+                              /*filename=*/ "test code",
+                              &error_msg);
+    CHECK(rw_map_.IsValid()) << error_msg;
+
+    // Store data.
+    uint8_t* code_addr = rw_map_.Begin() + code_offset_;
+    CHECK_ALIGNED_PARAM(code_addr, code_alignment);
+    CHECK_LE(vmap_table_offset, code_offset_);
+    memcpy(code_addr - vmap_table_offset, vmap_table.data(), vmap_table.size());
+    static_assert(std::is_trivially_copyable<OatQuickMethodHeader>::value, "Cannot use memcpy");
+    CHECK_LE(sizeof(method_header), code_offset_);
+    memcpy(code_addr - sizeof(method_header), &method_header, sizeof(method_header));
+    CHECK_LE(code_size, static_cast<size_t>(rw_map_.End() - code_addr));
+    memcpy(code_addr, code.data(), code_size);
+
+    // Sync data.
+    bool success = rw_map_.Sync();
+    CHECK(success);
+    success = FlushCpuCaches(rw_map_.Begin(), rw_map_.End());
+    CHECK(success);
+
+    // Map the data as read/executable.
+    rx_map_ = MemMap::MapFile(capacity,
+                              PROT_READ | PROT_EXEC,
+                              MAP_SHARED,
+                              mem_fd,
+                              /*start=*/ 0,
+                              /*low_4gb=*/ false,
+                              /*filename=*/ "test code",
+                              &error_msg);
+    CHECK(rx_map_.IsValid()) << error_msg;
+  }
+
+  const void* GetCodePointer() const {
+    DCHECK(rx_map_.IsValid());
+    DCHECK_LE(code_offset_, rx_map_.Size());
+    return rx_map_.Begin() + code_offset_;
+  }
+
+ private:
+  MemMap rw_map_;
+  MemMap rx_map_;
+  uint32_t code_offset_;
+
+  DISALLOW_COPY_AND_ASSIGN(CodeAndMetadata);
+};
+
 std::unique_ptr<CompilerOptions> CommonCompilerTestImpl::CreateCompilerOptions(
     InstructionSet instruction_set, const std::string& variant) {
   std::unique_ptr<CompilerOptions> compiler_options = std::make_unique<CompilerOptions>();
@@ -58,42 +138,24 @@ std::unique_ptr<CompilerOptions> CommonCompilerTestImpl::CreateCompilerOptions(
 CommonCompilerTestImpl::CommonCompilerTestImpl() {}
 CommonCompilerTestImpl::~CommonCompilerTestImpl() {}
 
+const void* CommonCompilerTestImpl::MakeExecutable(ArrayRef<const uint8_t> code,
+                                                   ArrayRef<const uint8_t> vmap_table,
+                                                   InstructionSet instruction_set) {
+  CHECK_NE(code.size(), 0u);
+  code_and_metadata_.emplace_back(code, vmap_table, instruction_set);
+  return code_and_metadata_.back().GetCodePointer();
+}
+
 void CommonCompilerTestImpl::MakeExecutable(ArtMethod* method,
                                             const CompiledMethod* compiled_method) {
   CHECK(method != nullptr);
   // If the code size is 0 it means the method was skipped due to profile guided compilation.
   if (compiled_method != nullptr && compiled_method->GetQuickCode().size() != 0u) {
-    ArrayRef<const uint8_t> code = compiled_method->GetQuickCode();
-    const uint32_t code_size = code.size();
-    ArrayRef<const uint8_t> vmap_table = compiled_method->GetVmapTable();
-    const uint32_t vmap_table_offset = vmap_table.empty() ? 0u
-        : sizeof(OatQuickMethodHeader) + vmap_table.size();
-    OatQuickMethodHeader method_header(vmap_table_offset, code_size);
-
-    header_code_and_maps_chunks_.push_back(std::vector<uint8_t>());
-    std::vector<uint8_t>* chunk = &header_code_and_maps_chunks_.back();
-    const size_t max_padding = GetInstructionSetAlignment(compiled_method->GetInstructionSet());
-    const size_t size = vmap_table.size() + sizeof(method_header) + code_size;
-    chunk->reserve(size + max_padding);
-    chunk->resize(sizeof(method_header));
-    static_assert(std::is_trivially_copyable<OatQuickMethodHeader>::value, "Cannot use memcpy");
-    memcpy(&(*chunk)[0], &method_header, sizeof(method_header));
-    chunk->insert(chunk->begin(), vmap_table.begin(), vmap_table.end());
-    chunk->insert(chunk->end(), code.begin(), code.end());
-    CHECK_EQ(chunk->size(), size);
-    const void* unaligned_code_ptr = chunk->data() + (size - code_size);
-    size_t offset = dchecked_integral_cast<size_t>(reinterpret_cast<uintptr_t>(unaligned_code_ptr));
-    size_t padding = compiled_method->AlignCode(offset) - offset;
-    // Make sure no resizing takes place.
-    CHECK_GE(chunk->capacity(), chunk->size() + padding);
-    chunk->insert(chunk->begin(), padding, 0);
-    const void* code_ptr = reinterpret_cast<const uint8_t*>(unaligned_code_ptr) + padding;
-    CHECK_EQ(code_ptr, static_cast<const void*>(chunk->data() + (chunk->size() - code_size)));
-    MakeExecutable(code_ptr, code.size());
-    // Remove hwasan tag.  This is done in kernel in newer versions.  This supports older kernels.
-    // This is needed to support stack walking, including exception handling.
-    const void* method_code = CompiledMethod::CodePointer(HWASanUntag(code_ptr),
-                                                          compiled_method->GetInstructionSet());
+    const void* code_ptr = MakeExecutable(compiled_method->GetQuickCode(),
+                                          compiled_method->GetVmapTable(),
+                                          compiled_method->GetInstructionSet());
+    const void* method_code =
+        CompiledMethod::CodePointer(code_ptr, compiled_method->GetInstructionSet());
     LOG(INFO) << "MakeExecutable " << method->PrettyMethod() << " code=" << method_code;
     method->SetEntryPointFromQuickCompiledCode(method_code);
   } else {
@@ -101,21 +163,6 @@ void CommonCompilerTestImpl::MakeExecutable(ArtMethod* method,
     // Or the generic JNI...
     GetClassLinker()->SetEntryPointsToInterpreter(method);
   }
-}
-
-void CommonCompilerTestImpl::MakeExecutable(const void* code_start, size_t code_length) {
-  CHECK(code_start != nullptr);
-  CHECK_NE(code_length, 0U);
-  uintptr_t data = reinterpret_cast<uintptr_t>(code_start);
-  uintptr_t base = RoundDown(data, kPageSize);
-  uintptr_t limit = RoundUp(data + code_length, kPageSize);
-  uintptr_t len = limit - base;
-  // Remove hwasan tag.  This is done in kernel in newer versions.  This supports older kernels.
-  void* base_ptr = HWASanUntag(reinterpret_cast<void*>(base));
-  int result = mprotect(base_ptr, len, PROT_READ | PROT_WRITE | PROT_EXEC);
-  CHECK_EQ(result, 0);
-
-  CHECK(FlushCpuCaches(reinterpret_cast<void*>(base), reinterpret_cast<void*>(base + len)));
 }
 
 void CommonCompilerTestImpl::SetUp() {
@@ -176,6 +223,7 @@ void CommonCompilerTestImpl::SetCompilerKind(Compiler::Kind compiler_kind) {
 }
 
 void CommonCompilerTestImpl::TearDown() {
+  code_and_metadata_.clear();
   verification_results_.reset();
   compiler_options_.reset();
 }
