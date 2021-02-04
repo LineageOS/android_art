@@ -76,13 +76,14 @@ class HLoopOptimization : public HOptimization {
     kNoShr           = 1 << 3,   // no arithmetic shift right
     kNoHiBits        = 1 << 4,   // "wider" operations cannot bring in higher order bits
     kNoSignedHAdd    = 1 << 5,   // no signed halving add
-    kNoUnroundedHAdd = 1 << 6,   // no unrounded halving add
-    kNoAbs           = 1 << 7,   // no absolute value
-    kNoStringCharAt  = 1 << 8,   // no StringCharAt
-    kNoReduction     = 1 << 9,   // no reduction
-    kNoSAD           = 1 << 10,  // no sum of absolute differences (SAD)
-    kNoWideSAD       = 1 << 11,  // no sum of absolute differences (SAD) with operand widening
-    kNoDotProd       = 1 << 12,  // no dot product
+    kNoUnsignedHAdd  = 1 << 6,   // no unsigned halving add
+    kNoUnroundedHAdd = 1 << 7,   // no unrounded halving add
+    kNoAbs           = 1 << 8,   // no absolute value
+    kNoStringCharAt  = 1 << 9,   // no StringCharAt
+    kNoReduction     = 1 << 10,  // no reduction
+    kNoSAD           = 1 << 11,  // no sum of absolute differences (SAD)
+    kNoWideSAD       = 1 << 12,  // no sum of absolute differences (SAD) with operand widening
+    kNoDotProd       = 1 << 13,  // no dot product
   };
 
   /*
@@ -270,6 +271,8 @@ class HLoopOptimization : public HOptimization {
   void RemoveDeadInstructions(const HInstructionList& list);
   bool CanRemoveCycle();  // Whether the current 'iset_' is removable.
 
+  bool IsInPredicatedVectorizationMode() const { return predicated_vectorization_mode_; }
+
   // Compiler options (to query ISA features).
   const CompilerOptions* compiler_options_;
 
@@ -304,6 +307,9 @@ class HLoopOptimization : public HOptimization {
 
   // Flag that tracks if any simplifications have occurred.
   bool simplified_;
+
+  // Whether to use predicated loop vectorization (e.g. for arm64 SVE target).
+  bool predicated_vectorization_mode_;
 
   // Number of "lanes" for selected packed type.
   uint32_t vector_length_;

@@ -21,6 +21,9 @@
 
 namespace art {
 
+// SVE is currently not enabled.
+static constexpr bool kArm64AllowSVE = false;
+
 class Arm64InstructionSetFeatures;
 using Arm64FeaturesUniquePtr = std::unique_ptr<const Arm64InstructionSetFeatures>;
 
@@ -94,7 +97,7 @@ class Arm64InstructionSetFeatures final : public InstructionSetFeatures {
   }
 
   bool HasSVE() const {
-    return has_sve_;
+    return kArm64AllowSVE && has_sve_;
   }
 
   virtual ~Arm64InstructionSetFeatures() {}
