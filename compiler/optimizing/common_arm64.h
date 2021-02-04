@@ -102,6 +102,11 @@ inline vixl::aarch64::VRegister VRegisterFrom(Location location) {
   return vixl::aarch64::VRegister(location.reg());
 }
 
+inline vixl::aarch64::ZRegister ZRegisterFrom(Location location) {
+  DCHECK(location.IsFpuRegister()) << location;
+  return vixl::aarch64::ZRegister(location.reg());
+}
+
 inline vixl::aarch64::VRegister SRegisterFrom(Location location) {
   DCHECK(location.IsFpuRegister()) << location;
   return vixl::aarch64::SRegister(location.reg());
@@ -298,7 +303,7 @@ inline bool Arm64CanEncodeConstantAsImmediate(HConstant* constant, HInstruction*
 }
 
 inline Location ARM64EncodableConstantOrRegister(HInstruction* constant,
-                                                        HInstruction* instr) {
+                                                 HInstruction* instr) {
   if (constant->IsConstant()
       && Arm64CanEncodeConstantAsImmediate(constant->AsConstant(), instr)) {
     return Location::ConstantLocation(constant->AsConstant());
