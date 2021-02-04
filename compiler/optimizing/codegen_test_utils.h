@@ -248,9 +248,17 @@ static void Run(const InternalCodeAllocator& allocator,
                 Expected expected) {
   InstructionSet target_isa = codegen.GetInstructionSet();
 
+  struct CodeHolder : CommonCompilerTestImpl {
+   protected:
+    ClassLinker* GetClassLinker() override { return nullptr; }
+    Runtime* GetRuntime() override { return nullptr; }
+  };
+  CodeHolder code_holder;
+  const void* code_ptr =
+      code_holder.MakeExecutable(allocator.GetMemory(), ArrayRef<const uint8_t>(), target_isa);
+
   typedef Expected (*fptr)();
-  CommonCompilerTest::MakeExecutable(allocator.GetMemory().data(), allocator.GetMemory().size());
-  fptr f = reinterpret_cast<fptr>(reinterpret_cast<uintptr_t>(allocator.GetMemory().data()));
+  fptr f = reinterpret_cast<fptr>(reinterpret_cast<uintptr_t>(code_ptr));
   if (target_isa == InstructionSet::kThumb2) {
     // For thumb we need the bottom bit set.
     f = reinterpret_cast<fptr>(reinterpret_cast<uintptr_t>(f) + 1);
