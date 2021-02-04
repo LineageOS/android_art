@@ -51,12 +51,16 @@ art_runtime_base_native_shared_libs = [
     // dependencies work with APEX libraries.
     "libart",
     "libart-compiler",
+    "libartservice",
     "libdt_fd_forward",
     "libdt_socket",
     "libjdwp",
     "libnpt",
     "libopenjdkjvm",
     "libopenjdkjvmti",
+    // TODO(chriswailes): Make libarttools a dependency for another target
+    // when such a target exists
+    "libarttools",
 ]
 
 art_runtime_base_native_device_only_shared_libs = [
@@ -156,6 +160,11 @@ libcore_java_libs = [
     "apache-xml",
 ]
 
+// ART Java libraries
+art_java_libs = [
+    "artservice",
+]
+
 // Native libraries that support the core Java libraries.
 //
 // Note: ART on-device chroot-based testing and benchmarking is not yet using
@@ -227,7 +236,7 @@ apex_defaults {
     compile_multilib: "both",
     manifest: "manifest-art.json",
     boot_images: ["art-boot-image"],
-    java_libs: libcore_java_libs,
+    java_libs: libcore_java_libs + art_java_libs,
     native_shared_libs: art_runtime_base_native_shared_libs +
         art_runtime_base_native_device_only_shared_libs +
         libcore_native_shared_libs,
@@ -351,7 +360,7 @@ art_apex_test_host {
     host_supported: true,
     device_supported: false,
     manifest: "manifest-art.json",
-    java_libs: libcore_java_libs,
+    java_libs: libcore_java_libs + art_java_libs,
     ignore_system_library_special_case: true,
     native_shared_libs: art_runtime_base_native_shared_libs +
         art_runtime_debug_native_shared_libs +
