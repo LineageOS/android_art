@@ -208,20 +208,20 @@ TEST_F(MetricsTest, HistogramTimer) {
 // Makes sure all defined metrics are included when dumping through StreamBackend.
 TEST_F(MetricsTest, StreamBackendDumpAllMetrics) {
   ArtMetrics metrics;
-  std::stringstream os;
-  StreamBackend backend(os);
+  StringBackend backend;
 
   metrics.ReportAllMetrics(&backend);
 
   // Make sure the resulting string lists all the counters.
+  const std::string result = backend.GetAndResetBuffer();
 #define COUNTER(name) \
-  EXPECT_NE(os.str().find(DatumName(DatumId::k##name)), std::string::npos)
+  EXPECT_NE(result.find(DatumName(DatumId::k##name)), std::string::npos)
   ART_COUNTERS(COUNTER);
 #undef COUNTER
 
   // Make sure the resulting string lists all the histograms.
 #define HISTOGRAM(name, num_buckets, minimum_value, maximum_value) \
-  EXPECT_NE(os.str().find(DatumName(DatumId::k##name)), std::string::npos)
+  EXPECT_NE(result.find(DatumName(DatumId::k##name)), std::string::npos)
   ART_HISTOGRAMS(HISTOGRAM);
 #undef HISTOGRAM
 }

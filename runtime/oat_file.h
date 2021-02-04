@@ -23,12 +23,12 @@
 #include <vector>
 
 #include "base/array_ref.h"
+#include "base/compiler_filter.h"
 #include "base/mutex.h"
 #include "base/os.h"
 #include "base/safe_map.h"
 #include "base/tracking_safe_map.h"
 #include "class_status.h"
-#include "compiler_filter.h"
 #include "dex/dex_file_layout.h"
 #include "dex/type_lookup_table.h"
 #include "dex/utf.h"
