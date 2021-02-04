@@ -49,7 +49,9 @@ struct ReportingConfig {
 
   // Returns whether any options are set that requires a background reporting thread.
   constexpr bool BackgroundReportingEnabled() const {
-    return ReportingEnabled() && periodic_report_seconds.has_value();
+    // If any reporting is enabled, we always need to do at least the startup report in the
+    // background.
+    return ReportingEnabled();
   }
 };
 
@@ -66,6 +68,10 @@ class MetricsReporter {
 
   // Sends a request to the background thread to shutdown.
   void MaybeStopBackgroundThread();
+
+  // Causes metrics to be reported so we can see a snapshot of the metrics after app startup
+  // completes.
+  void NotifyStartupCompleted();
 
   static constexpr const char* kBackgroundThreadName = "Metrics Background Reporting Thread";
 
@@ -89,7 +95,10 @@ class MetricsReporter {
   // A message indicating that the reporting thread should shut down.
   struct ShutdownRequestedMessage {};
 
-  MessageQueue<ShutdownRequestedMessage> messages_;
+  // A message indicating that app startup has completed.
+  struct StartupCompletedMessage {};
+
+  MessageQueue<ShutdownRequestedMessage, StartupCompletedMessage> messages_;
 };
 
 }  // namespace metrics
