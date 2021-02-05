@@ -946,9 +946,10 @@ bool HLoopOptimization::ShouldVectorize(LoopNode* node, HBasicBlock* block, int6
   //     make one particular reference aligned), never to exceed (1).
   // (3) variable to record how many references share same alignment.
   // (4) variable to record suitable candidate for dynamic loop peeling.
-  uint32_t desired_alignment = GetVectorSizeInBytes();
-  DCHECK_LE(desired_alignment, 16u);
-  uint32_t peeling_votes[16] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+  size_t desired_alignment = GetVectorSizeInBytes();
+  ScopedArenaVector<uint32_t> peeling_votes(desired_alignment, 0u,
+      loop_allocator_->Adapter(kArenaAllocLoopOptimization));
+
   uint32_t max_num_same_alignment = 0;
   const ArrayReference* peeling_candidate = nullptr;
 
@@ -1577,14 +1578,6 @@ bool HLoopOptimization::VectorizeUse(LoopNode* node,
 }
 
 uint32_t HLoopOptimization::GetVectorSizeInBytes() {
-  if (kIsDebugBuild) {
-    InstructionSet isa = compiler_options_->GetInstructionSet();
-    // TODO: Remove this check when there are no implicit assumptions on the SIMD reg size.
-    DCHECK_EQ(simd_register_size_, (isa == InstructionSet::kArm || isa == InstructionSet::kThumb2)
-                                   ? 8u
-                                   : 16u);
-  }
-
   return simd_register_size_;
 }
 
@@ -1616,6 +1609,8 @@ bool HLoopOptimization::TrySetVectorType(DataType::Type type, uint64_t* restrict
       if (IsInPredicatedVectorizationMode()) {
         // SVE vectorization.
         CHECK(features->AsArm64InstructionSetFeatures()->HasSVE());
+        size_t vector_length = simd_register_size_ / DataType::Size(type);
+        DCHECK_EQ(simd_register_size_ % DataType::Size(type), 0u);
         switch (type) {
           case DataType::Type::kBool:
           case DataType::Type::kUint8:
@@ -1625,7 +1620,7 @@ bool HLoopOptimization::TrySetVectorType(DataType::Type type, uint64_t* restrict
                              kNoUnsignedHAdd |
                              kNoUnroundedHAdd |
                              kNoSAD;
-            return TrySetVectorLength(type, 16);
+            return TrySetVectorLength(type, vector_length);
           case DataType::Type::kUint16:
           case DataType::Type::kInt16:
             *restrictions |= kNoDiv |
@@ -1634,19 +1629,19 @@ bool HLoopOptimization::TrySetVectorType(DataType::Type type, uint64_t* restrict
                              kNoUnroundedHAdd |
                              kNoSAD |
                              kNoDotProd;
-            return TrySetVectorLength(type, 8);
+            return TrySetVectorLength(type, vector_length);
           case DataType::Type::kInt32:
             *restrictions |= kNoDiv | kNoSAD;
-            return TrySetVectorLength(type, 4);
+            return TrySetVectorLength(type, vector_length);
           case DataType::Type::kInt64:
             *restrictions |= kNoDiv | kNoSAD;
-            return TrySetVectorLength(type, 2);
+            return TrySetVectorLength(type, vector_length);
           case DataType::Type::kFloat32:
             *restrictions |= kNoReduction;
-            return TrySetVectorLength(type, 4);
+            return TrySetVectorLength(type, vector_length);
           case DataType::Type::kFloat64:
             *restrictions |= kNoReduction;
-            return TrySetVectorLength(type, 2);
+            return TrySetVectorLength(type, vector_length);
           default:
             break;
         }
@@ -2311,12 +2306,12 @@ Alignment HLoopOptimization::ComputeAlignment(HInstruction* offset,
   return Alignment(DataType::Size(type), 0);
 }
 
-void HLoopOptimization::SetAlignmentStrategy(uint32_t peeling_votes[],
+void HLoopOptimization::SetAlignmentStrategy(const ScopedArenaVector<uint32_t>& peeling_votes,
                                              const ArrayReference* peeling_candidate) {
   // Current heuristic: pick the best static loop peeling factor, if any,
   // or otherwise use dynamic loop peeling on suggested peeling candidate.
   uint32_t max_vote = 0;
-  for (int32_t i = 0; i < 16; i++) {
+  for (size_t i = 0; i < peeling_votes.size(); i++) {
     if (peeling_votes[i] > max_vote) {
       max_vote = peeling_votes[i];
       vector_static_peeling_factor_ = i;

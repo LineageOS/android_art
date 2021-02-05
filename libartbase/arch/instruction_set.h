@@ -61,6 +61,9 @@ static constexpr size_t kArmAlignment = 8;
 // ARM64 instruction alignment. This is the recommended alignment for maximum performance.
 static constexpr size_t kArm64Alignment = 16;
 
+// ARM64 default SVE vector length.
+static constexpr size_t kArm64DefaultSVEVectorLength = 256;
+
 // X86 instruction alignment. This is the recommended alignment for maximum performance.
 static constexpr size_t kX86Alignment = 16;
 
