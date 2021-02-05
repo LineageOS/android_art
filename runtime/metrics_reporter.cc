@@ -59,15 +59,21 @@ void MetricsReporter::MaybeStopBackgroundThread() {
   }
 }
 
+void MetricsReporter::NotifyStartupCompleted() {
+  if (thread_.has_value()) {
+    messages_.SendMessage(StartupCompletedMessage{});
+  }
+}
+
 void MetricsReporter::BackgroundThreadRun() {
   LOG_STREAM(DEBUG) << "Metrics reporting thread started";
 
   // AttachCurrentThread is needed so we can safely use the ART concurrency primitives within the
   // messages_ MessageQueue.
-  runtime_->AttachCurrentThread(kBackgroundThreadName,
-                                /*as_daemon=*/true,
-                                runtime_->GetSystemThreadGroup(),
-                                /*create_peer=*/true);
+  const bool attached = runtime_->AttachCurrentThread(kBackgroundThreadName,
+                                                      /*as_daemon=*/true,
+                                                      runtime_->GetSystemThreadGroup(),
+                                                      /*create_peer=*/true);
   bool running = true;
 
   MaybeResetTimeout();
@@ -84,10 +90,16 @@ void MetricsReporter::BackgroundThreadRun() {
           ReportMetrics();
 
           MaybeResetTimeout();
+        },
+        [&]([[maybe_unused]] StartupCompletedMessage message) {
+          LOG_STREAM(DEBUG) << "App startup completed, reporting metrics";
+          ReportMetrics();
         });
   }
 
-  runtime_->DetachCurrentThread();
+  if (attached) {
+    runtime_->DetachCurrentThread();
+  }
   LOG_STREAM(DEBUG) << "Metrics reporting thread terminating";
 }
 
