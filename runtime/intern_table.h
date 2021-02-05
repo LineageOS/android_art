@@ -72,18 +72,23 @@ class InternTable {
     const char* utf8_data_;
   };
 
-  class StringHashEquals {
+  class StringHash {
    public:
     std::size_t operator()(const GcRoot<mirror::String>& root) const NO_THREAD_SAFETY_ANALYSIS;
-    bool operator()(const GcRoot<mirror::String>& a, const GcRoot<mirror::String>& b) const
-        NO_THREAD_SAFETY_ANALYSIS;
 
     // Utf8String can be used for lookup.
     std::size_t operator()(const Utf8String& key) const {
       // A cast to prevent undesired sign extension.
       return static_cast<uint32_t>(key.GetHash());
     }
+  };
 
+  class StringEquals {
+   public:
+    bool operator()(const GcRoot<mirror::String>& a, const GcRoot<mirror::String>& b) const
+        NO_THREAD_SAFETY_ANALYSIS;
+
+    // Utf8String can be used for lookup.
     bool operator()(const GcRoot<mirror::String>& a, const Utf8String& b) const
         NO_THREAD_SAFETY_ANALYSIS;
   };
@@ -100,8 +105,8 @@ class InternTable {
 
   using UnorderedSet = HashSet<GcRoot<mirror::String>,
                                GcRootEmptyFn,
-                               StringHashEquals,
-                               StringHashEquals,
+                               StringHash,
+                               StringEquals,
                                TrackingAllocator<GcRoot<mirror::String>, kAllocatorTagInternTable>>;
 
   InternTable();
