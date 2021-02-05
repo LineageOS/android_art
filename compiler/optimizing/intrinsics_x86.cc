@@ -3184,6 +3184,7 @@ void IntrinsicCodeGeneratorX86::VisitReferenceRefersTo(HInvoke* invoke) {
 
   __ movl(out, Address(obj, referent_offset));
   codegen_->MaybeRecordImplicitNullCheck(invoke);
+  __ MaybeUnpoisonHeapReference(out);
   // Note that the fence is a no-op, thanks to the x86 memory model.
   codegen_->GenerateMemoryBarrier(MemBarrierKind::kLoadAny);  // `referent` is volatile.
 
