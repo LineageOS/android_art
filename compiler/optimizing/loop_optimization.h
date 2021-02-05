@@ -238,7 +238,7 @@ class HLoopOptimization : public HOptimization {
                              DataType::Type type,
                              bool is_string_char_at,
                              uint32_t peeling = 0);
-  void SetAlignmentStrategy(uint32_t peeling_votes[],
+  void SetAlignmentStrategy(const ScopedArenaVector<uint32_t>& peeling_votes,
                             const ArrayReference* peeling_candidate);
   uint32_t MaxNumberPeeled();
   bool IsVectorizationProfitable(int64_t trip_count);
