@@ -16,6 +16,7 @@
 
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.VarHandle;
+import java.lang.ref.WeakReference;
 import java.lang.reflect.Field;
 import sun.misc.Unsafe;
 
@@ -31,6 +32,7 @@ public class Main {
         testVarHandleCompareAndSet();
         testVarHandleCompareAndExchange();
         testVarHandleGetAndSet();
+        testReferenceRefersTo();
     }
 
     public static void testFieldReads() {
@@ -399,6 +401,33 @@ public class Main {
             assertSameObject(f4444, f4444vh.getAndSet(mf, f4444));  // Unchanged.
             assertSameObject(f4998, f4998vh.getAndSet(mf, f4998));  // Unchanged.
             assertSameObject(f4999, f4999vh.getAndSet(mf, f4999));  // Unchanged.
+        }
+    }
+
+    public static void testReferenceRefersTo() throws Exception {
+        // Initialize local variables for comparison.
+        manyFields.testField0000 = new Object();
+        manyFields.testField1024 = new Object();
+        manyFields.testField4444 = new Object();
+        manyFields.testField4999 = new Object();
+        WeakReference<Object> f0000 = new WeakReference<Object>(manyFields.testField0000);
+        WeakReference<Object> f1024 = new WeakReference<Object>(manyFields.testField1024);
+        WeakReference<Object> f4444 = new WeakReference<Object>(manyFields.testField4444);
+        WeakReference<Object> f4999 = new WeakReference<Object>(manyFields.testField4999);
+
+        // Continually check reads from `manyFields` while allocating
+        // over 64MiB memory (with heap size limited to 16MiB), ensuring we run GC and stress the
+        // read barrier implementation in Reference.refersTo() if concurrent collector is enabled.
+        for (int i = 0; i != 64 * 1024; ++i) {
+            allocateAtLeast1KiB();
+            ManyFields mf = manyFields;  // Load the volatile `manyFields` once on each iteration.
+            // Test Reference.refersTo() with reference field access.
+            assertEqual(true, f0000.refersTo(mf.testField0000));
+            assertEqual(false, f0000.refersTo(mf.testField0001));
+            assertEqual(true, f1024.refersTo(mf.testField1024));
+            assertEqual(true, f4444.refersTo(mf.testField4444));
+            assertEqual(false, f4999.refersTo(mf.testField4998));
+            assertEqual(true, f4999.refersTo(mf.testField4999));
         }
     }
 

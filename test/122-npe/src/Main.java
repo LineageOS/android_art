@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+import java.lang.ref.WeakReference;
+
 /**
  * Test that null pointer exceptions are thrown by the VM.
  */
@@ -38,7 +40,7 @@ public class Main {
   static void methodTwo() {
     NullPointerException npe = null;
 
-    int thisLine = 41;
+    int thisLine = 43;
 
     new Object().getClass(); // Ensure compiled.
     try {
@@ -547,6 +549,14 @@ public class Main {
       npe = e;
     }
     check(npe, thisLine += 14);
+
+    npe = null;
+    try {
+      useInt(((WeakReference<Object>) null).refersTo(null) ? 1 : 0);
+    } catch (NullPointerException e) {
+      npe = e;
+    }
+    check(npe, thisLine += 8);
   }
 
   static void check(NullPointerException npe, int firstLine) {
@@ -558,8 +568,8 @@ public class Main {
     }
     StackTraceElement[] trace = npe.getStackTrace();
     checkElement(trace[0], "Main", "methodTwo", "Main.java", firstLine);
-    checkElement(trace[1], "Main", "methodOne", "Main.java", 27);
-    checkElement(trace[2], "Main", "main", "Main.java", 23);
+    checkElement(trace[1], "Main", "methodOne", "Main.java", 29);
+    checkElement(trace[2], "Main", "main", "Main.java", 25);
   }
 
   static void checkElement(StackTraceElement element,
