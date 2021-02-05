@@ -17,6 +17,7 @@
 #include "loop_analysis.h"
 
 #include "base/bit_vector-inl.h"
+#include "code_generator.h"
 #include "induction_var_range.h"
 
 namespace art {
@@ -76,6 +77,7 @@ int64_t LoopAnalysis::GetLoopTripCount(HLoopInformation* loop_info,
 // is provided. Enables scalar loop peeling and unrolling with the most conservative heuristics.
 class ArchDefaultLoopHelper : public ArchNoOptsLoopHelper {
  public:
+  explicit ArchDefaultLoopHelper(const CodeGenerator& codegen) : ArchNoOptsLoopHelper(codegen) {}
   // Scalar loop unrolling parameters and heuristics.
   //
   // Maximum possible unrolling factor.
@@ -132,6 +134,7 @@ class ArchDefaultLoopHelper : public ArchNoOptsLoopHelper {
 // peeling and unrolling and supports SIMD loop unrolling.
 class Arm64LoopHelper : public ArchDefaultLoopHelper {
  public:
+  explicit Arm64LoopHelper(const CodeGenerator& codegen) : ArchDefaultLoopHelper(codegen) {}
   // SIMD loop unrolling parameters and heuristics.
   //
   // Maximum possible unrolling factor.
@@ -157,6 +160,10 @@ class Arm64LoopHelper : public ArchDefaultLoopHelper {
     // Don't unroll with insufficient iterations.
     // TODO: Unroll loops with unknown trip count.
     DCHECK_NE(vector_length, 0u);
+    // TODO: Unroll loops in predicated vectorization mode.
+    if (codegen_.SupportsPredicatedSIMD()) {
+      return LoopAnalysisInfo::kNoUnrollingFactor;
+    }
     if (trip_count < (2 * vector_length + max_peel)) {
       return LoopAnalysisInfo::kNoUnrollingFactor;
     }
@@ -309,6 +316,8 @@ class X86_64LoopHelper : public ArchDefaultLoopHelper {
   uint32_t GetUnrollingFactor(HLoopInformation* loop_info, HBasicBlock* header) const;
 
  public:
+  explicit X86_64LoopHelper(const CodeGenerator& codegen) : ArchDefaultLoopHelper(codegen) {}
+
   uint32_t GetSIMDUnrollingFactor(HBasicBlock* block,
                                   int64_t trip_count,
                                   uint32_t max_peel,
@@ -398,17 +407,18 @@ uint32_t X86_64LoopHelper::GetUnrollingFactor(HLoopInformation* loop_info,
   return (1 << unrolling_factor);
 }
 
-ArchNoOptsLoopHelper* ArchNoOptsLoopHelper::Create(InstructionSet isa,
+ArchNoOptsLoopHelper* ArchNoOptsLoopHelper::Create(const CodeGenerator& codegen,
                                                    ArenaAllocator* allocator) {
+  InstructionSet isa = codegen.GetInstructionSet();
   switch (isa) {
     case InstructionSet::kArm64: {
-      return new (allocator) Arm64LoopHelper;
+      return new (allocator) Arm64LoopHelper(codegen);
     }
     case InstructionSet::kX86_64: {
-      return new (allocator) X86_64LoopHelper;
+      return new (allocator) X86_64LoopHelper(codegen);
     }
     default: {
-      return new (allocator) ArchDefaultLoopHelper;
+      return new (allocator) ArchDefaultLoopHelper(codegen);
     }
   }
 }
