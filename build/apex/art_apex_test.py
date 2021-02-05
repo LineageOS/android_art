@@ -747,6 +747,8 @@ class TestingTargetChecker:
     self._checker.check_art_test_executable('art_imgdiag_tests')
     self._checker.check_art_test_executable('art_libartbase_tests')
     self._checker.check_art_test_executable('art_libartpalette_tests')
+    self._checker.check_art_test_executable('art_libartservice_tests')
+    self._checker.check_art_test_executable('art_libarttools_tests')
     self._checker.check_art_test_executable('art_libdexfile_support_tests')
     self._checker.check_art_test_executable('art_libdexfile_tests')
     self._checker.check_art_test_executable('art_libprofile_tests')

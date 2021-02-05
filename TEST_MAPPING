@@ -12,6 +12,9 @@
     {
       "name": "BootImageProfileTest"
     },
+    {
+      "name": "ArtServiceTests"
+    },
     // ART gtests.
     {
       "name": "ArtGtestsTarget"
