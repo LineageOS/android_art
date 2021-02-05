@@ -570,6 +570,7 @@ bool MterpHandleIntrinsic(ShadowFrame* shadow_frame,
     UNIMPLEMENTED_CASE(UnsafeStoreFence /* ()V */)
     UNIMPLEMENTED_CASE(UnsafeFullFence /* ()V */)
     UNIMPLEMENTED_CASE(ReferenceGetReferent /* ()Ljava/lang/Object; */)
+    UNIMPLEMENTED_CASE(ReferenceRefersTo /* (Ljava/lang/Object;)Z */)
     UNIMPLEMENTED_CASE(IntegerValueOf /* (I)Ljava/lang/Integer; */)
     UNIMPLEMENTED_CASE(ThreadInterrupted /* ()Z */)
     UNIMPLEMENTED_CASE(CRC32Update /* (II)I */)
