@@ -37,6 +37,7 @@
 #include "handle.h"
 #include "jni.h"
 #include "mirror/class.h"
+#include "mirror/object.h"
 #include "verifier/verifier_enums.h"
 
 namespace art {
@@ -1366,6 +1367,10 @@ class ClassLinker {
 
   // Well known mirror::Class roots.
   GcRoot<mirror::ObjectArray<mirror::Class>> class_roots_;
+
+  // Method hashes for virtual methods from java.lang.Object used
+  // to avoid recalculating them for each class we link.
+  uint32_t object_virtual_method_hashes_[mirror::Object::kVTableLength];
 
   // A cache of the last FindArrayClass results. The cache serves to avoid creating array class
   // descriptors for the sake of performing FindClass.
