@@ -17,6 +17,7 @@
 #include "code_generator_arm64.h"
 
 #include "arch/arm64/instruction_set_features_arm64.h"
+#include "base/bit_utils_iterator.h"
 #include "mirror/array-inl.h"
 #include "mirror/string.h"
 
@@ -1588,6 +1589,64 @@ void InstructionCodeGeneratorARM64Neon::MoveToSIMDStackSlot(Location destination
       __ Str(temp, StackOperandFrom(destination));
     }
   }
+}
+
+// Calculate memory accessing operand for save/restore live registers.
+template <bool is_save>
+void SaveRestoreLiveRegistersHelperNeonImpl(CodeGeneratorARM64* codegen,
+                                            LocationSummary* locations,
+                                            int64_t spill_offset) {
+  const uint32_t core_spills = codegen->GetSlowPathSpills(locations, /* core_registers= */ true);
+  const uint32_t fp_spills = codegen->GetSlowPathSpills(locations, /* core_registers= */ false);
+  DCHECK(helpers::ArtVixlRegCodeCoherentForRegSet(core_spills,
+                                                  codegen->GetNumberOfCoreRegisters(),
+                                                  fp_spills,
+                                                  codegen->GetNumberOfFloatingPointRegisters()));
+
+  CPURegList core_list = CPURegList(CPURegister::kRegister, kXRegSize, core_spills);
+  const unsigned v_reg_size_in_bits = codegen->GetSlowPathFPWidth() * 8;
+  DCHECK_LE(codegen->GetSIMDRegisterWidth(), kQRegSizeInBytes);
+  CPURegList fp_list = CPURegList(CPURegister::kVRegister, v_reg_size_in_bits, fp_spills);
+
+  MacroAssembler* masm = codegen->GetVIXLAssembler();
+  UseScratchRegisterScope temps(masm);
+
+  Register base = masm->StackPointer();
+  int64_t core_spill_size = core_list.GetTotalSizeInBytes();
+  int64_t fp_spill_size = fp_list.GetTotalSizeInBytes();
+  int64_t reg_size = kXRegSizeInBytes;
+  int64_t max_ls_pair_offset = spill_offset + core_spill_size + fp_spill_size - 2 * reg_size;
+  uint32_t ls_access_size = WhichPowerOf2(reg_size);
+  if (((core_list.GetCount() > 1) || (fp_list.GetCount() > 1)) &&
+      !masm->IsImmLSPair(max_ls_pair_offset, ls_access_size)) {
+    // If the offset does not fit in the instruction's immediate field, use an alternate register
+    // to compute the base address(float point registers spill base address).
+    Register new_base = temps.AcquireSameSizeAs(base);
+    masm->Add(new_base, base, Operand(spill_offset + core_spill_size));
+    base = new_base;
+    spill_offset = -core_spill_size;
+    int64_t new_max_ls_pair_offset = fp_spill_size - 2 * reg_size;
+    DCHECK(masm->IsImmLSPair(spill_offset, ls_access_size));
+    DCHECK(masm->IsImmLSPair(new_max_ls_pair_offset, ls_access_size));
+  }
+
+  if (is_save) {
+    masm->StoreCPURegList(core_list, MemOperand(base, spill_offset));
+    masm->StoreCPURegList(fp_list, MemOperand(base, spill_offset + core_spill_size));
+  } else {
+    masm->LoadCPURegList(core_list, MemOperand(base, spill_offset));
+    masm->LoadCPURegList(fp_list, MemOperand(base, spill_offset + core_spill_size));
+  }
+}
+
+void InstructionCodeGeneratorARM64Neon::SaveLiveRegistersHelper(LocationSummary* locations,
+                                                                int64_t spill_offset) {
+  SaveRestoreLiveRegistersHelperNeonImpl</* is_save= */ true>(codegen_, locations, spill_offset);
+}
+
+void InstructionCodeGeneratorARM64Neon::RestoreLiveRegistersHelper(LocationSummary* locations,
+                                                                   int64_t spill_offset) {
+  SaveRestoreLiveRegistersHelperNeonImpl</* is_save= */ false>(codegen_, locations, spill_offset);
 }
 
 #undef __
