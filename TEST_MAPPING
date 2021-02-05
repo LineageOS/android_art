@@ -348,10 +348,13 @@
       "name": "art-run-test-176-app-image-string"
     },
     {
+      "name": "art-run-test-201-built-in-except-detail-messages"
+    },
+    {
       "name": "art-run-test-2019-constantcalculationsinking"
     },
     {
-      "name": "art-run-test-201-built-in-except-detail-messages"
+      "name": "art-run-test-202-thread-oome"
     },
     {
       "name": "art-run-test-2020-InvokeVirtual-Inlining"
@@ -382,9 +385,6 @@
     },
     {
       "name": "art-run-test-2029-contended-monitors"
-    },
-    {
-      "name": "art-run-test-202-thread-oome"
     },
     {
       "name": "art-run-test-2030-long-running-child"
