@@ -4154,6 +4154,15 @@ void Thread::SetTlab(uint8_t* start, uint8_t* end, uint8_t* limit) {
 }
 
 void Thread::ResetTlab() {
+  gc::Heap* const heap = Runtime::Current()->GetHeap();
+  if (heap->GetHeapSampler().IsEnabled()) {
+    // Note: We always ResetTlab before SetTlab, therefore we can do the sample
+    // offset adjustment here.
+    heap->AdjustSampleOffset(GetTlabPosOffset());
+    VLOG(heap) << "JHP: ResetTlab, Tid: " << GetTid()
+               << " adjustment = "
+               << (tlsPtr_.thread_local_pos - tlsPtr_.thread_local_start);
+  }
   SetTlab(nullptr, nullptr, nullptr);
 }
 
