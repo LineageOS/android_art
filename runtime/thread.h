@@ -36,6 +36,7 @@
 #include "handle.h"
 #include "handle_scope.h"
 #include "interpreter/interpreter_cache.h"
+#include "javaheapprof/javaheapsampler.h"
 #include "jvalue.h"
 #include "managed_stack.h"
 #include "offsets.h"
@@ -1155,6 +1156,11 @@ class Thread {
   // Returns the remaining space in the TLAB.
   size_t TlabSize() const {
     return tlsPtr_.thread_local_end - tlsPtr_.thread_local_pos;
+  }
+
+  // Returns pos offset from start.
+  size_t GetTlabPosOffset() const {
+    return tlsPtr_.thread_local_pos - tlsPtr_.thread_local_start;
   }
 
   // Returns the remaining space in the TLAB if we were to expand it to maximum capacity.
