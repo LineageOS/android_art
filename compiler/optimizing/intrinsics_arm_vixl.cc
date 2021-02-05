@@ -2559,6 +2559,68 @@ void IntrinsicCodeGeneratorARMVIXL::VisitReferenceGetReferent(HInvoke* invoke) {
   __ Bind(slow_path->GetExitLabel());
 }
 
+void IntrinsicLocationsBuilderARMVIXL::VisitReferenceRefersTo(HInvoke* invoke) {
+  IntrinsicVisitor::CreateReferenceRefersToLocations(invoke);
+}
+
+void IntrinsicCodeGeneratorARMVIXL::VisitReferenceRefersTo(HInvoke* invoke) {
+  LocationSummary* locations = invoke->GetLocations();
+  ArmVIXLAssembler* assembler = GetAssembler();
+  UseScratchRegisterScope temps(assembler->GetVIXLAssembler());
+
+  vixl32::Register obj = RegisterFrom(locations->InAt(0));
+  vixl32::Register other = RegisterFrom(locations->InAt(1));
+  vixl32::Register out = RegisterFrom(locations->Out());
+  vixl32::Register tmp = temps.Acquire();
+
+  uint32_t referent_offset = mirror::Reference::ReferentOffset().Uint32Value();
+  uint32_t monitor_offset = mirror::Object::MonitorOffset().Int32Value();
+
+  {
+    // Ensure that between load and MaybeRecordImplicitNullCheck there are no pools emitted.
+    // Loading scratch register always uses 32-bit encoding.
+    vixl::ExactAssemblyScope eas(assembler->GetVIXLAssembler(),
+                                 vixl32::k32BitT32InstructionSizeInBytes);
+    __ ldr(tmp, MemOperand(obj, referent_offset));
+    codegen_->MaybeRecordImplicitNullCheck(invoke);
+  }
+  codegen_->GenerateMemoryBarrier(MemBarrierKind::kLoadAny);  // `referent` is volatile.
+
+  if (kEmitCompilerReadBarrier) {
+    DCHECK(kUseBakerReadBarrier);
+
+    vixl32::Label calculate_result;
+    __ Subs(out, tmp, other);
+    __ B(eq, &calculate_result);  // `out` is 0 if taken.
+
+    // Check if the loaded reference is null.
+    __ Cmp(tmp, 0);
+    __ B(eq, &calculate_result);  // `out` is not 0 if taken.
+
+    // For correct memory visibility, we need a barrier before loading the lock word
+    // but we already have the barrier emitted for volatile load above which is sufficient.
+
+    // Load the lockword and check if it is a forwarding address.
+    static_assert(LockWord::kStateShift == 30u);
+    static_assert(LockWord::kStateForwardingAddress == 3u);
+    __ Ldr(tmp, MemOperand(tmp, monitor_offset));
+    __ Cmp(tmp, Operand(0xc0000000));
+    __ B(lo, &calculate_result);   // `out` is not 0 if taken.
+
+    // Extract the forwarding address and subtract from `other`.
+    __ Sub(out, other, Operand(tmp, LSL, LockWord::kForwardingAddressShift));
+
+    __ Bind(&calculate_result);
+  } else {
+    DCHECK(!kEmitCompilerReadBarrier);
+    __ Sub(out, tmp, other);
+  }
+
+  // Convert 0 to 1 and non-zero to 0 for the Boolean result (`out = (out == 0)`).
+  __ Clz(out, out);
+  __ Lsr(out, out, WhichPowerOf2(out.GetSizeInBits()));
+}
+
 void IntrinsicLocationsBuilderARMVIXL::VisitThreadInterrupted(HInvoke* invoke) {
   LocationSummary* locations =
       new (allocator_) LocationSummary(invoke, LocationSummary::kNoCall, kIntrinsified);
