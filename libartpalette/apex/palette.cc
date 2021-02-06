@@ -32,13 +32,13 @@ static constexpr const char* kPaletteSystemLibrary = "libartpalette-system.so";
 
 // Generic method used when a dynamically loaded palette instance does not
 // support a method.
-enum PaletteStatus PaletteMethodNotSupported() {
-  return PaletteStatus::kNotSupported;
+palette_status_t PaletteMethodNotSupported() {
+  return PALETTE_STATUS_NOT_SUPPORTED;
 }
 
 // Declare type aliases for pointers to each function in the interface.
 #define PALETTE_METHOD_TYPE_ALIAS(Name, ...) \
-  using Name ## Method = PaletteStatus(*)(__VA_ARGS__);
+  using Name ## Method = palette_status_t(*)(__VA_ARGS__);
 PALETTE_METHOD_LIST(PALETTE_METHOD_TYPE_ALIAS)
 #undef PALETTE_METHOD_TYPE_ALIAS
 
@@ -110,60 +110,60 @@ PaletteLoader::PaletteLoader() :
 
 extern "C" {
 
-enum PaletteStatus PaletteGetVersion(/*out*/int32_t* version) {
+palette_status_t PaletteGetVersion(/*out*/int32_t* version) {
   PaletteGetVersionMethod m = PaletteLoader::Instance().GetPaletteGetVersionMethod();
   return m(version);
 }
 
-enum PaletteStatus PaletteSchedSetPriority(int32_t tid, int32_t java_priority) {
+palette_status_t PaletteSchedSetPriority(int32_t tid, int32_t java_priority) {
   PaletteSchedSetPriorityMethod m = PaletteLoader::Instance().GetPaletteSchedSetPriorityMethod();
   return m(tid, java_priority);
 }
 
-enum PaletteStatus PaletteSchedGetPriority(int32_t tid, /*out*/int32_t* java_priority) {
+palette_status_t PaletteSchedGetPriority(int32_t tid, /*out*/int32_t* java_priority) {
   PaletteSchedGetPriorityMethod m = PaletteLoader::Instance().GetPaletteSchedGetPriorityMethod();
   return m(tid, java_priority);
 }
 
-enum PaletteStatus PaletteWriteCrashThreadStacks(/*in*/const char* stack, size_t stack_len) {
+palette_status_t PaletteWriteCrashThreadStacks(/*in*/const char* stack, size_t stack_len) {
   PaletteWriteCrashThreadStacksMethod m =
       PaletteLoader::Instance().GetPaletteWriteCrashThreadStacksMethod();
   return m(stack, stack_len);
 }
 
-enum PaletteStatus PaletteTraceEnabled(/*out*/int32_t* enabled) {
+palette_status_t PaletteTraceEnabled(/*out*/int32_t* enabled) {
   PaletteTraceEnabledMethod m = PaletteLoader::Instance().GetPaletteTraceEnabledMethod();
   return m(enabled);
 }
 
-enum PaletteStatus PaletteTraceBegin(/*in*/const char* name) {
+palette_status_t PaletteTraceBegin(/*in*/const char* name) {
   PaletteTraceBeginMethod m = PaletteLoader::Instance().GetPaletteTraceBeginMethod();
   return m(name);
 }
 
-enum PaletteStatus PaletteTraceEnd() {
+palette_status_t PaletteTraceEnd() {
   PaletteTraceEndMethod m = PaletteLoader::Instance().GetPaletteTraceEndMethod();
   return m();
 }
 
-enum PaletteStatus PaletteTraceIntegerValue(/*in*/const char* name, int32_t value) {
+palette_status_t PaletteTraceIntegerValue(/*in*/const char* name, int32_t value) {
   PaletteTraceIntegerValueMethod m = PaletteLoader::Instance().GetPaletteTraceIntegerValueMethod();
   return m(name, value);
 }
 
-enum PaletteStatus PaletteAshmemCreateRegion(const char* name, size_t size, int* fd) {
+palette_status_t PaletteAshmemCreateRegion(const char* name, size_t size, int* fd) {
   PaletteAshmemCreateRegionMethod m =
       PaletteLoader::Instance().GetPaletteAshmemCreateRegionMethod();
   return m(name, size, fd);
 }
 
-enum PaletteStatus PaletteAshmemSetProtRegion(int fd, int prot) {
+palette_status_t PaletteAshmemSetProtRegion(int fd, int prot) {
   PaletteAshmemSetProtRegionMethod m =
       PaletteLoader::Instance().GetPaletteAshmemSetProtRegionMethod();
   return m(fd, prot);
 }
 
-enum PaletteStatus PaletteGetHooks(PaletteHooks** hooks) {
+palette_status_t PaletteGetHooks(PaletteHooks** hooks) {
   PaletteGetHooksMethod m =
       PaletteLoader::Instance().GetPaletteGetHooksMethod();
   return m(hooks);

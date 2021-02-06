@@ -27,7 +27,7 @@ extern "C" {
 // Palette method signatures are defined in palette_method_list.h.
 
 #define PALETTE_METHOD_DECLARATION(Name, ...) \
-  enum PaletteStatus Name(__VA_ARGS__);
+  palette_status_t Name(__VA_ARGS__);
 #include "palette_method_list.h"
 PALETTE_METHOD_LIST(PALETTE_METHOD_DECLARATION)
 #undef PALETTE_METHOD_DECLARATION
