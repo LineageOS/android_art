@@ -142,6 +142,7 @@ libart_cc_defaults {
         "interpreter/shadow_frame.cc",
         "interpreter/unstarted_runtime.cc",
         "java_frame_root_info.cc",
+        "javaheapprof/javaheapsampler.cc",
         "jit/debugger_interface.cc",
         "jit/jit.cc",
         "jit/jit_code_cache.cc",

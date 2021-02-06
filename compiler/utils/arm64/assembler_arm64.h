@@ -24,6 +24,7 @@
 #include <android-base/logging.h>
 
 #include "base/arena_containers.h"
+#include "base/bit_utils_iterator.h"
 #include "base/macros.h"
 #include "dwarf/register.h"
 #include "offsets.h"
@@ -97,6 +98,28 @@ class Arm64Assembler final : public Assembler {
 
   void SpillRegisters(vixl::aarch64::CPURegList registers, int offset);
   void UnspillRegisters(vixl::aarch64::CPURegList registers, int offset);
+
+  // A helper to save/restore a list of ZRegisters to a specified stack offset location.
+  template <bool is_save>
+  void SaveRestoreZRegisterList(uint32_t vreg_bit_vector, int64_t stack_offset) {
+    if (vreg_bit_vector == 0) {
+      return;
+    }
+    vixl::aarch64::UseScratchRegisterScope temps(GetVIXLAssembler());
+    vixl::aarch64::Register temp = temps.AcquireX();
+    vixl_masm_.Add(temp, vixl::aarch64::sp, stack_offset);
+    size_t slot_no = 0;
+    for (uint32_t i : LowToHighBits(vreg_bit_vector)) {
+      if (is_save) {
+        vixl_masm_.Str(vixl::aarch64::ZRegister(i),
+                       vixl::aarch64::SVEMemOperand(temp, slot_no, vixl::aarch64::SVE_MUL_VL));
+      } else {
+        vixl_masm_.Ldr(vixl::aarch64::ZRegister(i),
+                       vixl::aarch64::SVEMemOperand(temp, slot_no, vixl::aarch64::SVE_MUL_VL));
+      }
+      slot_no++;
+    }
+  }
 
   // Jump to address (not setting link register)
   void JumpTo(ManagedRegister m_base, Offset offs, ManagedRegister m_scratch);
