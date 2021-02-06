@@ -29,8 +29,8 @@
 namespace art {
 
 const uint8_t ImageHeader::kImageMagic[] = { 'a', 'r', 't', '\n' };
-// Last change: Fix clinit with nterp.
-const uint8_t ImageHeader::kImageVersion[] = { '0', '9', '3', '\0' };
+// Last change: Reference.refersTo() intrinsic.
+const uint8_t ImageHeader::kImageVersion[] = { '0', '9', '4', '\0' };
 
 ImageHeader::ImageHeader(uint32_t image_reservation_size,
                          uint32_t component_count,

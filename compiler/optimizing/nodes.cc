@@ -3199,6 +3199,19 @@ std::ostream& operator<<(std::ostream& os, HInvokeStaticOrDirect::ClinitCheckReq
   }
 }
 
+bool HInvokeVirtual::CanDoImplicitNullCheckOn(HInstruction* obj) const {
+  if (obj != InputAt(0)) {
+    return false;
+  }
+  switch (GetIntrinsic()) {
+    case Intrinsics::kReferenceRefersTo:
+      return true;
+    default:
+      // TODO: Add implicit null checks in more intrinsics.
+      return false;
+  }
+}
+
 bool HLoadClass::InstructionDataEquals(const HInstruction* other) const {
   const HLoadClass* other_load_class = other->AsLoadClass();
   // TODO: To allow GVN for HLoadClass from different dex files, we should compare the type

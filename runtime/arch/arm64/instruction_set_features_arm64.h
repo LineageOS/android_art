@@ -100,6 +100,11 @@ class Arm64InstructionSetFeatures final : public InstructionSetFeatures {
     return kArm64AllowSVE && has_sve_;
   }
 
+  size_t GetSVEVectorLength() const {
+    // TODO: support SVE vector length detection.
+    return kArm64DefaultSVEVectorLength;
+  }
+
   virtual ~Arm64InstructionSetFeatures() {}
 
  protected:

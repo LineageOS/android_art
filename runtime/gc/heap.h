@@ -834,6 +834,38 @@ class Heap {
   void DumpGcCountRateHistogram(std::ostream& os) const REQUIRES(!*gc_complete_lock_);
   void DumpBlockingGcCountRateHistogram(std::ostream& os) const REQUIRES(!*gc_complete_lock_);
 
+  // Perfetto Art Heap Profiler Support.
+  // HeapID is a heap identifier used by the Perfetto API and is used in allocation reporting
+  // to Perfetto API.
+  void SetPerfettoJavaHeapProfHeapID(uint32_t heapid) {
+    perfetto_javaheapprof_heapid_ = heapid;
+  }
+
+  uint32_t GetPerfettoJavaHeapProfHeapID() const {
+    return perfetto_javaheapprof_heapid_;
+  }
+
+  HeapSampler& GetHeapSampler() {
+    return heap_sampler_;
+  }
+
+  void InitPerfettoJavaHeapProf();
+  int CheckPerfettoJHPEnabled();
+  // In NonTlab case: Check whether we should report a sample allocation and if so report it.
+  // Also update state (bytes_until_sample).
+  void JHPCheckNonTlabSampleAllocation(Thread* self,
+                                       mirror::Object* ret,
+                                       size_t alloc_size);
+  // In Tlab case: Calculate the next tlab size (location of next sample point) and whether
+  // a sample should be taken.
+  size_t JHPCalculateNextTlabSize(Thread* self,
+                                  size_t jhp_def_tlab_size,
+                                  size_t alloc_size,
+                                  bool* take_sample,
+                                  size_t* bytes_until_sample);
+  // Reduce the number of bytes to the next sample position by this adjustment.
+  void AdjustSampleOffset(size_t adjustment);
+
   // Allocation tracking support
   // Callers to this function use double-checked locking to ensure safety on allocation_records_
   bool IsAllocTrackingEnabled() const {
@@ -1570,6 +1602,10 @@ class Heap {
   Atomic<bool> alloc_tracking_enabled_;
   std::unique_ptr<AllocRecordObjectMap> allocation_records_;
   size_t alloc_record_depth_;
+
+  // Perfetto Java Heap Profiler support.
+  uint32_t perfetto_javaheapprof_heapid_;
+  HeapSampler heap_sampler_;
 
   // GC stress related data structures.
   Mutex* backtrace_lock_ DEFAULT_MUTEX_ACQUIRED_AFTER;
