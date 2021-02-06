@@ -4071,7 +4071,7 @@ ObjPtr<mirror::DexCache> ClassLinker::RegisterDexFile(const DexFile& dex_file,
   }
   PaletteHooks* hooks = nullptr;
   VLOG(class_linker) << "Registered dex file " << dex_file.GetLocation();
-  if (PaletteGetHooks(&hooks) == PaletteStatus::kOkay) {
+  if (PaletteGetHooks(&hooks) == PALETTE_STATUS_OK) {
     hooks->NotifyDexFileLoaded(dex_file.GetLocation().c_str());
   }
   return h_dex_cache.Get();

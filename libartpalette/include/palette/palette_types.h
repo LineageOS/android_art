@@ -23,14 +23,24 @@
 extern "C" {
 #endif  // __cplusplus
 
-// Return values for palette functions.
-enum PaletteStatus {
-  kOkay = 0,
-  kCheckErrno = 1,
-  kInvalidArgument = 2,
-  kNotSupported = 3,
-  kFailedCheckLog = 4,
-};
+typedef int32_t palette_status_t;
+
+// Palette function return value when the function completed successfully.
+#define PALETTE_STATUS_OK                 ((palette_status_t) 0)
+
+// Palette function return value when the function called yielded and error captured by `errno`.
+#define PALETTE_STATUS_CHECK_ERRNO        ((palette_status_t) 1)
+
+// Palette function return value when an argument to the function was invalid.
+#define PALETTE_STATUS_INVALID_ARGUMENT   ((palette_status_t) 2)
+
+// Palette function return value when the function called is not supported. This value allows
+// palette functions to be retired across Android versions. Palette functions can never be removed
+// from the palette interface by design.
+#define PALETTE_STATUS_NOT_SUPPORTED      ((palette_status_t) 3)
+
+// Palette function return value when the function failed for unknown reasons.
+#define PALETTE_STATUS_FAILED_CHECK_LOG   ((palette_status_t) 4)
 
 #ifdef __cplusplus
 }

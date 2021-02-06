@@ -28,7 +28,7 @@ namespace art {
 
 inline bool ATraceEnabled() {
   int enabled = 0;
-  if (UNLIKELY(PaletteTraceEnabled(&enabled) == PaletteStatus::kOkay && enabled != 0)) {
+  if (UNLIKELY(PaletteTraceEnabled(&enabled) == PALETTE_STATUS_OK && enabled != 0)) {
     return true;
   } else {
     return false;
