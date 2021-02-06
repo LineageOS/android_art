@@ -1354,6 +1354,11 @@
         "description": ["Failing on RI. Needs further investigating."]
     },
     {
+        "tests": ["122-npe", "160-read-barrier-stress"],
+        "variant": "jvm",
+        "description": ["Reference.refersTo() not supported on old version of RI."]
+    },
+    {
         "tests": ["2232-write-metrics-to-log"],
         "variant": "jvm",
         "description": ["RI does not support ART metrics."]

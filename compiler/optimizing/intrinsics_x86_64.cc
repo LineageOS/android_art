@@ -2712,6 +2712,61 @@ void IntrinsicCodeGeneratorX86_64::VisitReferenceGetReferent(HInvoke* invoke) {
   __ Bind(slow_path->GetExitLabel());
 }
 
+void IntrinsicLocationsBuilderX86_64::VisitReferenceRefersTo(HInvoke* invoke) {
+  IntrinsicVisitor::CreateReferenceRefersToLocations(invoke);
+}
+
+void IntrinsicCodeGeneratorX86_64::VisitReferenceRefersTo(HInvoke* invoke) {
+  X86_64Assembler* assembler = GetAssembler();
+  LocationSummary* locations = invoke->GetLocations();
+
+  CpuRegister obj = locations->InAt(0).AsRegister<CpuRegister>();
+  CpuRegister other = locations->InAt(1).AsRegister<CpuRegister>();
+  CpuRegister out = locations->Out().AsRegister<CpuRegister>();
+
+  uint32_t referent_offset = mirror::Reference::ReferentOffset().Uint32Value();
+  uint32_t monitor_offset = mirror::Object::MonitorOffset().Int32Value();
+
+  __ movl(out, Address(obj, referent_offset));
+  codegen_->MaybeRecordImplicitNullCheck(invoke);
+  __ MaybeUnpoisonHeapReference(out);
+  // Note that the fence is a no-op, thanks to the x86-64 memory model.
+  codegen_->GenerateMemoryBarrier(MemBarrierKind::kLoadAny);  // `referent` is volatile.
+
+  __ cmpl(out, other);
+
+  if (kEmitCompilerReadBarrier) {
+    DCHECK(kUseBakerReadBarrier);
+
+    NearLabel calculate_result;
+    __ j(kEqual, &calculate_result);  // ZF set if taken.
+
+    // Check if the loaded reference is null in a way that leaves ZF clear for null.
+    __ cmpl(out, Immediate(1));
+    __ j(kBelow, &calculate_result);  // ZF clear if taken.
+
+    // For correct memory visibility, we need a barrier before loading the lock word
+    // but we already have the barrier emitted for volatile load above which is sufficient.
+
+    // Load the lockword and check if it is a forwarding address.
+    static_assert(LockWord::kStateShift == 30u);
+    static_assert(LockWord::kStateForwardingAddress == 3u);
+    __ movl(out, Address(out, monitor_offset));
+    __ cmpl(out, Immediate(static_cast<int32_t>(0xc0000000)));
+    __ j(kBelow, &calculate_result);   // ZF clear if taken.
+
+    // Extract the forwarding address and compare with `other`.
+    __ shll(out, Immediate(LockWord::kForwardingAddressShift));
+    __ cmpl(out, other);
+
+    __ Bind(&calculate_result);
+  }
+
+  // Convert ZF into the Boolean result.
+  __ setcc(kEqual, out);
+  __ movzxb(out, out);
+}
+
 void IntrinsicLocationsBuilderX86_64::VisitThreadInterrupted(HInvoke* invoke) {
   LocationSummary* locations =
       new (allocator_) LocationSummary(invoke, LocationSummary::kNoCall, kIntrinsified);

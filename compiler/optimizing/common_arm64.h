@@ -182,6 +182,10 @@ inline vixl::aarch64::MemOperand StackOperandFrom(Location location) {
   return vixl::aarch64::MemOperand(vixl::aarch64::sp, location.GetStackIndex());
 }
 
+inline vixl::aarch64::SVEMemOperand SveStackOperandFrom(Location location) {
+  return vixl::aarch64::SVEMemOperand(vixl::aarch64::sp, location.GetStackIndex());
+}
+
 inline vixl::aarch64::MemOperand HeapOperand(const vixl::aarch64::Register& base,
                                                     size_t offset = 0) {
   // A heap reference must be 32bit, so fit in a W register.
@@ -213,6 +217,10 @@ inline Location LocationFrom(const vixl::aarch64::Register& reg) {
 
 inline Location LocationFrom(const vixl::aarch64::VRegister& fpreg) {
   return Location::FpuRegisterLocation(fpreg.GetCode());
+}
+
+inline Location LocationFrom(const vixl::aarch64::ZRegister& zreg) {
+  return Location::FpuRegisterLocation(zreg.GetCode());
 }
 
 inline vixl::aarch64::Operand OperandFromMemOperand(

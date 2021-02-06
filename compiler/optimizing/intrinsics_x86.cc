@@ -3167,6 +3167,67 @@ void IntrinsicCodeGeneratorX86::VisitReferenceGetReferent(HInvoke* invoke) {
   __ Bind(slow_path->GetExitLabel());
 }
 
+void IntrinsicLocationsBuilderX86::VisitReferenceRefersTo(HInvoke* invoke) {
+  IntrinsicVisitor::CreateReferenceRefersToLocations(invoke);
+}
+
+void IntrinsicCodeGeneratorX86::VisitReferenceRefersTo(HInvoke* invoke) {
+  X86Assembler* assembler = GetAssembler();
+  LocationSummary* locations = invoke->GetLocations();
+
+  Register obj = locations->InAt(0).AsRegister<Register>();
+  Register other = locations->InAt(1).AsRegister<Register>();
+  Register out = locations->Out().AsRegister<Register>();
+
+  uint32_t referent_offset = mirror::Reference::ReferentOffset().Uint32Value();
+  uint32_t monitor_offset = mirror::Object::MonitorOffset().Int32Value();
+
+  __ movl(out, Address(obj, referent_offset));
+  codegen_->MaybeRecordImplicitNullCheck(invoke);
+  __ MaybeUnpoisonHeapReference(out);
+  // Note that the fence is a no-op, thanks to the x86 memory model.
+  codegen_->GenerateMemoryBarrier(MemBarrierKind::kLoadAny);  // `referent` is volatile.
+
+  NearLabel end, return_true, return_false;
+  __ cmpl(out, other);
+
+  if (kEmitCompilerReadBarrier) {
+    DCHECK(kUseBakerReadBarrier);
+
+    __ j(kEqual, &return_true);
+
+    // Check if the loaded reference is null.
+    __ testl(out, out);
+    __ j(kZero, &return_false);
+
+    // For correct memory visibility, we need a barrier before loading the lock word
+    // but we already have the barrier emitted for volatile load above which is sufficient.
+
+    // Load the lockword and check if it is a forwarding address.
+    static_assert(LockWord::kStateShift == 30u);
+    static_assert(LockWord::kStateForwardingAddress == 3u);
+    __ movl(out, Address(out, monitor_offset));
+    __ cmpl(out, Immediate(static_cast<int32_t>(0xc0000000)));
+    __ j(kBelow, &return_false);
+
+    // Extract the forwarding address and compare with `other`.
+    __ shll(out, Immediate(LockWord::kForwardingAddressShift));
+    __ cmpl(out, other);
+  }
+
+  __ j(kNotEqual, &return_false);
+
+  // Return true and exit the function.
+  __ Bind(&return_true);
+  __ movl(out, Immediate(1));
+  __ jmp(&end);
+
+  // Return false and exit the function.
+  __ Bind(&return_false);
+  __ xorl(out, out);
+  __ Bind(&end);
+}
+
 void IntrinsicLocationsBuilderX86::VisitThreadInterrupted(HInvoke* invoke) {
   LocationSummary* locations =
       new (allocator_) LocationSummary(invoke, LocationSummary::kNoCall, kIntrinsified);

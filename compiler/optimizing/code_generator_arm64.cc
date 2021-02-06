@@ -169,54 +169,6 @@ static RegisterSet OneRegInReferenceOutSaveEverythingCallerSaves() {
 #define __ down_cast<CodeGeneratorARM64*>(codegen)->GetVIXLAssembler()->  // NOLINT
 #define QUICK_ENTRY_POINT(x) QUICK_ENTRYPOINT_OFFSET(kArm64PointerSize, x).Int32Value()
 
-// Calculate memory accessing operand for save/restore live registers.
-static void SaveRestoreLiveRegistersHelper(CodeGenerator* codegen,
-                                           LocationSummary* locations,
-                                           int64_t spill_offset,
-                                           bool is_save) {
-  const uint32_t core_spills = codegen->GetSlowPathSpills(locations, /* core_registers= */ true);
-  const uint32_t fp_spills = codegen->GetSlowPathSpills(locations, /* core_registers= */ false);
-  DCHECK(ArtVixlRegCodeCoherentForRegSet(core_spills,
-                                         codegen->GetNumberOfCoreRegisters(),
-                                         fp_spills,
-                                         codegen->GetNumberOfFloatingPointRegisters()));
-
-  CPURegList core_list = CPURegList(CPURegister::kRegister, kXRegSize, core_spills);
-  const unsigned v_reg_size_in_bits = codegen->GetSlowPathFPWidth() * 8;
-  DCHECK_LE(codegen->GetSIMDRegisterWidth(), kQRegSizeInBytes);
-  CPURegList fp_list = CPURegList(CPURegister::kVRegister, v_reg_size_in_bits, fp_spills);
-
-  MacroAssembler* masm = down_cast<CodeGeneratorARM64*>(codegen)->GetVIXLAssembler();
-  UseScratchRegisterScope temps(masm);
-
-  Register base = masm->StackPointer();
-  int64_t core_spill_size = core_list.GetTotalSizeInBytes();
-  int64_t fp_spill_size = fp_list.GetTotalSizeInBytes();
-  int64_t reg_size = kXRegSizeInBytes;
-  int64_t max_ls_pair_offset = spill_offset + core_spill_size + fp_spill_size - 2 * reg_size;
-  uint32_t ls_access_size = WhichPowerOf2(reg_size);
-  if (((core_list.GetCount() > 1) || (fp_list.GetCount() > 1)) &&
-      !masm->IsImmLSPair(max_ls_pair_offset, ls_access_size)) {
-    // If the offset does not fit in the instruction's immediate field, use an alternate register
-    // to compute the base address(float point registers spill base address).
-    Register new_base = temps.AcquireSameSizeAs(base);
-    __ Add(new_base, base, Operand(spill_offset + core_spill_size));
-    base = new_base;
-    spill_offset = -core_spill_size;
-    int64_t new_max_ls_pair_offset = fp_spill_size - 2 * reg_size;
-    DCHECK(masm->IsImmLSPair(spill_offset, ls_access_size));
-    DCHECK(masm->IsImmLSPair(new_max_ls_pair_offset, ls_access_size));
-  }
-
-  if (is_save) {
-    __ StoreCPURegList(core_list, MemOperand(base, spill_offset));
-    __ StoreCPURegList(fp_list, MemOperand(base, spill_offset + core_spill_size));
-  } else {
-    __ LoadCPURegList(core_list, MemOperand(base, spill_offset));
-    __ LoadCPURegList(fp_list, MemOperand(base, spill_offset + core_spill_size));
-  }
-}
-
 void SlowPathCodeARM64::SaveLiveRegisters(CodeGenerator* codegen, LocationSummary* locations) {
   size_t stack_offset = codegen->GetFirstRegisterSlotInSlowPath();
   const uint32_t core_spills = codegen->GetSlowPathSpills(locations, /* core_registers= */ true);
@@ -240,15 +192,15 @@ void SlowPathCodeARM64::SaveLiveRegisters(CodeGenerator* codegen, LocationSummar
     stack_offset += fp_reg_size;
   }
 
-  SaveRestoreLiveRegistersHelper(codegen,
-                                 locations,
-                                 codegen->GetFirstRegisterSlotInSlowPath(), /* is_save= */ true);
+  InstructionCodeGeneratorARM64* visitor =
+      down_cast<CodeGeneratorARM64*>(codegen)->GetInstructionCodeGeneratorArm64();
+  visitor->SaveLiveRegistersHelper(locations, codegen->GetFirstRegisterSlotInSlowPath());
 }
 
 void SlowPathCodeARM64::RestoreLiveRegisters(CodeGenerator* codegen, LocationSummary* locations) {
-  SaveRestoreLiveRegistersHelper(codegen,
-                                 locations,
-                                 codegen->GetFirstRegisterSlotInSlowPath(), /* is_save= */ false);
+  InstructionCodeGeneratorARM64* visitor =
+      down_cast<CodeGeneratorARM64*>(codegen)->GetInstructionCodeGeneratorArm64();
+  visitor->RestoreLiveRegistersHelper(locations, codegen->GetFirstRegisterSlotInSlowPath());
 }
 
 class BoundsCheckSlowPathARM64 : public SlowPathCodeARM64 {
@@ -995,6 +947,12 @@ CodeGeneratorARM64::CodeGeneratorARM64(HGraph* graph,
 
 bool CodeGeneratorARM64::ShouldUseSVE() const {
   return GetInstructionSetFeatures().HasSVE();
+}
+
+size_t CodeGeneratorARM64::GetSIMDRegisterWidth() const {
+  return SupportsPredicatedSIMD()
+      ? GetInstructionSetFeatures().GetSVEVectorLength() / kBitsPerByte
+      : vixl::aarch64::kQRegSizeInBytes;
 }
 
 #define __ GetVIXLAssembler()->
