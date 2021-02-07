@@ -1,0 +1,2 @@
+Test that even if hiddenapi bits are not propagated up the hierarchy, the
+runtime can handle a method being visible through different means.
