@@ -282,12 +282,6 @@ class StackVisitor {
     return cur_shadow_frame_;
   }
 
-  HandleScope* GetCurrentHandleScope(size_t pointer_size) const {
-    ArtMethod** sp = GetCurrentQuickFrame();
-    // Skip ArtMethod*; handle scope comes next;
-    return reinterpret_cast<HandleScope*>(reinterpret_cast<uintptr_t>(sp) + pointer_size);
-  }
-
   std::string DescribeLocation() const REQUIRES_SHARED(Locks::mutator_lock_);
 
   static size_t ComputeNumFrames(Thread* thread, StackWalkKind walk_kind)

@@ -21,7 +21,6 @@
 #include "arch/arm/jni_frame_arm.h"
 #include "arch/instruction_set.h"
 #include "base/macros.h"
-#include "handle_scope-inl.h"
 #include "utils/arm/managed_register_arm.h"
 
 namespace art {
@@ -394,28 +393,27 @@ size_t ArmJniCallingConvention::FrameSize() const {
   if (UNLIKELY(is_critical_native_)) {
     CHECK(!SpillsMethod());
     CHECK(!HasLocalReferenceSegmentState());
-    CHECK(!HasHandleScope());
     CHECK(!SpillsReturnValue());
     return 0u;  // There is no managed frame for @CriticalNative.
   }
 
   // Method*, callee save area size, local reference segment state
-  CHECK(SpillsMethod());
+  DCHECK(SpillsMethod());
   const size_t method_ptr_size = static_cast<size_t>(kArmPointerSize);
   const size_t callee_save_area_size = CalleeSaveRegisters().size() * kFramePointerSize;
   size_t total_size = method_ptr_size + callee_save_area_size;
 
-  CHECK(HasLocalReferenceSegmentState());
-  // local reference segment state
-  total_size += kFramePointerSize;
-  // TODO: Probably better to use sizeof(IRTSegmentState) here...
-
-  CHECK(HasHandleScope());
-  total_size += HandleScope::SizeOf(kArmPointerSize, ReferenceCount());
+  DCHECK(HasLocalReferenceSegmentState());
+  const size_t cookie_size = SavedLocalReferenceCookieSize();
+  total_size += cookie_size;
 
   // Plus return value spill area size
-  CHECK(SpillsReturnValue());
-  total_size += SizeOfReturnValue();
+  if (SpillsReturnValue()) {
+    // No padding between cookie and return value on arm.
+    DCHECK_EQ(ReturnValueSaveLocation().SizeValue(),
+              SavedLocalReferenceCookieOffset().SizeValue() + cookie_size);
+    total_size += SizeOfReturnValue();
+  }
 
   return RoundUp(total_size, kStackAlignment);
 }

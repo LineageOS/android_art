@@ -2589,8 +2589,8 @@ class JNI {
       return JNIGlobalRefType;
     case kWeakGlobal:
       return JNIWeakGlobalRefType;
-    case kHandleScopeOrInvalid:
-      // Assume value is in a handle scope.
+    case kJniTransitionOrInvalid:
+      // Assume value is in a JNI transition frame.
       return JNILocalRefType;
     }
     LOG(FATAL) << "IndirectRefKind[" << kind << "]";

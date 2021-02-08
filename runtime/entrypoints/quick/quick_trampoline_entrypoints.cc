@@ -1436,12 +1436,6 @@ extern "C" const void* artQuickResolutionTrampoline(
  *                            necessary.
  *
  * void PushStack(uintptr_t): Push a value to the stack.
- *
- * uintptr_t PushHandleScope(mirror::Object* ref): Add a reference to the HandleScope. This _will_ have nullptr,
- *                                          as this might be important for null initialization.
- *                                          Must return the jobject, that is, the reference to the
- *                                          entry in the HandleScope (nullptr if necessary).
- *
  */
 template<class T> class BuildNativeCallFrameStateMachine {
  public:
@@ -1522,22 +1516,6 @@ template<class T> class BuildNativeCallFrameStateMachine {
     } else {
       stack_entries_++;  // TODO: have a field for pointer length as multiple of 32b
       PushStack(reinterpret_cast<uintptr_t>(val));
-      gpr_index_ = 0;
-    }
-  }
-
-  bool HaveHandleScopeGpr() const {
-    return gpr_index_ > 0;
-  }
-
-  void AdvanceHandleScope(mirror::Object* ptr) REQUIRES_SHARED(Locks::mutator_lock_) {
-    uintptr_t handle = PushHandle(ptr);
-    if (HaveHandleScopeGpr()) {
-      gpr_index_--;
-      PushGpr(handle);
-    } else {
-      stack_entries_++;
-      PushStack(handle);
       gpr_index_ = 0;
     }
   }
@@ -1718,9 +1696,6 @@ template<class T> class BuildNativeCallFrameStateMachine {
   void PushStack(uintptr_t val) {
     delegate_->PushStack(val);
   }
-  uintptr_t PushHandle(mirror::Object* ref) REQUIRES_SHARED(Locks::mutator_lock_) {
-    return delegate_->PushHandle(ref);
-  }
 
   uint32_t gpr_index_;      // Number of free GPRs
   uint32_t fpr_index_;      // Number of free FPRs
@@ -1765,11 +1740,8 @@ class ComputeNativeCallFrameSize {
       Primitive::Type cur_type_ = Primitive::GetType(shorty[i]);
       switch (cur_type_) {
         case Primitive::kPrimNot:
-          // TODO: fix abuse of mirror types.
-          sm.AdvanceHandleScope(
-              reinterpret_cast<mirror::Object*>(0x12345678));
+          sm.AdvancePointer(nullptr);
           break;
-
         case Primitive::kPrimBoolean:
         case Primitive::kPrimByte:
         case Primitive::kPrimChar:
@@ -1811,10 +1783,6 @@ class ComputeNativeCallFrameSize {
     // counting is already done in the superclass
   }
 
-  virtual uintptr_t PushHandle(mirror::Object* /* ptr */) {
-    return reinterpret_cast<uintptr_t>(nullptr);
-  }
-
  protected:
   uint32_t num_stack_entries_;
 };
@@ -1822,26 +1790,18 @@ class ComputeNativeCallFrameSize {
 class ComputeGenericJniFrameSize final : public ComputeNativeCallFrameSize {
  public:
   explicit ComputeGenericJniFrameSize(bool critical_native)
-    : num_handle_scope_references_(0), critical_native_(critical_native) {}
+    : critical_native_(critical_native) {}
 
-  uintptr_t* ComputeLayout(Thread* self,
-                           ArtMethod** managed_sp,
-                           const char* shorty,
-                           uint32_t shorty_len,
-                           HandleScope** handle_scope) REQUIRES_SHARED(Locks::mutator_lock_) {
+  uintptr_t* ComputeLayout(ArtMethod** managed_sp, const char* shorty, uint32_t shorty_len)
+      REQUIRES_SHARED(Locks::mutator_lock_) {
     DCHECK_EQ(Runtime::Current()->GetClassLinker()->GetImagePointerSize(), kRuntimePointerSize);
 
     Walk(shorty, shorty_len);
 
-    // Add space for cookie and HandleScope.
-    void* storage = GetGenericJniHandleScope(managed_sp, num_handle_scope_references_);
-    DCHECK_ALIGNED(storage, sizeof(uintptr_t));
-    *handle_scope =
-        HandleScope::Create(storage, self->GetTopHandleScope(), num_handle_scope_references_);
-    DCHECK_EQ(*handle_scope, storage);
-    uint8_t* sp8 = reinterpret_cast<uint8_t*>(*handle_scope);
-    DCHECK_GE(static_cast<size_t>(reinterpret_cast<uint8_t*>(managed_sp) - sp8),
-              HandleScope::SizeOf(num_handle_scope_references_) + kJniCookieSize);
+    // Add space for cookie.
+    DCHECK_ALIGNED(managed_sp, sizeof(uintptr_t));
+    static_assert(sizeof(uintptr_t) >= sizeof(IRTSegmentState));
+    uint8_t* sp8 = reinterpret_cast<uint8_t*>(managed_sp) - sizeof(uintptr_t);
 
     // Layout stack arguments.
     sp8 = LayoutStackArgs(sp8);
@@ -1873,21 +1833,13 @@ class ComputeGenericJniFrameSize final : public ComputeNativeCallFrameSize {
     return GetHiddenArgSlot(reserved_area) + 1;
   }
 
-  uintptr_t PushHandle(mirror::Object* /* ptr */) override;
-
   // Add JNIEnv* and jobj/jclass before the shorty-derived elements.
   void WalkHeader(BuildNativeCallFrameStateMachine<ComputeNativeCallFrameSize>* sm) override
       REQUIRES_SHARED(Locks::mutator_lock_);
 
  private:
-  uint32_t num_handle_scope_references_;
   const bool critical_native_;
 };
-
-uintptr_t ComputeGenericJniFrameSize::PushHandle(mirror::Object* /* ptr */) {
-  num_handle_scope_references_++;
-  return reinterpret_cast<uintptr_t>(nullptr);
-}
 
 void ComputeGenericJniFrameSize::WalkHeader(
     BuildNativeCallFrameStateMachine<ComputeNativeCallFrameSize>* sm) {
@@ -1900,7 +1852,7 @@ void ComputeGenericJniFrameSize::WalkHeader(
   sm->AdvancePointer(nullptr);
 
   // Class object or this as first argument
-  sm->AdvanceHandleScope(reinterpret_cast<mirror::Object*>(0x12345678));
+  sm->AdvancePointer(nullptr);
 }
 
 // Class to push values to three separate regions. Used to fill the native call part. Adheres to
@@ -1939,11 +1891,6 @@ class FillNativeCall {
     cur_stack_arg_++;
   }
 
-  virtual uintptr_t PushHandle(mirror::Object*) REQUIRES_SHARED(Locks::mutator_lock_) {
-    LOG(FATAL) << "(Non-JNI) Native call does not use handles.";
-    UNREACHABLE();
-  }
-
  private:
   uintptr_t* cur_gpr_reg_;
   uint32_t* cur_fpr_reg_;
@@ -1962,14 +1909,14 @@ class BuildGenericJniFrameVisitor final : public QuickArgumentVisitor {
                               ArtMethod** managed_sp,
                               uintptr_t* reserved_area)
      : QuickArgumentVisitor(managed_sp, is_static, shorty, shorty_len),
-       jni_call_(nullptr, nullptr, nullptr, nullptr, critical_native),
-       sm_(&jni_call_) {
+       jni_call_(nullptr, nullptr, nullptr, critical_native),
+       sm_(&jni_call_),
+       current_vreg_(nullptr) {
     DCHECK_ALIGNED(managed_sp, kStackAlignment);
     DCHECK_ALIGNED(reserved_area, sizeof(uintptr_t));
 
     ComputeGenericJniFrameSize fsc(critical_native);
-    uintptr_t* out_args_sp =
-        fsc.ComputeLayout(self, managed_sp, shorty, shorty_len, &handle_scope_);
+    uintptr_t* out_args_sp = fsc.ComputeLayout(managed_sp, shorty, shorty_len);
 
     // Store hidden argument for @CriticalNative.
     uintptr_t* hidden_arg_slot = fsc.GetHiddenArgSlot(reserved_area);
@@ -1982,10 +1929,15 @@ class BuildGenericJniFrameVisitor final : public QuickArgumentVisitor {
     uintptr_t* out_args_sp_slot = fsc.GetOutArgsSpSlot(reserved_area);
     *out_args_sp_slot = reinterpret_cast<uintptr_t>(out_args_sp);
 
+    // Prepare vreg pointer for spilling references.
+    static constexpr size_t frame_size =
+        RuntimeCalleeSaveFrame::GetFrameSize(CalleeSaveType::kSaveRefsAndArgs);
+    current_vreg_ = reinterpret_cast<uint32_t*>(
+        reinterpret_cast<uint8_t*>(managed_sp) + frame_size + sizeof(ArtMethod*));
+
     jni_call_.Reset(fsc.GetStartGprRegs(reserved_area),
                     fsc.GetStartFprRegs(reserved_area),
-                    out_args_sp,
-                    handle_scope_);
+                    out_args_sp);
 
     // First 2 parameters are always excluded for CriticalNative methods.
     if (LIKELY(!critical_native)) {
@@ -1993,53 +1945,31 @@ class BuildGenericJniFrameVisitor final : public QuickArgumentVisitor {
       sm_.AdvancePointer(self->GetJniEnv());
 
       if (is_static) {
-        sm_.AdvanceHandleScope(method->GetDeclaringClass().Ptr());
+        // The `jclass` is a pointer to the method's declaring class.
+        // The declaring class must be marked.
+        method->GetDeclaringClass<kWithReadBarrier>();
+        sm_.AdvancePointer(method->GetDeclaringClassAddressWithoutBarrier());
       }  // else "this" reference is already handled by QuickArgumentVisitor.
     }
   }
 
   void Visit() REQUIRES_SHARED(Locks::mutator_lock_) override;
 
-  void FinalizeHandleScope(Thread* self) REQUIRES_SHARED(Locks::mutator_lock_);
-
-  StackReference<mirror::Object>* GetFirstHandleScopeEntry() {
-    return handle_scope_->GetHandle(0).GetReference();
-  }
-
-  jobject GetFirstHandleScopeJObject() const REQUIRES_SHARED(Locks::mutator_lock_) {
-    return handle_scope_->GetHandle(0).ToJObject();
-  }
-
  private:
   // A class to fill a JNI call. Adds reference/handle-scope management to FillNativeCall.
   class FillJniCall final : public FillNativeCall {
    public:
-    FillJniCall(uintptr_t* gpr_regs, uint32_t* fpr_regs, uintptr_t* stack_args,
-                HandleScope* handle_scope, bool critical_native)
-      : FillNativeCall(gpr_regs, fpr_regs, stack_args),
-                       handle_scope_(handle_scope),
-        cur_entry_(0),
-        critical_native_(critical_native) {}
+    FillJniCall(uintptr_t* gpr_regs,
+                uint32_t* fpr_regs,
+                uintptr_t* stack_args,
+                bool critical_native)
+        : FillNativeCall(gpr_regs, fpr_regs, stack_args),
+          cur_entry_(0),
+          critical_native_(critical_native) {}
 
-    uintptr_t PushHandle(mirror::Object* ref) override REQUIRES_SHARED(Locks::mutator_lock_);
-
-    void Reset(uintptr_t* gpr_regs, uint32_t* fpr_regs, uintptr_t* stack_args, HandleScope* scope) {
+    void Reset(uintptr_t* gpr_regs, uint32_t* fpr_regs, uintptr_t* stack_args) {
       FillNativeCall::Reset(gpr_regs, fpr_regs, stack_args);
-      handle_scope_ = scope;
       cur_entry_ = 0U;
-    }
-
-    void ResetRemainingScopeSlots() REQUIRES_SHARED(Locks::mutator_lock_) {
-      // Initialize padding entries.
-      size_t expected_slots = handle_scope_->NumberOfReferences();
-      while (cur_entry_ < expected_slots) {
-        handle_scope_->GetMutableHandle(cur_entry_++).Assign(nullptr);
-      }
-
-      if (!critical_native_) {
-        // Non-critical natives have at least the self class (jclass) or this (jobject).
-        DCHECK_NE(cur_entry_, 0U);
-      }
     }
 
     bool CriticalNative() const {
@@ -2047,27 +1977,19 @@ class BuildGenericJniFrameVisitor final : public QuickArgumentVisitor {
     }
 
    private:
-    HandleScope* handle_scope_;
     size_t cur_entry_;
     const bool critical_native_;
   };
 
-  HandleScope* handle_scope_;
   FillJniCall jni_call_;
-
   BuildNativeCallFrameStateMachine<FillJniCall> sm_;
+
+  // Pointer to the current vreg in caller's reserved out vreg area.
+  // Used for spilling reference arguments.
+  uint32_t* current_vreg_;
 
   DISALLOW_COPY_AND_ASSIGN(BuildGenericJniFrameVisitor);
 };
-
-uintptr_t BuildGenericJniFrameVisitor::FillJniCall::PushHandle(mirror::Object* ref) {
-  uintptr_t tmp;
-  MutableHandle<mirror::Object> h = handle_scope_->GetMutableHandle(cur_entry_);
-  h.Assign(ref);
-  tmp = reinterpret_cast<uintptr_t>(h.ToJObject());
-  cur_entry_++;
-  return tmp;
-}
 
 void BuildGenericJniFrameVisitor::Visit() {
   Primitive::Type type = GetParamPrimitiveType();
@@ -2080,6 +2002,7 @@ void BuildGenericJniFrameVisitor::Visit() {
         long_arg = *reinterpret_cast<jlong*>(GetParamAddress());
       }
       sm_.AdvanceLong(long_arg);
+      current_vreg_ += 2u;
       break;
     }
     case Primitive::kPrimDouble: {
@@ -2091,16 +2014,22 @@ void BuildGenericJniFrameVisitor::Visit() {
         double_arg = *reinterpret_cast<uint64_t*>(GetParamAddress());
       }
       sm_.AdvanceDouble(double_arg);
+      current_vreg_ += 2u;
       break;
     }
     case Primitive::kPrimNot: {
-      StackReference<mirror::Object>* stack_ref =
-          reinterpret_cast<StackReference<mirror::Object>*>(GetParamAddress());
-      sm_.AdvanceHandleScope(stack_ref->AsMirrorPtr());
+      mirror::Object* obj =
+          reinterpret_cast<StackReference<mirror::Object>*>(GetParamAddress())->AsMirrorPtr();
+      StackReference<mirror::Object>* spill_ref =
+          reinterpret_cast<StackReference<mirror::Object>*>(current_vreg_);
+      spill_ref->Assign(obj);
+      sm_.AdvancePointer(obj != nullptr ? spill_ref : nullptr);
+      current_vreg_ += 1u;
       break;
     }
     case Primitive::kPrimFloat:
       sm_.AdvanceFloat(*reinterpret_cast<float*>(GetParamAddress()));
+      current_vreg_ += 1u;
       break;
     case Primitive::kPrimBoolean:  // Fall-through.
     case Primitive::kPrimByte:     // Fall-through.
@@ -2108,19 +2037,11 @@ void BuildGenericJniFrameVisitor::Visit() {
     case Primitive::kPrimShort:    // Fall-through.
     case Primitive::kPrimInt:      // Fall-through.
       sm_.AdvanceInt(*reinterpret_cast<jint*>(GetParamAddress()));
+      current_vreg_ += 1u;
       break;
     case Primitive::kPrimVoid:
       LOG(FATAL) << "UNREACHABLE";
       UNREACHABLE();
-  }
-}
-
-void BuildGenericJniFrameVisitor::FinalizeHandleScope(Thread* self) {
-  // Clear out rest of the scope.
-  jni_call_.ResetRemainingScopeSlots();
-  if (!jni_call_.CriticalNative()) {
-    // Install HandleScope.
-    self->PushHandleScope(handle_scope_);
   }
 }
 
@@ -2165,8 +2086,6 @@ extern "C" const void* artQuickGenericJniTrampoline(Thread* self,
   {
     ScopedAssertNoThreadSuspension sants(__FUNCTION__);
     visitor.VisitArguments();
-    // FinalizeHandleScope pushes the handle scope on the thread.
-    visitor.FinalizeHandleScope(self);
   }
 
   // Fix up managed-stack things in Thread. After this we can walk the stack.
@@ -2204,7 +2123,8 @@ extern "C" const void* artQuickGenericJniTrampoline(Thread* self,
     // Start JNI, save the cookie.
     if (called->IsSynchronized()) {
       DCHECK(normal_native) << " @FastNative and synchronize is not supported";
-      cookie = JniMethodStartSynchronized(visitor.GetFirstHandleScopeJObject(), self);
+      jobject lock = GetGenericJniSynchronizationObject(self, called);
+      cookie = JniMethodStartSynchronized(lock, self);
       if (self->IsExceptionPending()) {
         self->PopHandleScope();
         return nullptr;  // Report error.
@@ -2259,14 +2179,6 @@ extern "C" uint64_t artQuickGenericJniEndTrampoline(Thread* self,
   uint32_t* sp32 = reinterpret_cast<uint32_t*>(sp);
   ArtMethod* called = *sp;
   uint32_t cookie = *(sp32 - 1);
-  if (kIsDebugBuild && !called->IsCriticalNative()) {
-    BaseHandleScope* handle_scope = self->GetTopHandleScope();
-    DCHECK(handle_scope != nullptr);
-    DCHECK(!handle_scope->IsVariableSized());
-    // Note: We do not hold mutator lock here for normal JNI, so we cannot use the method's shorty
-    // to determine the number of references. Instead rely on the value from the HandleScope.
-    DCHECK_EQ(handle_scope, GetGenericJniHandleScope(sp, handle_scope->NumberOfReferences()));
-  }
   return GenericJniMethodEnd(self, cookie, result, result_f, called);
 }
 

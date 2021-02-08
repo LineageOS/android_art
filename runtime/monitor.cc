@@ -31,6 +31,7 @@
 #include "dex/dex_file-inl.h"
 #include "dex/dex_file_types.h"
 #include "dex/dex_instruction-inl.h"
+#include "entrypoints/entrypoint_utils-inl.h"
 #include "lock_word-inl.h"
 #include "mirror/class-inl.h"
 #include "mirror/object-inl.h"
@@ -1464,9 +1465,9 @@ void Monitor::VisitLocks(StackVisitor* stack_visitor,
   // TODO: use the JNI implementation's table of explicit MonitorEnter calls and dump those too.
   if (m->IsNative()) {
     if (m->IsSynchronized()) {
-      ObjPtr<mirror::Object> jni_this =
-          stack_visitor->GetCurrentHandleScope(sizeof(void*))->GetReference(0);
-      callback(jni_this, callback_context);
+      Thread* thread = stack_visitor->GetThread();
+      jobject lock = GetGenericJniSynchronizationObject(thread, m);
+      callback(thread->DecodeJObject(lock), callback_context);
     }
     return;
   }

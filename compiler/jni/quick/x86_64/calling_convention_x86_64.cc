@@ -21,7 +21,6 @@
 #include "arch/instruction_set.h"
 #include "arch/x86_64/jni_frame_x86_64.h"
 #include "base/bit_utils.h"
-#include "handle_scope-inl.h"
 #include "utils/x86_64/managed_register_x86_64.h"
 
 namespace art {
@@ -183,27 +182,31 @@ size_t X86_64JniCallingConvention::FrameSize() const {
   if (is_critical_native_) {
     CHECK(!SpillsMethod());
     CHECK(!HasLocalReferenceSegmentState());
-    CHECK(!HasHandleScope());
     CHECK(!SpillsReturnValue());
     return 0u;  // There is no managed frame for @CriticalNative.
   }
 
   // Method*, PC return address and callee save area size, local reference segment state
-  CHECK(SpillsMethod());
+  DCHECK(SpillsMethod());
   const size_t method_ptr_size = static_cast<size_t>(kX86_64PointerSize);
   const size_t pc_return_addr_size = kFramePointerSize;
   const size_t callee_save_area_size = CalleeSaveRegisters().size() * kFramePointerSize;
   size_t total_size = method_ptr_size + pc_return_addr_size + callee_save_area_size;
 
-  CHECK(HasLocalReferenceSegmentState());
-  total_size += kFramePointerSize;
-
-  CHECK(HasHandleScope());
-  total_size += HandleScope::SizeOf(kX86_64PointerSize, ReferenceCount());
+  DCHECK(HasLocalReferenceSegmentState());
+  const size_t cookie_size = SavedLocalReferenceCookieSize();
+  total_size += cookie_size;
 
   // Plus return value spill area size
-  CHECK(SpillsReturnValue());
-  total_size += SizeOfReturnValue();
+  if (SpillsReturnValue()) {
+    // For 64-bit return values there shall be a 4B alignment gap between the cookie
+    // and the saved return value. However, we do not need to round the intermediate
+    // `total_size` here as the final rounding below shall add sufficient padding.
+    DCHECK_ALIGNED(total_size, 4u);
+    DCHECK(!IsAligned<8u>(total_size));
+    static_assert(IsAligned<8u>(kStackAlignment));
+    total_size += SizeOfReturnValue();
+  }
 
   return RoundUp(total_size, kStackAlignment);
 }

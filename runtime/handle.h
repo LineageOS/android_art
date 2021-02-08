@@ -93,14 +93,6 @@ class Handle : public ValueObject {
     return reference_->IsNull();
   }
 
-  ALWAYS_INLINE jobject ToJObject() const REQUIRES_SHARED(Locks::mutator_lock_) {
-    if (UNLIKELY(reference_->AsMirrorPtr() == nullptr)) {
-      // Special case so that we work with null handles.
-      return nullptr;
-    }
-    return reinterpret_cast<jobject>(reference_);
-  }
-
   ALWAYS_INLINE StackReference<mirror::Object>* GetReference() {
     return reference_;
   }
