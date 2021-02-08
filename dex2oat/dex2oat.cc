@@ -1407,7 +1407,7 @@ class Dex2Oat final {
 
     // At this point, file descriptors have been setup. Report that we're starting the compilation.
     PaletteHooks* hooks = nullptr;
-    if (PaletteGetHooks(&hooks) == PaletteStatus::kOkay) {
+    if (PaletteGetHooks(&hooks) == PALETTE_STATUS_OK) {
       // We dup the zip file descriptor, as the oat writer will close it in
       // OatWriter::CloseSources (we still want to close it there for
       // consistency with other kinds of inputs).
@@ -2164,7 +2164,7 @@ class Dex2Oat final {
     // Now that the files have been written to, report that we've ended the
     // compilation.
     PaletteHooks* hooks = nullptr;
-    if (PaletteGetHooks(&hooks) == PaletteStatus::kOkay) {
+    if (PaletteGetHooks(&hooks) == PALETTE_STATUS_OK) {
       hooks->NotifyEndDex2oatCompilation(zip_dup_fd_,
                                          IsAppImage() ? app_image_fd_ : image_fd_,
                                          oat_fd_,

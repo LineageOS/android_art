@@ -533,9 +533,9 @@ int JitMemoryRegion::CreateZygoteMemory(size_t capacity, std::string* error_msg)
   LOG(INFO) << "Falling back to ashmem implementation for JIT zygote mapping";
 
   int fd;
-  PaletteStatus status = PaletteAshmemCreateRegion(kRegionName, capacity, &fd);
-  if (status != PaletteStatus::kOkay) {
-    CHECK_EQ(status, PaletteStatus::kCheckErrno);
+  palette_status_t status = PaletteAshmemCreateRegion(kRegionName, capacity, &fd);
+  if (status != PALETTE_STATUS_OK) {
+    CHECK_EQ(status, PALETTE_STATUS_CHECK_ERRNO);
     std::ostringstream oss;
     oss << "Failed to create zygote mapping: " << strerror(errno);
     *error_msg = oss.str();
@@ -554,9 +554,9 @@ bool JitMemoryRegion::ProtectZygoteMemory(int fd, std::string* error_msg) {
       return false;
     }
   } else {
-    PaletteStatus status = PaletteAshmemSetProtRegion(fd, PROT_READ);
-    if (status != PaletteStatus::kOkay) {
-      CHECK_EQ(status, PaletteStatus::kCheckErrno);
+    palette_status_t status = PaletteAshmemSetProtRegion(fd, PROT_READ);
+    if (status != PALETTE_STATUS_OK) {
+      CHECK_EQ(status, PALETTE_STATUS_CHECK_ERRNO);
       std::ostringstream oss;
       oss << "Failed to protect zygote mapping: " << strerror(errno);
       *error_msg = oss.str();
