@@ -103,18 +103,22 @@ class ClassTable {
 
   using DescriptorHashPair = std::pair<const char*, uint32_t>;
 
-  class ClassDescriptorHashEquals {
+  class ClassDescriptorHash {
    public:
     // uint32_t for cross compilation.
     uint32_t operator()(const TableSlot& slot) const NO_THREAD_SAFETY_ANALYSIS;
+    // uint32_t for cross compilation.
+    uint32_t operator()(const DescriptorHashPair& pair) const NO_THREAD_SAFETY_ANALYSIS;
+  };
+
+  class ClassDescriptorEquals {
+   public:
     // Same class loader and descriptor.
     bool operator()(const TableSlot& a, const TableSlot& b) const
         NO_THREAD_SAFETY_ANALYSIS;
     // Same descriptor.
     bool operator()(const TableSlot& a, const DescriptorHashPair& b) const
         NO_THREAD_SAFETY_ANALYSIS;
-    // uint32_t for cross compilation.
-    uint32_t operator()(const DescriptorHashPair& pair) const NO_THREAD_SAFETY_ANALYSIS;
   };
 
   class TableSlotEmptyFn {
@@ -132,8 +136,8 @@ class ClassTable {
   // should be compared for a matching class descriptor and class loader.
   typedef HashSet<TableSlot,
                   TableSlotEmptyFn,
-                  ClassDescriptorHashEquals,
-                  ClassDescriptorHashEquals,
+                  ClassDescriptorHash,
+                  ClassDescriptorEquals,
                   TrackingAllocator<TableSlot, kAllocatorTagClassTable>> ClassSet;
 
   ClassTable();
