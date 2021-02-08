@@ -24,71 +24,71 @@
 
 #include "palette_system.h"
 
-enum PaletteStatus PaletteGetVersion(int32_t* version) {
+palette_status_t PaletteGetVersion(int32_t* version) {
   *version = art::palette::kPaletteVersion;
-  return PaletteStatus::kOkay;
+  return PALETTE_STATUS_OK;
 }
 
 // Cached thread priority for testing. No thread priorities are ever affected.
 static std::mutex g_tid_priority_map_mutex;
 static std::map<int32_t, int32_t> g_tid_priority_map;
 
-enum PaletteStatus PaletteSchedSetPriority(int32_t tid, int32_t priority) {
+palette_status_t PaletteSchedSetPriority(int32_t tid, int32_t priority) {
   if (priority < art::palette::kMinManagedThreadPriority ||
       priority > art::palette::kMaxManagedThreadPriority) {
-    return PaletteStatus::kInvalidArgument;
+    return PALETTE_STATUS_INVALID_ARGUMENT;
   }
   std::lock_guard guard(g_tid_priority_map_mutex);
   g_tid_priority_map[tid] = priority;
-  return PaletteStatus::kOkay;
+  return PALETTE_STATUS_OK;
 }
 
-enum PaletteStatus PaletteSchedGetPriority(int32_t tid,
+palette_status_t PaletteSchedGetPriority(int32_t tid,
                                            /*out*/int32_t* priority) {
   std::lock_guard guard(g_tid_priority_map_mutex);
   if (g_tid_priority_map.find(tid) == g_tid_priority_map.end()) {
     g_tid_priority_map[tid] = art::palette::kNormalManagedThreadPriority;
   }
   *priority = g_tid_priority_map[tid];
-  return PaletteStatus::kOkay;
+  return PALETTE_STATUS_OK;
 }
 
-enum PaletteStatus PaletteWriteCrashThreadStacks(/*in*/ const char* stacks, size_t stacks_len) {
+palette_status_t PaletteWriteCrashThreadStacks(/*in*/ const char* stacks, size_t stacks_len) {
   LOG(INFO) << std::string_view(stacks, stacks_len);
-  return PaletteStatus::kOkay;
+  return PALETTE_STATUS_OK;
 }
 
-enum PaletteStatus PaletteTraceEnabled(/*out*/int32_t* enabled) {
+palette_status_t PaletteTraceEnabled(/*out*/int32_t* enabled) {
   *enabled = 0;
-  return PaletteStatus::kOkay;
+  return PALETTE_STATUS_OK;
 }
 
-enum PaletteStatus PaletteTraceBegin(const char* name ATTRIBUTE_UNUSED) {
-  return PaletteStatus::kOkay;
+palette_status_t PaletteTraceBegin(const char* name ATTRIBUTE_UNUSED) {
+  return PALETTE_STATUS_OK;
 }
 
-enum PaletteStatus PaletteTraceEnd() {
-  return PaletteStatus::kOkay;
+palette_status_t PaletteTraceEnd() {
+  return PALETTE_STATUS_OK;
 }
 
-enum PaletteStatus PaletteTraceIntegerValue(const char* name ATTRIBUTE_UNUSED,
+palette_status_t PaletteTraceIntegerValue(const char* name ATTRIBUTE_UNUSED,
                                             int32_t value ATTRIBUTE_UNUSED) {
-  return PaletteStatus::kOkay;
+  return PALETTE_STATUS_OK;
 }
 
-enum PaletteStatus PaletteAshmemCreateRegion(const char* name ATTRIBUTE_UNUSED,
+palette_status_t PaletteAshmemCreateRegion(const char* name ATTRIBUTE_UNUSED,
                                              size_t size ATTRIBUTE_UNUSED,
                                              int* fd) {
   *fd = -1;
-  return PaletteStatus::kNotSupported;
+  return PALETTE_STATUS_NOT_SUPPORTED;
 }
 
-enum PaletteStatus PaletteAshmemSetProtRegion(int fd ATTRIBUTE_UNUSED,
+palette_status_t PaletteAshmemSetProtRegion(int fd ATTRIBUTE_UNUSED,
                                               int prot ATTRIBUTE_UNUSED) {
-  return PaletteStatus::kNotSupported;
+  return PALETTE_STATUS_NOT_SUPPORTED;
 }
 
-enum PaletteStatus PaletteGetHooks(PaletteHooks** hooks) {
+palette_status_t PaletteGetHooks(PaletteHooks** hooks) {
   *hooks = nullptr;
-  return PaletteStatus::kNotSupported;
+  return PALETTE_STATUS_NOT_SUPPORTED;
 }

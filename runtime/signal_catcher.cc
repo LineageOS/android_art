@@ -105,11 +105,11 @@ bool SignalCatcher::ShouldHalt() {
 
 void SignalCatcher::Output(const std::string& s) {
   ScopedThreadStateChange tsc(Thread::Current(), kWaitingForSignalCatcherOutput);
-  PaletteStatus status = PaletteWriteCrashThreadStacks(s.data(), s.size());
-  if (status == PaletteStatus::kOkay) {
+  palette_status_t status = PaletteWriteCrashThreadStacks(s.data(), s.size());
+  if (status == PALETTE_STATUS_OK) {
     LOG(INFO) << "Wrote stack traces to tombstoned";
   } else {
-    CHECK(status == PaletteStatus::kFailedCheckLog);
+    CHECK(status == PALETTE_STATUS_FAILED_CHECK_LOG);
     LOG(ERROR) << "Failed to write stack traces to tombstoned";
   }
 }

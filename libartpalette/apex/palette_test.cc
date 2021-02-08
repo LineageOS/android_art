@@ -37,34 +37,34 @@ class PaletteClientTest : public testing::Test {};
 
 TEST_F(PaletteClientTest, GetVersion) {
   int32_t version = -1;
-  PaletteStatus status = PaletteGetVersion(&version);
-  ASSERT_EQ(PaletteStatus::kOkay, status);
+  palette_status_t status = PaletteGetVersion(&version);
+  ASSERT_EQ(PALETTE_STATUS_OK, status);
   ASSERT_GE(version, 1);
 }
 
 TEST_F(PaletteClientTest, SchedPriority) {
   int32_t tid = GetTid();
   int32_t saved_priority;
-  EXPECT_EQ(PaletteStatus::kOkay, PaletteSchedGetPriority(tid, &saved_priority));
+  EXPECT_EQ(PALETTE_STATUS_OK, PaletteSchedGetPriority(tid, &saved_priority));
 
-  EXPECT_EQ(PaletteStatus::kInvalidArgument, PaletteSchedSetPriority(tid, /*java_priority=*/ 0));
-  EXPECT_EQ(PaletteStatus::kInvalidArgument, PaletteSchedSetPriority(tid, /*java_priority=*/ -1));
-  EXPECT_EQ(PaletteStatus::kInvalidArgument, PaletteSchedSetPriority(tid, /*java_priority=*/ 11));
+  EXPECT_EQ(PALETTE_STATUS_INVALID_ARGUMENT, PaletteSchedSetPriority(tid, /*java_priority=*/ 0));
+  EXPECT_EQ(PALETTE_STATUS_INVALID_ARGUMENT, PaletteSchedSetPriority(tid, /*java_priority=*/ -1));
+  EXPECT_EQ(PALETTE_STATUS_INVALID_ARGUMENT, PaletteSchedSetPriority(tid, /*java_priority=*/ 11));
 
-  EXPECT_EQ(PaletteStatus::kOkay, PaletteSchedSetPriority(tid, /*java_priority=*/ 1));
-  EXPECT_EQ(PaletteStatus::kOkay, PaletteSchedSetPriority(tid, saved_priority));
+  EXPECT_EQ(PALETTE_STATUS_OK, PaletteSchedSetPriority(tid, /*java_priority=*/ 1));
+  EXPECT_EQ(PALETTE_STATUS_OK, PaletteSchedSetPriority(tid, saved_priority));
 }
 
 TEST_F(PaletteClientTest, Trace) {
   int32_t enabled;
-  EXPECT_EQ(PaletteStatus::kOkay, PaletteTraceEnabled(&enabled));
-  EXPECT_EQ(PaletteStatus::kOkay, PaletteTraceBegin("Hello world!"));
-  EXPECT_EQ(PaletteStatus::kOkay, PaletteTraceEnd());
-  EXPECT_EQ(PaletteStatus::kOkay, PaletteTraceIntegerValue("Beans", /*value=*/ 3));
+  EXPECT_EQ(PALETTE_STATUS_OK, PaletteTraceEnabled(&enabled));
+  EXPECT_EQ(PALETTE_STATUS_OK, PaletteTraceBegin("Hello world!"));
+  EXPECT_EQ(PALETTE_STATUS_OK, PaletteTraceEnd());
+  EXPECT_EQ(PALETTE_STATUS_OK, PaletteTraceIntegerValue("Beans", /*value=*/ 3));
 }
 
 TEST_F(PaletteClientTest, GetHooks) {
   PaletteHooks* hooks = nullptr;
-  PaletteStatus status = PaletteGetHooks(&hooks);
-  ASSERT_TRUE(status == PaletteStatus::kOkay || status == PaletteStatus::kNotSupported);
+  palette_status_t status = PaletteGetHooks(&hooks);
+  ASSERT_TRUE(status == PALETTE_STATUS_OK || status == PALETTE_STATUS_NOT_SUPPORTED);
 }
