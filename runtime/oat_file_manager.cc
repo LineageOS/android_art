@@ -68,7 +68,7 @@ const OatFile* OatFileManager::RegisterOatFile(std::unique_ptr<const OatFile> oa
   // Use class_linker vlog to match the log for dex file registration.
   VLOG(class_linker) << "Registered oat file " << oat_file->GetLocation();
   PaletteHooks* hooks = nullptr;
-  if (PaletteGetHooks(&hooks) == PaletteStatus::kOkay) {
+  if (PaletteGetHooks(&hooks) == PALETTE_STATUS_OK) {
     hooks->NotifyOatFileLoaded(oat_file->GetLocation().c_str());
   }
 
