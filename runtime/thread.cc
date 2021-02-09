@@ -1049,11 +1049,14 @@ Thread* Thread::Attach(const char* thread_name,
       self->CreatePeer(thread_name, as_daemon, thread_group);
       if (self->IsExceptionPending()) {
         // We cannot keep the exception around, as we're deleting self. Try to be helpful and log
-        // it.
+        // the failure but do not dump the exception details. If we fail to allocate the peer, we
+        // usually also fail to allocate an exception object and throw a pre-allocated OOME without
+        // any useful information. If we do manage to allocate the exception object, the memory
+        // information in the message could have been collected too late and therefore misleading.
         {
           ScopedObjectAccess soa(self);
-          LOG(ERROR) << "Exception creating thread peer:";
-          LOG(ERROR) << self->GetException()->Dump();
+          LOG(ERROR) << "Exception creating thread peer: "
+                     << ((thread_name != nullptr) ? thread_name : "<null>");
           self->ClearException();
         }
         return false;
