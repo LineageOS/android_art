@@ -419,9 +419,6 @@ class ImageWriter final {
   void UpdateImageBinSlotOffset(mirror::Object* object, size_t oat_index, size_t new_offset)
       REQUIRES_SHARED(Locks::mutator_lock_);
 
-  void AddMethodPointerArray(ObjPtr<mirror::PointerArray> arr)
-      REQUIRES_SHARED(Locks::mutator_lock_);
-
   // Returns the address in the boot image if we are compiling the app image.
   const uint8_t* GetOatAddress(StubType type) const;
 
@@ -475,6 +472,10 @@ class ImageWriter final {
   void CopyAndFixupNativeData(size_t oat_index) REQUIRES_SHARED(Locks::mutator_lock_);
   void CopyAndFixupObjects() REQUIRES_SHARED(Locks::mutator_lock_);
   void CopyAndFixupObject(mirror::Object* obj) REQUIRES_SHARED(Locks::mutator_lock_);
+  template <bool kCheckIfDone>
+  mirror::Object* CopyObject(mirror::Object* obj) REQUIRES_SHARED(Locks::mutator_lock_);
+  void CopyAndFixupMethodPointerArray(mirror::PointerArray* arr)
+      REQUIRES_SHARED(Locks::mutator_lock_);
   void CopyAndFixupMethod(ArtMethod* orig, ArtMethod* copy, size_t oat_index)
       REQUIRES_SHARED(Locks::mutator_lock_);
   void CopyAndFixupImTable(ImTable* orig, ImTable* copy)
@@ -499,8 +500,6 @@ class ImageWriter final {
   void FixupClass(mirror::Class* orig, mirror::Class* copy)
       REQUIRES_SHARED(Locks::mutator_lock_);
   void FixupObject(mirror::Object* orig, mirror::Object* copy)
-      REQUIRES_SHARED(Locks::mutator_lock_);
-  void FixupMethodPointerArray(mirror::Object* dst, mirror::PointerArray* arr)
       REQUIRES_SHARED(Locks::mutator_lock_);
 
   // Get quick code for non-resolution/imt_conflict/abstract method.
@@ -634,10 +633,6 @@ class ImageWriter final {
 
   // Offset from image_begin_ to where the first object is in image_.
   size_t image_objects_offset_begin_;
-
-  // Method pointer arrays that need to be updated. Since these are only some int and long arrays,
-  // we need to keep track. These include vtable arrays and iftable arrays.
-  HashSet<mirror::PointerArray*> method_pointer_arrays_;
 
   // Saved hash codes. We use these to restore lockwords which were temporarily used to have
   // forwarding addresses as well as copying over hash codes.

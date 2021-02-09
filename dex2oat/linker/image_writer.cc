@@ -636,23 +636,6 @@ void ImageWriter::SetImageBinSlot(mirror::Object* object, BinSlot bin_slot) {
   DCHECK(IsImageBinSlotAssigned(object));
 }
 
-void ImageWriter::AddMethodPointerArray(ObjPtr<mirror::PointerArray> arr) {
-  DCHECK(arr != nullptr);
-  if (kIsDebugBuild) {
-    for (size_t i = 0, len = arr->GetLength(); i < len; i++) {
-      ArtMethod* method = arr->GetElementPtrSize<ArtMethod*>(i, target_ptr_size_);
-      if (method != nullptr && !method->IsRuntimeMethod()) {
-        ObjPtr<mirror::Class> klass = method->GetDeclaringClass();
-        CHECK(klass == nullptr || KeepClass(klass))
-            << Class::PrettyClass(klass) << " should be a kept class";
-      }
-    }
-  }
-  // kBinArtMethodClean picked arbitrarily, just required to differentiate between ArtFields and
-  // ArtMethods.
-  method_pointer_arrays_.insert(arr.Ptr());
-}
-
 ImageWriter::Bin ImageWriter::AssignImageBinSlot(mirror::Object* object, size_t oat_index) {
   DCHECK(object != nullptr);
   size_t object_size = object->SizeOf();
@@ -696,20 +679,6 @@ ImageWriter::Bin ImageWriter::AssignImageBinSlot(mirror::Object* object, size_t 
     if (object->IsClass()) {
       bin = Bin::kClassVerified;
       ObjPtr<mirror::Class> klass = object->AsClass();
-
-      // Add non-embedded vtable to the pointer array table if there is one.
-      ObjPtr<mirror::PointerArray> vtable = klass->GetVTable();
-      if (vtable != nullptr) {
-        AddMethodPointerArray(vtable);
-      }
-      ObjPtr<mirror::IfTable> iftable = klass->GetIfTable();
-      if (iftable != nullptr) {
-        for (int32_t i = 0; i < klass->GetIfTableCount(); ++i) {
-          if (iftable->GetMethodArrayCount(i) > 0) {
-            AddMethodPointerArray(iftable->GetMethodArray(i));
-          }
-        }
-      }
 
       // Move known dirty objects into their own sections. This includes:
       //   - classes with dirty static fields.
@@ -2834,8 +2803,12 @@ void ImageWriter::CopyAndFixupNativeData(size_t oat_index) {
   }
 }
 
-void ImageWriter::FixupMethodPointerArray(mirror::Object* dst, mirror::PointerArray* arr) {
-  CHECK(arr->IsIntArray() || arr->IsLongArray()) << arr->GetClass()->PrettyClass() << " " << arr;
+void ImageWriter::CopyAndFixupMethodPointerArray(mirror::PointerArray* arr) {
+  // Pointer arrays are processed early and each is visited just once.
+  // Therefore we know that this array has not been copied yet.
+  mirror::Object* dst = CopyObject</*kCheckIfDone=*/ false>(arr);
+  DCHECK(dst != nullptr);
+  DCHECK(arr->IsIntArray() || arr->IsLongArray()) << arr->GetClass()->PrettyClass() << " " << arr;
   // Fixup int and long pointers for the ArtMethod or ArtField arrays.
   const size_t num_elements = arr->GetLength();
   CopyAndFixupReference(
@@ -2861,6 +2834,15 @@ void ImageWriter::CopyAndFixupObject(Object* obj) {
   if (!IsImageBinSlotAssigned(obj)) {
     return;
   }
+  // Some objects (such as method pointer arrays) may have been processed before.
+  mirror::Object* dst = CopyObject</*kCheckIfDone=*/ true>(obj);
+  if (dst != nullptr) {
+    FixupObject(obj, dst);
+  }
+}
+
+template <bool kCheckIfDone>
+inline Object* ImageWriter::CopyObject(Object* obj) {
   size_t oat_index = GetOatIndex(obj);
   size_t offset = GetImageOffset(obj, oat_index);
   ImageInfo& image_info = GetImageInfo(oat_index);
@@ -2868,7 +2850,12 @@ void ImageWriter::CopyAndFixupObject(Object* obj) {
   DCHECK_LT(offset, image_info.image_end_);
   const auto* src = reinterpret_cast<const uint8_t*>(obj);
 
-  image_info.image_bitmap_.Set(dst);  // Mark the obj as live.
+  bool done = image_info.image_bitmap_.Set(dst);  // Mark the obj as live.
+  // Check if the object was already copied, unless the caller indicated that it was not.
+  if (kCheckIfDone && done) {
+    return nullptr;
+  }
+  DCHECK(!done);
 
   const size_t n = obj->SizeOf();
 
@@ -2896,7 +2883,7 @@ void ImageWriter::CopyAndFixupObject(Object* obj) {
     // safe since we mark all of the objects that may reference non immune objects as gray.
     CHECK(dst->AtomicSetMarkBit(0, 1));
   }
-  FixupObject(obj, dst);
+  return dst;
 }
 
 // Rewrite all the references in the copied object to point to their image address equivalent
@@ -2932,12 +2919,67 @@ class ImageWriter::FixupVisitor {
   mirror::Object* const copy_;
 };
 
+// Visit method pointer arrays in `klass` that were not inherited from its superclass.
+template <typename Visitor>
+static void VisitNewMethodPointerArrays(ObjPtr<mirror::Class> klass, Visitor&& visitor)
+    REQUIRES_SHARED(Locks::mutator_lock_) {
+  ObjPtr<mirror::Class> super = klass->GetSuperClass<kVerifyNone, kWithoutReadBarrier>();
+  ObjPtr<mirror::PointerArray> vtable = klass->GetVTable<kVerifyNone, kWithoutReadBarrier>();
+  if (vtable != nullptr &&
+      (super == nullptr || vtable != super->GetVTable<kVerifyNone, kWithoutReadBarrier>())) {
+    visitor(vtable);
+  }
+  int32_t iftable_count = klass->GetIfTableCount();
+  int32_t super_iftable_count = (super != nullptr) ? super->GetIfTableCount() : 0;
+  ObjPtr<mirror::IfTable> iftable = klass->GetIfTable<kVerifyNone, kWithoutReadBarrier>();
+  ObjPtr<mirror::IfTable> super_iftable =
+      (super != nullptr) ? super->GetIfTable<kVerifyNone, kWithoutReadBarrier>() : nullptr;
+  for (int32_t i = 0; i < iftable_count; ++i) {
+    ObjPtr<mirror::PointerArray> methods =
+        iftable->GetMethodArrayOrNull<kVerifyNone, kWithoutReadBarrier>(i);
+    ObjPtr<mirror::PointerArray> super_methods = (i < super_iftable_count)
+        ? super_iftable->GetMethodArrayOrNull<kVerifyNone, kWithoutReadBarrier>(i)
+        : nullptr;
+    if (methods != super_methods) {
+      DCHECK(methods != nullptr);
+      if (i < super_iftable_count) {
+        DCHECK(super_methods != nullptr);
+        DCHECK_EQ(methods->GetLength(), super_methods->GetLength());
+      }
+      visitor(methods);
+    }
+  }
+}
+
 void ImageWriter::CopyAndFixupObjects() {
+  // Copy and fix up pointer arrays first as they require special treatment.
+  auto method_pointer_array_visitor =
+      [&](ObjPtr<mirror::PointerArray> pointer_array) REQUIRES_SHARED(Locks::mutator_lock_) {
+        CopyAndFixupMethodPointerArray(pointer_array.Ptr());
+      };
+  for (ImageInfo& image_info : image_infos_) {
+    if (image_info.class_table_size_ != 0u) {
+      DCHECK(image_info.class_table_.has_value());
+      for (const ClassTable::TableSlot slot : *image_info.class_table_) {
+        ObjPtr<mirror::Class> klass = slot.Read<kWithoutReadBarrier>();
+        DCHECK(klass != nullptr);
+        // Do not process boot image classes present in app image class table.
+        DCHECK(!IsInBootImage(klass.Ptr()) || compiler_options_.IsAppImage());
+        if (!IsInBootImage(klass.Ptr())) {
+          // Do not fix up method pointer arrays inherited from superclass. If they are part
+          // of the current image, they were or shall be copied when visiting the superclass.
+          VisitNewMethodPointerArrays(klass, method_pointer_array_visitor);
+        }
+      }
+    }
+  }
+
   auto visitor = [&](Object* obj) REQUIRES_SHARED(Locks::mutator_lock_) {
     DCHECK(obj != nullptr);
     CopyAndFixupObject(obj);
   };
   Runtime::Current()->GetHeap()->VisitObjects(visitor);
+
   // Fill the padding objects since they are required for in order traversal of the image space.
   for (ImageInfo& image_info : image_infos_) {
     for (const size_t start_offset : image_info.padding_offsets_) {
@@ -2959,6 +3001,7 @@ void ImageWriter::CopyAndFixupObjects() {
       }
     }
   }
+
   // We no longer need the hashcode map, values have already been copied to target objects.
   saved_hashcode_map_.clear();
 }
@@ -3074,16 +3117,6 @@ void ImageWriter::FixupObject(Object* orig, Object* copy) {
   DCHECK(copy != nullptr);
   if (kUseBakerReadBarrier) {
     orig->AssertReadBarrierState();
-  }
-  if (orig->IsIntArray() || orig->IsLongArray()) {
-    // Is this a native pointer array?
-    auto it = method_pointer_arrays_.find(down_cast<mirror::PointerArray*>(orig));
-    if (it != method_pointer_arrays_.end()) {
-      // Should only need to fixup every pointer array exactly once.
-      FixupMethodPointerArray(copy, down_cast<mirror::PointerArray*>(orig));
-      method_pointer_arrays_.erase(it);
-      return;
-    }
   }
   if (orig->IsClass()) {
     FixupClass(orig->AsClass<kVerifyNone>().Ptr(), down_cast<mirror::Class*>(copy));
