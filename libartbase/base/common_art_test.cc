@@ -295,6 +295,10 @@ void CommonArtTestImpl::SetUpAndroidDataDir(std::string& android_data) {
 }
 
 void CommonArtTestImpl::SetUp() {
+  // Some tests clear these and when running with --no_isolate this can cause
+  // later tests to fail
+  Locks::Init();
+  MemMap::Init();
   SetUpAndroidRootEnvVars();
   SetUpAndroidDataDir(android_data_);
 

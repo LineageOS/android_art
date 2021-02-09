@@ -307,7 +307,7 @@ void InternTable::SweepInternTableWeaks(IsMarkedVisitor* visitor) {
   weak_interns_.SweepWeaks(visitor);
 }
 
-std::size_t InternTable::StringHashEquals::operator()(const GcRoot<mirror::String>& root) const {
+std::size_t InternTable::StringHash::operator()(const GcRoot<mirror::String>& root) const {
   if (kIsDebugBuild) {
     Locks::mutator_lock_->AssertSharedHeld(Thread::Current());
   }
@@ -316,16 +316,16 @@ std::size_t InternTable::StringHashEquals::operator()(const GcRoot<mirror::Strin
       static_cast<uint32_t>(root.Read<kWithoutReadBarrier>()->GetHashCode()));
 }
 
-bool InternTable::StringHashEquals::operator()(const GcRoot<mirror::String>& a,
-                                               const GcRoot<mirror::String>& b) const {
+bool InternTable::StringEquals::operator()(const GcRoot<mirror::String>& a,
+                                           const GcRoot<mirror::String>& b) const {
   if (kIsDebugBuild) {
     Locks::mutator_lock_->AssertSharedHeld(Thread::Current());
   }
   return a.Read<kWithoutReadBarrier>()->Equals(b.Read<kWithoutReadBarrier>());
 }
 
-bool InternTable::StringHashEquals::operator()(const GcRoot<mirror::String>& a,
-                                               const Utf8String& b) const {
+bool InternTable::StringEquals::operator()(const GcRoot<mirror::String>& a,
+                                           const Utf8String& b) const {
   if (kIsDebugBuild) {
     Locks::mutator_lock_->AssertSharedHeld(Thread::Current());
   }
