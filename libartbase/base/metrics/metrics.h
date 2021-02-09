@@ -22,12 +22,13 @@
 #include <array>
 #include <atomic>
 #include <optional>
-#include <ostream>
+#include <sstream>
 #include <string_view>
 #include <thread>
 #include <vector>
 
 #include "android-base/logging.h"
+#include "base/compiler_filter.h"
 #include "base/time_utils.h"
 
 #pragma clang diagnostic push
@@ -79,10 +80,59 @@ enum class DatumId {
 #undef ART_HISTOGRAM
 };
 
+// We log compilation reasons as part of the metadata we report. Since elsewhere compilation reasons
+// are specified as a string, we define them as an enum here which indicates the reasons that we
+// support.
+enum class CompilationReason {
+  kError,
+  kUnknown,
+  kFirstBoot,
+  kBoot,
+  kInstall,
+  kBgDexopt,
+  kABOTA,
+  kInactive,
+  kShared,
+  kInstallWithDexMetadata,
+};
+
+constexpr const char* CompilationReasonName(CompilationReason reason) {
+  switch (reason) {
+    case CompilationReason::kError:
+      return "Error";
+    case CompilationReason::kUnknown:
+      return "Unknown";
+    case CompilationReason::kFirstBoot:
+      return "FirstBoot";
+    case CompilationReason::kBoot:
+      return "Boot";
+    case CompilationReason::kInstall:
+      return "Install";
+    case CompilationReason::kBgDexopt:
+      return "BgDexopt";
+    case CompilationReason::kABOTA:
+      return "ABOTA";
+    case CompilationReason::kInactive:
+      return "Inactive";
+    case CompilationReason::kShared:
+      return "Shared";
+    case CompilationReason::kInstallWithDexMetadata:
+      return "InstallWithDexMetadata";
+  }
+}
+
+// SessionData contains metadata about a metrics session (basically the lifetime of an ART process).
+// This information should not change for the lifetime of the session.
 struct SessionData {
-  const uint64_t session_id;
-  const std::string_view package_name;
-  // TODO: compiler filter / dexopt state
+  static SessionData CreateDefault();
+
+  static constexpr int64_t kInvalidSessionId = -1;
+  static constexpr int32_t kInvalidUserId = -1;
+
+  int64_t session_id;
+  int32_t uid;
+  CompilationReason compilation_reason;
+  std::optional<CompilerFilter::Filter> compiler_filter;
 };
 
 // MetricsBackends are used by a metrics reporter to write metrics to some external location. For
@@ -91,7 +141,6 @@ class MetricsBackend {
  public:
   virtual ~MetricsBackend() {}
 
- protected:
   // Begins an ART metrics session.
   //
   // This is called by the metrics reporter when the runtime is starting up. The session_data
@@ -100,12 +149,9 @@ class MetricsBackend {
   // for this process.
   virtual void BeginSession(const SessionData& session_data) = 0;
 
-  // Marks the end of a metrics session.
-  //
-  // The metrics reporter will call this when metrics reported ends (e.g. when the runtime is
-  // shutting down). No further metrics will be reported for this session. Note that EndSession is
-  // not guaranteed to be called, since clean shutdowns for the runtime are quite rare in practice.
-  virtual void EndSession() = 0;
+ protected:
+  // Called by the metrics reporter to indicate that a new metrics report is starting.
+  virtual void BeginReport(uint64_t timestamp_millis) = 0;
 
   // Called by the metrics reporter to give the current value of the counter with id counter_type.
   //
@@ -129,10 +175,14 @@ class MetricsBackend {
                                int64_t maximum_value,
                                const std::vector<uint32_t>& buckets) = 0;
 
+  // Called by the metrics reporter to indicate that the current metrics report is complete.
+  virtual void EndReport() = 0;
+
   template <DatumId counter_type>
   friend class MetricsCounter;
   template <DatumId histogram_type, size_t num_buckets, int64_t low_value, int64_t high_value>
   friend class MetricsHistogram;
+  friend class ArtMetrics;
 };
 
 template <DatumId counter_type>
@@ -208,13 +258,16 @@ class MetricsHistogram {
   static_assert(std::atomic<value_t>::is_always_lock_free);
 };
 
-// A backend that writes metrics in a human-readable format to an std::ostream.
-class StreamBackend : public MetricsBackend {
+// A backend that writes metrics in a human-readable format to a string.
+//
+// This is used as a base for LogBackend and FileBackend.
+class StringBackend : public MetricsBackend {
  public:
-  explicit StreamBackend(std::ostream& os);
+  StringBackend();
 
   void BeginSession(const SessionData& session_data) override;
-  void EndSession() override;
+
+  void BeginReport(uint64_t timestamp_millis) override;
 
   void ReportCounter(DatumId counter_type, uint64_t value) override;
 
@@ -223,8 +276,40 @@ class StreamBackend : public MetricsBackend {
                        int64_t high_value,
                        const std::vector<uint32_t>& buckets) override;
 
+  void EndReport() override;
+
+  std::string GetAndResetBuffer();
+
  private:
-  std::ostream& os_;
+  std::ostringstream os_;
+  std::optional<SessionData> session_data_;
+};
+
+// A backend that writes metrics in human-readable format to the log (i.e. logcat).
+class LogBackend : public StringBackend {
+ public:
+  explicit LogBackend(android::base::LogSeverity level);
+
+  void BeginReport(uint64_t timestamp_millis) override;
+  void EndReport() override;
+
+ private:
+  android::base::LogSeverity level_;
+};
+
+// A backend that writes metrics to a file.
+//
+// These are currently written in the same human-readable format used by StringBackend and
+// LogBackend, but we will probably want a more machine-readable format in the future.
+class FileBackend : public StringBackend {
+ public:
+  explicit FileBackend(std::string filename);
+
+  void BeginReport(uint64_t timestamp_millis) override;
+  void EndReport() override;
+
+ private:
+  std::string filename_;
 };
 
 /**
@@ -323,14 +408,7 @@ class ArtMetrics {
 #undef ART_HISTOGRAM
 
  private:
-  // This field is only included to allow us expand the ART_COUNTERS and ART_HISTOGRAMS macro in
-  // the initializer list in ArtMetrics::ArtMetrics. See metrics.cc for how it's used.
-  //
-  // It's declared as a zero-length array so it has no runtime space impact.
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wunused-private-field"
-  int unused_[0];
-#pragma clang diagnostic pop  // -Wunused-private-field
+  uint64_t beginning_timestamp_;
 
 #define ART_COUNTER(name) MetricsCounter<DatumId::k##name> name##_;
   ART_COUNTERS(ART_COUNTER)

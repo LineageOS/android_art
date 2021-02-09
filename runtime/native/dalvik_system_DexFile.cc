@@ -21,6 +21,7 @@
 #include "android-base/stringprintf.h"
 
 #include "base/casts.h"
+#include "base/compiler_filter.h"
 #include "base/file_utils.h"
 #include "base/hiddenapi_domain.h"
 #include "base/logging.h"
@@ -31,7 +32,6 @@
 #include "class_linker.h"
 #include "class_loader_context.h"
 #include "common_throws.h"
-#include "compiler_filter.h"
 #include "dex/art_dex_file_loader.h"
 #include "dex/descriptors_names.h"
 #include "dex/dex_file-inl.h"

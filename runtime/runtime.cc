@@ -1070,7 +1070,10 @@ void Runtime::InitNonZygoteOrPostFork(
   heap_->ResetGcPerformanceInfo();
 
   if (metrics_reporter_ != nullptr) {
-    metrics_reporter_->MaybeStartBackgroundThread();
+    metrics::SessionData session_data{metrics::SessionData::CreateDefault()};
+    session_data.session_id = GetRandomNumber<int64_t>(0, std::numeric_limits<int64_t>::max());
+    // TODO: set session_data.compilation_reason and session_data.compiler_filter
+    metrics_reporter_->MaybeStartBackgroundThread(session_data);
   }
 
   StartSignalCatcher();

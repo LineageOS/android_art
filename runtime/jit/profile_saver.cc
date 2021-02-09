@@ -24,6 +24,7 @@
 #include "android-base/strings.h"
 
 #include "art_method-inl.h"
+#include "base/compiler_filter.h"
 #include "base/enums.h"
 #include "base/logging.h"  // For VLOG.
 #include "base/scoped_arena_containers.h"
@@ -31,7 +32,6 @@
 #include "base/systrace.h"
 #include "base/time_utils.h"
 #include "class_table-inl.h"
-#include "compiler_filter.h"
 #include "dex/dex_file_loader.h"
 #include "dex_reference_collection.h"
 #include "gc/collector_type.h"
