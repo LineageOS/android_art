@@ -189,6 +189,8 @@ class ImageWriter final {
     kClassInitializedFinalStatics,  // Class initializers have been run, no non-final statics
     // Likely-clean:
     kString,                      // [String] Almost always immutable (except for obj header).
+    // Definitely clean:
+    kMethodPointerArray,          // ART internal vtables and interface method tables, int[]/long[].
     // Add more bins here if we add more segregation code.
     // Non mirror fields must be below.
     // ArtFields should be always clean.
@@ -408,7 +410,9 @@ class ImageWriter final {
 
   Bin AssignImageBinSlot(mirror::Object* object, size_t oat_index)
       REQUIRES_SHARED(Locks::mutator_lock_);
-  void RecordNativeRelocations(ObjPtr<mirror::Object> obj, size_t oat_index)
+  void AssignImageBinSlot(mirror::Object* object, size_t oat_index, Bin bin)
+      REQUIRES_SHARED(Locks::mutator_lock_);
+  void RecordNativeRelocations(ObjPtr<mirror::Class> klass, size_t oat_index)
       REQUIRES_SHARED(Locks::mutator_lock_);
   void SetImageBinSlot(mirror::Object* object, BinSlot bin_slot)
       REQUIRES_SHARED(Locks::mutator_lock_);

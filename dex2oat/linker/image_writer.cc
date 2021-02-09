@@ -638,7 +638,6 @@ void ImageWriter::SetImageBinSlot(mirror::Object* object, BinSlot bin_slot) {
 
 ImageWriter::Bin ImageWriter::AssignImageBinSlot(mirror::Object* object, size_t oat_index) {
   DCHECK(object != nullptr);
-  size_t object_size = object->SizeOf();
 
   // The magic happens here. We segregate objects into different bins based
   // on how likely they are to get dirty at runtime.
@@ -722,6 +721,14 @@ ImageWriter::Bin ImageWriter::AssignImageBinSlot(mirror::Object* object, size_t 
     // else bin = kBinRegular
   }
 
+  AssignImageBinSlot(object, oat_index, bin);
+  return bin;
+}
+
+void ImageWriter::AssignImageBinSlot(mirror::Object* object, size_t oat_index, Bin bin) {
+  DCHECK(object != nullptr);
+  size_t object_size = object->SizeOf();
+
   // Assign the oat index too.
   if (IsMultiImage()) {
     DCHECK(oat_index_map_.find(object) == oat_index_map_.end());
@@ -745,8 +752,6 @@ ImageWriter::Bin ImageWriter::AssignImageBinSlot(mirror::Object* object, size_t 
 
   // Grow the image closer to the end by the object we just assigned.
   image_info.image_end_ += offset_delta;
-
-  return bin;
 }
 
 bool ImageWriter::WillMethodBeDirty(ArtMethod* m) const {
@@ -1325,98 +1330,93 @@ ObjPtr<ObjectArray<Object>> ImageWriter::CreateImageRoots(
   return image_roots.Get();
 }
 
-void ImageWriter::RecordNativeRelocations(ObjPtr<mirror::Object> obj, size_t oat_index) {
-  if (obj->IsClass()) {
-    // Visit and assign offsets for fields and field arrays.
-    ObjPtr<mirror::Class> as_klass = obj->AsClass();
-    DCHECK_EQ(oat_index, GetOatIndexForClass(as_klass));
-    DCHECK(!as_klass->IsErroneous()) << as_klass->GetStatus();
-    if (compiler_options_.IsAppImage()) {
-      // Extra consistency check: no boot loader classes should be left!
-      CHECK(!IsBootClassLoaderClass(as_klass)) << as_klass->PrettyClass();
-    }
-    LengthPrefixedArray<ArtField>* fields[] = {
-        as_klass->GetSFieldsPtr(), as_klass->GetIFieldsPtr(),
-    };
-    ImageInfo& image_info = GetImageInfo(oat_index);
-    for (LengthPrefixedArray<ArtField>* cur_fields : fields) {
-      // Total array length including header.
-      if (cur_fields != nullptr) {
-        // Forward the entire array at once.
-        size_t offset = image_info.GetBinSlotSize(Bin::kArtField);
-        DCHECK(!IsInBootImage(cur_fields));
-        bool inserted =
-            native_object_relocations_.insert(std::make_pair(
-                cur_fields,
-                NativeObjectRelocation {
-                    oat_index, offset, NativeObjectRelocationType::kArtFieldArray
-                })).second;
-        CHECK(inserted) << "Field array " << cur_fields << " already forwarded";
-        const size_t size = LengthPrefixedArray<ArtField>::ComputeSize(cur_fields->size());
-        offset += size;
-        image_info.IncrementBinSlotSize(Bin::kArtField, size);
-        DCHECK_EQ(offset, image_info.GetBinSlotSize(Bin::kArtField));
-      }
-    }
-    // Visit and assign offsets for methods.
-    size_t num_methods = as_klass->NumMethods();
-    if (num_methods != 0) {
-      bool any_dirty = false;
-      for (auto& m : as_klass->GetMethods(target_ptr_size_)) {
-        if (WillMethodBeDirty(&m)) {
-          any_dirty = true;
-          break;
-        }
-      }
-      NativeObjectRelocationType type = any_dirty
-          ? NativeObjectRelocationType::kArtMethodDirty
-          : NativeObjectRelocationType::kArtMethodClean;
-      Bin bin_type = BinTypeForNativeRelocationType(type);
-      // Forward the entire array at once, but header first.
-      const size_t method_alignment = ArtMethod::Alignment(target_ptr_size_);
-      const size_t method_size = ArtMethod::Size(target_ptr_size_);
-      const size_t header_size = LengthPrefixedArray<ArtMethod>::ComputeSize(0,
-                                                                             method_size,
-                                                                             method_alignment);
-      LengthPrefixedArray<ArtMethod>* array = as_klass->GetMethodsPtr();
-      size_t offset = image_info.GetBinSlotSize(bin_type);
-      DCHECK(!IsInBootImage(array));
+void ImageWriter::RecordNativeRelocations(ObjPtr<mirror::Class> klass, size_t oat_index) {
+  // Visit and assign offsets for fields and field arrays.
+  DCHECK_EQ(oat_index, GetOatIndexForClass(klass));
+  DCHECK(!klass->IsErroneous()) << klass->GetStatus();
+  if (compiler_options_.IsAppImage()) {
+    // Extra consistency check: no boot loader classes should be left!
+    CHECK(!IsBootClassLoaderClass(klass)) << klass->PrettyClass();
+  }
+  LengthPrefixedArray<ArtField>* fields[] = {
+      klass->GetSFieldsPtr(), klass->GetIFieldsPtr(),
+  };
+  ImageInfo& image_info = GetImageInfo(oat_index);
+  for (LengthPrefixedArray<ArtField>* cur_fields : fields) {
+    // Total array length including header.
+    if (cur_fields != nullptr) {
+      // Forward the entire array at once.
+      size_t offset = image_info.GetBinSlotSize(Bin::kArtField);
+      DCHECK(!IsInBootImage(cur_fields));
       bool inserted =
           native_object_relocations_.insert(std::make_pair(
-              array,
+              cur_fields,
               NativeObjectRelocation {
+                  oat_index, offset, NativeObjectRelocationType::kArtFieldArray
+              })).second;
+      CHECK(inserted) << "Field array " << cur_fields << " already forwarded";
+      const size_t size = LengthPrefixedArray<ArtField>::ComputeSize(cur_fields->size());
+      offset += size;
+      image_info.IncrementBinSlotSize(Bin::kArtField, size);
+      DCHECK_EQ(offset, image_info.GetBinSlotSize(Bin::kArtField));
+    }
+  }
+  // Visit and assign offsets for methods.
+  size_t num_methods = klass->NumMethods();
+  if (num_methods != 0) {
+    bool any_dirty = false;
+    for (auto& m : klass->GetMethods(target_ptr_size_)) {
+      if (WillMethodBeDirty(&m)) {
+        any_dirty = true;
+        break;
+      }
+    }
+    NativeObjectRelocationType type = any_dirty
+        ? NativeObjectRelocationType::kArtMethodDirty
+        : NativeObjectRelocationType::kArtMethodClean;
+    Bin bin_type = BinTypeForNativeRelocationType(type);
+    // Forward the entire array at once, but header first.
+    const size_t method_alignment = ArtMethod::Alignment(target_ptr_size_);
+    const size_t method_size = ArtMethod::Size(target_ptr_size_);
+    const size_t header_size = LengthPrefixedArray<ArtMethod>::ComputeSize(0,
+                                                                           method_size,
+                                                                           method_alignment);
+    LengthPrefixedArray<ArtMethod>* array = klass->GetMethodsPtr();
+    size_t offset = image_info.GetBinSlotSize(bin_type);
+    DCHECK(!IsInBootImage(array));
+    bool inserted =
+        native_object_relocations_.insert(std::make_pair(
+            array,
+            NativeObjectRelocation {
                   oat_index,
                   offset,
                   any_dirty ? NativeObjectRelocationType::kArtMethodArrayDirty
                             : NativeObjectRelocationType::kArtMethodArrayClean
               })).second;
-      CHECK(inserted) << "Method array " << array << " already forwarded";
-      image_info.IncrementBinSlotSize(bin_type, header_size);
-      for (auto& m : as_klass->GetMethods(target_ptr_size_)) {
-        AssignMethodOffset(&m, type, oat_index);
-      }
-      (any_dirty ? dirty_methods_ : clean_methods_) += num_methods;
+    CHECK(inserted) << "Method array " << array << " already forwarded";
+    image_info.IncrementBinSlotSize(bin_type, header_size);
+    for (auto& m : klass->GetMethods(target_ptr_size_)) {
+      AssignMethodOffset(&m, type, oat_index);
     }
-    // Assign offsets for all runtime methods in the IMT since these may hold conflict tables
-    // live.
-    if (as_klass->ShouldHaveImt()) {
-      ImTable* imt = as_klass->GetImt(target_ptr_size_);
-      if (TryAssignImTableOffset(imt, oat_index)) {
-        // Since imt's can be shared only do this the first time to not double count imt method
-        // fixups.
-        for (size_t i = 0; i < ImTable::kSize; ++i) {
-          ArtMethod* imt_method = imt->Get(i, target_ptr_size_);
-          DCHECK(imt_method != nullptr);
-          if (imt_method->IsRuntimeMethod() &&
-              !IsInBootImage(imt_method) &&
-              !NativeRelocationAssigned(imt_method)) {
-            AssignMethodOffset(imt_method, NativeObjectRelocationType::kRuntimeMethod, oat_index);
-          }
+    (any_dirty ? dirty_methods_ : clean_methods_) += num_methods;
+  }
+  // Assign offsets for all runtime methods in the IMT since these may hold conflict tables
+  // live.
+  if (klass->ShouldHaveImt()) {
+    ImTable* imt = klass->GetImt(target_ptr_size_);
+    if (TryAssignImTableOffset(imt, oat_index)) {
+      // Since imt's can be shared only do this the first time to not double count imt method
+      // fixups.
+      for (size_t i = 0; i < ImTable::kSize; ++i) {
+        ArtMethod* imt_method = imt->Get(i, target_ptr_size_);
+        DCHECK(imt_method != nullptr);
+        if (imt_method->IsRuntimeMethod() &&
+            !IsInBootImage(imt_method) &&
+            !NativeRelocationAssigned(imt_method)) {
+          AssignMethodOffset(imt_method, NativeObjectRelocationType::kRuntimeMethod, oat_index);
         }
       }
     }
-  } else if (obj->IsDexCache()) {
-    DCHECK_EQ(oat_index, GetOatIndexForDexFile(obj->AsDexCache()->GetDexFile()));
   }
 }
 
@@ -1820,6 +1820,38 @@ class ImageWriter::LayoutHelper::VisitReferencesVisitor {
   const size_t oat_index_;
 };
 
+// Visit method pointer arrays in `klass` that were not inherited from its superclass.
+template <typename Visitor>
+static void VisitNewMethodPointerArrays(ObjPtr<mirror::Class> klass, Visitor&& visitor)
+    REQUIRES_SHARED(Locks::mutator_lock_) {
+  ObjPtr<mirror::Class> super = klass->GetSuperClass<kVerifyNone, kWithoutReadBarrier>();
+  ObjPtr<mirror::PointerArray> vtable = klass->GetVTable<kVerifyNone, kWithoutReadBarrier>();
+  if (vtable != nullptr &&
+      (super == nullptr || vtable != super->GetVTable<kVerifyNone, kWithoutReadBarrier>())) {
+    visitor(vtable);
+  }
+  int32_t iftable_count = klass->GetIfTableCount();
+  int32_t super_iftable_count = (super != nullptr) ? super->GetIfTableCount() : 0;
+  ObjPtr<mirror::IfTable> iftable = klass->GetIfTable<kVerifyNone, kWithoutReadBarrier>();
+  ObjPtr<mirror::IfTable> super_iftable =
+      (super != nullptr) ? super->GetIfTable<kVerifyNone, kWithoutReadBarrier>() : nullptr;
+  for (int32_t i = 0; i < iftable_count; ++i) {
+    ObjPtr<mirror::PointerArray> methods =
+        iftable->GetMethodArrayOrNull<kVerifyNone, kWithoutReadBarrier>(i);
+    ObjPtr<mirror::PointerArray> super_methods = (i < super_iftable_count)
+        ? super_iftable->GetMethodArrayOrNull<kVerifyNone, kWithoutReadBarrier>(i)
+        : nullptr;
+    if (methods != super_methods) {
+      DCHECK(methods != nullptr);
+      if (i < super_iftable_count) {
+        DCHECK(super_methods != nullptr);
+        DCHECK_EQ(methods->GetLength(), super_methods->GetLength());
+      }
+      visitor(methods);
+    }
+  }
+}
+
 void ImageWriter::LayoutHelper::ProcessDexFileObjects(Thread* self) {
   Runtime* runtime = Runtime::Current();
   ClassLinker* class_linker = runtime->GetClassLinker();
@@ -1833,9 +1865,24 @@ void ImageWriter::LayoutHelper::ProcessDexFileObjects(Thread* self) {
   DCHECK(work_queue_.empty());
   work_queue_ = visitor.ProcessCollectedClasses(self);
   for (const std::pair<ObjPtr<mirror::Object>, size_t>& entry : work_queue_) {
-    DCHECK(entry.first->IsClass());
-    bool assigned = TryAssignBinSlot(entry.first, entry.second);
-    DCHECK(assigned);
+    DCHECK(entry.first != nullptr);
+    ObjPtr<mirror::Class> klass = entry.first->AsClass();
+    size_t oat_index = entry.second;
+    DCHECK(!image_writer_->IsInBootImage(klass.Ptr()));
+    DCHECK(!image_writer_->IsImageBinSlotAssigned(klass.Ptr()));
+    image_writer_->RecordNativeRelocations(klass, oat_index);
+    Bin klass_bin = image_writer_->AssignImageBinSlot(klass.Ptr(), oat_index);
+    bin_objects_[oat_index][enum_cast<size_t>(klass_bin)].push_back(klass.Ptr());
+
+    auto method_pointer_array_visitor =
+        [&](ObjPtr<mirror::PointerArray> pointer_array) REQUIRES_SHARED(Locks::mutator_lock_) {
+          Bin bin = kBinObjects ? Bin::kMethodPointerArray : Bin::kRegular;
+          image_writer_->AssignImageBinSlot(pointer_array.Ptr(), oat_index, bin);
+          bin_objects_[oat_index][enum_cast<size_t>(bin)].push_back(pointer_array.Ptr());
+          // No need to add to the work queue. The class reference, if not in the boot image
+          // (that is, when compiling the primary boot image), is already in the work queue.
+        };
+    VisitNewMethodPointerArrays(klass, method_pointer_array_visitor);
   }
 
   // Assign bin slots to dex caches.
@@ -2280,7 +2327,6 @@ bool ImageWriter::LayoutHelper::TryAssignBinSlot(ObjPtr<mirror::Object> obj, siz
   }
   bool assigned = false;
   if (!image_writer_->IsImageBinSlotAssigned(obj.Ptr())) {
-    image_writer_->RecordNativeRelocations(obj, oat_index);
     Bin bin = image_writer_->AssignImageBinSlot(obj.Ptr(), oat_index);
     bin_objects_[oat_index][enum_cast<size_t>(bin)].push_back(obj.Ptr());
     assigned = true;
@@ -2918,38 +2964,6 @@ class ImageWriter::FixupVisitor {
   ImageWriter* const image_writer_;
   mirror::Object* const copy_;
 };
-
-// Visit method pointer arrays in `klass` that were not inherited from its superclass.
-template <typename Visitor>
-static void VisitNewMethodPointerArrays(ObjPtr<mirror::Class> klass, Visitor&& visitor)
-    REQUIRES_SHARED(Locks::mutator_lock_) {
-  ObjPtr<mirror::Class> super = klass->GetSuperClass<kVerifyNone, kWithoutReadBarrier>();
-  ObjPtr<mirror::PointerArray> vtable = klass->GetVTable<kVerifyNone, kWithoutReadBarrier>();
-  if (vtable != nullptr &&
-      (super == nullptr || vtable != super->GetVTable<kVerifyNone, kWithoutReadBarrier>())) {
-    visitor(vtable);
-  }
-  int32_t iftable_count = klass->GetIfTableCount();
-  int32_t super_iftable_count = (super != nullptr) ? super->GetIfTableCount() : 0;
-  ObjPtr<mirror::IfTable> iftable = klass->GetIfTable<kVerifyNone, kWithoutReadBarrier>();
-  ObjPtr<mirror::IfTable> super_iftable =
-      (super != nullptr) ? super->GetIfTable<kVerifyNone, kWithoutReadBarrier>() : nullptr;
-  for (int32_t i = 0; i < iftable_count; ++i) {
-    ObjPtr<mirror::PointerArray> methods =
-        iftable->GetMethodArrayOrNull<kVerifyNone, kWithoutReadBarrier>(i);
-    ObjPtr<mirror::PointerArray> super_methods = (i < super_iftable_count)
-        ? super_iftable->GetMethodArrayOrNull<kVerifyNone, kWithoutReadBarrier>(i)
-        : nullptr;
-    if (methods != super_methods) {
-      DCHECK(methods != nullptr);
-      if (i < super_iftable_count) {
-        DCHECK(super_methods != nullptr);
-        DCHECK_EQ(methods->GetLength(), super_methods->GetLength());
-      }
-      visitor(methods);
-    }
-  }
-}
 
 void ImageWriter::CopyAndFixupObjects() {
   // Copy and fix up pointer arrays first as they require special treatment.
