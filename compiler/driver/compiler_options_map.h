@@ -20,9 +20,9 @@
 #include <string>
 #include <vector>
 
+#include "base/compiler_filter.h"
 #include "base/variant_map.h"
 #include "cmdline_types.h"
-#include "compiler_filter.h"
 
 namespace art {
 

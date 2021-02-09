@@ -46,13 +46,6 @@ struct ReportingConfig {
 
   // Returns whether any options are set that enables metrics reporting.
   constexpr bool ReportingEnabled() const { return dump_to_logcat || dump_to_file.has_value(); }
-
-  // Returns whether any options are set that requires a background reporting thread.
-  constexpr bool BackgroundReportingEnabled() const {
-    // If any reporting is enabled, we always need to do at least the startup report in the
-    // background.
-    return ReportingEnabled();
-  }
 };
 
 // MetricsReporter handles periodically reporting ART metrics.
@@ -64,7 +57,7 @@ class MetricsReporter {
   ~MetricsReporter();
 
   // Creates and runs the background reporting thread.
-  void MaybeStartBackgroundThread();
+  void MaybeStartBackgroundThread(SessionData session_data);
 
   // Sends a request to the background thread to shutdown.
   void MaybeStopBackgroundThread();
@@ -89,7 +82,7 @@ class MetricsReporter {
 
   const ReportingConfig config_;
   Runtime* runtime_;
-
+  std::vector<std::unique_ptr<MetricsBackend>> backends_;
   std::optional<std::thread> thread_;
 
   // A message indicating that the reporting thread should shut down.
@@ -98,7 +91,13 @@ class MetricsReporter {
   // A message indicating that app startup has completed.
   struct StartupCompletedMessage {};
 
-  MessageQueue<ShutdownRequestedMessage, StartupCompletedMessage> messages_;
+  // A message marking the beginning of a metrics logging session.
+  //
+  // The primary purpose of this is to pass the session metadata from the Runtime to the metrics
+  // backends.
+  struct BeginSessionMessage{ SessionData session_data; };
+
+  MessageQueue<ShutdownRequestedMessage, StartupCompletedMessage, BeginSessionMessage> messages_;
 };
 
 }  // namespace metrics
