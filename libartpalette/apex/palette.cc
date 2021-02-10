@@ -169,4 +169,10 @@ palette_status_t PaletteGetHooks(PaletteHooks** hooks) {
   return m(hooks);
 }
 
+palette_status_t PaletteCreateOdrefreshStagingDirectory(const char** staging_dir) {
+  PaletteCreateOdrefreshStagingDirectoryMethod m =
+      PaletteLoader::Instance().GetPaletteCreateOdrefreshStagingDirectoryMethod();
+  return m(staging_dir);
+}
+
 }  // extern "C"
