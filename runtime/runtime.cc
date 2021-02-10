@@ -1448,6 +1448,7 @@ bool Runtime::Init(RuntimeArgumentMap&& runtime_options_in) {
 
   dump_gc_performance_on_shutdown_ = runtime_options.Exists(Opt::DumpGCPerformanceOnShutdown);
 
+  bool has_explicit_jdwp_options = runtime_options.Get(Opt::JdwpOptions) != nullptr;
   jdwp_options_ = runtime_options.GetOrDefault(Opt::JdwpOptions);
   jdwp_provider_ = CanonicalizeJdwpProvider(runtime_options.GetOrDefault(Opt::JdwpProvider),
                                             IsJavaDebuggable());
@@ -1458,11 +1459,13 @@ bool Runtime::Init(RuntimeArgumentMap&& runtime_options_in) {
         bool has_transport = jdwp_options_.find("transport") != std::string::npos;
         std::string adb_connection_args =
             std::string("  -XjdwpProvider:adbconnection -XjdwpOptions:") + jdwp_options_;
-        LOG(WARNING) << "Jdwp options given when jdwp is disabled! You probably want to enable "
-                     << "jdwp with one of:" << std::endl
-                     << "  -Xplugin:libopenjdkjvmti" << (kIsDebugBuild ? "d" : "") << ".so "
-                     << "-agentpath:libjdwp.so=" << jdwp_options_ << std::endl
-                     << (has_transport ? "" : adb_connection_args);
+        if (has_explicit_jdwp_options) {
+          LOG(WARNING) << "Jdwp options given when jdwp is disabled! You probably want to enable "
+                      << "jdwp with one of:" << std::endl
+                      << "  -Xplugin:libopenjdkjvmti" << (kIsDebugBuild ? "d" : "") << ".so "
+                      << "-agentpath:libjdwp.so=" << jdwp_options_ << std::endl
+                      << (has_transport ? "" : adb_connection_args);
+        }
       }
       break;
     }
