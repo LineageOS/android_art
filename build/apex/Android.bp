@@ -24,6 +24,7 @@ art_runtime_base_binaries_both_on_device_first_on_host = [
 //   only the "first" (likely 64-bit) version is required on host).
 art_runtime_base_binaries_prefer32_on_device_first_on_host = [
     "dexoptanalyzer",
+    "odrefresh",
     "profman",
 ]
 
@@ -131,7 +132,6 @@ art_tools_debug_binaries_both = [
 
 // Tools exclusively for the device APEX derived from art-tools in art/Android.mk.
 art_tools_device_only_binaries = [
-    "compile_bcp.sh",
     // oatdump cannot link with host linux_bionic due to not using clang lld;
     // TODO: Make it work with clang lld.
     "oatdump",
@@ -333,6 +333,7 @@ art_gtests = [
     "art_libdexfile_support_tests",
     "art_libprofile_tests",
     "art_oatdump_tests",
+    "art_odrefresh_tests",
     "art_profman_tests",
     "art_runtime_compiler_tests",
     "art_runtime_tests",

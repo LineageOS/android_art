@@ -136,6 +136,7 @@ ART_TEST_MODULES := \
     art_libdexfile_tests \
     art_libprofile_tests \
     art_oatdump_tests \
+    art_odrefresh_tests \
     art_profman_tests \
     art_runtime_compiler_tests \
     art_runtime_tests \

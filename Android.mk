@@ -349,6 +349,7 @@ LOCAL_REQUIRED_MODULES := \
     $(call art_module_lib,libart-compiler) \
     $(call art_module_lib,libopenjdkjvm) \
     $(call art_module_lib,libopenjdkjvmti) \
+    $(call art_module_lib,odrefresh) \
     $(call art_module_lib,profman) \
     $(call art_module_lib,libadbconnection) \
     $(call art_module_lib,libperfetto_hprof) \
