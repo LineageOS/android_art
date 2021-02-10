@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef ART_RUNTIME_COMPILER_FILTER_H_
-#define ART_RUNTIME_COMPILER_FILTER_H_
+#ifndef ART_LIBARTBASE_BASE_COMPILER_FILTER_H_
+#define ART_LIBARTBASE_BASE_COMPILER_FILTER_H_
 
 #include <iosfwd>
 #include <string>
@@ -110,4 +110,4 @@ std::ostream& operator<<(std::ostream& os, const CompilerFilter::Filter& rhs);
 
 }  // namespace art
 
-#endif  // ART_RUNTIME_COMPILER_FILTER_H_
+#endif  // ART_LIBARTBASE_BASE_COMPILER_FILTER_H_

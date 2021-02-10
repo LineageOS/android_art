@@ -34,7 +34,8 @@ namespace test {
 class TestBackendBase : public MetricsBackend {
  public:
   void BeginSession([[maybe_unused]] const SessionData& session_data) override {}
-  void EndSession() override {}
+
+  void BeginReport([[maybe_unused]] uint64_t timestamp_since_start_ms) override {}
 
   void ReportCounter([[maybe_unused]] DatumId counter_type,
                      [[maybe_unused]] uint64_t value) override {}
@@ -43,6 +44,8 @@ class TestBackendBase : public MetricsBackend {
                        [[maybe_unused]] int64_t low_value_,
                        [[maybe_unused]] int64_t high_value,
                        [[maybe_unused]] const std::vector<uint32_t>& buckets) override {}
+
+  void EndReport() override {}
 };
 
 template <DatumId counter_type>

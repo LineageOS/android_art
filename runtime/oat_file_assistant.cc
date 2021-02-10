@@ -24,6 +24,7 @@
 #include "android-base/stringprintf.h"
 #include "android-base/strings.h"
 
+#include "base/compiler_filter.h"
 #include "base/file_utils.h"
 #include "base/logging.h"  // For VLOG.
 #include "base/macros.h"
@@ -34,7 +35,6 @@
 #include "base/utils.h"
 #include "class_linker.h"
 #include "class_loader_context.h"
-#include "compiler_filter.h"
 #include "dex/art_dex_file_loader.h"
 #include "dex/dex_file_loader.h"
 #include "exec_utils.h"

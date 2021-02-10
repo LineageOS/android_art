@@ -22,11 +22,11 @@
 #include <string>
 #include <vector>
 
+#include "base/compiler_filter.h"
 #include "base/globals.h"
 #include "base/hash_set.h"
 #include "base/macros.h"
 #include "base/utils.h"
-#include "compiler_filter.h"
 #include "optimizing/register_allocator.h"
 
 namespace art {
