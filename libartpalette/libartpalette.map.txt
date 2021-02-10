@@ -17,17 +17,17 @@
 LIBARTPALETTE_1 {
   global:
     # --- VERSION 01 API ---
-    PaletteGetVersion;
-    PaletteSchedSetPriority;
-    PaletteSchedGetPriority;
-    PaletteWriteCrashThreadStacks;
-    PaletteTraceEnabled;
-    PaletteTraceBegin;
-    PaletteTraceEnd;
-    PaletteTraceIntegerValue;
-    PaletteAshmemCreateRegion;
-    PaletteAshmemSetProtRegion;
-    PaletteGetHooks;
+    PaletteGetVersion; # apex
+    PaletteSchedSetPriority; # apex
+    PaletteSchedGetPriority; # apex
+    PaletteWriteCrashThreadStacks; #apex
+    PaletteTraceEnabled; # apex
+    PaletteTraceBegin; # apex
+    PaletteTraceEnd; # apex
+    PaletteTraceIntegerValue; # apex
+    PaletteAshmemCreateRegion; # apex
+    PaletteAshmemSetProtRegion; # apex
+    PaletteGetHooks; # apex
 
   local:
     *;
