@@ -44,6 +44,7 @@ public class Main {
     test_Math_isNaN_F();
     test_Math_isInfinite_D();
     test_Math_isInfinite_F();
+    test_Math_multiplyHigh();
     test_Short_reverseBytes();
     test_Integer_reverseBytes();
     test_Long_reverseBytes();
@@ -976,6 +977,12 @@ public class Main {
     Assert.assertFalse(Float.isInfinite(Float.intBitsToFloat(0x80400000)));
     Assert.assertFalse(Float.isInfinite(Float.intBitsToFloat(0x00000001)));
     Assert.assertFalse(Float.isInfinite(Float.intBitsToFloat(0x80000001)));
+  }
+
+  public static void test_Math_multiplyHigh() {
+    Math.multiplyHigh(2L, 3L);
+    Assert.assertEquals(Math.multiplyHigh(2L, 3L), 0L);
+    Assert.assertEquals(Math.multiplyHigh(Long.MAX_VALUE, Long.MAX_VALUE), 4611686018427387903L);
   }
 
   public static void test_StrictMath_abs_I() {
