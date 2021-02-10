@@ -551,7 +551,7 @@ class ReleaseChecker:
     self._checker.check_native_library('libsigchain')
 
     # Check internal Java libraries
-    self._checker.check_java_library("artservice")
+    self._checker.check_java_library("service-art")
 
     # Check java libraries for Managed Core Library.
     self._checker.check_java_library('apache-xml')

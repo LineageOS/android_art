@@ -28,7 +28,7 @@ package {
 }
 
 java_test {
-    name: "ArtServiceTests",
+    name: "ArtManagerLocalTests",
 
     // Include all test java files.
     srcs: [
@@ -37,7 +37,7 @@ java_test {
 
     static_libs: [
         "junit",
-        "artservice",
+        "service-art.impl",
     ],
 
     platform_apis: true,
