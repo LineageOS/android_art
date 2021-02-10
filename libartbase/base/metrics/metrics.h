@@ -303,7 +303,7 @@ class LogBackend : public StringBackend {
 // LogBackend, but we will probably want a more machine-readable format in the future.
 class FileBackend : public StringBackend {
  public:
-  explicit FileBackend(std::string filename);
+  explicit FileBackend(const std::string& filename);
 
   void BeginReport(uint64_t timestamp_millis) override;
   void EndReport() override;
