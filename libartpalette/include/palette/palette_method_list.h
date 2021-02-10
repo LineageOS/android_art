@@ -32,6 +32,11 @@
   M(PaletteTraceIntegerValue, const char* name, int32_t value)              \
   M(PaletteAshmemCreateRegion, const char* name, size_t size, int* fd)      \
   M(PaletteAshmemSetProtRegion, int, int)                                   \
-  M(PaletteGetHooks, /*out*/PaletteHooks**)
+  M(PaletteGetHooks, /*out*/PaletteHooks**)                                 \
+  /* Create the staging directory for on-device signing.                 */ \
+  /* `staging_dir` is updated to point to a constant string in the       */ \
+  /* palette implementation.                                             */ \
+  /* This method is not thread-safe.                                     */ \
+  M(PaletteCreateOdrefreshStagingDirectory, /*out*/const char** staging_dir)
 
 #endif  // ART_LIBARTPALETTE_INCLUDE_PALETTE_PALETTE_METHOD_LIST_H_
