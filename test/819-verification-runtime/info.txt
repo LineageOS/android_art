@@ -1,0 +1,2 @@
+Regression test for the verifier, where we need to keep the behavior of
+a known throwing instruction means the code following it is unreachable.

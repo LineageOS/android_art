@@ -17,7 +17,7 @@
 #include <gtest/gtest.h>
 
 #include "arch/instruction_set.h"
-#include "compiler_filter.h"
+#include "base/compiler_filter.h"
 #include "dexopt_test.h"
 
 namespace art {

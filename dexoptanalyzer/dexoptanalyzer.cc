@@ -22,13 +22,13 @@
 
 #include "android-base/stringprintf.h"
 #include "android-base/strings.h"
+#include "base/compiler_filter.h"
 #include "base/file_utils.h"
 #include "base/logging.h"  // For InitLogging.
 #include "base/mutex.h"
 #include "base/os.h"
 #include "base/string_view_cpp20.h"
 #include "base/utils.h"
-#include "compiler_filter.h"
 #include "class_loader_context.h"
 #include "dex/dex_file.h"
 #include "noop_compiler_callbacks.h"

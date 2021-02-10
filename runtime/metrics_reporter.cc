@@ -16,8 +16,6 @@
 
 #include "metrics_reporter.h"
 
-#include "android-base/file.h"
-#include "base/scoped_flock.h"
 #include "runtime.h"
 #include "runtime_options.h"
 #include "thread-current-inl.h"
@@ -27,8 +25,6 @@
 
 namespace art {
 namespace metrics {
-
-using android::base::WriteStringToFd;
 
 std::unique_ptr<MetricsReporter> MetricsReporter::Create(ReportingConfig config, Runtime* runtime) {
   // We can't use std::make_unique here because the MetricsReporter constructor is private.
@@ -40,22 +36,18 @@ MetricsReporter::MetricsReporter(ReportingConfig config, Runtime* runtime)
 
 MetricsReporter::~MetricsReporter() { MaybeStopBackgroundThread(); }
 
-void MetricsReporter::MaybeStartBackgroundThread() {
-  if (config_.BackgroundReportingEnabled()) {
-    CHECK(!thread_.has_value());
+void MetricsReporter::MaybeStartBackgroundThread(SessionData session_data) {
+  CHECK(!thread_.has_value());
 
-    thread_.emplace(&MetricsReporter::BackgroundThreadRun, this);
-  }
+  thread_.emplace(&MetricsReporter::BackgroundThreadRun, this);
+
+  messages_.SendMessage(BeginSessionMessage{session_data});
 }
 
 void MetricsReporter::MaybeStopBackgroundThread() {
   if (thread_.has_value()) {
     messages_.SendMessage(ShutdownRequestedMessage{});
     thread_->join();
-  }
-  // Do one final metrics report, if enabled.
-  if (config_.report_metrics_on_shutdown) {
-    ReportMetrics();
   }
 }
 
@@ -76,13 +68,33 @@ void MetricsReporter::BackgroundThreadRun() {
                                                       /*create_peer=*/true);
   bool running = true;
 
+  // Configure the backends
+  if (config_.dump_to_logcat) {
+    backends_.emplace_back(new LogBackend(LogSeverity::INFO));
+  }
+  if (config_.dump_to_file.has_value()) {
+    backends_.emplace_back(new FileBackend(config_.dump_to_file.value()));
+  }
+
   MaybeResetTimeout();
 
   while (running) {
     messages_.SwitchReceive(
+        [&](BeginSessionMessage message) {
+          LOG_STREAM(DEBUG) << "Received session metadata";
+
+          for (auto& backend : backends_) {
+            backend->BeginSession(message.session_data);
+          }
+        },
         [&]([[maybe_unused]] ShutdownRequestedMessage message) {
           LOG_STREAM(DEBUG) << "Shutdown request received";
           running = false;
+
+          // Do one final metrics report, if enabled.
+          if (config_.report_metrics_on_shutdown) {
+            ReportMetrics();
+          }
         },
         [&]([[maybe_unused]] TimeoutExpiredMessage message) {
           LOG_STREAM(DEBUG) << "Timer expired, reporting metrics";
@@ -110,34 +122,10 @@ void MetricsReporter::MaybeResetTimeout() {
 }
 
 void MetricsReporter::ReportMetrics() const {
-  if (config_.dump_to_logcat) {
-    LOG_STREAM(INFO) << "\n*** ART internal metrics ***\n\n";
-    // LOG_STREAM(INFO) destroys the stream at the end of the statement, which makes it tricky pass
-    // it to store as a field in StreamBackend. To get around this, we use an immediately-invoked
-    // lambda expression to act as a let-binding, letting us access the stream for long enough to
-    // dump the metrics.
-    [this](std::ostream& os) {
-      StreamBackend backend{os};
-      runtime_->GetMetrics()->ReportAllMetrics(&backend);
-    }(LOG_STREAM(INFO));
-    LOG_STREAM(INFO) << "\n*** Done dumping ART internal metrics ***\n";
-  }
-  if (config_.dump_to_file.has_value()) {
-    const auto& filename = config_.dump_to_file.value();
-    std::ostringstream stream;
-    StreamBackend backend{stream};
-    runtime_->GetMetrics()->ReportAllMetrics(&backend);
+  ArtMetrics* metrics{runtime_->GetMetrics()};
 
-    std::string error_message;
-    auto file{
-        LockedFile::Open(filename.c_str(), O_CREAT | O_WRONLY | O_APPEND, true, &error_message)};
-    if (file.get() == nullptr) {
-      LOG(WARNING) << "Could open metrics file '" << filename << "': " << error_message;
-    } else {
-      if (!WriteStringToFd(stream.str(), file.get()->Fd())) {
-        PLOG(WARNING) << "Error writing metrics to file";
-      }
-    }
+  for (auto& backend : backends_) {
+    metrics->ReportAllMetrics(backend.get());
   }
 }
 
