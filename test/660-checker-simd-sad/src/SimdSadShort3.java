@@ -35,15 +35,24 @@ public class SimdSadShort3 {
   //
   /// CHECK-START-ARM64: int SimdSadShort3.sadShort2IntParamRight(short[], short) loop_optimization (after)
   /// CHECK-DAG: <<Cons0:i\d+>>  IntConstant 0                  loop:none
-  /// CHECK-DAG: <<Cons8:i\d+>>  IntConstant 8                  loop:none
   /// CHECK-DAG: <<Param:s\d+>>  ParameterValue                 loop:none
-  /// CHECK-DAG: <<Rep:d\d+>>    VecReplicateScalar [<<Param>>] loop:none
-  /// CHECK-DAG: <<Set:d\d+>>    VecSetScalars [<<Cons0>>]      loop:none
-  /// CHECK-DAG: <<Phi1:i\d+>>   Phi [<<Cons0>>,{{i\d+}}]       loop:<<Loop:B\d+>> outer_loop:none
-  /// CHECK-DAG: <<Phi2:d\d+>>   Phi [<<Set>>,{{d\d+}}]         loop:<<Loop>>      outer_loop:none
-  /// CHECK-DAG: <<Load:d\d+>>   VecLoad [{{l\d+}},<<Phi1>>]    loop:<<Loop>>      outer_loop:none
-  /// CHECK-DAG: <<SAD:d\d+>>    VecSADAccumulate [<<Phi2>>,<<Load>>,<<Rep>>] loop:<<Loop>> outer_loop:none
-  /// CHECK-DAG:                 Add [<<Phi1>>,<<Cons8>>]       loop:<<Loop>>      outer_loop:none
+  /// CHECK-IF:     hasIsaFeature("sve")
+  //
+  //      SAD idiom is not supported for SVE.
+  ///     CHECK-NOT: VecSADAccumulate
+  //
+  /// CHECK-ELSE:
+  //
+  ///     CHECK-DAG: <<Cons8:i\d+>>  IntConstant 8                  loop:none
+  ///     CHECK-DAG: <<Rep:d\d+>>    VecReplicateScalar [<<Param>>] loop:none
+  ///     CHECK-DAG: <<Set:d\d+>>    VecSetScalars [<<Cons0>>]      loop:none
+  ///     CHECK-DAG: <<Phi1:i\d+>>   Phi [<<Cons0>>,{{i\d+}}]       loop:<<Loop:B\d+>> outer_loop:none
+  ///     CHECK-DAG: <<Phi2:d\d+>>   Phi [<<Set>>,{{d\d+}}]         loop:<<Loop>>      outer_loop:none
+  ///     CHECK-DAG: <<Load:d\d+>>   VecLoad [{{l\d+}},<<Phi1>>]    loop:<<Loop>>      outer_loop:none
+  ///     CHECK-DAG: <<SAD:d\d+>>    VecSADAccumulate [<<Phi2>>,<<Load>>,<<Rep>>] loop:<<Loop>> outer_loop:none
+  ///     CHECK-DAG:                 Add [<<Phi1>>,<<Cons8>>]       loop:<<Loop>>      outer_loop:none
+  //
+  /// CHECK-FI:
   private static int sadShort2IntParamRight(short[] s, short param) {
     int sad = 0;
     for (int i = 0; i < s.length; i++) {
@@ -66,15 +75,24 @@ public class SimdSadShort3 {
   //
   /// CHECK-START-ARM64: int SimdSadShort3.sadShort2IntParamLeft(short[], short) loop_optimization (after)
   /// CHECK-DAG: <<Cons0:i\d+>>  IntConstant 0                  loop:none
-  /// CHECK-DAG: <<Cons8:i\d+>>  IntConstant 8                  loop:none
   /// CHECK-DAG: <<Param:s\d+>>  ParameterValue                 loop:none
-  /// CHECK-DAG: <<Rep:d\d+>>    VecReplicateScalar [<<Param>>] loop:none
-  /// CHECK-DAG: <<Set:d\d+>>    VecSetScalars [<<Cons0>>]      loop:none
-  /// CHECK-DAG: <<Phi1:i\d+>>   Phi [<<Cons0>>,{{i\d+}}]       loop:<<Loop:B\d+>> outer_loop:none
-  /// CHECK-DAG: <<Phi2:d\d+>>   Phi [<<Set>>,{{d\d+}}]         loop:<<Loop>>      outer_loop:none
-  /// CHECK-DAG: <<Load:d\d+>>   VecLoad [{{l\d+}},<<Phi1>>]    loop:<<Loop>>      outer_loop:none
-  /// CHECK-DAG: <<SAD:d\d+>>    VecSADAccumulate [<<Phi2>>,<<Rep>>,<<Load>>] loop:<<Loop>> outer_loop:none
-  /// CHECK-DAG:                 Add [<<Phi1>>,<<Cons8>>]       loop:<<Loop>>      outer_loop:none
+  /// CHECK-IF:     hasIsaFeature("sve")
+  //
+  //      SAD idiom is not supported for SVE.
+  ///     CHECK-NOT: VecSADAccumulate
+  //
+  /// CHECK-ELSE:
+  //
+  ///     CHECK-DAG: <<Cons8:i\d+>>  IntConstant 8                  loop:none
+  ///     CHECK-DAG: <<Rep:d\d+>>    VecReplicateScalar [<<Param>>] loop:none
+  ///     CHECK-DAG: <<Set:d\d+>>    VecSetScalars [<<Cons0>>]      loop:none
+  ///     CHECK-DAG: <<Phi1:i\d+>>   Phi [<<Cons0>>,{{i\d+}}]       loop:<<Loop:B\d+>> outer_loop:none
+  ///     CHECK-DAG: <<Phi2:d\d+>>   Phi [<<Set>>,{{d\d+}}]         loop:<<Loop>>      outer_loop:none
+  ///     CHECK-DAG: <<Load:d\d+>>   VecLoad [{{l\d+}},<<Phi1>>]    loop:<<Loop>>      outer_loop:none
+  ///     CHECK-DAG: <<SAD:d\d+>>    VecSADAccumulate [<<Phi2>>,<<Rep>>,<<Load>>] loop:<<Loop>> outer_loop:none
+  ///     CHECK-DAG:                 Add [<<Phi1>>,<<Cons8>>]       loop:<<Loop>>      outer_loop:none
+  //
+  /// CHECK-FI:
   private static int sadShort2IntParamLeft(short[] s, short param) {
     int sad = 0;
     for (int i = 0; i < s.length; i++) {
@@ -97,15 +115,24 @@ public class SimdSadShort3 {
   //
   /// CHECK-START-ARM64: int SimdSadShort3.sadShort2IntConstRight(short[]) loop_optimization (after)
   /// CHECK-DAG: <<Cons0:i\d+>>  IntConstant 0                  loop:none
-  /// CHECK-DAG: <<Cons8:i\d+>>  IntConstant 8                  loop:none
   /// CHECK-DAG: <<ConsI:i\d+>>  IntConstant 32767              loop:none
-  /// CHECK-DAG: <<Rep:d\d+>>    VecReplicateScalar [<<ConsI>>] loop:none
-  /// CHECK-DAG: <<Set:d\d+>>    VecSetScalars [<<Cons0>>]      loop:none
-  /// CHECK-DAG: <<Phi1:i\d+>>   Phi [<<Cons0>>,{{i\d+}}]       loop:<<Loop:B\d+>> outer_loop:none
-  /// CHECK-DAG: <<Phi2:d\d+>>   Phi [<<Set>>,{{d\d+}}]         loop:<<Loop>>      outer_loop:none
-  /// CHECK-DAG: <<Load:d\d+>>   VecLoad [{{l\d+}},<<Phi1>>]    loop:<<Loop>>      outer_loop:none
-  /// CHECK-DAG: <<SAD:d\d+>>    VecSADAccumulate [<<Phi2>>,<<Load>>,<<Rep>>] loop:<<Loop>> outer_loop:none
-  /// CHECK-DAG:                 Add [<<Phi1>>,<<Cons8>>]       loop:<<Loop>>      outer_loop:none
+  /// CHECK-IF:     hasIsaFeature("sve")
+  //
+  //      SAD idiom is not supported for SVE.
+  ///     CHECK-NOT: VecSADAccumulate
+  //
+  /// CHECK-ELSE:
+  //
+  ///     CHECK-DAG: <<Cons8:i\d+>>  IntConstant 8                  loop:none
+  ///     CHECK-DAG: <<Rep:d\d+>>    VecReplicateScalar [<<ConsI>>] loop:none
+  ///     CHECK-DAG: <<Set:d\d+>>    VecSetScalars [<<Cons0>>]      loop:none
+  ///     CHECK-DAG: <<Phi1:i\d+>>   Phi [<<Cons0>>,{{i\d+}}]       loop:<<Loop:B\d+>> outer_loop:none
+  ///     CHECK-DAG: <<Phi2:d\d+>>   Phi [<<Set>>,{{d\d+}}]         loop:<<Loop>>      outer_loop:none
+  ///     CHECK-DAG: <<Load:d\d+>>   VecLoad [{{l\d+}},<<Phi1>>]    loop:<<Loop>>      outer_loop:none
+  ///     CHECK-DAG: <<SAD:d\d+>>    VecSADAccumulate [<<Phi2>>,<<Load>>,<<Rep>>] loop:<<Loop>> outer_loop:none
+  ///     CHECK-DAG:                 Add [<<Phi1>>,<<Cons8>>]       loop:<<Loop>>      outer_loop:none
+  //
+  /// CHECK-FI:
   private static int sadShort2IntConstRight(short[] s) {
     int sad = 0;
     for (int i = 0; i < s.length; i++) {
@@ -128,15 +155,24 @@ public class SimdSadShort3 {
   //
   /// CHECK-START-ARM64: int SimdSadShort3.sadShort2IntConstLeft(short[]) loop_optimization (after)
   /// CHECK-DAG: <<Cons0:i\d+>>  IntConstant 0                  loop:none
-  /// CHECK-DAG: <<Cons8:i\d+>>  IntConstant 8                  loop:none
   /// CHECK-DAG: <<ConsI:i\d+>>  IntConstant 32767              loop:none
-  /// CHECK-DAG: <<Rep:d\d+>>    VecReplicateScalar [<<ConsI>>] loop:none
-  /// CHECK-DAG: <<Set:d\d+>>    VecSetScalars [<<Cons0>>]      loop:none
-  /// CHECK-DAG: <<Phi1:i\d+>>   Phi [<<Cons0>>,{{i\d+}}]       loop:<<Loop:B\d+>> outer_loop:none
-  /// CHECK-DAG: <<Phi2:d\d+>>   Phi [<<Set>>,{{d\d+}}]         loop:<<Loop>>      outer_loop:none
-  /// CHECK-DAG: <<Load:d\d+>>   VecLoad [{{l\d+}},<<Phi1>>]    loop:<<Loop>>      outer_loop:none
-  /// CHECK-DAG: <<SAD:d\d+>>    VecSADAccumulate [<<Phi2>>,<<Rep>>,<<Load>>] loop:<<Loop>> outer_loop:none
-  /// CHECK-DAG:                 Add [<<Phi1>>,<<Cons8>>]       loop:<<Loop>>      outer_loop:none
+  /// CHECK-IF:     hasIsaFeature("sve")
+  //
+  //      SAD idiom is not supported for SVE.
+  ///     CHECK-NOT: VecSADAccumulate
+  //
+  /// CHECK-ELSE:
+  //
+  ///     CHECK-DAG: <<Cons8:i\d+>>  IntConstant 8                  loop:none
+  ///     CHECK-DAG: <<Rep:d\d+>>    VecReplicateScalar [<<ConsI>>] loop:none
+  ///     CHECK-DAG: <<Set:d\d+>>    VecSetScalars [<<Cons0>>]      loop:none
+  ///     CHECK-DAG: <<Phi1:i\d+>>   Phi [<<Cons0>>,{{i\d+}}]       loop:<<Loop:B\d+>> outer_loop:none
+  ///     CHECK-DAG: <<Phi2:d\d+>>   Phi [<<Set>>,{{d\d+}}]         loop:<<Loop>>      outer_loop:none
+  ///     CHECK-DAG: <<Load:d\d+>>   VecLoad [{{l\d+}},<<Phi1>>]    loop:<<Loop>>      outer_loop:none
+  ///     CHECK-DAG: <<SAD:d\d+>>    VecSADAccumulate [<<Phi2>>,<<Rep>>,<<Load>>] loop:<<Loop>> outer_loop:none
+  ///     CHECK-DAG:                 Add [<<Phi1>>,<<Cons8>>]       loop:<<Loop>>      outer_loop:none
+  //
+  /// CHECK-FI:
   private static int sadShort2IntConstLeft(short[] s) {
     int sad = 0;
     for (int i = 0; i < s.length; i++) {
@@ -159,15 +195,24 @@ public class SimdSadShort3 {
   //
   /// CHECK-START-ARM64: int SimdSadShort3.sadShort2IntInvariantRight(short[], int) loop_optimization (after)
   /// CHECK-DAG: <<Cons0:i\d+>>  IntConstant 0                  loop:none
-  /// CHECK-DAG: <<Cons8:i\d+>>  IntConstant 8                  loop:none
   /// CHECK-DAG: <<Conv:s\d+>>   TypeConversion [{{i\d+}}]      loop:none
-  /// CHECK-DAG: <<Rep:d\d+>>    VecReplicateScalar [<<Conv>>]  loop:none
-  /// CHECK-DAG: <<Set:d\d+>>    VecSetScalars [<<Cons0>>]      loop:none
-  /// CHECK-DAG: <<Phi1:i\d+>>   Phi [<<Cons0>>,{{i\d+}}]       loop:<<Loop:B\d+>> outer_loop:none
-  /// CHECK-DAG: <<Phi2:d\d+>>   Phi [<<Set>>,{{d\d+}}]         loop:<<Loop>>      outer_loop:none
-  /// CHECK-DAG: <<Load:d\d+>>   VecLoad [{{l\d+}},<<Phi1>>]    loop:<<Loop>>      outer_loop:none
-  /// CHECK-DAG: <<SAD:d\d+>>    VecSADAccumulate [<<Phi2>>,<<Load>>,<<Rep>>] loop:<<Loop>> outer_loop:none
-  /// CHECK-DAG:                 Add [<<Phi1>>,<<Cons8>>]       loop:<<Loop>>      outer_loop:none
+  /// CHECK-IF:     hasIsaFeature("sve")
+  //
+  //      SAD idiom is not supported for SVE.
+  ///     CHECK-NOT: VecSADAccumulate
+  //
+  /// CHECK-ELSE:
+  //
+  ///     CHECK-DAG: <<Cons8:i\d+>>  IntConstant 8                  loop:none
+  ///     CHECK-DAG: <<Rep:d\d+>>    VecReplicateScalar [<<Conv>>]  loop:none
+  ///     CHECK-DAG: <<Set:d\d+>>    VecSetScalars [<<Cons0>>]      loop:none
+  ///     CHECK-DAG: <<Phi1:i\d+>>   Phi [<<Cons0>>,{{i\d+}}]       loop:<<Loop:B\d+>> outer_loop:none
+  ///     CHECK-DAG: <<Phi2:d\d+>>   Phi [<<Set>>,{{d\d+}}]         loop:<<Loop>>      outer_loop:none
+  ///     CHECK-DAG: <<Load:d\d+>>   VecLoad [{{l\d+}},<<Phi1>>]    loop:<<Loop>>      outer_loop:none
+  ///     CHECK-DAG: <<SAD:d\d+>>    VecSADAccumulate [<<Phi2>>,<<Load>>,<<Rep>>] loop:<<Loop>> outer_loop:none
+  ///     CHECK-DAG:                 Add [<<Phi1>>,<<Cons8>>]       loop:<<Loop>>      outer_loop:none
+  //
+  /// CHECK-FI:
   private static int sadShort2IntInvariantRight(short[] s, int val) {
     int sad = 0;
     short x = (short) (val + 1);
@@ -191,15 +236,24 @@ public class SimdSadShort3 {
   //
   /// CHECK-START-ARM64: int SimdSadShort3.sadShort2IntInvariantLeft(short[], int) loop_optimization (after)
   /// CHECK-DAG: <<Cons0:i\d+>>  IntConstant 0                  loop:none
-  /// CHECK-DAG: <<Cons8:i\d+>>  IntConstant 8                  loop:none
   /// CHECK-DAG: <<Conv:s\d+>>   TypeConversion [{{i\d+}}]      loop:none
-  /// CHECK-DAG: <<Rep:d\d+>>    VecReplicateScalar [<<Conv>>]  loop:none
-  /// CHECK-DAG: <<Set:d\d+>>    VecSetScalars [<<Cons0>>]      loop:none
-  /// CHECK-DAG: <<Phi1:i\d+>>   Phi [<<Cons0>>,{{i\d+}}]       loop:<<Loop:B\d+>> outer_loop:none
-  /// CHECK-DAG: <<Phi2:d\d+>>   Phi [<<Set>>,{{d\d+}}]         loop:<<Loop>>      outer_loop:none
-  /// CHECK-DAG: <<Load:d\d+>>   VecLoad [{{l\d+}},<<Phi1>>]    loop:<<Loop>>      outer_loop:none
-  /// CHECK-DAG: <<SAD:d\d+>>    VecSADAccumulate [<<Phi2>>,<<Rep>>,<<Load>>] loop:<<Loop>> outer_loop:none
-  /// CHECK-DAG:                 Add [<<Phi1>>,<<Cons8>>]       loop:<<Loop>>      outer_loop:none
+  /// CHECK-IF:     hasIsaFeature("sve")
+  //
+  //      SAD idiom is not supported for SVE.
+  ///     CHECK-NOT: VecSADAccumulate
+  //
+  /// CHECK-ELSE:
+  //
+  ///     CHECK-DAG: <<Cons8:i\d+>>  IntConstant 8                  loop:none
+  ///     CHECK-DAG: <<Rep:d\d+>>    VecReplicateScalar [<<Conv>>]  loop:none
+  ///     CHECK-DAG: <<Set:d\d+>>    VecSetScalars [<<Cons0>>]      loop:none
+  ///     CHECK-DAG: <<Phi1:i\d+>>   Phi [<<Cons0>>,{{i\d+}}]       loop:<<Loop:B\d+>> outer_loop:none
+  ///     CHECK-DAG: <<Phi2:d\d+>>   Phi [<<Set>>,{{d\d+}}]         loop:<<Loop>>      outer_loop:none
+  ///     CHECK-DAG: <<Load:d\d+>>   VecLoad [{{l\d+}},<<Phi1>>]    loop:<<Loop>>      outer_loop:none
+  ///     CHECK-DAG: <<SAD:d\d+>>    VecSADAccumulate [<<Phi2>>,<<Rep>>,<<Load>>] loop:<<Loop>> outer_loop:none
+  ///     CHECK-DAG:                 Add [<<Phi1>>,<<Cons8>>]       loop:<<Loop>>      outer_loop:none
+  //
+  /// CHECK-FI:
   private static int sadShort2IntInvariantLeft(short[] s, int val) {
     int sad = 0;
     short x = (short) (val + 1);
@@ -225,16 +279,25 @@ public class SimdSadShort3 {
   //
   /// CHECK-START-ARM64: int SimdSadShort3.sadShort2IntCastedExprRight(short[]) loop_optimization (after)
   /// CHECK-DAG: <<Cons0:i\d+>>  IntConstant 0                  loop:none
-  /// CHECK-DAG: <<Cons8:i\d+>>  IntConstant 8                  loop:none
   /// CHECK-DAG: <<ConsI:i\d+>>  IntConstant 110                loop:none
-  /// CHECK-DAG: <<Rep:d\d+>>    VecReplicateScalar [<<ConsI>>] loop:none
-  /// CHECK-DAG: <<Set:d\d+>>    VecSetScalars [<<Cons0>>]      loop:none
-  /// CHECK-DAG: <<Phi1:i\d+>>   Phi [<<Cons0>>,{{i\d+}}]       loop:<<Loop:B\d+>> outer_loop:none
-  /// CHECK-DAG: <<Phi2:d\d+>>   Phi [<<Set>>,{{d\d+}}]         loop:<<Loop>>      outer_loop:none
-  /// CHECK-DAG: <<Load:d\d+>>   VecLoad [{{l\d+}},<<Phi1>>]    loop:<<Loop>>      outer_loop:none
-  /// CHECK-DAG: <<Add:d\d+>>    VecAdd [<<Load>>,<<Rep>>]      loop:<<Loop>>      outer_loop:none
-  /// CHECK-DAG: <<SAD:d\d+>>    VecSADAccumulate [<<Phi2>>,<<Load>>,<<Add>>] loop:<<Loop>> outer_loop:none
-  /// CHECK-DAG:                 Add [<<Phi1>>,<<Cons8>>]       loop:<<Loop>>      outer_loop:none
+  /// CHECK-IF:     hasIsaFeature("sve")
+  //
+  //      SAD idiom is not supported for SVE.
+  ///     CHECK-NOT: VecSADAccumulate
+  //
+  /// CHECK-ELSE:
+  //
+  ///     CHECK-DAG: <<Cons8:i\d+>>  IntConstant 8                  loop:none
+  ///     CHECK-DAG: <<Rep:d\d+>>    VecReplicateScalar [<<ConsI>>] loop:none
+  ///     CHECK-DAG: <<Set:d\d+>>    VecSetScalars [<<Cons0>>]      loop:none
+  ///     CHECK-DAG: <<Phi1:i\d+>>   Phi [<<Cons0>>,{{i\d+}}]       loop:<<Loop:B\d+>> outer_loop:none
+  ///     CHECK-DAG: <<Phi2:d\d+>>   Phi [<<Set>>,{{d\d+}}]         loop:<<Loop>>      outer_loop:none
+  ///     CHECK-DAG: <<Load:d\d+>>   VecLoad [{{l\d+}},<<Phi1>>]    loop:<<Loop>>      outer_loop:none
+  ///     CHECK-DAG: <<Add:d\d+>>    VecAdd [<<Load>>,<<Rep>>]      loop:<<Loop>>      outer_loop:none
+  ///     CHECK-DAG: <<SAD:d\d+>>    VecSADAccumulate [<<Phi2>>,<<Load>>,<<Add>>] loop:<<Loop>> outer_loop:none
+  ///     CHECK-DAG:                 Add [<<Phi1>>,<<Cons8>>]       loop:<<Loop>>      outer_loop:none
+  //
+  /// CHECK-FI:
   private static int sadShort2IntCastedExprRight(short[] s) {
     int sad = 0;
     for (int i = 0; i < s.length; i++) {
@@ -260,16 +323,25 @@ public class SimdSadShort3 {
   //
   /// CHECK-START-ARM64: int SimdSadShort3.sadShort2IntCastedExprLeft(short[]) loop_optimization (after)
   /// CHECK-DAG: <<Cons0:i\d+>>  IntConstant 0                  loop:none
-  /// CHECK-DAG: <<Cons8:i\d+>>  IntConstant 8                  loop:none
   /// CHECK-DAG: <<ConsI:i\d+>>  IntConstant 110                loop:none
-  /// CHECK-DAG: <<Rep:d\d+>>    VecReplicateScalar [<<ConsI>>] loop:none
-  /// CHECK-DAG: <<Set:d\d+>>    VecSetScalars [<<Cons0>>]      loop:none
-  /// CHECK-DAG: <<Phi1:i\d+>>   Phi [<<Cons0>>,{{i\d+}}]       loop:<<Loop:B\d+>> outer_loop:none
-  /// CHECK-DAG: <<Phi2:d\d+>>   Phi [<<Set>>,{{d\d+}}]         loop:<<Loop>>      outer_loop:none
-  /// CHECK-DAG: <<Load:d\d+>>   VecLoad [{{l\d+}},<<Phi1>>]    loop:<<Loop>>      outer_loop:none
-  /// CHECK-DAG: <<Add:d\d+>>    VecAdd [<<Load>>,<<Rep>>]      loop:<<Loop>>      outer_loop:none
-  /// CHECK-DAG: <<SAD:d\d+>>    VecSADAccumulate [<<Phi2>>,<<Add>>,<<Load>>] loop:<<Loop>> outer_loop:none
-  /// CHECK-DAG:                 Add [<<Phi1>>,<<Cons8>>]       loop:<<Loop>>      outer_loop:none
+  /// CHECK-IF:     hasIsaFeature("sve")
+  //
+  //      SAD idiom is not supported for SVE.
+  ///     CHECK-NOT: VecSADAccumulate
+  //
+  /// CHECK-ELSE:
+  //
+  ///     CHECK-DAG: <<Cons8:i\d+>>  IntConstant 8                  loop:none
+  ///     CHECK-DAG: <<Rep:d\d+>>    VecReplicateScalar [<<ConsI>>] loop:none
+  ///     CHECK-DAG: <<Set:d\d+>>    VecSetScalars [<<Cons0>>]      loop:none
+  ///     CHECK-DAG: <<Phi1:i\d+>>   Phi [<<Cons0>>,{{i\d+}}]       loop:<<Loop:B\d+>> outer_loop:none
+  ///     CHECK-DAG: <<Phi2:d\d+>>   Phi [<<Set>>,{{d\d+}}]         loop:<<Loop>>      outer_loop:none
+  ///     CHECK-DAG: <<Load:d\d+>>   VecLoad [{{l\d+}},<<Phi1>>]    loop:<<Loop>>      outer_loop:none
+  ///     CHECK-DAG: <<Add:d\d+>>    VecAdd [<<Load>>,<<Rep>>]      loop:<<Loop>>      outer_loop:none
+  ///     CHECK-DAG: <<SAD:d\d+>>    VecSADAccumulate [<<Phi2>>,<<Add>>,<<Load>>] loop:<<Loop>> outer_loop:none
+  ///     CHECK-DAG:                 Add [<<Phi1>>,<<Cons8>>]       loop:<<Loop>>      outer_loop:none
+  //
+  /// CHECK-FI:
   private static int sadShort2IntCastedExprLeft(short[] s) {
     int sad = 0;
     for (int i = 0; i < s.length; i++) {
