@@ -164,4 +164,5 @@ cc_test {
         "jni_headers",
         "libnativebridge-headers",
     ],
+    gtest:false,
 }

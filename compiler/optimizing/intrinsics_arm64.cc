@@ -3856,6 +3856,23 @@ void IntrinsicCodeGeneratorARM64::VisitLongDivideUnsigned(HInvoke* invoke) {
   GenerateDivideUnsigned(invoke, codegen_);
 }
 
+void IntrinsicLocationsBuilderARM64::VisitMathMultiplyHigh(HInvoke* invoke) {
+  CreateIntIntToIntLocations(allocator_, invoke);
+}
+
+void IntrinsicCodeGeneratorARM64::VisitMathMultiplyHigh(HInvoke* invoke) {
+  LocationSummary* locations = invoke->GetLocations();
+  MacroAssembler* masm = codegen_->GetVIXLAssembler();
+  DataType::Type type = invoke->GetType();
+  DCHECK(type == DataType::Type::kInt64);
+
+  Register x = RegisterFrom(locations->InAt(0), type);
+  Register y = RegisterFrom(locations->InAt(1), type);
+  Register out = RegisterFrom(locations->Out(), type);
+
+  __ Smulh(out, x, y);
+}
+
 class VarHandleSlowPathARM64 : public IntrinsicSlowPathARM64 {
  public:
   VarHandleSlowPathARM64(HInvoke* invoke, std::memory_order order)
