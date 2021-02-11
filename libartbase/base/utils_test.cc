@@ -15,6 +15,7 @@
  */
 
 #include "utils.h"
+#include "stl_util.h"
 
 #include "gtest/gtest.h"
 
@@ -41,9 +42,13 @@ TEST_F(UtilsTest, PrettySize) {
   EXPECT_EQ("512B", PrettySize(512));
 }
 
+void Split(const char* arr, char s, std::vector<std::string_view>* sv) {
+  Split<std::string_view>(std::string_view(arr), s, sv);
+}
+
 TEST_F(UtilsTest, Split) {
-  std::vector<std::string> actual;
-  std::vector<std::string> expected;
+  std::vector<std::string_view> actual;
+  std::vector<std::string_view> expected;
 
   expected.clear();
 
@@ -113,6 +118,50 @@ TEST_F(UtilsTest, GetProcessStatus) {
   EXPECT_EQ("<unknown>", GetProcessStatus("tate"));
   EXPECT_EQ("<unknown>", GetProcessStatus("e"));
   EXPECT_EQ("<unknown>", GetProcessStatus("InvalidFieldName"));
+}
+
+TEST_F(UtilsTest, StringSplit) {
+  auto range = SplitString("[ab[c[[d[e[", '[');
+  auto it = range.begin();
+  EXPECT_FALSE(it == range.end());
+  EXPECT_EQ(*it++, "");
+  EXPECT_FALSE(it == range.end());
+  EXPECT_EQ(*it++, "ab");
+  EXPECT_FALSE(it == range.end());
+  EXPECT_EQ(*it++, "c");
+  EXPECT_FALSE(it == range.end());
+  EXPECT_EQ(*it++, "");
+  EXPECT_FALSE(it == range.end());
+  EXPECT_EQ(*it++, "d");
+  EXPECT_FALSE(it == range.end());
+  EXPECT_EQ(*it++, "e");
+  EXPECT_FALSE(it == range.end());
+  EXPECT_EQ(*it++, "");
+  EXPECT_TRUE(it == range.end());
+}
+
+TEST_F(UtilsTest, StringSplit2) {
+  auto range = SplitString("ab[c[[d[e", '[');
+  auto it = range.begin();
+  EXPECT_FALSE(it == range.end());
+  EXPECT_EQ(*it++, "ab");
+  EXPECT_FALSE(it == range.end());
+  EXPECT_EQ(*it++, "c");
+  EXPECT_FALSE(it == range.end());
+  EXPECT_EQ(*it++, "");
+  EXPECT_FALSE(it == range.end());
+  EXPECT_EQ(*it++, "d");
+  EXPECT_FALSE(it == range.end());
+  EXPECT_EQ(*it++, "e");
+  EXPECT_TRUE(it == range.end());
+}
+
+TEST_F(UtilsTest, StringSplit3) {
+  auto range = SplitString("", '[');
+  auto it = range.begin();
+  EXPECT_FALSE(it == range.end());
+  EXPECT_EQ(*it++, "");
+  EXPECT_TRUE(it == range.end());
 }
 
 }  // namespace art

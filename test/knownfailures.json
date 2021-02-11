@@ -42,7 +42,6 @@
     },
     {
         "tests": ["002-sleep",
-                  "053-wait-some",
                   "055-enum-performance",
                   "133-static-invoke-super"],
         "description": ["Tests that are timing sensitive and flaky on heavily",
