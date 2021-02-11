@@ -50,11 +50,22 @@ public class Main {
   /// CHECK-START-ARM64: int Main.breakLoop(int[]) loop_optimization (after)
   /// CHECK-DAG: <<Par:l\d+>>  ParameterValue                          loop:none
   /// CHECK-DAG: <<One:i\d+>>  IntConstant 1                           loop:none
-  /// CHECK-DAG: <<Four:i\d+>> IntConstant 4                           loop:none
   /// CHECK-DAG: <<Nil:l\d+>>  NullCheck [<<Par>>]                     loop:none
-  /// CHECK-DAG: <<Rep:d\d+>>  VecReplicateScalar [<<One>>]            loop:none
-  /// CHECK-DAG:               VecStore [<<Nil>>,<<Phi:i\d+>>,<<Rep>>] loop:<<Loop:B\d+>> outer_loop:none
-  /// CHECK-DAG:               Add [<<Phi>>,<<Four>>]                  loop:<<Loop>>      outer_loop:none
+  /// CHECK-IF:     hasIsaFeature("sve")
+  //
+  ///     CHECK-DAG: <<Rep:d\d+>>   VecReplicateScalar [<<One>>,{{j\d+}}]             loop:none
+  ///     CHECK-DAG: <<LoopP:j\d+>> VecPredWhile                                      loop:<<Loop:B\d+>> outer_loop:none
+  ///     CHECK-DAG:                VecStore [<<Nil>>,<<Phi:i\d+>>,<<Rep>>,<<LoopP>>] loop:<<Loop>>      outer_loop:none
+  ///     CHECK-DAG:                Add [<<Phi>>,{{i\d+}}]                            loop:<<Loop>>      outer_loop:none
+  //
+  /// CHECK-ELSE:
+  //
+  ///     CHECK-DAG: <<Four:i\d+>>  IntConstant 4                           loop:none
+  ///     CHECK-DAG: <<Rep:d\d+>>   VecReplicateScalar [<<One>>]            loop:none
+  ///     CHECK-DAG:                VecStore [<<Nil>>,<<Phi:i\d+>>,<<Rep>>] loop:<<Loop:B\d+>> outer_loop:none
+  ///     CHECK-DAG:                Add [<<Phi>>,<<Four>>]                  loop:<<Loop>>      outer_loop:none
+  //
+  /// CHECK-FI:
   static int breakLoop(int[] a) {
     int l = 0;
     int u = a.length - 1;
@@ -141,10 +152,21 @@ public class Main {
   /// CHECK-DAG: <<Par:l\d+>>   ParameterValue                          loop:none
   /// CHECK-DAG: <<One:i\d+>>   IntConstant 1                           loop:none
   /// CHECK-DAG: <<Three:i\d+>> IntConstant 3                           loop:none
-  /// CHECK-DAG: <<Four:i\d+>>  IntConstant 4                           loop:none
-  /// CHECK-DAG: <<Rep:d\d+>>   VecReplicateScalar [<<Three>>]          loop:none
-  /// CHECK-DAG:                VecStore [<<Par>>,<<Phi:i\d+>>,<<Rep>>] loop:<<Loop:B\d+>> outer_loop:none
-  /// CHECK-DAG:                Add [<<Phi>>,<<Four>>]                  loop:<<Loop>>      outer_loop:none
+  /// CHECK-IF:     hasIsaFeature("sve")
+  //
+  ///     CHECK-DAG: <<Rep:d\d+>>   VecReplicateScalar [<<Three>>,{{j\d+}}]           loop:none
+  ///     CHECK-DAG: <<LoopP:j\d+>> VecPredWhile                                      loop:<<Loop:B\d+>> outer_loop:none
+  ///     CHECK-DAG:                VecStore [<<Par>>,<<Phi:i\d+>>,<<Rep>>,<<LoopP>>] loop:<<Loop>>      outer_loop:none
+  ///     CHECK-DAG:                Add [<<Phi>>,{{i\d+}}]                            loop:<<Loop>>      outer_loop:none
+  //
+  /// CHECK-ELSE:
+  //
+  ///     CHECK-DAG: <<Four:i\d+>>  IntConstant 4                           loop:none
+  ///     CHECK-DAG: <<Rep:d\d+>>   VecReplicateScalar [<<Three>>]          loop:none
+  ///     CHECK-DAG:                VecStore [<<Par>>,<<Phi:i\d+>>,<<Rep>>] loop:<<Loop:B\d+>> outer_loop:none
+  ///     CHECK-DAG:                Add [<<Phi>>,<<Four>>]                  loop:<<Loop>>      outer_loop:none
+  //
+  /// CHECK-FI:
   static int breakLoopSafeConst(int[] a) {
     int l = Integer.MAX_VALUE - 16;
     int u = Integer.MAX_VALUE - 1;
@@ -262,10 +284,22 @@ public class Main {
   /// CHECK-START-ARM64: int Main.breakLoopReduction(int[]) loop_optimization (after)
   /// CHECK-DAG: <<Par:l\d+>>   ParameterValue              loop:none
   /// CHECK-DAG: <<Zero:i\d+>>  IntConstant 0               loop:none
-  /// CHECK-DAG: <<Exp:d\d+>>   VecSetScalars [<<Zero>>]    loop:none
-  /// CHECK-DAG: <<VPhi:d\d+>>  Phi [<<Exp>>,<<VAdd:d\d+>>] loop:<<Loop:B\d+>> outer_loop:none
-  /// CHECK-DAG: <<VLoad:d\d+>> VecLoad                     loop:<<Loop>>      outer_loop:none
-  /// CHECK-DAG: <<VAdd>>       VecAdd [<<VPhi>>,<<VLoad>>] loop:<<Loop>>      outer_loop:none
+  /// CHECK-IF:     hasIsaFeature("sve")
+  //
+  ///     CHECK-DAG: <<Exp:d\d+>>   VecSetScalars [<<Zero>>,{{j\d+}}]     loop:none
+  ///     CHECK-DAG: <<LoopP:j\d+>> VecPredWhile                          loop:<<Loop:B\d+>> outer_loop:none
+  ///     CHECK-DAG: <<VPhi:d\d+>>  Phi [<<Exp>>,<<VAdd:d\d+>>]           loop:<<Loop>>      outer_loop:none
+  ///     CHECK-DAG: <<VLoad:d\d+>> VecLoad                               loop:<<Loop>>      outer_loop:none
+  ///     CHECK-DAG: <<VAdd>>       VecAdd [<<VPhi>>,<<VLoad>>,<<LoopP>>] loop:<<Loop>>      outer_loop:none
+  //
+  /// CHECK-ELSE:
+  //
+  ///     CHECK-DAG: <<Exp:d\d+>>   VecSetScalars [<<Zero>>]    loop:none
+  ///     CHECK-DAG: <<VPhi:d\d+>>  Phi [<<Exp>>,<<VAdd:d\d+>>] loop:<<Loop:B\d+>> outer_loop:none
+  ///     CHECK-DAG: <<VLoad:d\d+>> VecLoad                     loop:<<Loop>>      outer_loop:none
+  ///     CHECK-DAG: <<VAdd>>       VecAdd [<<VPhi>>,<<VLoad>>] loop:<<Loop>>      outer_loop:none
+  //
+  /// CHECK-FI:
   static int breakLoopReduction(int[] a) {
     int l = 0;
     int u = a.length - 1;

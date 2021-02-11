@@ -37,22 +37,42 @@ public class TestByte {
   /// CHECK-START-ARM64: int other.TestByte.testDotProdSimple(byte[], byte[]) loop_optimization (after)
   /// CHECK-DAG: <<Const0:i\d+>>  IntConstant 0                                         loop:none
   /// CHECK-DAG: <<Const1:i\d+>>  IntConstant 1                                         loop:none
-  /// CHECK-DAG: <<Const16:i\d+>> IntConstant 16                                        loop:none
-  /// CHECK-DAG: <<Set:d\d+>>     VecSetScalars [<<Const1>>]                            loop:none
-  /// CHECK-DAG: <<Phi1:i\d+>>    Phi [<<Const0>>,{{i\d+}}]                             loop:<<Loop:B\d+>> outer_loop:none
-  /// CHECK-DAG: <<Phi2:d\d+>>    Phi [<<Set>>,{{d\d+}}]                                loop:<<Loop>>      outer_loop:none
-  /// CHECK-DAG: <<Load1:d\d+>>   VecLoad [{{l\d+}},<<Phi1>>]                           loop:<<Loop>>      outer_loop:none
-  /// CHECK-DAG: <<Load2:d\d+>>   VecLoad [{{l\d+}},<<Phi1>>]                           loop:<<Loop>>      outer_loop:none
-  /// CHECK-DAG:                  VecDotProd [<<Phi2>>,<<Load1>>,<<Load2>>] type:Int8   loop:<<Loop>>      outer_loop:none
-  /// CHECK-DAG:                  Add [<<Phi1>>,<<Const16>>]                            loop:<<Loop>>      outer_loop:none
+  /// CHECK-IF:     hasIsaFeature("sve")
   //
-  /// CHECK-DAG: <<Reduce:d\d+>>  VecReduce [<<Phi2>>]                                  loop:none
-  /// CHECK-DAG:                  VecExtractScalar [<<Reduce>>]                         loop:none
+  ///     CHECK-DAG: <<Set:d\d+>>     VecSetScalars [<<Const1>>,{{j\d+}}]                             loop:none
+  ///     CHECK-DAG: <<Phi1:i\d+>>    Phi [<<Const0>>,{{i\d+}}]                                       loop:<<Loop:B\d+>> outer_loop:none
+  ///     CHECK-DAG: <<Phi2:d\d+>>    Phi [<<Set>>,{{d\d+}}]                                          loop:<<Loop>>      outer_loop:none
+  ///     CHECK-DAG: <<LoopP:j\d+>>   VecPredWhile [<<Phi1>>,{{i\d+}}]                                loop:<<Loop>>      outer_loop:none
+  ///     CHECK-DAG: <<Load1:d\d+>>   VecLoad [{{l\d+}},<<Phi1>>,<<LoopP>>]                           loop:<<Loop>>      outer_loop:none
+  ///     CHECK-DAG: <<Load2:d\d+>>   VecLoad [{{l\d+}},<<Phi1>>,<<LoopP>>]                           loop:<<Loop>>      outer_loop:none
+  ///     CHECK-DAG:                  VecDotProd [<<Phi2>>,<<Load1>>,<<Load2>>,<<LoopP>>] type:Int8   loop:<<Loop>>      outer_loop:none
+  ///     CHECK-DAG:                  Add [<<Phi1>>,{{i\d+}}]                                         loop:<<Loop>>      outer_loop:none
+  //
+  ///     CHECK-DAG: <<Reduce:d\d+>>  VecReduce [<<Phi2>>,{{j\d+}}]                                   loop:none
+  ///     CHECK-DAG:                  VecExtractScalar [<<Reduce>>,{{j\d+}}]                          loop:none
+  //
+  /// CHECK-ELSE:
+  //
+  ///     CHECK-DAG: <<Const16:i\d+>> IntConstant 16                                        loop:none
+  ///     CHECK-DAG: <<Set:d\d+>>     VecSetScalars [<<Const1>>]                            loop:none
+  ///     CHECK-DAG: <<Phi1:i\d+>>    Phi [<<Const0>>,{{i\d+}}]                             loop:<<Loop:B\d+>> outer_loop:none
+  ///     CHECK-DAG: <<Phi2:d\d+>>    Phi [<<Set>>,{{d\d+}}]                                loop:<<Loop>>      outer_loop:none
+  ///     CHECK-DAG: <<Load1:d\d+>>   VecLoad [{{l\d+}},<<Phi1>>]                           loop:<<Loop>>      outer_loop:none
+  ///     CHECK-DAG: <<Load2:d\d+>>   VecLoad [{{l\d+}},<<Phi1>>]                           loop:<<Loop>>      outer_loop:none
+  ///     CHECK-DAG:                  VecDotProd [<<Phi2>>,<<Load1>>,<<Load2>>] type:Int8   loop:<<Loop>>      outer_loop:none
+  ///     CHECK-DAG:                  Add [<<Phi1>>,<<Const16>>]                            loop:<<Loop>>      outer_loop:none
+  //
+  ///     CHECK-DAG: <<Reduce:d\d+>>  VecReduce [<<Phi2>>]                                  loop:none
+  ///     CHECK-DAG:                  VecExtractScalar [<<Reduce>>]                         loop:none
+  //
+  /// CHECK-FI:
 
 
   /// CHECK-START-ARM64: int other.TestByte.testDotProdSimple(byte[], byte[]) disassembly (after)
   /// CHECK:        VecDotProd
-  /// CHECK-IF:     hasIsaFeature("dotprod")
+  /// CHECK-IF:     hasIsaFeature("sve")
+  ///               CHECK:        sdot z{{\d+}}.s, z{{\d+}}.b, z{{\d+}}.b
+  /// CHECK-ELIF:   hasIsaFeature("dotprod")
   ///               CHECK-NEXT:   sdot v{{\d+}}.4s, v{{\d+}}.16b, v{{\d+}}.16b
   /// CHECK-ELSE:
   ///               CHECK-NOT:    sdot
@@ -85,20 +105,41 @@ public class TestByte {
   /// CHECK-START-ARM64: int other.TestByte.testDotProdComplex(byte[], byte[]) loop_optimization (after)
   /// CHECK-DAG: <<Const0:i\d+>>  IntConstant 0                                         loop:none
   /// CHECK-DAG: <<Const1:i\d+>>  IntConstant 1                                         loop:none
-  /// CHECK-DAG: <<Const16:i\d+>> IntConstant 16                                        loop:none
-  /// CHECK-DAG: <<Repl:d\d+>>    VecReplicateScalar [<<Const1>>]                       loop:none
-  /// CHECK-DAG: <<Set:d\d+>>     VecSetScalars [<<Const1>>]                            loop:none
-  /// CHECK-DAG: <<Phi1:i\d+>>    Phi [<<Const0>>,{{i\d+}}]                             loop:<<Loop:B\d+>> outer_loop:none
-  /// CHECK-DAG: <<Phi2:d\d+>>    Phi [<<Set>>,{{d\d+}}]                                loop:<<Loop>>      outer_loop:none
-  /// CHECK-DAG: <<Load1:d\d+>>   VecLoad [{{l\d+}},<<Phi1>>]                           loop:<<Loop>>      outer_loop:none
-  /// CHECK-DAG: <<VAdd1:d\d+>>   VecAdd [<<Load1>>,<<Repl>>]                           loop:<<Loop>>      outer_loop:none
-  /// CHECK-DAG: <<Load2:d\d+>>   VecLoad [{{l\d+}},<<Phi1>>]                           loop:<<Loop>>      outer_loop:none
-  /// CHECK-DAG: <<VAdd2:d\d+>>   VecAdd [<<Load2>>,<<Repl>>]                           loop:<<Loop>>      outer_loop:none
-  /// CHECK-DAG:                  VecDotProd [<<Phi2>>,<<VAdd1>>,<<VAdd2>>] type:Int8   loop:<<Loop>>      outer_loop:none
-  /// CHECK-DAG:                  Add [<<Phi1>>,<<Const16>>]                            loop:<<Loop>>      outer_loop:none
+  /// CHECK-IF:     hasIsaFeature("sve")
   //
-  /// CHECK-DAG: <<Reduce:d\d+>>  VecReduce [<<Phi2>>]                                  loop:none
-  /// CHECK-DAG:                  VecExtractScalar [<<Reduce>>]                         loop:none
+  ///     CHECK-DAG: <<Repl:d\d+>>    VecReplicateScalar [<<Const1>>,{{j\d+}}]                        loop:none
+  ///     CHECK-DAG: <<Set:d\d+>>     VecSetScalars [<<Const1>>,{{j\d+}}]                             loop:none
+  ///     CHECK-DAG: <<Phi1:i\d+>>    Phi [<<Const0>>,{{i\d+}}]                                       loop:<<Loop:B\d+>> outer_loop:none
+  ///     CHECK-DAG: <<Phi2:d\d+>>    Phi [<<Set>>,{{d\d+}}]                                          loop:<<Loop>>      outer_loop:none
+  ///     CHECK-DAG: <<LoopP:j\d+>>   VecPredWhile [<<Phi1>>,{{i\d+}}]                                loop:<<Loop>>      outer_loop:none
+  ///     CHECK-DAG: <<Load1:d\d+>>   VecLoad [{{l\d+}},<<Phi1>>,<<LoopP>>]                           loop:<<Loop>>      outer_loop:none
+  ///     CHECK-DAG: <<VAdd1:d\d+>>   VecAdd [<<Load1>>,<<Repl>>,<<LoopP>>]                           loop:<<Loop>>      outer_loop:none
+  ///     CHECK-DAG: <<Load2:d\d+>>   VecLoad [{{l\d+}},<<Phi1>>,<<LoopP>>]                           loop:<<Loop>>      outer_loop:none
+  ///     CHECK-DAG: <<VAdd2:d\d+>>   VecAdd [<<Load2>>,<<Repl>>,<<LoopP>>]                           loop:<<Loop>>      outer_loop:none
+  ///     CHECK-DAG:                  VecDotProd [<<Phi2>>,<<VAdd1>>,<<VAdd2>>,<<LoopP>>] type:Int8   loop:<<Loop>>      outer_loop:none
+  ///     CHECK-DAG:                  Add [<<Phi1>>,{{i\d+}}]                                         loop:<<Loop>>      outer_loop:none
+  //
+  ///     CHECK-DAG: <<Reduce:d\d+>>  VecReduce [<<Phi2>>,{{j\d+}}]                                   loop:none
+  ///     CHECK-DAG:                  VecExtractScalar [<<Reduce>>,{{j\d+}}]                          loop:none
+  //
+  /// CHECK-ELSE:
+  //
+  ///     CHECK-DAG: <<Const16:i\d+>> IntConstant 16                                        loop:none
+  ///     CHECK-DAG: <<Repl:d\d+>>    VecReplicateScalar [<<Const1>>]                       loop:none
+  ///     CHECK-DAG: <<Set:d\d+>>     VecSetScalars [<<Const1>>]                            loop:none
+  ///     CHECK-DAG: <<Phi1:i\d+>>    Phi [<<Const0>>,{{i\d+}}]                             loop:<<Loop:B\d+>> outer_loop:none
+  ///     CHECK-DAG: <<Phi2:d\d+>>    Phi [<<Set>>,{{d\d+}}]                                loop:<<Loop>>      outer_loop:none
+  ///     CHECK-DAG: <<Load1:d\d+>>   VecLoad [{{l\d+}},<<Phi1>>]                           loop:<<Loop>>      outer_loop:none
+  ///     CHECK-DAG: <<VAdd1:d\d+>>   VecAdd [<<Load1>>,<<Repl>>]                           loop:<<Loop>>      outer_loop:none
+  ///     CHECK-DAG: <<Load2:d\d+>>   VecLoad [{{l\d+}},<<Phi1>>]                           loop:<<Loop>>      outer_loop:none
+  ///     CHECK-DAG: <<VAdd2:d\d+>>   VecAdd [<<Load2>>,<<Repl>>]                           loop:<<Loop>>      outer_loop:none
+  ///     CHECK-DAG:                  VecDotProd [<<Phi2>>,<<VAdd1>>,<<VAdd2>>] type:Int8   loop:<<Loop>>      outer_loop:none
+  ///     CHECK-DAG:                  Add [<<Phi1>>,<<Const16>>]                            loop:<<Loop>>      outer_loop:none
+  //
+  ///     CHECK-DAG: <<Reduce:d\d+>>  VecReduce [<<Phi2>>]                                  loop:none
+  ///     CHECK-DAG:                  VecExtractScalar [<<Reduce>>]                         loop:none
+  //
+  /// CHECK-FI:
   public static final int testDotProdComplex(byte[] a, byte[] b) {
     int s = 1;
     for (int i = 0; i < b.length; i++) {
@@ -122,21 +163,41 @@ public class TestByte {
   /// CHECK-START-ARM64: int other.TestByte.testDotProdSimpleUnsigned(byte[], byte[]) loop_optimization (after)
   /// CHECK-DAG: <<Const0:i\d+>>  IntConstant 0                                         loop:none
   /// CHECK-DAG: <<Const1:i\d+>>  IntConstant 1                                         loop:none
-  /// CHECK-DAG: <<Const16:i\d+>> IntConstant 16                                        loop:none
-  /// CHECK-DAG: <<Set:d\d+>>     VecSetScalars [<<Const1>>]                            loop:none
-  /// CHECK-DAG: <<Phi1:i\d+>>    Phi [<<Const0>>,{{i\d+}}]                             loop:<<Loop:B\d+>> outer_loop:none
-  /// CHECK-DAG: <<Phi2:d\d+>>    Phi [<<Set>>,{{d\d+}}]                                loop:<<Loop>>      outer_loop:none
-  /// CHECK-DAG: <<Load1:d\d+>>   VecLoad [{{l\d+}},<<Phi1>>]                           loop:<<Loop>>      outer_loop:none
-  /// CHECK-DAG: <<Load2:d\d+>>   VecLoad [{{l\d+}},<<Phi1>>]                           loop:<<Loop>>      outer_loop:none
-  /// CHECK-DAG:                  VecDotProd [<<Phi2>>,<<Load1>>,<<Load2>>] type:Uint8  loop:<<Loop>>      outer_loop:none
-  /// CHECK-DAG:                  Add [<<Phi1>>,<<Const16>>]                            loop:<<Loop>>      outer_loop:none
+  /// CHECK-IF:     hasIsaFeature("sve")
   //
-  /// CHECK-DAG: <<Reduce:d\d+>>  VecReduce [<<Phi2>>]                                  loop:none
-  /// CHECK-DAG:                  VecExtractScalar [<<Reduce>>]                         loop:none
+  ///     CHECK-DAG: <<Set:d\d+>>     VecSetScalars [<<Const1>>,{{j\d+}}]                             loop:none
+  ///     CHECK-DAG: <<Phi1:i\d+>>    Phi [<<Const0>>,{{i\d+}}]                                       loop:<<Loop:B\d+>> outer_loop:none
+  ///     CHECK-DAG: <<Phi2:d\d+>>    Phi [<<Set>>,{{d\d+}}]                                          loop:<<Loop>>      outer_loop:none
+  ///     CHECK-DAG: <<LoopP:j\d+>>   VecPredWhile [<<Phi1>>,{{i\d+}}]                                loop:<<Loop>>      outer_loop:none
+  ///     CHECK-DAG: <<Load1:d\d+>>   VecLoad [{{l\d+}},<<Phi1>>,<<LoopP>>]                           loop:<<Loop>>      outer_loop:none
+  ///     CHECK-DAG: <<Load2:d\d+>>   VecLoad [{{l\d+}},<<Phi1>>,<<LoopP>>]                           loop:<<Loop>>      outer_loop:none
+  ///     CHECK-DAG:                  VecDotProd [<<Phi2>>,<<Load1>>,<<Load2>>,<<LoopP>>] type:Uint8  loop:<<Loop>>      outer_loop:none
+  ///     CHECK-DAG:                  Add [<<Phi1>>,{{i\d+}}]                                         loop:<<Loop>>      outer_loop:none
+  //
+  ///     CHECK-DAG: <<Reduce:d\d+>>  VecReduce [<<Phi2>>,{{j\d+}}]                                   loop:none
+  ///     CHECK-DAG:                  VecExtractScalar [<<Reduce>>,{{j\d+}}]                          loop:none
+  //
+  /// CHECK-ELSE:
+  //
+  ///     CHECK-DAG: <<Const16:i\d+>> IntConstant 16                                        loop:none
+  ///     CHECK-DAG: <<Set:d\d+>>     VecSetScalars [<<Const1>>]                            loop:none
+  ///     CHECK-DAG: <<Phi1:i\d+>>    Phi [<<Const0>>,{{i\d+}}]                             loop:<<Loop:B\d+>> outer_loop:none
+  ///     CHECK-DAG: <<Phi2:d\d+>>    Phi [<<Set>>,{{d\d+}}]                                loop:<<Loop>>      outer_loop:none
+  ///     CHECK-DAG: <<Load1:d\d+>>   VecLoad [{{l\d+}},<<Phi1>>]                           loop:<<Loop>>      outer_loop:none
+  ///     CHECK-DAG: <<Load2:d\d+>>   VecLoad [{{l\d+}},<<Phi1>>]                           loop:<<Loop>>      outer_loop:none
+  ///     CHECK-DAG:                  VecDotProd [<<Phi2>>,<<Load1>>,<<Load2>>] type:Uint8  loop:<<Loop>>      outer_loop:none
+  ///     CHECK-DAG:                  Add [<<Phi1>>,<<Const16>>]                            loop:<<Loop>>      outer_loop:none
+  //
+  ///     CHECK-DAG: <<Reduce:d\d+>>  VecReduce [<<Phi2>>]                                  loop:none
+  ///     CHECK-DAG:                  VecExtractScalar [<<Reduce>>]                         loop:none
+  //
+  /// CHECK-FI:
 
   /// CHECK-START-ARM64: int other.TestByte.testDotProdSimpleUnsigned(byte[], byte[]) disassembly (after)
   /// CHECK:        VecDotProd
-  /// CHECK-IF:     hasIsaFeature("dotprod")
+  /// CHECK-IF:     hasIsaFeature("sve")
+  ///               CHECK:        udot z{{\d+}}.s, z{{\d+}}.b, z{{\d+}}.b
+  /// CHECK-ELIF:   hasIsaFeature("dotprod")
   ///               CHECK-NEXT:   udot v{{\d+}}.4s, v{{\d+}}.16b, v{{\d+}}.16b
   /// CHECK-ELSE:
   ///               CHECK-NOT:    sdot
@@ -169,20 +230,41 @@ public class TestByte {
   /// CHECK-START-ARM64: int other.TestByte.testDotProdComplexUnsigned(byte[], byte[]) loop_optimization (after)
   /// CHECK-DAG: <<Const0:i\d+>>  IntConstant 0                                         loop:none
   /// CHECK-DAG: <<Const1:i\d+>>  IntConstant 1                                         loop:none
-  /// CHECK-DAG: <<Const16:i\d+>> IntConstant 16                                        loop:none
-  /// CHECK-DAG: <<Repl:d\d+>>    VecReplicateScalar [<<Const1>>]                       loop:none
-  /// CHECK-DAG: <<Set:d\d+>>     VecSetScalars [<<Const1>>]                            loop:none
-  /// CHECK-DAG: <<Phi1:i\d+>>    Phi [<<Const0>>,{{i\d+}}]                             loop:<<Loop:B\d+>> outer_loop:none
-  /// CHECK-DAG: <<Phi2:d\d+>>    Phi [<<Set>>,{{d\d+}}]                                loop:<<Loop>>      outer_loop:none
-  /// CHECK-DAG: <<Load1:d\d+>>   VecLoad [{{l\d+}},<<Phi1>>]                           loop:<<Loop>>      outer_loop:none
-  /// CHECK-DAG: <<VAdd1:d\d+>>   VecAdd [<<Load1>>,<<Repl>>]                           loop:<<Loop>>      outer_loop:none
-  /// CHECK-DAG: <<Load2:d\d+>>   VecLoad [{{l\d+}},<<Phi1>>]                           loop:<<Loop>>      outer_loop:none
-  /// CHECK-DAG: <<VAdd2:d\d+>>   VecAdd [<<Load2>>,<<Repl>>]                           loop:<<Loop>>      outer_loop:none
-  /// CHECK-DAG:                  VecDotProd [<<Phi2>>,<<VAdd1>>,<<VAdd2>>] type:Uint8  loop:<<Loop>>      outer_loop:none
-  /// CHECK-DAG:                  Add [<<Phi1>>,<<Const16>>]                            loop:<<Loop>>      outer_loop:none
+  /// CHECK-IF:     hasIsaFeature("sve")
   //
-  /// CHECK-DAG: <<Reduce:d\d+>>  VecReduce [<<Phi2>>]                                  loop:none
-  /// CHECK-DAG:                  VecExtractScalar [<<Reduce>>]                         loop:none
+  ///     CHECK-DAG: <<Repl:d\d+>>    VecReplicateScalar [<<Const1>>,{{j\d+}}]                        loop:none
+  ///     CHECK-DAG: <<Set:d\d+>>     VecSetScalars [<<Const1>>,{{j\d+}}]                             loop:none
+  ///     CHECK-DAG: <<Phi1:i\d+>>    Phi [<<Const0>>,{{i\d+}}]                                       loop:<<Loop:B\d+>> outer_loop:none
+  ///     CHECK-DAG: <<Phi2:d\d+>>    Phi [<<Set>>,{{d\d+}}]                                          loop:<<Loop>>      outer_loop:none
+  ///     CHECK-DAG: <<LoopP:j\d+>>   VecPredWhile [<<Phi1>>,{{i\d+}}]                                loop:<<Loop>>      outer_loop:none
+  ///     CHECK-DAG: <<Load1:d\d+>>   VecLoad [{{l\d+}},<<Phi1>>,<<LoopP>>]                           loop:<<Loop>>      outer_loop:none
+  ///     CHECK-DAG: <<VAdd1:d\d+>>   VecAdd [<<Load1>>,<<Repl>>,<<LoopP>>]                           loop:<<Loop>>      outer_loop:none
+  ///     CHECK-DAG: <<Load2:d\d+>>   VecLoad [{{l\d+}},<<Phi1>>,<<LoopP>>]                           loop:<<Loop>>      outer_loop:none
+  ///     CHECK-DAG: <<VAdd2:d\d+>>   VecAdd [<<Load2>>,<<Repl>>,<<LoopP>>]                           loop:<<Loop>>      outer_loop:none
+  ///     CHECK-DAG:                  VecDotProd [<<Phi2>>,<<VAdd1>>,<<VAdd2>>,<<LoopP>>] type:Uint8  loop:<<Loop>>      outer_loop:none
+  ///     CHECK-DAG:                  Add [<<Phi1>>,{{i\d+}}]                                         loop:<<Loop>>      outer_loop:none
+  //
+  ///     CHECK-DAG: <<Reduce:d\d+>>  VecReduce [<<Phi2>>,{{j\d+}}]                                   loop:none
+  ///     CHECK-DAG:                  VecExtractScalar [<<Reduce>>,{{j\d+}}]                          loop:none
+  //
+  /// CHECK-ELSE:
+  //
+  ///     CHECK-DAG: <<Const16:i\d+>> IntConstant 16                                        loop:none
+  ///     CHECK-DAG: <<Repl:d\d+>>    VecReplicateScalar [<<Const1>>]                       loop:none
+  ///     CHECK-DAG: <<Set:d\d+>>     VecSetScalars [<<Const1>>]                            loop:none
+  ///     CHECK-DAG: <<Phi1:i\d+>>    Phi [<<Const0>>,{{i\d+}}]                             loop:<<Loop:B\d+>> outer_loop:none
+  ///     CHECK-DAG: <<Phi2:d\d+>>    Phi [<<Set>>,{{d\d+}}]                                loop:<<Loop>>      outer_loop:none
+  ///     CHECK-DAG: <<Load1:d\d+>>   VecLoad [{{l\d+}},<<Phi1>>]                           loop:<<Loop>>      outer_loop:none
+  ///     CHECK-DAG: <<VAdd1:d\d+>>   VecAdd [<<Load1>>,<<Repl>>]                           loop:<<Loop>>      outer_loop:none
+  ///     CHECK-DAG: <<Load2:d\d+>>   VecLoad [{{l\d+}},<<Phi1>>]                           loop:<<Loop>>      outer_loop:none
+  ///     CHECK-DAG: <<VAdd2:d\d+>>   VecAdd [<<Load2>>,<<Repl>>]                           loop:<<Loop>>      outer_loop:none
+  ///     CHECK-DAG:                  VecDotProd [<<Phi2>>,<<VAdd1>>,<<VAdd2>>] type:Uint8  loop:<<Loop>>      outer_loop:none
+  ///     CHECK-DAG:                  Add [<<Phi1>>,<<Const16>>]                            loop:<<Loop>>      outer_loop:none
+  //
+  ///     CHECK-DAG: <<Reduce:d\d+>>  VecReduce [<<Phi2>>]                                  loop:none
+  ///     CHECK-DAG:                  VecExtractScalar [<<Reduce>>]                         loop:none
+  //
+  /// CHECK-FI:
   public static final int testDotProdComplexUnsigned(byte[] a, byte[] b) {
     int s = 1;
     for (int i = 0; i < b.length; i++) {
@@ -210,20 +292,41 @@ public class TestByte {
   /// CHECK-START-ARM64: int other.TestByte.testDotProdComplexUnsignedCastedToSigned(byte[], byte[]) loop_optimization (after)
   /// CHECK-DAG: <<Const0:i\d+>>  IntConstant 0                                         loop:none
   /// CHECK-DAG: <<Const1:i\d+>>  IntConstant 1                                         loop:none
-  /// CHECK-DAG: <<Const16:i\d+>> IntConstant 16                                        loop:none
-  /// CHECK-DAG: <<Repl:d\d+>>    VecReplicateScalar [<<Const1>>]                       loop:none
-  /// CHECK-DAG: <<Set:d\d+>>     VecSetScalars [<<Const1>>]                            loop:none
-  /// CHECK-DAG: <<Phi1:i\d+>>    Phi [<<Const0>>,{{i\d+}}]                             loop:<<Loop:B\d+>> outer_loop:none
-  /// CHECK-DAG: <<Phi2:d\d+>>    Phi [<<Set>>,{{d\d+}}]                                loop:<<Loop>>      outer_loop:none
-  /// CHECK-DAG: <<Load1:d\d+>>   VecLoad [{{l\d+}},<<Phi1>>]                           loop:<<Loop>>      outer_loop:none
-  /// CHECK-DAG: <<VAdd1:d\d+>>   VecAdd [<<Load1>>,<<Repl>>]                           loop:<<Loop>>      outer_loop:none
-  /// CHECK-DAG: <<Load2:d\d+>>   VecLoad [{{l\d+}},<<Phi1>>]                           loop:<<Loop>>      outer_loop:none
-  /// CHECK-DAG: <<VAdd2:d\d+>>   VecAdd [<<Load2>>,<<Repl>>]                           loop:<<Loop>>      outer_loop:none
-  /// CHECK-DAG:                  VecDotProd [<<Phi2>>,<<VAdd1>>,<<VAdd2>>] type:Int8   loop:<<Loop>>      outer_loop:none
-  /// CHECK-DAG:                  Add [<<Phi1>>,<<Const16>>]                            loop:<<Loop>>      outer_loop:none
+  /// CHECK-IF:     hasIsaFeature("sve")
   //
-  /// CHECK-DAG: <<Reduce:d\d+>>  VecReduce [<<Phi2>>]                                  loop:none
-  /// CHECK-DAG:                  VecExtractScalar [<<Reduce>>]                         loop:none
+  ///     CHECK-DAG: <<Repl:d\d+>>    VecReplicateScalar [<<Const1>>,{{j\d+}}]                        loop:none
+  ///     CHECK-DAG: <<Set:d\d+>>     VecSetScalars [<<Const1>>,{{j\d+}}]                             loop:none
+  ///     CHECK-DAG: <<Phi1:i\d+>>    Phi [<<Const0>>,{{i\d+}}]                                       loop:<<Loop:B\d+>> outer_loop:none
+  ///     CHECK-DAG: <<Phi2:d\d+>>    Phi [<<Set>>,{{d\d+}}]                                          loop:<<Loop>>      outer_loop:none
+  ///     CHECK-DAG: <<LoopP:j\d+>>   VecPredWhile [<<Phi1>>,{{i\d+}}]                                loop:<<Loop>>      outer_loop:none
+  ///     CHECK-DAG: <<Load1:d\d+>>   VecLoad [{{l\d+}},<<Phi1>>,<<LoopP>>]                           loop:<<Loop>>      outer_loop:none
+  ///     CHECK-DAG: <<VAdd1:d\d+>>   VecAdd [<<Load1>>,<<Repl>>,<<LoopP>>]                           loop:<<Loop>>      outer_loop:none
+  ///     CHECK-DAG: <<Load2:d\d+>>   VecLoad [{{l\d+}},<<Phi1>>,<<LoopP>>]                           loop:<<Loop>>      outer_loop:none
+  ///     CHECK-DAG: <<VAdd2:d\d+>>   VecAdd [<<Load2>>,<<Repl>>,<<LoopP>>]                           loop:<<Loop>>      outer_loop:none
+  ///     CHECK-DAG:                  VecDotProd [<<Phi2>>,<<VAdd1>>,<<VAdd2>>,<<LoopP>>] type:Int8   loop:<<Loop>>      outer_loop:none
+  ///     CHECK-DAG:                  Add [<<Phi1>>,{{i\d+}}]                                         loop:<<Loop>>      outer_loop:none
+  //
+  ///     CHECK-DAG: <<Reduce:d\d+>>  VecReduce [<<Phi2>>,{{j\d+}}]                                   loop:none
+  ///     CHECK-DAG:                  VecExtractScalar [<<Reduce>>,{{j\d+}}]                          loop:none
+  //
+  /// CHECK-ELSE:
+  //
+  ///     CHECK-DAG: <<Const16:i\d+>> IntConstant 16                                        loop:none
+  ///     CHECK-DAG: <<Repl:d\d+>>    VecReplicateScalar [<<Const1>>]                       loop:none
+  ///     CHECK-DAG: <<Set:d\d+>>     VecSetScalars [<<Const1>>]                            loop:none
+  ///     CHECK-DAG: <<Phi1:i\d+>>    Phi [<<Const0>>,{{i\d+}}]                             loop:<<Loop:B\d+>> outer_loop:none
+  ///     CHECK-DAG: <<Phi2:d\d+>>    Phi [<<Set>>,{{d\d+}}]                                loop:<<Loop>>      outer_loop:none
+  ///     CHECK-DAG: <<Load1:d\d+>>   VecLoad [{{l\d+}},<<Phi1>>]                           loop:<<Loop>>      outer_loop:none
+  ///     CHECK-DAG: <<VAdd1:d\d+>>   VecAdd [<<Load1>>,<<Repl>>]                           loop:<<Loop>>      outer_loop:none
+  ///     CHECK-DAG: <<Load2:d\d+>>   VecLoad [{{l\d+}},<<Phi1>>]                           loop:<<Loop>>      outer_loop:none
+  ///     CHECK-DAG: <<VAdd2:d\d+>>   VecAdd [<<Load2>>,<<Repl>>]                           loop:<<Loop>>      outer_loop:none
+  ///     CHECK-DAG:                  VecDotProd [<<Phi2>>,<<VAdd1>>,<<VAdd2>>] type:Int8   loop:<<Loop>>      outer_loop:none
+  ///     CHECK-DAG:                  Add [<<Phi1>>,<<Const16>>]                            loop:<<Loop>>      outer_loop:none
+  //
+  ///     CHECK-DAG: <<Reduce:d\d+>>  VecReduce [<<Phi2>>]                                  loop:none
+  ///     CHECK-DAG:                  VecExtractScalar [<<Reduce>>]                         loop:none
+  //
+  /// CHECK-FI:
   public static final int testDotProdComplexUnsignedCastedToSigned(byte[] a, byte[] b) {
     int s = 1;
     for (int i = 0; i < b.length; i++) {
@@ -251,20 +354,41 @@ public class TestByte {
   /// CHECK-START-ARM64: int other.TestByte.testDotProdComplexSignedCastedToUnsigned(byte[], byte[]) loop_optimization (after)
   /// CHECK-DAG: <<Const0:i\d+>>  IntConstant 0                                         loop:none
   /// CHECK-DAG: <<Const1:i\d+>>  IntConstant 1                                         loop:none
-  /// CHECK-DAG: <<Const16:i\d+>> IntConstant 16                                        loop:none
-  /// CHECK-DAG: <<Repl:d\d+>>    VecReplicateScalar [<<Const1>>]                       loop:none
-  /// CHECK-DAG: <<Set:d\d+>>     VecSetScalars [<<Const1>>]                            loop:none
-  /// CHECK-DAG: <<Phi1:i\d+>>    Phi [<<Const0>>,{{i\d+}}]                             loop:<<Loop:B\d+>> outer_loop:none
-  /// CHECK-DAG: <<Phi2:d\d+>>    Phi [<<Set>>,{{d\d+}}]                                loop:<<Loop>>      outer_loop:none
-  /// CHECK-DAG: <<Load1:d\d+>>   VecLoad [{{l\d+}},<<Phi1>>]                           loop:<<Loop>>      outer_loop:none
-  /// CHECK-DAG: <<VAdd1:d\d+>>   VecAdd [<<Load1>>,<<Repl>>]                           loop:<<Loop>>      outer_loop:none
-  /// CHECK-DAG: <<Load2:d\d+>>   VecLoad [{{l\d+}},<<Phi1>>]                           loop:<<Loop>>      outer_loop:none
-  /// CHECK-DAG: <<VAdd2:d\d+>>   VecAdd [<<Load2>>,<<Repl>>]                           loop:<<Loop>>      outer_loop:none
-  /// CHECK-DAG:                  VecDotProd [<<Phi2>>,<<VAdd1>>,<<VAdd2>>] type:Uint8  loop:<<Loop>>      outer_loop:none
-  /// CHECK-DAG:                  Add [<<Phi1>>,<<Const16>>]                            loop:<<Loop>>      outer_loop:none
+  /// CHECK-IF:     hasIsaFeature("sve")
   //
-  /// CHECK-DAG: <<Reduce:d\d+>>  VecReduce [<<Phi2>>]                                  loop:none
-  /// CHECK-DAG:                  VecExtractScalar [<<Reduce>>]                         loop:none
+  ///     CHECK-DAG: <<Repl:d\d+>>    VecReplicateScalar [<<Const1>>,{{j\d+}}]                        loop:none
+  ///     CHECK-DAG: <<Set:d\d+>>     VecSetScalars [<<Const1>>,{{j\d+}}]                             loop:none
+  ///     CHECK-DAG: <<Phi1:i\d+>>    Phi [<<Const0>>,{{i\d+}}]                                       loop:<<Loop:B\d+>> outer_loop:none
+  ///     CHECK-DAG: <<Phi2:d\d+>>    Phi [<<Set>>,{{d\d+}}]                                          loop:<<Loop>>      outer_loop:none
+  ///     CHECK-DAG: <<LoopP:j\d+>>   VecPredWhile [<<Phi1>>,{{i\d+}}]                                loop:<<Loop>>      outer_loop:none
+  ///     CHECK-DAG: <<Load1:d\d+>>   VecLoad [{{l\d+}},<<Phi1>>,<<LoopP>>]                           loop:<<Loop>>      outer_loop:none
+  ///     CHECK-DAG: <<VAdd1:d\d+>>   VecAdd [<<Load1>>,<<Repl>>,<<LoopP>>]                           loop:<<Loop>>      outer_loop:none
+  ///     CHECK-DAG: <<Load2:d\d+>>   VecLoad [{{l\d+}},<<Phi1>>,<<LoopP>>]                           loop:<<Loop>>      outer_loop:none
+  ///     CHECK-DAG: <<VAdd2:d\d+>>   VecAdd [<<Load2>>,<<Repl>>,<<LoopP>>]                           loop:<<Loop>>      outer_loop:none
+  ///     CHECK-DAG:                  VecDotProd [<<Phi2>>,<<VAdd1>>,<<VAdd2>>,<<LoopP>>] type:Uint8  loop:<<Loop>>      outer_loop:none
+  ///     CHECK-DAG:                  Add [<<Phi1>>,{{i\d+}}]                                         loop:<<Loop>>      outer_loop:none
+  //
+  ///     CHECK-DAG: <<Reduce:d\d+>>  VecReduce [<<Phi2>>,{{j\d+}}]                                   loop:none
+  ///     CHECK-DAG:                  VecExtractScalar [<<Reduce>>,{{j\d+}}]                          loop:none
+  //
+  /// CHECK-ELSE:
+  //
+  ///     CHECK-DAG: <<Const16:i\d+>> IntConstant 16                                        loop:none
+  ///     CHECK-DAG: <<Repl:d\d+>>    VecReplicateScalar [<<Const1>>]                       loop:none
+  ///     CHECK-DAG: <<Set:d\d+>>     VecSetScalars [<<Const1>>]                            loop:none
+  ///     CHECK-DAG: <<Phi1:i\d+>>    Phi [<<Const0>>,{{i\d+}}]                             loop:<<Loop:B\d+>> outer_loop:none
+  ///     CHECK-DAG: <<Phi2:d\d+>>    Phi [<<Set>>,{{d\d+}}]                                loop:<<Loop>>      outer_loop:none
+  ///     CHECK-DAG: <<Load1:d\d+>>   VecLoad [{{l\d+}},<<Phi1>>]                           loop:<<Loop>>      outer_loop:none
+  ///     CHECK-DAG: <<VAdd1:d\d+>>   VecAdd [<<Load1>>,<<Repl>>]                           loop:<<Loop>>      outer_loop:none
+  ///     CHECK-DAG: <<Load2:d\d+>>   VecLoad [{{l\d+}},<<Phi1>>]                           loop:<<Loop>>      outer_loop:none
+  ///     CHECK-DAG: <<VAdd2:d\d+>>   VecAdd [<<Load2>>,<<Repl>>]                           loop:<<Loop>>      outer_loop:none
+  ///     CHECK-DAG:                  VecDotProd [<<Phi2>>,<<VAdd1>>,<<VAdd2>>] type:Uint8  loop:<<Loop>>      outer_loop:none
+  ///     CHECK-DAG:                  Add [<<Phi1>>,<<Const16>>]                            loop:<<Loop>>      outer_loop:none
+  //
+  ///     CHECK-DAG: <<Reduce:d\d+>>  VecReduce [<<Phi2>>]                                  loop:none
+  ///     CHECK-DAG:                  VecExtractScalar [<<Reduce>>]                         loop:none
+  //
+  /// CHECK-FI:
   public static final int testDotProdComplexSignedCastedToUnsigned(byte[] a, byte[] b) {
     int s = 1;
     for (int i = 0; i < b.length; i++) {
