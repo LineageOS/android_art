@@ -92,3 +92,8 @@ palette_status_t PaletteGetHooks(PaletteHooks** hooks) {
   *hooks = nullptr;
   return PALETTE_STATUS_NOT_SUPPORTED;
 }
+
+palette_status_t PaletteCreateOdrefreshStagingDirectory(const char** staging_dir) {
+  *staging_dir = nullptr;
+  return PALETTE_STATUS_NOT_SUPPORTED;
+}

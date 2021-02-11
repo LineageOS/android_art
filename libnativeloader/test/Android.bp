@@ -81,4 +81,5 @@ cc_test {
         "api_test.c",
     ],
     header_libs: ["libnativeloader-headers"],
+    gtest: false,
 }

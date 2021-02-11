@@ -500,6 +500,7 @@ bool MterpHandleIntrinsic(ShadowFrame* shadow_frame,
     UNIMPLEMENTED_CASE(MathRint /* (D)D */)
     UNIMPLEMENTED_CASE(MathRoundDouble /* (D)J */)
     UNIMPLEMENTED_CASE(MathRoundFloat /* (F)I */)
+    UNIMPLEMENTED_CASE(MathMultiplyHigh /* (JJ)J */)
     UNIMPLEMENTED_CASE(SystemArrayCopyChar /* ([CI[CII)V */)
     UNIMPLEMENTED_CASE(SystemArrayCopy /* (Ljava/lang/Object;ILjava/lang/Object;II)V */)
     UNIMPLEMENTED_CASE(ThreadCurrentThread /* ()Ljava/lang/Thread; */)
