@@ -290,8 +290,17 @@ public class Main {
   /// CHECK-NOT: VecLoad
   //
   /// CHECK-START-ARM64: void Main.string2Bytes(char[], java.lang.String) loop_optimization (after)
-  /// CHECK-DAG: VecLoad  loop:<<Loop:B\d+>> outer_loop:none
-  /// CHECK-DAG: VecStore loop:<<Loop>>      outer_loop:none
+  /// CHECK-IF:     hasIsaFeature("sve")
+  //
+  //      TODO: Support CharAt for SVE.
+  ///     CHECK-NOT: VecLoad
+  //
+  /// CHECK-ELSE:
+  //
+  ///     CHECK-DAG: VecLoad  loop:<<Loop:B\d+>> outer_loop:none
+  ///     CHECK-DAG: VecStore loop:<<Loop>>      outer_loop:none
+  //
+  /// CHECK-FI:
   //
   // NOTE: should correctly deal with compressed and uncompressed cases.
   private static void string2Bytes(char[] a, String b) {
@@ -305,8 +314,17 @@ public class Main {
   /// CHECK-NOT: VecLoad
 
   /// CHECK-START-ARM64: void Main.$noinline$stringToShorts(short[], java.lang.String) loop_optimization (after)
-  /// CHECK-DAG: VecLoad  loop:<<Loop:B\d+>> outer_loop:none
-  /// CHECK-DAG: VecStore loop:<<Loop>>      outer_loop:none
+  /// CHECK-IF:     hasIsaFeature("sve")
+  //
+  //      TODO: Support CharAt for SVE.
+  ///     CHECK-NOT: VecLoad
+  //
+  /// CHECK-ELSE:
+  //
+  ///     CHECK-DAG: VecLoad  loop:<<Loop:B\d+>> outer_loop:none
+  ///     CHECK-DAG: VecStore loop:<<Loop>>      outer_loop:none
+  //
+  /// CHECK-FI:
   private static void $noinline$stringToShorts(short[] dest, String src) {
     int min = Math.min(dest.length, src.length());
     for (int i = 0; i < min; ++i) {
@@ -350,9 +368,20 @@ public class Main {
   //
   /// CHECK-START-ARM64: void Main.oneBoth(short[], char[]) loop_optimization (after)
   /// CHECK-DAG: <<One:i\d+>>  IntConstant 1                             loop:none
-  /// CHECK-DAG: <<Repl:d\d+>> VecReplicateScalar [<<One>>]              loop:none
-  /// CHECK-DAG:               VecStore [{{l\d+}},<<Phi:i\d+>>,<<Repl>>] loop:<<Loop:B\d+>> outer_loop:none
-  /// CHECK-DAG:               VecStore [{{l\d+}},<<Phi>>,<<Repl>>]      loop:<<Loop>>      outer_loop:none
+  /// CHECK-IF:     hasIsaFeature("sve")
+  //
+  ///     CHECK-DAG: <<Repl:d\d+>>  VecReplicateScalar [<<One>>,{{j\d+}}]               loop:none
+  ///     CHECK-DAG: <<LoopP:j\d+>> VecPredWhile                                        loop:<<Loop:B\d+>> outer_loop:none
+  ///     CHECK-DAG:                VecStore [{{l\d+}},<<Phi:i\d+>>,<<Repl>>,<<LoopP>>] loop:<<Loop>>      outer_loop:none
+  ///     CHECK-DAG:                VecStore [{{l\d+}},<<Phi>>,<<Repl>>,<<LoopP>>]      loop:<<Loop>>      outer_loop:none
+  //
+  /// CHECK-ELSE:
+  //
+  ///     CHECK-DAG: <<Repl:d\d+>>  VecReplicateScalar [<<One>>]              loop:none
+  ///     CHECK-DAG:                VecStore [{{l\d+}},<<Phi:i\d+>>,<<Repl>>] loop:<<Loop:B\d+>> outer_loop:none
+  ///     CHECK-DAG:                VecStore [{{l\d+}},<<Phi>>,<<Repl>>]      loop:<<Loop>>      outer_loop:none
+  //
+  /// CHECK-FI:
   //
   // Bug b/37764324: integral same-length packed types can be mixed freely.
   private static void oneBoth(short[] a, char[] b) {
@@ -382,6 +411,7 @@ public class Main {
   //
   /// CHECK-START-ARM: void Main.typeConv(byte[], byte[]) loop_optimization (after)
   /// CHECK-DAG: <<One:i\d+>>  IntConstant 1                         loop:none
+
   /// CHECK-DAG: <<Repl:d\d+>> VecReplicateScalar [<<One>>]          loop:none
   /// CHECK-DAG: <<Load:d\d+>> VecLoad [{{l\d+}},<<Phi1:i\d+>>]      loop:<<Loop1:B\d+>> outer_loop:none
   /// CHECK-DAG: <<Vadd:d\d+>> VecAdd [<<Load>>,<<Repl>>]            loop:<<Loop1>>      outer_loop:none
@@ -393,14 +423,26 @@ public class Main {
   //
   /// CHECK-START-ARM64: void Main.typeConv(byte[], byte[]) loop_optimization (after)
   /// CHECK-DAG: <<One:i\d+>>  IntConstant 1                         loop:none
-  /// CHECK-DAG: <<Repl:d\d+>> VecReplicateScalar [<<One>>]          loop:none
-  /// CHECK-DAG: <<Load:d\d+>> VecLoad [{{l\d+}},<<Phi1:i\d+>>]      loop:<<Loop1:B\d+>> outer_loop:none
-  /// CHECK-DAG: <<Vadd:d\d+>> VecAdd [<<Load>>,<<Repl>>]            loop:<<Loop1>>      outer_loop:none
-  /// CHECK-DAG:               VecStore [{{l\d+}},<<Phi1>>,<<Vadd>>] loop:<<Loop1>>      outer_loop:none
-  /// CHECK-DAG: <<Get:b\d+>>  ArrayGet [{{l\d+}},<<Phi2:i\d+>>]     loop:<<Loop2:B\d+>> outer_loop:none
-  /// CHECK-DAG: <<Add:i\d+>>  Add [<<Get>>,<<One>>]                 loop:<<Loop2>>      outer_loop:none
-  /// CHECK-DAG: <<Cnv:b\d+>>  TypeConversion [<<Add>>]              loop:<<Loop2>>      outer_loop:none
-  /// CHECK-DAG:               ArraySet [{{l\d+}},<<Phi2>>,<<Cnv>>]  loop:<<Loop2>>      outer_loop:none
+  /// CHECK-IF:     hasIsaFeature("sve")
+  //
+  ///     CHECK-DAG: <<Repl:d\d+>>  VecReplicateScalar [<<One>>,{{j\d+}}]           loop:none
+  ///     CHECK-DAG: <<LoopP:j\d+>> VecPredWhile                                    loop:<<Loop1:B\d+>> outer_loop:none
+  ///     CHECK-DAG: <<Load:d\d+>>  VecLoad [{{l\d+}},<<Phi1:i\d+>>,<<LoopP>>]      loop:<<Loop1>>      outer_loop:none
+  ///     CHECK-DAG: <<Vadd:d\d+>>  VecAdd [<<Load>>,<<Repl>>,<<LoopP>>]            loop:<<Loop1>>      outer_loop:none
+  ///     CHECK-DAG:                VecStore [{{l\d+}},<<Phi1>>,<<Vadd>>,<<LoopP>>] loop:<<Loop1>>      outer_loop:none
+  //
+  /// CHECK-ELSE:
+  //
+  ///     CHECK-DAG: <<Repl:d\d+>>  VecReplicateScalar [<<One>>]          loop:none
+  ///     CHECK-DAG: <<Load:d\d+>>  VecLoad [{{l\d+}},<<Phi1:i\d+>>]      loop:<<Loop1:B\d+>> outer_loop:none
+  ///     CHECK-DAG: <<Vadd:d\d+>>  VecAdd [<<Load>>,<<Repl>>]            loop:<<Loop1>>      outer_loop:none
+  ///     CHECK-DAG:                VecStore [{{l\d+}},<<Phi1>>,<<Vadd>>] loop:<<Loop1>>      outer_loop:none
+  ///     CHECK-DAG: <<Get:b\d+>>   ArrayGet [{{l\d+}},<<Phi2:i\d+>>]     loop:<<Loop2:B\d+>> outer_loop:none
+  ///     CHECK-DAG: <<Add:i\d+>>   Add [<<Get>>,<<One>>]                 loop:<<Loop2>>      outer_loop:none
+  ///     CHECK-DAG: <<Cnv:b\d+>>   TypeConversion [<<Add>>]              loop:<<Loop2>>      outer_loop:none
+  ///     CHECK-DAG:                ArraySet [{{l\d+}},<<Phi2>>,<<Cnv>>]  loop:<<Loop2>>      outer_loop:none
+  //
+  /// CHECK-FI:
   //
   // Scalar code in cleanup loop uses correct byte type on array get and type conversion.
   private static void typeConv(byte[] a, byte[] b) {
@@ -718,9 +760,22 @@ public class Main {
 
   // Idioms common sub-expression bug: SAD and ArraySet.
   //
-  /// CHECK-START-{ARM,ARM64}: int Main.testSADAndSet(int[], int[], int[]) loop_optimization (after)
+  /// CHECK-START-ARM: int Main.testSADAndSet(int[], int[], int[]) loop_optimization (after)
   /// CHECK-DAG:       VecSADAccumulate
   /// CHECK-DAG:       VecStore
+  //
+  /// CHECK-START-ARM64: int Main.testSADAndSet(int[], int[], int[]) loop_optimization (after)
+  /// CHECK-IF:     hasIsaFeature("sve")
+  //
+  //      VecSADAccumulate is not supported for SVE.
+  ///     CHECK-NOT:       VecSADAccumulate
+  //
+  /// CHECK-ELSE:
+  //
+  ///     CHECK-DAG:       VecSADAccumulate
+  ///     CHECK-DAG:       VecStore
+  //
+  /// CHECK-FI:
   public static int testSADAndSet(int[] x, int[] y, int[] z) {
     int min_length = Math.min(x.length, y.length);
     int sad = 0;
@@ -733,9 +788,22 @@ public class Main {
   }
 
   // Idioms common sub-expression bug: SAD and SAD.
-  /// CHECK-START-{ARM,ARM64}: int Main.testSADAndSAD(int[], int[]) loop_optimization (after)
+  /// CHECK-START-ARM: int Main.testSADAndSAD(int[], int[]) loop_optimization (after)
   /// CHECK-DAG:       VecSADAccumulate
   /// CHECK-DAG:       VecSADAccumulate
+  //
+  /// CHECK-START-ARM64: int Main.testSADAndSAD(int[], int[]) loop_optimization (after)
+  /// CHECK-IF:     hasIsaFeature("sve")
+  //
+  //      VecSADAccumulate is not supported for SVE.
+  ///     CHECK-NOT:       VecSADAccumulate
+  //
+  /// CHECK-ELSE:
+  //
+  ///     CHECK-DAG:       VecSADAccumulate
+  ///     CHECK-DAG:       VecSADAccumulate
+  //
+  /// CHECK-FI:
   public static final int testSADAndSAD(int[] x, int[] y) {
     int s0 = 1;
     int s1 = 1;
@@ -785,11 +853,26 @@ public class Main {
 
   // Idioms common sub-expression bug: SAD and SAD with extra abs.
   //
-  /// CHECK-START-{ARM,ARM64}: int Main.testSADAndSADExtraAbs0(int[], int[]) loop_optimization (after)
+  /// CHECK-START-ARM: int Main.testSADAndSADExtraAbs0(int[], int[]) loop_optimization (after)
   /// CHECK-DAG:       VecSub
   /// CHECK-DAG:       VecAbs
   /// CHECK-DAG:       VecSADAccumulate
   /// CHECK-DAG:       VecSADAccumulate
+  //
+  /// CHECK-START-ARM64: int Main.testSADAndSADExtraAbs0(int[], int[]) loop_optimization (after)
+  /// CHECK-IF:     hasIsaFeature("sve")
+  //
+  //      VecSADAccumulate is not supported for SVE.
+  ///     CHECK-NOT:       VecSADAccumulate
+  //
+  /// CHECK-ELSE:
+  //
+  ///     CHECK-DAG:       VecSub
+  ///     CHECK-DAG:       VecAbs
+  ///     CHECK-DAG:       VecSADAccumulate
+  ///     CHECK-DAG:       VecSADAccumulate
+  //
+  /// CHECK-FI:
   public static final int testSADAndSADExtraAbs0(int[] x, int[] y) {
     int s0 = 1;
     int s1 = 1;
@@ -804,11 +887,26 @@ public class Main {
 
   // Idioms common sub-expression bug: SAD and SAD with extra abs (reversed order).
   //
-  /// CHECK-START-{ARM,ARM64}: int Main.testSADAndSADExtraAbs1(int[], int[]) loop_optimization (after)
+  /// CHECK-START-ARM: int Main.testSADAndSADExtraAbs1(int[], int[]) loop_optimization (after)
   /// CHECK-DAG:       VecSub
   /// CHECK-DAG:       VecAbs
   /// CHECK-DAG:       VecSADAccumulate
   /// CHECK-DAG:       VecSADAccumulate
+  //
+  /// CHECK-START-ARM64: int Main.testSADAndSADExtraAbs1(int[], int[]) loop_optimization (after)
+  /// CHECK-IF:     hasIsaFeature("sve")
+  //
+  //      VecSADAccumulate is not supported for SVE.
+  ///     CHECK-NOT:       VecSADAccumulate
+  //
+  /// CHECK-ELSE:
+  //
+  ///     CHECK-DAG:       VecSub
+  ///     CHECK-DAG:       VecAbs
+  ///     CHECK-DAG:       VecSADAccumulate
+  ///     CHECK-DAG:       VecSADAccumulate
+  //
+  /// CHECK-FI:
   public static final int testSADAndSADExtraAbs1(int[] x, int[] y) {
     int s0 = 1;
     int s1 = 1;
@@ -825,9 +923,18 @@ public class Main {
   // Idioms common sub-expression bug: SAD and DotProd combined.
   //
   /// CHECK-START-ARM64: int Main.testSADAndDotProdCombined0(byte[], byte[]) loop_optimization (after)
-  /// CHECK-DAG:       VecSub
-  /// CHECK-DAG:       VecSADAccumulate
-  /// CHECK-DAG:       VecDotProd
+  /// CHECK-IF:     hasIsaFeature("sve")
+  //
+  //      VecSADAccumulate is not supported for SVE.
+  ///     CHECK-NOT:       VecSADAccumulate
+  //
+  /// CHECK-ELSE:
+  //
+  ///     CHECK-DAG:       VecSub
+  ///     CHECK-DAG:       VecSADAccumulate
+  ///     CHECK-DAG:       VecDotProd
+  //
+  /// CHECK-FI:
   public static final int testSADAndDotProdCombined0(byte[] x, byte[] y) {
     int s0 = 1;
     int s1 = 1;
@@ -844,9 +951,18 @@ public class Main {
 
   // Idioms common sub-expression bug: SAD and DotProd combined (reversed order).
   /// CHECK-START-ARM64: int Main.testSADAndDotProdCombined1(byte[], byte[]) loop_optimization (after)
-  /// CHECK-DAG:       VecSub
-  /// CHECK-DAG:       VecSADAccumulate
-  /// CHECK-DAG:       VecDotProd
+  /// CHECK-IF:     hasIsaFeature("sve")
+  //
+  //      VecSADAccumulate is not supported for SVE.
+  ///     CHECK-NOT:       VecSADAccumulate
+  //
+  /// CHECK-ELSE:
+  //
+  ///     CHECK-DAG:       VecSub
+  ///     CHECK-DAG:       VecSADAccumulate
+  ///     CHECK-DAG:       VecDotProd
+  //
+  /// CHECK-FI:
   public static final int testSADAndDotProdCombined1(byte[] x, byte[] y) {
     int s0 = 1;
     int s1 = 1;
