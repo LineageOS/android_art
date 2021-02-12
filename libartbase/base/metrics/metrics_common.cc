@@ -167,7 +167,7 @@ void LogBackend::EndReport() {
   LOG_STREAM(level_) << GetAndResetBuffer();
 }
 
-FileBackend::FileBackend(std::string filename) : filename_{filename} {}
+FileBackend::FileBackend(const std::string& filename) : filename_{filename} {}
 
 void FileBackend::BeginReport(uint64_t timestamp_since_start_ms) {
   GetAndResetBuffer();

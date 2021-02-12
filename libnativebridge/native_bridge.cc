@@ -263,6 +263,65 @@ bool NeedsNativeBridge(const char* instruction_set) {
   return strncmp(instruction_set, ABI_STRING, strlen(ABI_STRING) + 1) != 0;
 }
 
+#ifndef __APPLE__
+static bool MountCpuinfo(const char* cpuinfo_path) {
+  // If the file does not exist, the mount command will fail,
+  // so we save the extra file existence check.
+  if (TEMP_FAILURE_RETRY(mount(cpuinfo_path,        // Source.
+                               "/proc/cpuinfo",     // Target.
+                               nullptr,             // FS type.
+                               MS_BIND,             // Mount flags: bind mount.
+                               nullptr)) == -1) {   // "Data."
+    ALOGW("Failed to bind-mount %s as /proc/cpuinfo: %s", cpuinfo_path, strerror(errno));
+    return false;
+  }
+  return true;
+}
+#endif
+
+static void MountCpuinfoForInstructionSet(const char* instruction_set) {
+  if (instruction_set == nullptr) {
+    return;
+  }
+
+  size_t isa_len = strlen(instruction_set);
+  if (isa_len > 10) {
+    // 10 is a loose upper bound on the currently known instruction sets (a tight bound is 7 for
+    // x86_64 [including the trailing \0]). This is so we don't have to change here if there will
+    // be another instruction set in the future.
+    ALOGW("Instruction set %s is malformed, must be less than or equal to 10 characters.",
+          instruction_set);
+    return;
+  }
+
+#if defined(__APPLE__)
+  ALOGW("Mac OS does not support bind-mounting. Host simulation of native bridge impossible.");
+
+#elif !defined(__ANDROID__)
+  // To be able to test on the host, we hardwire a relative path.
+  MountCpuinfo("./cpuinfo");
+
+#else  // __ANDROID__
+  char cpuinfo_path[1024];
+
+  // Bind-mount /system/etc/cpuinfo.<isa>.txt to /proc/cpuinfo.
+  snprintf(cpuinfo_path, sizeof(cpuinfo_path), "/system/etc/cpuinfo.%s.txt", instruction_set);
+  if (MountCpuinfo(cpuinfo_path)) {
+    return;
+  }
+
+  // Bind-mount /system/lib{,64}/<isa>/cpuinfo to /proc/cpuinfo.
+  // TODO(b/179753190): remove when all implementations migrate to system/etc!
+#ifdef __LP64__
+  snprintf(cpuinfo_path, sizeof(cpuinfo_path), "/system/lib64/%s/cpuinfo", instruction_set);
+#else
+  snprintf(cpuinfo_path, sizeof(cpuinfo_path), "/system/lib/%s/cpuinfo", instruction_set);
+#endif  // __LP64__
+  MountCpuinfo(cpuinfo_path);
+
+#endif
+}
+
 bool PreInitializeNativeBridge(const char* app_data_dir_in, const char* instruction_set) {
   if (state != NativeBridgeState::kOpened) {
     ALOGE("Invalid state: native bridge is expected to be opened.");
@@ -281,52 +340,11 @@ bool PreInitializeNativeBridge(const char* app_data_dir_in, const char* instruct
     app_code_cache_dir = nullptr;
   }
 
-  // Bind-mount /system/lib{,64}/<isa>/cpuinfo to /proc/cpuinfo.
-  // Failure is not fatal and will keep the native bridge in kPreInitialized.
+  // Mount cpuinfo that corresponds to the instruction set.
+  // Failure is not fatal.
+  MountCpuinfoForInstructionSet(instruction_set);
+
   state = NativeBridgeState::kPreInitialized;
-
-#ifndef __APPLE__
-  if (instruction_set == nullptr) {
-    return true;
-  }
-  size_t isa_len = strlen(instruction_set);
-  if (isa_len > 10) {
-    // 10 is a loose upper bound on the currently known instruction sets (a tight bound is 7 for
-    // x86_64 [including the trailing \0]). This is so we don't have to change here if there will
-    // be another instruction set in the future.
-    ALOGW("Instruction set %s is malformed, must be less than or equal to 10 characters.",
-          instruction_set);
-    return true;
-  }
-
-  // If the file does not exist, the mount command will fail,
-  // so we save the extra file existence check.
-  char cpuinfo_path[1024];
-
-#if defined(__ANDROID__)
-  snprintf(cpuinfo_path, sizeof(cpuinfo_path), "/system/lib"
-#ifdef __LP64__
-      "64"
-#endif  // __LP64__
-      "/%s/cpuinfo", instruction_set);
-#else   // !__ANDROID__
-  // To be able to test on the host, we hardwire a relative path.
-  snprintf(cpuinfo_path, sizeof(cpuinfo_path), "./cpuinfo");
-#endif
-
-  // Bind-mount.
-  if (TEMP_FAILURE_RETRY(mount(cpuinfo_path,        // Source.
-                               "/proc/cpuinfo",     // Target.
-                               nullptr,             // FS type.
-                               MS_BIND,             // Mount flags: bind mount.
-                               nullptr)) == -1) {   // "Data."
-    ALOGW("Failed to bind-mount %s as /proc/cpuinfo: %s", cpuinfo_path, strerror(errno));
-  }
-#else  // __APPLE__
-  UNUSED(instruction_set);
-  ALOGW("Mac OS does not support bind-mounting. Host simulation of native bridge impossible.");
-#endif
-
   return true;
 }
 

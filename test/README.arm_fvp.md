@@ -18,35 +18,12 @@ firmware.
 ```
 cd $AOSP
 
-# Apply the patch to increase the model's disk space.
-cd device/generic/goldfish/fvpbase
-git apply disk_space.patch
-cd ..
-
 . build/envsetup.sh
 # fvp_mini target is used as we don't need a GUI for ART tests.
 lunch fvp_mini-eng
 
 # This is expected to fail; it generates all the build rules files.
 m
-```
-
-disk_space.patch:
-
-```
-diff --git a/fvpbase/BoardConfig.mk b/fvpbase/BoardConfig.mk
-index 1d810634..59c554cc 100644
---- a/fvpbase/BoardConfig.mk
-+++ b/fvpbase/BoardConfig.mk
-@@ -44,7 +44,7 @@ TARGET_COPY_OUT_SYSTEM_EXT := system/system_ext
-
- BOARD_VENDORIMAGE_FILE_SYSTEM_TYPE := ext4
-
--BOARD_USERDATAIMAGE_PARTITION_SIZE := 576716800
-+BOARD_USERDATAIMAGE_PARTITION_SIZE := 1153433600
-
- BOARD_BOOTIMAGE_PARTITION_SIZE := 33554432
-
 ```
 
 ### Building the kernel
