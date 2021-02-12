@@ -99,9 +99,22 @@ public class HaddOther {
 
   //  Should be an add, followed by a halving add.
   //
-  /// CHECK-START-{ARM,ARM64}: void HaddOther.test_no_hadd_sum_casted_plus_const(short[], short[], short[]) loop_optimization (after)
+  /// CHECK-START-ARM: void HaddOther.test_no_hadd_sum_casted_plus_const(short[], short[], short[]) loop_optimization (after)
   /// CHECK: VecAdd
   /// CHECK: VecHalvingAdd
+  //
+  /// CHECK-START-ARM64: void HaddOther.test_no_hadd_sum_casted_plus_const(short[], short[], short[]) loop_optimization (after)
+  /// CHECK-IF:     hasIsaFeature("sve")
+  //
+  //      HalvingAdd idiom is not supported for SVE.
+  ///     CHECK-NOT: VecHalvingAdd
+  //
+  /// CHECK-ELSE:
+  //
+  ///     CHECK: VecAdd
+  ///     CHECK: VecHalvingAdd
+  //
+  /// CHECK-FI:
   private static void test_no_hadd_sum_casted_plus_const(short[] a, short[] b, short[] out) {
     int min_length = Math.min(out.length, Math.min(a.length, b.length));
     for (int i = 0; i < min_length; i++) {

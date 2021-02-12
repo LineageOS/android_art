@@ -560,6 +560,7 @@ static void MaybeOverrideVerbosity() {
   //  gLogVerbosity.deopt = true;  // TODO: don't check this in!
   //  gLogVerbosity.gc = true;  // TODO: don't check this in!
   //  gLogVerbosity.heap = true;  // TODO: don't check this in!
+  //  gLogVerbosity.image = true;  // TODO: don't check this in!
   //  gLogVerbosity.interpreter = true;  // TODO: don't check this in!
   //  gLogVerbosity.jdwp = true;  // TODO: don't check this in!
   //  gLogVerbosity.jit = true;  // TODO: don't check this in!
