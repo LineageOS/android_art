@@ -51,13 +51,13 @@ class FlagMetaBase {
       // lambda that is specialized to handle each branch of the variant and call the correct
       // methods on the command line parser builder.
       FlagValuePointer location = flag->GetLocation();
-      auto cases = {[&]() {
+      auto cases = {std::function<void()>([&]() {
         if (std::holds_alternative<std::optional<T>*>(location)) {
           builder = &builder->Define(flag->command_line_argument_name_.c_str())
                          .template WithType<T>()
                          .IntoLocation(std::get<std::optional<T>*>(location));
         }
-      }...};
+      })...};
       for (auto c : cases) {
         c();
       }
@@ -75,7 +75,7 @@ class FlagMetaBase {
   virtual FlagValuePointer GetLocation() = 0;
 };
 
-using FlagBase = FlagMetaBase<bool>;
+using FlagBase = FlagMetaBase<bool, int, std::string>;
 
 template <>
 std::forward_list<FlagBase*> FlagBase::ALL_FLAGS;
@@ -95,6 +95,9 @@ class Flag : public FlagBase {
   // server-configured value, if present, otherwise the system property value, if present, and
   // finally, the default value.
   Value operator()();
+
+  // Returns the value of the flag or an empty option if it was not set.
+  std::optional<Value> GetOptional();
 
   // Reload the server-configured value and system property values. In general this should not be
   // used directly, but it can be used to support reloading the value without restarting the device.
@@ -138,6 +141,10 @@ class Flag : public FlagBase {
 //     setprop dalvik.vm.metrics.write-to-log true
 struct Flags {
   Flag<bool> WriteMetricsToLog{"metrics.write-to-log", false};
+  Flag<bool> WriteMetricsToStatsd{"metrics.write-to-statsd", false};
+  Flag<bool> ReportMetricsOnShutdown{"metrics.report-on-shutdown", true};
+  Flag<int> MetricsReportingPeriod{"metrics.reporting-period"};
+  Flag<std::string> WriteMetricsToFile{"metrics.write-to-file"};
 };
 
 // This is the actual instance of all the flags.
