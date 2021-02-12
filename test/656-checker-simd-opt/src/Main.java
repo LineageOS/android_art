@@ -30,18 +30,35 @@ public class Main {
   //
   /// CHECK-START-ARM64: void Main.unroll(float[], float[]) loop_optimization (after)
   /// CHECK-DAG: <<Cons:f\d+>> FloatConstant 2.5                    loop:none
-  /// CHECK-DAG: <<Incr:i\d+>> IntConstant 4                        loop:none
-  /// CHECK-DAG: <<Repl:d\d+>> VecReplicateScalar [<<Cons>>]        loop:none
-  /// CHECK-NOT:               VecReplicateScalar
-  /// CHECK-DAG: <<Phi:i\d+>>  Phi                                  loop:<<Loop:B\d+>> outer_loop:none
-  /// CHECK-DAG: <<Get1:d\d+>> VecLoad [{{l\d+}},<<Phi>>]           loop:<<Loop>>      outer_loop:none
-  /// CHECK-DAG: <<Mul1:d\d+>> VecMul [<<Get1>>,<<Repl>>]           loop:<<Loop>>      outer_loop:none
-  /// CHECK-DAG:               VecStore [{{l\d+}},<<Phi>>,<<Mul1>>] loop:<<Loop>>      outer_loop:none
-  /// CHECK-DAG: <<Add:i\d+>>  Add [<<Phi>>,<<Incr>>]               loop:<<Loop>>      outer_loop:none
-  /// CHECK-DAG: <<Get2:d\d+>> VecLoad [{{l\d+}},<<Add>>]           loop:<<Loop>>      outer_loop:none
-  /// CHECK-DAG: <<Mul2:d\d+>> VecMul [<<Get2>>,<<Repl>>]           loop:<<Loop>>      outer_loop:none
-  /// CHECK-DAG:               VecStore [{{l\d+}},<<Add>>,<<Mul2>>] loop:<<Loop>>      outer_loop:none
-  /// CHECK-DAG:               Add [<<Add>>,<<Incr>>]               loop:<<Loop>>      outer_loop:none
+
+  /// CHECK-IF:     hasIsaFeature("sve")
+  //
+  ///     CHECK-DAG: <<Repl:d\d+>>  VecReplicateScalar [<<Cons>>,{{j\d+}}]         loop:none
+  ///     CHECK-NOT:                VecReplicateScalar
+  ///     CHECK-DAG: <<Phi:i\d+>>   Phi                                            loop:<<Loop:B\d+>> outer_loop:none
+  ///     CHECK-DAG: <<LoopP:j\d+>> VecPredWhile [<<Phi>>,{{i\d+}}]                loop:<<Loop>>      outer_loop:none
+  ///     CHECK-DAG: <<Get1:d\d+>>  VecLoad [{{l\d+}},<<Phi>>,<<LoopP>>]           loop:<<Loop>>      outer_loop:none
+  ///     CHECK-DAG: <<Mul1:d\d+>>  VecMul [<<Get1>>,<<Repl>>,<<LoopP>>]           loop:<<Loop>>      outer_loop:none
+  ///     CHECK-DAG:                VecStore [{{l\d+}},<<Phi>>,<<Mul1>>,<<LoopP>>] loop:<<Loop>>      outer_loop:none
+  ///     CHECK-DAG: <<Add:i\d+>>   Add [<<Phi>>,{{i\d+}}]                         loop:<<Loop>>      outer_loop:none
+  //      No unroll for SVE yet.
+  //
+  /// CHECK-ELSE:
+  //
+  ///     CHECK-DAG: <<Incr:i\d+>>  IntConstant 4                        loop:none
+  ///     CHECK-DAG: <<Repl:d\d+>>  VecReplicateScalar [<<Cons>>]        loop:none
+  ///     CHECK-NOT:                VecReplicateScalar
+  ///     CHECK-DAG: <<Phi:i\d+>>   Phi                                  loop:<<Loop:B\d+>> outer_loop:none
+  ///     CHECK-DAG: <<Get1:d\d+>>  VecLoad [{{l\d+}},<<Phi>>]           loop:<<Loop>>      outer_loop:none
+  ///     CHECK-DAG: <<Mul1:d\d+>>  VecMul [<<Get1>>,<<Repl>>]           loop:<<Loop>>      outer_loop:none
+  ///     CHECK-DAG:                VecStore [{{l\d+}},<<Phi>>,<<Mul1>>] loop:<<Loop>>      outer_loop:none
+  ///     CHECK-DAG: <<Add:i\d+>>   Add [<<Phi>>,<<Incr>>]               loop:<<Loop>>      outer_loop:none
+  ///     CHECK-DAG: <<Get2:d\d+>>  VecLoad [{{l\d+}},<<Add>>]           loop:<<Loop>>      outer_loop:none
+  ///     CHECK-DAG: <<Mul2:d\d+>>  VecMul [<<Get2>>,<<Repl>>]           loop:<<Loop>>      outer_loop:none
+  ///     CHECK-DAG:                VecStore [{{l\d+}},<<Add>>,<<Mul2>>] loop:<<Loop>>      outer_loop:none
+  ///     CHECK-DAG:                Add [<<Add>>,<<Incr>>]               loop:<<Loop>>      outer_loop:none
+  //
+  /// CHECK-FI:
   private static void unroll(float[] x, float[] y) {
     for (int i = 0; i < 100; i++) {
       x[i] = y[i] * 2.5f;
@@ -51,15 +68,32 @@ public class Main {
   /// CHECK-START-ARM64: void Main.stencil(int[], int[], int) loop_optimization (after)
   /// CHECK-DAG: <<CP1:i\d+>>   IntConstant 1                         loop:none
   /// CHECK-DAG: <<CP2:i\d+>>   IntConstant 2                         loop:none
-  /// CHECK-DAG: <<Phi:i\d+>>   Phi                                   loop:<<Loop:B\d+>> outer_loop:none
-  /// CHECK-DAG: <<Add1:i\d+>>  Add [<<Phi>>,<<CP1>>]                 loop:<<Loop>>      outer_loop:none
-  /// CHECK-DAG: <<Get1:d\d+>>  VecLoad [{{l\d+}},<<Phi>>]            loop:<<Loop>>      outer_loop:none
-  /// CHECK-DAG: <<Get2:d\d+>>  VecLoad [{{l\d+}},<<Add1>>]           loop:<<Loop>>      outer_loop:none
-  /// CHECK-DAG: <<Add2:d\d+>>  VecAdd [<<Get1>>,<<Get2>>]            loop:<<Loop>>      outer_loop:none
-  /// CHECK-DAG: <<Add3:i\d+>>  Add [<<Phi>>,<<CP2>>]                 loop:<<Loop>>      outer_loop:none
-  /// CHECK-DAG: <<Get3:d\d+>>  VecLoad [{{l\d+}},<<Add3>>]           loop:<<Loop>>      outer_loop:none
-  /// CHECK-DAG: <<Add4:d\d+>>  VecAdd [<<Add2>>,<<Get3>>]            loop:<<Loop>>      outer_loop:none
-  /// CHECK-DAG:                VecStore [{{l\d+}},<<Add1>>,<<Add4>>] loop:<<Loop>>      outer_loop:none
+  /// CHECK-IF:     hasIsaFeature("sve")
+  //
+  ///     CHECK-DAG: <<Phi:i\d+>>   Phi                                             loop:<<Loop:B\d+>> outer_loop:none
+  ///     CHECK-DAG: <<LoopP:j\d+>> VecPredWhile [<<Phi>>,{{i\d+}}]                 loop:<<Loop>>      outer_loop:none
+  ///     CHECK-DAG: <<Add1:i\d+>>  Add [<<Phi>>,<<CP1>>]                           loop:<<Loop>>      outer_loop:none
+  ///     CHECK-DAG: <<Get1:d\d+>>  VecLoad [{{l\d+}},<<Phi>>,<<LoopP>>]            loop:<<Loop>>      outer_loop:none
+  ///     CHECK-DAG: <<Get2:d\d+>>  VecLoad [{{l\d+}},<<Add1>>,<<LoopP>>]           loop:<<Loop>>      outer_loop:none
+  ///     CHECK-DAG: <<Add2:d\d+>>  VecAdd [<<Get1>>,<<Get2>>,<<LoopP>>]            loop:<<Loop>>      outer_loop:none
+  ///     CHECK-DAG: <<Add3:i\d+>>  Add [<<Phi>>,<<CP2>>]                           loop:<<Loop>>      outer_loop:none
+  ///     CHECK-DAG: <<Get3:d\d+>>  VecLoad [{{l\d+}},<<Add3>>,<<LoopP>>]           loop:<<Loop>>      outer_loop:none
+  ///     CHECK-DAG: <<Add4:d\d+>>  VecAdd [<<Add2>>,<<Get3>>,<<LoopP>>]            loop:<<Loop>>      outer_loop:none
+  ///     CHECK-DAG:                VecStore [{{l\d+}},<<Add1>>,<<Add4>>,<<LoopP>>] loop:<<Loop>>      outer_loop:none
+  //
+  /// CHECK-ELSE:
+  //
+  ///     CHECK-DAG: <<Phi:i\d+>>   Phi                                   loop:<<Loop:B\d+>> outer_loop:none
+  ///     CHECK-DAG: <<Add1:i\d+>>  Add [<<Phi>>,<<CP1>>]                 loop:<<Loop>>      outer_loop:none
+  ///     CHECK-DAG: <<Get1:d\d+>>  VecLoad [{{l\d+}},<<Phi>>]            loop:<<Loop>>      outer_loop:none
+  ///     CHECK-DAG: <<Get2:d\d+>>  VecLoad [{{l\d+}},<<Add1>>]           loop:<<Loop>>      outer_loop:none
+  ///     CHECK-DAG: <<Add2:d\d+>>  VecAdd [<<Get1>>,<<Get2>>]            loop:<<Loop>>      outer_loop:none
+  ///     CHECK-DAG: <<Add3:i\d+>>  Add [<<Phi>>,<<CP2>>]                 loop:<<Loop>>      outer_loop:none
+  ///     CHECK-DAG: <<Get3:d\d+>>  VecLoad [{{l\d+}},<<Add3>>]           loop:<<Loop>>      outer_loop:none
+  ///     CHECK-DAG: <<Add4:d\d+>>  VecAdd [<<Add2>>,<<Get3>>]            loop:<<Loop>>      outer_loop:none
+  ///     CHECK-DAG:                VecStore [{{l\d+}},<<Add1>>,<<Add4>>] loop:<<Loop>>      outer_loop:none
+  //
+  /// CHECK-FI:
   private static void stencil(int[] a, int[] b, int n) {
     for (int i = 1; i < n - 1; i++) {
       a[i] = b[i - 1] + b[i] + b[i + 1];
@@ -82,15 +116,32 @@ public class Main {
   /// CHECK-START-{X86_64,ARM64}: void Main.stencilAddInt(int[], int[], int) loop_optimization (after)
   /// CHECK-DAG: <<CP1:i\d+>>   IntConstant 1                         loop:none
   /// CHECK-DAG: <<CP2:i\d+>>   IntConstant 2                         loop:none
-  /// CHECK-DAG: <<Phi:i\d+>>   Phi                                   loop:<<Loop:B\d+>> outer_loop:none
-  /// CHECK-DAG: <<Add1:i\d+>>  Add [<<Phi>>,<<CP1>>]                 loop:<<Loop>>      outer_loop:none
-  /// CHECK-DAG: <<Get1:d\d+>>  VecLoad [{{l\d+}},<<Phi>>]            loop:<<Loop>>      outer_loop:none
-  /// CHECK-DAG: <<Get2:d\d+>>  VecLoad [{{l\d+}},<<Add1>>]           loop:<<Loop>>      outer_loop:none
-  /// CHECK-DAG: <<Add2:d\d+>>  VecAdd [<<Get1>>,<<Get2>>]            loop:<<Loop>>      outer_loop:none
-  /// CHECK-DAG: <<Add3:i\d+>>  Add [<<Phi>>,<<CP2>>]                 loop:<<Loop>>      outer_loop:none
-  /// CHECK-DAG: <<Get3:d\d+>>  VecLoad [{{l\d+}},<<Add3>>]           loop:<<Loop>>      outer_loop:none
-  /// CHECK-DAG: <<Add4:d\d+>>  VecAdd [<<Add2>>,<<Get3>>]            loop:<<Loop>>      outer_loop:none
-  /// CHECK-DAG:                VecStore [{{l\d+}},<<Add1>>,<<Add4>>] loop:<<Loop>>      outer_loop:none
+  /// CHECK-IF:     hasIsaFeature("sve")
+  //
+  ///     CHECK-DAG: <<Phi:i\d+>>   Phi                                             loop:<<Loop:B\d+>> outer_loop:none
+  ///     CHECK-DAG: <<LoopP:j\d+>> VecPredWhile [<<Phi>>,{{i\d+}}]                 loop:<<Loop>>      outer_loop:none
+  ///     CHECK-DAG: <<Add1:i\d+>>  Add [<<Phi>>,<<CP1>>]                           loop:<<Loop>>      outer_loop:none
+  ///     CHECK-DAG: <<Get1:d\d+>>  VecLoad [{{l\d+}},<<Phi>>,<<LoopP>>]            loop:<<Loop>>      outer_loop:none
+  ///     CHECK-DAG: <<Get2:d\d+>>  VecLoad [{{l\d+}},<<Add1>>,<<LoopP>>]           loop:<<Loop>>      outer_loop:none
+  ///     CHECK-DAG: <<Add2:d\d+>>  VecAdd [<<Get1>>,<<Get2>>,<<LoopP>>]            loop:<<Loop>>      outer_loop:none
+  ///     CHECK-DAG: <<Add3:i\d+>>  Add [<<Phi>>,<<CP2>>]                           loop:<<Loop>>      outer_loop:none
+  ///     CHECK-DAG: <<Get3:d\d+>>  VecLoad [{{l\d+}},<<Add3>>,<<LoopP>>]           loop:<<Loop>>      outer_loop:none
+  ///     CHECK-DAG: <<Add4:d\d+>>  VecAdd [<<Add2>>,<<Get3>>,<<LoopP>>]            loop:<<Loop>>      outer_loop:none
+  ///     CHECK-DAG:                VecStore [{{l\d+}},<<Add1>>,<<Add4>>,<<LoopP>>] loop:<<Loop>>      outer_loop:none
+  //
+  /// CHECK-ELSE:
+  //
+  ///     CHECK-DAG: <<Phi:i\d+>>   Phi                                   loop:<<Loop:B\d+>> outer_loop:none
+  ///     CHECK-DAG: <<Add1:i\d+>>  Add [<<Phi>>,<<CP1>>]                 loop:<<Loop>>      outer_loop:none
+  ///     CHECK-DAG: <<Get1:d\d+>>  VecLoad [{{l\d+}},<<Phi>>]            loop:<<Loop>>      outer_loop:none
+  ///     CHECK-DAG: <<Get2:d\d+>>  VecLoad [{{l\d+}},<<Add1>>]           loop:<<Loop>>      outer_loop:none
+  ///     CHECK-DAG: <<Add2:d\d+>>  VecAdd [<<Get1>>,<<Get2>>]            loop:<<Loop>>      outer_loop:none
+  ///     CHECK-DAG: <<Add3:i\d+>>  Add [<<Phi>>,<<CP2>>]                 loop:<<Loop>>      outer_loop:none
+  ///     CHECK-DAG: <<Get3:d\d+>>  VecLoad [{{l\d+}},<<Add3>>]           loop:<<Loop>>      outer_loop:none
+  ///     CHECK-DAG: <<Add4:d\d+>>  VecAdd [<<Add2>>,<<Get3>>]            loop:<<Loop>>      outer_loop:none
+  ///     CHECK-DAG:                VecStore [{{l\d+}},<<Add1>>,<<Add4>>] loop:<<Loop>>      outer_loop:none
+  //
+  /// CHECK-FI:
   private static void stencilAddInt(int[] a, int[] b, int n) {
     int minus1 = $inline$constMinus1();
     for (int i = 1; i < n + minus1; i++) {
@@ -119,15 +170,32 @@ public class Main {
   /// CHECK-START-{X86_64,ARM64}: void Main.stencilSubInt(int[], int[], int) loop_optimization (after)
   /// CHECK-DAG: <<CP1:i\d+>>   IntConstant 1                         loop:none
   /// CHECK-DAG: <<CP2:i\d+>>   IntConstant 2                         loop:none
-  /// CHECK-DAG: <<Phi:i\d+>>   Phi                                   loop:<<Loop:B\d+>> outer_loop:none
-  /// CHECK-DAG: <<Add1:i\d+>>  Add [<<Phi>>,<<CP1>>]                 loop:<<Loop>>      outer_loop:none
-  /// CHECK-DAG: <<Get1:d\d+>>  VecLoad [{{l\d+}},<<Phi>>]            loop:<<Loop>>      outer_loop:none
-  /// CHECK-DAG: <<Get2:d\d+>>  VecLoad [{{l\d+}},<<Add1>>]           loop:<<Loop>>      outer_loop:none
-  /// CHECK-DAG: <<Add2:d\d+>>  VecAdd [<<Get1>>,<<Get2>>]            loop:<<Loop>>      outer_loop:none
-  /// CHECK-DAG: <<Add3:i\d+>>  Add [<<Phi>>,<<CP2>>]                 loop:<<Loop>>      outer_loop:none
-  /// CHECK-DAG: <<Get3:d\d+>>  VecLoad [{{l\d+}},<<Add3>>]           loop:<<Loop>>      outer_loop:none
-  /// CHECK-DAG: <<Add4:d\d+>>  VecAdd [<<Add2>>,<<Get3>>]            loop:<<Loop>>      outer_loop:none
-  /// CHECK-DAG:                VecStore [{{l\d+}},<<Add1>>,<<Add4>>] loop:<<Loop>>      outer_loop:none
+  /// CHECK-IF:     hasIsaFeature("sve")
+  //
+  ///     CHECK-DAG: <<Phi:i\d+>>   Phi                                             loop:<<Loop:B\d+>> outer_loop:none
+  ///     CHECK-DAG: <<LoopP:j\d+>> VecPredWhile [<<Phi>>,{{i\d+}}]                 loop:<<Loop>>      outer_loop:none
+  ///     CHECK-DAG: <<Add1:i\d+>>  Add [<<Phi>>,<<CP1>>]                           loop:<<Loop>>      outer_loop:none
+  ///     CHECK-DAG: <<Get1:d\d+>>  VecLoad [{{l\d+}},<<Phi>>,<<LoopP>>]            loop:<<Loop>>      outer_loop:none
+  ///     CHECK-DAG: <<Get2:d\d+>>  VecLoad [{{l\d+}},<<Add1>>,<<LoopP>>]           loop:<<Loop>>      outer_loop:none
+  ///     CHECK-DAG: <<Add2:d\d+>>  VecAdd [<<Get1>>,<<Get2>>,<<LoopP>>]            loop:<<Loop>>      outer_loop:none
+  ///     CHECK-DAG: <<Add3:i\d+>>  Add [<<Phi>>,<<CP2>>]                           loop:<<Loop>>      outer_loop:none
+  ///     CHECK-DAG: <<Get3:d\d+>>  VecLoad [{{l\d+}},<<Add3>>,<<LoopP>>]           loop:<<Loop>>      outer_loop:none
+  ///     CHECK-DAG: <<Add4:d\d+>>  VecAdd [<<Add2>>,<<Get3>>,<<LoopP>>]            loop:<<Loop>>      outer_loop:none
+  ///     CHECK-DAG:                VecStore [{{l\d+}},<<Add1>>,<<Add4>>,<<LoopP>>] loop:<<Loop>>      outer_loop:none
+  //
+  /// CHECK-ELSE:
+  //
+  ///     CHECK-DAG: <<Phi:i\d+>>   Phi                                   loop:<<Loop:B\d+>> outer_loop:none
+  ///     CHECK-DAG: <<Add1:i\d+>>  Add [<<Phi>>,<<CP1>>]                 loop:<<Loop>>      outer_loop:none
+  ///     CHECK-DAG: <<Get1:d\d+>>  VecLoad [{{l\d+}},<<Phi>>]            loop:<<Loop>>      outer_loop:none
+  ///     CHECK-DAG: <<Get2:d\d+>>  VecLoad [{{l\d+}},<<Add1>>]           loop:<<Loop>>      outer_loop:none
+  ///     CHECK-DAG: <<Add2:d\d+>>  VecAdd [<<Get1>>,<<Get2>>]            loop:<<Loop>>      outer_loop:none
+  ///     CHECK-DAG: <<Add3:i\d+>>  Add [<<Phi>>,<<CP2>>]                 loop:<<Loop>>      outer_loop:none
+  ///     CHECK-DAG: <<Get3:d\d+>>  VecLoad [{{l\d+}},<<Add3>>]           loop:<<Loop>>      outer_loop:none
+  ///     CHECK-DAG: <<Add4:d\d+>>  VecAdd [<<Add2>>,<<Get3>>]            loop:<<Loop>>      outer_loop:none
+  ///     CHECK-DAG:                VecStore [{{l\d+}},<<Add1>>,<<Add4>>] loop:<<Loop>>      outer_loop:none
+  //
+  /// CHECK-FI:
   private static void stencilSubInt(int[] a, int[] b, int n) {
     int plus1 = $inline$constPlus1();
     for (int i = 1; i < n - plus1; i++) {
@@ -152,15 +220,29 @@ public class Main {
   /// CHECK-START-ARM64: long Main.longInductionReduction(long[]) loop_optimization (after)
   /// CHECK-DAG: <<L0:j\d+>>    LongConstant 0               loop:none
   /// CHECK-DAG: <<L1:j\d+>>    LongConstant 1               loop:none
-  /// CHECK-DAG: <<L2:j\d+>>    LongConstant 2               loop:none
   /// CHECK-DAG: <<I0:i\d+>>    IntConstant 0                loop:none
   /// CHECK-DAG: <<Get:j\d+>>   ArrayGet [{{l\d+}},<<I0>>]   loop:none
-  /// CHECK-DAG: <<Rep:d\d+>>   VecReplicateScalar [<<Get>>] loop:none
-  /// CHECK-DAG: <<Set:d\d+>>   VecSetScalars [<<L1>>]       loop:none
-  /// CHECK-DAG: <<Phi1:j\d+>>  Phi [<<L0>>,{{j\d+}}]        loop:<<Loop:B\d+>> outer_loop:none
-  /// CHECK-DAG: <<Phi2:d\d+>>  Phi [<<Set>>,{{d\d+}}]       loop:<<Loop>>      outer_loop:none
-  /// CHECK-DAG:                VecAdd [<<Phi2>>,<<Rep>>]    loop:<<Loop>>      outer_loop:none
-  /// CHECK-DAG:                Add [<<Phi1>>,<<L2>>]        loop:<<Loop>>      outer_loop:none
+  /// CHECK-IF:     hasIsaFeature("sve")
+  //
+  ///     CHECK-DAG: <<Rep:d\d+>>   VecReplicateScalar [<<Get>>,{{j\d+}}]  loop:none
+  ///     CHECK-DAG: <<Set:d\d+>>   VecSetScalars [<<L1>>,{{j\d+}}]        loop:none
+  ///     CHECK-DAG: <<Phi1:j\d+>>  Phi [<<L0>>,{{j\d+}}]                  loop:<<Loop:B\d+>> outer_loop:none
+  ///     CHECK-DAG: <<Phi2:d\d+>>  Phi [<<Set>>,{{d\d+}}]                 loop:<<Loop>>      outer_loop:none
+  ///     CHECK-DAG: <<LoopP:j\d+>> VecPredWhile [<<Phi1>>,{{j\d+}}]       loop:<<Loop>>      outer_loop:none
+  ///     CHECK-DAG:                VecAdd [<<Phi2>>,<<Rep>>,<<LoopP>>]    loop:<<Loop>>      outer_loop:none
+  ///     CHECK-DAG:                Add [<<Phi1>>,{{j\d+}}]                loop:<<Loop>>      outer_loop:none
+  //
+  /// CHECK-ELSE:
+  //
+  ///     CHECK-DAG: <<L2:j\d+>>    LongConstant 2               loop:none
+  ///     CHECK-DAG: <<Rep:d\d+>>   VecReplicateScalar [<<Get>>] loop:none
+  ///     CHECK-DAG: <<Set:d\d+>>   VecSetScalars [<<L1>>]       loop:none
+  ///     CHECK-DAG: <<Phi1:j\d+>>  Phi [<<L0>>,{{j\d+}}]        loop:<<Loop:B\d+>> outer_loop:none
+  ///     CHECK-DAG: <<Phi2:d\d+>>  Phi [<<Set>>,{{d\d+}}]       loop:<<Loop>>      outer_loop:none
+  ///     CHECK-DAG:                VecAdd [<<Phi2>>,<<Rep>>]    loop:<<Loop>>      outer_loop:none
+  ///     CHECK-DAG:                Add [<<Phi1>>,<<L2>>]        loop:<<Loop>>      outer_loop:none
+  //
+  /// CHECK-FI:
   static long longInductionReduction(long[] y) {
     long x = 1;
     for (long i = 0; i < 10; i++) {
@@ -181,13 +263,25 @@ public class Main {
   /// CHECK-START-ARM64: void Main.intVectorLongInvariant(int[], long[]) loop_optimization (after)
   /// CHECK-DAG: <<I0:i\d+>>    IntConstant 0                       loop:none
   /// CHECK-DAG: <<I1:i\d+>>    IntConstant 1                       loop:none
-  /// CHECK-DAG: <<I4:i\d+>>    IntConstant 4                       loop:none
   /// CHECK-DAG: <<Get:j\d+>>   ArrayGet [{{l\d+}},<<I0>>]          loop:none
   /// CHECK-DAG: <<Cnv:i\d+>>   TypeConversion [<<Get>>]            loop:none
-  /// CHECK-DAG: <<Rep:d\d+>>   VecReplicateScalar [<<Cnv>>]        loop:none
-  /// CHECK-DAG: <<Phi:i\d+>>   Phi [<<I0>>,{{i\d+}}]               loop:<<Loop:B\d+>> outer_loop:none
-  /// CHECK-DAG:                VecStore [{{l\d+}},<<Phi>>,<<Rep>>] loop:<<Loop>>      outer_loop:none
-  /// CHECK-DAG:                Add [<<Phi>>,<<I4>>]                loop:<<Loop>>      outer_loop:none
+  /// CHECK-IF:     hasIsaFeature("sve")
+  //
+  ///     CHECK-DAG: <<Rep:d\d+>>   VecReplicateScalar [<<Cnv>>,{{j\d+}}]         loop:none
+  ///     CHECK-DAG: <<Phi:i\d+>>   Phi [<<I0>>,{{i\d+}}]                         loop:<<Loop:B\d+>> outer_loop:none
+  ///     CHECK-DAG: <<LoopP:j\d+>> VecPredWhile [<<Phi>>,{{i\d+}}]               loop:<<Loop>>      outer_loop:none
+  ///     CHECK-DAG:                VecStore [{{l\d+}},<<Phi>>,<<Rep>>,<<LoopP>>] loop:<<Loop>>      outer_loop:none
+  ///     CHECK-DAG:                Add [<<Phi>>,{{i\d+}}]                        loop:<<Loop>>      outer_loop:none
+  //
+  /// CHECK-ELSE:
+  //
+  ///     CHECK-DAG: <<I4:i\d+>>    IntConstant 4                       loop:none
+  ///     CHECK-DAG: <<Rep:d\d+>>   VecReplicateScalar [<<Cnv>>]        loop:none
+  ///     CHECK-DAG: <<Phi:i\d+>>   Phi [<<I0>>,{{i\d+}}]               loop:<<Loop:B\d+>> outer_loop:none
+  ///     CHECK-DAG:                VecStore [{{l\d+}},<<Phi>>,<<Rep>>] loop:<<Loop>>      outer_loop:none
+  ///     CHECK-DAG:                Add [<<Phi>>,<<I4>>]                loop:<<Loop>>      outer_loop:none
+  //
+  /// CHECK-FI:
   static void intVectorLongInvariant(int[] x, long[] y) {
     for (int i = 0; i < 100; i++) {
       x[i] = (int) y[0];
@@ -208,15 +302,29 @@ public class Main {
   //
   /// CHECK-START-ARM64: void Main.longCanBeDoneWithInt(int[], int[]) loop_optimization (after)
   /// CHECK-DAG: <<I0:i\d+>>    IntConstant 0                       loop:none
-  /// CHECK-DAG: <<I4:i\d+>>    IntConstant 4                       loop:none
   /// CHECK-DAG: <<L1:j\d+>>    LongConstant 1                      loop:none
   /// CHECK-DAG: <<Cnv:i\d+>>   TypeConversion [<<L1>>]             loop:none
-  /// CHECK-DAG: <<Rep:d\d+>>   VecReplicateScalar [<<Cnv>>]        loop:none
-  /// CHECK-DAG: <<Phi:i\d+>>   Phi [<<I0>>,{{i\d+}}]               loop:<<Loop:B\d+>> outer_loop:none
-  /// CHECK-DAG: <<Load:d\d+>>  VecLoad [{{l\d+}},<<Phi>>]          loop:<<Loop>>      outer_loop:none
-  /// CHECK-DAG: <<Add:d\d+>>   VecAdd [<<Load>>,<<Rep>>]           loop:<<Loop>>      outer_loop:none
-  /// CHECK-DAG:                VecStore [{{l\d+}},<<Phi>>,<<Add>>] loop:<<Loop>>      outer_loop:none
-  /// CHECK-DAG:                Add [<<Phi>>,<<I4>>]                loop:<<Loop>>      outer_loop:none
+  /// CHECK-IF:     hasIsaFeature("sve")
+  //
+  ///     CHECK-DAG: <<Rep:d\d+>>   VecReplicateScalar [<<Cnv>>,{{j\d+}}]         loop:none
+  ///     CHECK-DAG: <<Phi:i\d+>>   Phi [<<I0>>,{{i\d+}}]                         loop:<<Loop:B\d+>> outer_loop:none
+  ///     CHECK-DAG: <<LoopP:j\d+>> VecPredWhile [<<Phi>>,{{i\d+}}]               loop:<<Loop>>      outer_loop:none
+  ///     CHECK-DAG: <<Load:d\d+>>  VecLoad [{{l\d+}},<<Phi>>,<<LoopP>>]          loop:<<Loop>>      outer_loop:none
+  ///     CHECK-DAG: <<Add:d\d+>>   VecAdd [<<Load>>,<<Rep>>,<<LoopP>>]           loop:<<Loop>>      outer_loop:none
+  ///     CHECK-DAG:                VecStore [{{l\d+}},<<Phi>>,<<Add>>,<<LoopP>>] loop:<<Loop>>      outer_loop:none
+  ///     CHECK-DAG:                Add [<<Phi>>,{{i\d+}}]                        loop:<<Loop>>      outer_loop:none
+  //
+  /// CHECK-ELSE:
+  //
+  ///     CHECK-DAG: <<I4:i\d+>>    IntConstant 4                       loop:none
+  ///     CHECK-DAG: <<Rep:d\d+>>   VecReplicateScalar [<<Cnv>>]        loop:none
+  ///     CHECK-DAG: <<Phi:i\d+>>   Phi [<<I0>>,{{i\d+}}]               loop:<<Loop:B\d+>> outer_loop:none
+  ///     CHECK-DAG: <<Load:d\d+>>  VecLoad [{{l\d+}},<<Phi>>]          loop:<<Loop>>      outer_loop:none
+  ///     CHECK-DAG: <<Add:d\d+>>   VecAdd [<<Load>>,<<Rep>>]           loop:<<Loop>>      outer_loop:none
+  ///     CHECK-DAG:                VecStore [{{l\d+}},<<Phi>>,<<Add>>] loop:<<Loop>>      outer_loop:none
+  ///     CHECK-DAG:                Add [<<Phi>>,<<I4>>]                loop:<<Loop>>      outer_loop:none
+  //
+  /// CHECK-FI:
   static void longCanBeDoneWithInt(int[] x, int[] y) {
     for (int i = 0; i < 100; i++) {
       x[i] = (int) (y[i] + 1L);

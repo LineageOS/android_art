@@ -2720,14 +2720,33 @@ public class Main {
 
   /// CHECK-START: int Main.testLoop15(int) load_store_elimination (before)
   /// CHECK-DAG:                 NewArray
-  /// CHECK-DAG:                 ArraySet
+  /// CHECK-IF:     hasIsaFeature("sve")
+  //
+  ///     CHECK-DAG:                 VecPredWhile
+  ///     CHECK-DAG:                 VecStore
+  //
+  /// CHECK-ELSE:
+  //
+  ///     CHECK-DAG:                 ArraySet
+  //
+  /// CHECK-FI:
+  //
   /// CHECK-DAG:                 ArrayGet
 
   /// CHECK-START: int Main.testLoop15(int) load_store_elimination (after)
   /// CHECK-DAG:                 NewArray
-  /// CHECK-DAG:                 ArraySet
+  /// CHECK-IF:     hasIsaFeature("sve")
+  //
+  ///     CHECK-DAG:                 VecPredWhile
+  ///     CHECK-DAG:                 VecStore
+  //
+  /// CHECK-ELSE:
+  //
+  ///     CHECK-DAG:                 ArraySet
+  //
+  /// CHECK-FI:
+  //
   /// CHECK-DAG:                 ArrayGet
-
   // Test that aliasing array store in the loop is not eliminated
   // when a loop Phi placeholder is marked for keeping.
   private static int testLoop15(int n) {
