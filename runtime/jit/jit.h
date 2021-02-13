@@ -393,6 +393,9 @@ class Jit {
   // Called when system finishes booting.
   void BootCompleted();
 
+  // Are we in a zygote using JIT compilation?
+  static bool InZygoteUsingJit();
+
   // Compile methods from the given profile (.prof extension). If `add_to_queue`
   // is true, methods in the profile are added to the JIT queue. Otherwise they are compiled
   // directly.
