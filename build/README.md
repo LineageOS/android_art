@@ -17,6 +17,9 @@ which has extra internal consistency checks enabled, and some debug tools. A
 device cannot have both the non-debug and debug variants installed at once - it
 may not boot then.
 
+`com.google.android.art.apex` (note `.google.`) is the Google signed variant of
+the module. It is also mutually exclusive with the other ones.
+
 
 ## Building as a module on `master-art`
 
@@ -34,8 +37,15 @@ may not boot then.
 
     ```
     lunch art_module_<arch>
-    export TARGET_BUILD_APPS=com.android.art
     export SOONG_ALLOW_MISSING_DEPENDENCIES=true
+    export TARGET_BUILD_APPS=com.android.art
+    ```
+
+    For Google internal builds, specify instead the Google signed variant of the
+    module:
+
+    ```
+    export TARGET_BUILD_APPS=com.google.android.art
     ```
 
     `<arch>` is the device architecture, one of `arm`, `arm64`, `x86`, or
@@ -59,6 +69,8 @@ may not boot then.
     adb install out/target/product/module_<arch>/system/apex/com.android.art.apex
     adb reboot
     ```
+
+    The name of the APEX file depends on what you put in `TARGET_BUILD_APPS`.
 
 
 ## Building as part of the base system image
