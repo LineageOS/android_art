@@ -607,8 +607,7 @@ EXPLICIT_FIND_METHOD_FROM_CODE_TYPED_TEMPLATE_DECL(kInterface);
 inline ArtField* FindFieldFast(uint32_t field_idx, ArtMethod* referrer, FindFieldType type,
                                size_t expected_size) {
   ScopedAssertNoThreadSuspension ants(__FUNCTION__);
-  ArtField* resolved_field =
-      referrer->GetDexCache()->GetResolvedField(field_idx, kRuntimePointerSize);
+  ArtField* resolved_field = referrer->GetDexCache()->GetResolvedField(field_idx);
   if (UNLIKELY(resolved_field == nullptr)) {
     return nullptr;
   }

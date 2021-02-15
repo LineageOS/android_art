@@ -97,7 +97,7 @@ template <typename T> struct PACKED(2 * __SIZEOF_POINTER__) NativeDexCachePair {
   NativeDexCachePair(const NativeDexCachePair<T>&) = default;
   NativeDexCachePair& operator=(const NativeDexCachePair<T>&) = default;
 
-  static void Initialize(std::atomic<NativeDexCachePair<T>>* dex_cache, PointerSize pointer_size);
+  static void Initialize(std::atomic<NativeDexCachePair<T>>* dex_cache);
 
   static uint32_t InvalidIndexForSlot(uint32_t slot) {
     // Since the cache size is a power of two, 0 will always map to slot 0.
@@ -297,20 +297,16 @@ class MANAGED DexCache final : public Object {
 
   void ClearResolvedType(dex::TypeIndex type_idx) REQUIRES_SHARED(Locks::mutator_lock_);
 
-  ALWAYS_INLINE ArtMethod* GetResolvedMethod(uint32_t method_idx, PointerSize ptr_size)
+  ALWAYS_INLINE ArtMethod* GetResolvedMethod(uint32_t method_idx)
       REQUIRES_SHARED(Locks::mutator_lock_);
 
-  ALWAYS_INLINE void SetResolvedMethod(uint32_t method_idx,
-                                       ArtMethod* resolved,
-                                       PointerSize ptr_size)
+  ALWAYS_INLINE void SetResolvedMethod(uint32_t method_idx, ArtMethod* resolved)
       REQUIRES_SHARED(Locks::mutator_lock_);
 
-  // Pointer sized variant, used for patching.
-  ALWAYS_INLINE ArtField* GetResolvedField(uint32_t idx, PointerSize ptr_size)
+  ALWAYS_INLINE ArtField* GetResolvedField(uint32_t idx)
       REQUIRES_SHARED(Locks::mutator_lock_);
 
-  // Pointer sized variant, used for patching.
-  ALWAYS_INLINE void SetResolvedField(uint32_t idx, ArtField* field, PointerSize ptr_size)
+  ALWAYS_INLINE void SetResolvedField(uint32_t idx, ArtField* field)
       REQUIRES_SHARED(Locks::mutator_lock_);
 
   MethodType* GetResolvedMethodType(dex::ProtoIndex proto_idx) REQUIRES_SHARED(Locks::mutator_lock_);
@@ -450,15 +446,13 @@ class MANAGED DexCache final : public Object {
   void SetLocation(ObjPtr<String> location) REQUIRES_SHARED(Locks::mutator_lock_);
 
   template <typename T>
-  static NativeDexCachePair<T> GetNativePairPtrSize(std::atomic<NativeDexCachePair<T>>* pair_array,
-                                                    size_t idx,
-                                                    PointerSize ptr_size);
+  static NativeDexCachePair<T> GetNativePair(std::atomic<NativeDexCachePair<T>>* pair_array,
+                                             size_t idx);
 
   template <typename T>
-  static void SetNativePairPtrSize(std::atomic<NativeDexCachePair<T>>* pair_array,
-                                   size_t idx,
-                                   NativeDexCachePair<T> pair,
-                                   PointerSize ptr_size);
+  static void SetNativePair(std::atomic<NativeDexCachePair<T>>* pair_array,
+                            size_t idx,
+                            NativeDexCachePair<T> pair);
 
   static size_t PreResolvedStringsSize(size_t num_strings) {
     return sizeof(GcRoot<mirror::String>) * num_strings;
