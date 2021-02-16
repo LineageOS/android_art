@@ -37,7 +37,9 @@
 #include "dex_to_dex_decompiler.h"
 #include "gc/heap.h"
 #include "gc/space/image_space.h"
+#include "mirror/class-inl.h"
 #include "quicken_info.h"
+#include "handle_scope-inl.h"
 #include "runtime.h"
 #include "verifier/verifier_deps.h"
 
@@ -504,6 +506,145 @@ bool VdexFile::MatchesClassLoaderContext(const ClassLoaderContext& context) cons
         << spec << ", actual=" << context.EncodeContextForOatFile("") << ")";
     return false;
   }
+}
+
+static ObjPtr<mirror::Class> FindClassAndClearException(ClassLinker* class_linker,
+                                                        Thread* self,
+                                                        const char* name,
+                                                        Handle<mirror::ClassLoader> class_loader)
+    REQUIRES_SHARED(Locks::mutator_lock_) {
+  ObjPtr<mirror::Class> result = class_linker->FindClass(self, name, class_loader);
+  if (result == nullptr) {
+    DCHECK(self->IsExceptionPending());
+    self->ClearException();
+  }
+  return result;
+}
+
+static const char* GetStringFromId(const DexFile& dex_file,
+                                   dex::StringIndex string_id,
+                                   uint32_t number_of_extra_strings,
+                                   const uint32_t* extra_strings_offsets,
+                                   const uint8_t* verifier_deps) {
+  uint32_t num_ids_in_dex = dex_file.NumStringIds();
+  if (string_id.index_ < num_ids_in_dex) {
+    return dex_file.StringDataByIdx(string_id);
+  } else {
+    CHECK_LT(string_id.index_ - num_ids_in_dex, number_of_extra_strings);
+    uint32_t offset = extra_strings_offsets[string_id.index_ - num_ids_in_dex];
+    return reinterpret_cast<const char*>(verifier_deps) + offset;
+  }
+}
+
+// Returns an array of offsets where the assignability checks for each class
+// definition are stored.
+static const uint32_t* GetDexFileClassDefs(const uint8_t* verifier_deps, uint32_t index) {
+  uint32_t dex_file_offset = reinterpret_cast<const uint32_t*>(verifier_deps)[index];
+  return reinterpret_cast<const uint32_t*>(verifier_deps + dex_file_offset);
+}
+
+// Returns an array of offsets where extra strings are stored.
+static const uint32_t* GetExtraStringsOffsets(const DexFile& dex_file,
+                                              const uint8_t* verifier_deps,
+                                              const uint32_t* dex_file_class_defs,
+                                              /*out*/ uint32_t* number_of_extra_strings) {
+  // The information for strings is right after dex_file_class_defs, 4-byte
+  // aligned
+  uint32_t end_of_assignability_types = dex_file_class_defs[dex_file.NumClassDefs()];
+  const uint8_t* strings_data_start =
+      AlignUp(verifier_deps + end_of_assignability_types, sizeof(uint32_t));
+  // First entry is the number of extra strings for this dex file.
+  *number_of_extra_strings = *reinterpret_cast<const uint32_t*>(strings_data_start);
+  // Then an array of offsets in `verifier_deps` for the extra strings.
+  return reinterpret_cast<const uint32_t*>(strings_data_start + sizeof(uint32_t));
+}
+
+ClassStatus VdexFile::ComputeClassStatus(Thread* self, Handle<mirror::Class> cls) const {
+  const DexFile& dex_file = cls->GetDexFile();
+  uint16_t class_def_index = cls->GetDexClassDefIndex();
+
+  // Find which dex file index from within the vdex file.
+  uint32_t index = 0;
+  for (; index < GetVerifierDepsHeader().GetNumberOfDexFiles(); ++index) {
+    if (dex_file.GetLocationChecksum() == GetLocationChecksum(index)) {
+      break;
+    }
+  }
+  DCHECK_NE(index, GetVerifierDepsHeader().GetNumberOfDexFiles());
+
+  const uint8_t* verifier_deps = GetVerifierDepsStart();
+  const uint32_t* dex_file_class_defs = GetDexFileClassDefs(verifier_deps, index);
+
+  // Fetch type checks offsets.
+  uint32_t class_def_offset = dex_file_class_defs[class_def_index];
+  if (class_def_offset == verifier::VerifierDeps::kNotVerifiedMarker) {
+    // Return a status that needs re-verification.
+    return ClassStatus::kResolved;
+  }
+  // End offset for this class's type checks. We know there is one and the loop
+  // will terminate.
+  uint32_t end_offset = verifier::VerifierDeps::kNotVerifiedMarker;
+  for (uint32_t i = class_def_index + 1; i < dex_file.NumClassDefs() + 1; ++i) {
+    end_offset = dex_file_class_defs[i];
+    if (end_offset != verifier::VerifierDeps::kNotVerifiedMarker) {
+      break;
+    }
+  }
+  DCHECK_NE(end_offset, verifier::VerifierDeps::kNotVerifiedMarker);
+
+  uint32_t number_of_extra_strings = 0;
+  // Offset where extra strings are stored.
+  const uint32_t* extra_strings_offsets = GetExtraStringsOffsets(dex_file,
+                                                                 verifier_deps,
+                                                                 dex_file_class_defs,
+                                                                 &number_of_extra_strings);
+
+  // Loop over and perform each assignability check.
+  StackHandleScope<3> hs(self);
+  ClassLinker* class_linker = Runtime::Current()->GetClassLinker();
+  Handle<mirror::ClassLoader> class_loader(hs.NewHandle(cls->GetClassLoader()));
+  MutableHandle<mirror::Class> source(hs.NewHandle<mirror::Class>(nullptr));
+  MutableHandle<mirror::Class> destination(hs.NewHandle<mirror::Class>(nullptr));
+
+  const uint8_t* cursor = verifier_deps + class_def_offset;
+  const uint8_t* end = verifier_deps + end_offset;
+  while (cursor < end) {
+    uint32_t destination_index;
+    uint32_t source_index;
+    if (UNLIKELY(!DecodeUnsignedLeb128Checked(&cursor, end, &destination_index) ||
+                 !DecodeUnsignedLeb128Checked(&cursor, end, &source_index))) {
+      // Error parsing the data, just return that we are not verified.
+      return ClassStatus::kResolved;
+    }
+    const char* destination_desc = GetStringFromId(dex_file,
+                                                   dex::StringIndex(destination_index),
+                                                   number_of_extra_strings,
+                                                   extra_strings_offsets,
+                                                   verifier_deps);
+    destination.Assign(
+        FindClassAndClearException(class_linker, self, destination_desc, class_loader));
+
+    const char* source_desc = GetStringFromId(dex_file,
+                                              dex::StringIndex(source_index),
+                                              number_of_extra_strings,
+                                              extra_strings_offsets,
+                                              verifier_deps);
+    source.Assign(FindClassAndClearException(class_linker, self, source_desc, class_loader));
+
+    if (destination == nullptr || source == nullptr) {
+      // The interpreter / compiler can handle a missing class.
+      continue;
+    }
+
+    DCHECK(destination->IsResolved() && source->IsResolved());
+    if (!destination->IsAssignableFrom(source.Get())) {
+      // An implicit assignability check is failing in the code, return that the
+      // class is not verified.
+      return ClassStatus::kResolved;
+    }
+  }
+
+  return ClassStatus::kVerifiedNeedsAccessChecks;
 }
 
 }  // namespace art

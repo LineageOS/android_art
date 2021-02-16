@@ -158,7 +158,7 @@ extern "C" JNIEXPORT jboolean JNICALL Java_Main_areClassesPreverified(JNIEnv*,
 
       ClassStatus oat_file_class_status(ClassStatus::kNotReady);
       bool is_preverified = class_linker->VerifyClassUsingOatFile(
-          *dex_file, h_class.Get(), oat_file_class_status);
+          soa.Self(), *dex_file, h_class, oat_file_class_status);
 
       if (is_first) {
         all_preverified = is_preverified;
