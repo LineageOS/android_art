@@ -763,11 +763,8 @@ ALWAYS_INLINE bool MterpFieldAccessFast(Instruction* inst,
   // This effectively inlines the fast path from ArtMethod::GetDexCache.
   ArtMethod* referrer = shadow_frame->GetMethod();
   if (LIKELY(!referrer->IsObsolete() && !do_access_checks)) {
-    // Avoid read barriers, since we need only the pointer to the native (non-movable)
-    // DexCache field array which we can get even through from-space objects.
-    ObjPtr<mirror::Class> klass = referrer->GetDeclaringClass<kWithoutReadBarrier>();
-    ObjPtr<mirror::DexCache> dex_cache =
-        klass->GetDexCache<kDefaultVerifyFlags, kWithoutReadBarrier>();
+    ObjPtr<mirror::Class> klass = referrer->GetDeclaringClass();
+    ObjPtr<mirror::DexCache> dex_cache = klass->GetDexCache<kDefaultVerifyFlags>();
 
     // Try to find the desired field in DexCache.
     uint32_t field_idx = kIsStatic ? inst->VRegB_21c() : inst->VRegC_22c();
