@@ -36,12 +36,10 @@ sh_binary {
     src: "art",
     filename_from_src: true,
     target: {
-        android: {
-            required: [
-                "com.android.art",
-            ],
-        },
         host: {
+            // On device we require the ART APEX, but its Soong module name may
+            // be different depending on branch, and it's always present anyway,
+            // so we leave it out.
             required: [
                 "dalvikvm",
                 "dex2oat",
@@ -59,12 +57,10 @@ sh_binary {
     src: "dex2oat_wrapper",
     filename_from_src: true,
     target: {
-        android: {
-            required: [
-                "com.android.art",
-            ],
-        },
         host: {
+            // On device we require the ART APEX, but its Soong module name may
+            // be different depending on branch, and it's always present anyway,
+            // so we leave it out.
             required: [
                 "dex2oat",
             ],
