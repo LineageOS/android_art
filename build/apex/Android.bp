@@ -302,6 +302,7 @@ art_apex {
     name: "com.android.art",
     defaults: ["com.android.art-device-defaults"],
     certificate: ":com.android.art.certificate",
+    updatable: false,
 }
 
 // "Debug" version of the ART APEX module (containing both release and
@@ -311,6 +312,7 @@ art_apex {
     name: "com.android.art.debug",
     defaults: ["com.android.art-devel-defaults"],
     certificate: ":com.android.art.certificate",
+    updatable: false,
 }
 
 // ART gtests with dependencies on internal ART APEX libraries.
@@ -349,6 +351,7 @@ art_apex_test {
     certificate: ":com.android.art.certificate",
     tests: art_gtests,
     binaries: ["signal_dumper"], // Need signal_dumper for run-tests.
+    updatable: false,
 }
 
 // TODO: Do this better. art_apex_test_host will disable host builds when
@@ -364,6 +367,7 @@ art_apex_test_host {
     host_supported: true,
     device_supported: false,
     manifest: "manifest-art.json",
+    updatable: false,
     java_libs: libcore_java_libs + art_java_libs,
     ignore_system_library_special_case: true,
     native_shared_libs: art_runtime_base_native_shared_libs +

@@ -36,6 +36,8 @@ struct ReportingConfig {
   // If set, provides a file name to enable metrics logging to a file.
   std::optional<std::string> dump_to_file;
 
+  bool dump_to_statsd{false};
+
   // Indicates whether to report the final state of metrics on shutdown.
   //
   // Note that reporting only happens if some output, such as logcat, is enabled.
@@ -45,7 +47,9 @@ struct ReportingConfig {
   std::optional<unsigned int> periodic_report_seconds;
 
   // Returns whether any options are set that enables metrics reporting.
-  constexpr bool ReportingEnabled() const { return dump_to_logcat || dump_to_file.has_value(); }
+  constexpr bool ReportingEnabled() const {
+    return dump_to_logcat || dump_to_file.has_value() || dump_to_statsd;
+  }
 };
 
 // MetricsReporter handles periodically reporting ART metrics.

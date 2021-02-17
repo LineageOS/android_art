@@ -41,7 +41,7 @@
 #include "jdwp_provider.h"
 #include "jni/jni_id_manager.h"
 #include "jni_id_type.h"
-#include "metrics_reporter.h"
+#include "metrics/reporter.h"
 #include "obj_ptr.h"
 #include "offsets.h"
 #include "process_state.h"
