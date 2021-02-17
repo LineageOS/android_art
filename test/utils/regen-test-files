@@ -281,7 +281,7 @@ known_failing_tests = frozenset([
 # the `presubmit` test group in `TEST_MAPPING` file -- the rest will be included
 # in `postsubmit` test group.
 # This value has to be a number between 0 and 100.
-presubmit_tests_percentage = 25
+presubmit_tests_percentage = 50
 
 
 # Is `run_test` a Checker test (i.e. a test containing Checker
