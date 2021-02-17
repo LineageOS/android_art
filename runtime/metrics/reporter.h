@@ -33,6 +33,9 @@ struct ReportingConfig {
   // Causes metrics to be written to the log, which makes them show up in logcat.
   bool dump_to_logcat{false};
 
+  // Causes metrics to be written to statsd, which causes them to be uploaded to Westworld.
+  bool dump_to_statsd{false};
+
   // If set, provides a file name to enable metrics logging to a file.
   std::optional<std::string> dump_to_file;
 
@@ -45,7 +48,9 @@ struct ReportingConfig {
   std::optional<unsigned int> periodic_report_seconds;
 
   // Returns whether any options are set that enables metrics reporting.
-  constexpr bool ReportingEnabled() const { return dump_to_logcat || dump_to_file.has_value(); }
+  constexpr bool ReportingEnabled() const {
+    return dump_to_logcat || dump_to_file.has_value() || dump_to_statsd;
+  }
 };
 
 // MetricsReporter handles periodically reporting ART metrics.
