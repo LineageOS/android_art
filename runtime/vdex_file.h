@@ -24,13 +24,20 @@
 #include "base/macros.h"
 #include "base/mem_map.h"
 #include "base/os.h"
+#include "class_status.h"
 #include "dex/compact_offset_table.h"
 #include "dex/dex_file.h"
 #include "quicken_info.h"
+#include "handle.h"
 
 namespace art {
 
 class ClassLoaderContext;
+class Thread;
+
+namespace mirror {
+class Class;
+}
 
 namespace verifier {
 class VerifierDeps;
@@ -373,6 +380,9 @@ class VdexFile {
   // Make the Vdex file & underlying dex-files RW or RO. Should only be used for in-place
   // dequickening.
   void AllowWriting(bool value) const;
+
+  ClassStatus ComputeClassStatus(Thread* self, Handle<mirror::Class> cls) const
+      REQUIRES_SHARED(Locks::mutator_lock_);
 
  private:
   uint32_t GetQuickeningInfoTableOffset(const uint8_t* source_dex_begin) const;

@@ -2371,21 +2371,6 @@ extern "C" TwoWordReturn artInvokeVirtualTrampolineWithAccessCheck(
   return artInvokeCommon<kVirtual, true>(method_idx, this_object, self, sp);
 }
 
-// Helper function for art_quick_imt_conflict_trampoline to look up the interface method.
-extern "C" ArtMethod* artLookupResolvedMethod(uint32_t method_index, ArtMethod* referrer)
-    REQUIRES_SHARED(Locks::mutator_lock_) {
-  ScopedAssertNoThreadSuspension ants(__FUNCTION__);
-  DCHECK(!referrer->IsProxyMethod());
-  ArtMethod* result = Runtime::Current()->GetClassLinker()->LookupResolvedMethod(
-      method_index, referrer->GetDexCache(), referrer->GetClassLoader());
-  DCHECK(result == nullptr ||
-         result->GetDeclaringClass()->IsInterface() ||
-         result->GetDeclaringClass() ==
-             WellKnownClasses::ToClass(WellKnownClasses::java_lang_Object))
-      << result->PrettyMethod();
-  return result;
-}
-
 // Determine target of interface dispatch. The interface method and this object are known non-null.
 // The interface method is the method returned by the dex cache in the conflict trampoline.
 extern "C" TwoWordReturn artInvokeInterfaceTrampoline(ArtMethod* interface_method,

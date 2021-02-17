@@ -62,6 +62,10 @@ class VerifierDeps {
  public:
   explicit VerifierDeps(const std::vector<const DexFile*>& dex_files, bool output_only = true);
 
+  // Marker to know whether a class is verified. A non-verified class will have
+  // this marker as its offset entry in the encoded data.
+  static uint32_t constexpr kNotVerifiedMarker = std::numeric_limits<uint32_t>::max();
+
   // Fill dependencies from stored data. Returns true on success, false on failure.
   bool ParseStoredData(const std::vector<const DexFile*>& dex_files, ArrayRef<const uint8_t> data);
 

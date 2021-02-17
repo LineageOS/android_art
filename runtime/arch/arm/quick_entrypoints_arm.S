@@ -1387,7 +1387,6 @@ END art_quick_proxy_invoke_handler
      *
      * Note that this stub writes to r0, r4, and r12.
      */
-    .extern artLookupResolvedMethod
 ENTRY art_quick_imt_conflict_trampoline
     ldr     r0, [r0, #ART_METHOD_JNI_OFFSET_32]  // Load ImtConflictTable
     ldr     r4, [r0]  // Load first entry in ImtConflictTable.

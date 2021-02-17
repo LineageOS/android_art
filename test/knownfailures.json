@@ -1367,5 +1367,18 @@
         "tests": ["2232-write-metrics-to-log"],
         "variant": "target",
         "description": ["Checks LOG_STREAM output, which cannot be captured on target."]
+    },
+    {
+        "tests": ["053-wait-some"],
+        "env_vars": {"ART_TEST_DEBUG_GC": "true"},
+        "bug": "b/175435088",
+        "description": ["Test is time-sensitive and fails on debug-gc configuration."]
+    },
+    {
+        "tests": ["053-wait-some"],
+        "variant": "interp-ac",
+        "bug": "b/175435088",
+        "description": ["Test is time-sensitive and fails on interpreter-access-checks",
+                        "configuration."]
     }
 ]

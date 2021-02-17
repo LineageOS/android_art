@@ -385,10 +385,6 @@ static inline bool DecodeTuple(const uint8_t** in, const uint8_t* end, std::tupl
   return true;
 }
 
-// Marker to know whether a class is verified. A non-verified class will have
-// this marker as its offset entry in the encoded data.
-static uint32_t constexpr kNotVerifiedMarker = std::numeric_limits<uint32_t>::max();
-
 static void SetUint32InUint8Array(std::vector<uint8_t>* out,
                                   uint32_t uint8_offset,
                                   uint32_t uint32_offset,
@@ -414,7 +410,7 @@ static void EncodeSetVector(std::vector<uint8_t>* out,
         EncodeTuple(out, entry);
       }
     } else {
-      SetUint32InUint8Array(out, offsets_index, class_def_index, kNotVerifiedMarker);
+      SetUint32InUint8Array(out, offsets_index, class_def_index, VerifierDeps::kNotVerifiedMarker);
     }
     class_def_index++;
   }
@@ -435,7 +431,7 @@ static bool DecodeSetVector(const uint8_t** cursor,
   *cursor += (num_class_defs + 1) * sizeof(uint32_t);
   for (uint32_t i = 0; i < num_class_defs; ++i) {
     uint32_t offset = offsets[i];
-    if (offset == kNotVerifiedMarker) {
+    if (offset == VerifierDeps::kNotVerifiedMarker) {
       (*verified_classes)[i] = false;
       continue;
     }
@@ -446,7 +442,8 @@ static bool DecodeSetVector(const uint8_t** cursor,
     // Find the offset of the next entry. This will tell us where to stop when
     // reading the checks. Note that the last entry in the `offsets` array points
     // to the end of the assignability types data, so the loop will terminate correctly.
-    while (next_valid_offset_index <= i || offsets[next_valid_offset_index] == kNotVerifiedMarker) {
+    while (next_valid_offset_index <= i ||
+           offsets[next_valid_offset_index] == VerifierDeps::kNotVerifiedMarker) {
       next_valid_offset_index++;
     }
     const uint8_t* set_end = start + offsets[next_valid_offset_index];

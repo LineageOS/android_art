@@ -29,11 +29,12 @@ namespace {
 extern "C" JNIEXPORT jboolean JNICALL Java_Main_isAotVerified(JNIEnv* env, jclass, jclass cls) {
   ScopedObjectAccess soa(env);
   Runtime* rt = Runtime::Current();
-
-  ObjPtr<mirror::Class> klass = soa.Decode<mirror::Class>(cls);
+  StackHandleScope<1> hs(soa.Self());
+  Handle<mirror::Class> klass = hs.NewHandle(soa.Decode<mirror::Class>(cls));
   const DexFile& dex_file = *klass->GetDexCache()->GetDexFile();
   ClassStatus oat_file_class_status(ClassStatus::kNotReady);
-  bool ret = rt->GetClassLinker()->VerifyClassUsingOatFile(dex_file, klass, oat_file_class_status);
+  bool ret = rt->GetClassLinker()->VerifyClassUsingOatFile(
+      soa.Self(), dex_file, klass, oat_file_class_status);
   return ret;
 }
 

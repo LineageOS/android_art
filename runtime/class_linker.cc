@@ -145,6 +145,7 @@
 #include "thread_list.h"
 #include "trace.h"
 #include "transaction.h"
+#include "vdex_file.h"
 #include "verifier/class_verifier.h"
 #include "well_known_classes.h"
 
@@ -4623,7 +4624,7 @@ verifier::FailureKind ClassLinker::VerifyClass(
   // Try to use verification information from the oat file, otherwise do runtime verification.
   const DexFile& dex_file = *klass->GetDexCache()->GetDexFile();
   ClassStatus oat_file_class_status(ClassStatus::kNotReady);
-  bool preverified = VerifyClassUsingOatFile(dex_file, klass.Get(), oat_file_class_status);
+  bool preverified = VerifyClassUsingOatFile(self, dex_file, klass, oat_file_class_status);
 
   VLOG(class_linker) << "Class preverified status for class "
                      << klass->PrettyDescriptor()
@@ -4738,8 +4739,9 @@ verifier::FailureKind ClassLinker::PerformClassVerification(Thread* self,
                                               error_msg);
 }
 
-bool ClassLinker::VerifyClassUsingOatFile(const DexFile& dex_file,
-                                          ObjPtr<mirror::Class> klass,
+bool ClassLinker::VerifyClassUsingOatFile(Thread* self,
+                                          const DexFile& dex_file,
+                                          Handle<mirror::Class> klass,
                                           ClassStatus& oat_file_class_status) {
   // If we're compiling, we can only verify the class using the oat file if
   // we are not compiling the image or if the class we're verifying is not part of
@@ -4748,7 +4750,7 @@ bool ClassLinker::VerifyClassUsingOatFile(const DexFile& dex_file,
   if (Runtime::Current()->IsAotCompiler()) {
     CompilerCallbacks* callbacks = Runtime::Current()->GetCompilerCallbacks();
     // We are compiling an app (not the image).
-    if (!callbacks->CanUseOatStatusForVerification(klass.Ptr())) {
+    if (!callbacks->CanUseOatStatusForVerification(klass.Get())) {
       return false;
     }
   }
@@ -4769,6 +4771,16 @@ bool ClassLinker::VerifyClassUsingOatFile(const DexFile& dex_file,
     // check the class status to ensure we run with access checks.
     return true;
   }
+
+  // Check the class status with the vdex file.
+  const OatFile* oat_file = oat_dex_file->GetOatFile();
+  if (oat_file != nullptr) {
+    oat_file_class_status = oat_file->GetVdexFile()->ComputeClassStatus(self, klass);
+    if (oat_file_class_status >= ClassStatus::kVerifiedNeedsAccessChecks) {
+      return true;
+    }
+  }
+
   // If we only verified a subset of the classes at compile time, we can end up with classes that
   // were resolved by the verifier.
   if (oat_file_class_status == ClassStatus::kResolved) {
