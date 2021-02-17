@@ -92,6 +92,10 @@ from device_config import device_config
 #                            47m
 timeout = 3600 # 60 minutes
 
+if env.ART_TEST_RUN_ON_ARM_FVP:
+  # Increase timeout to 600 minutes due to the emulation overhead on FVP.
+  timeout = 36000
+
 # DISABLED_TEST_CONTAINER holds information about the disabled tests. It is a map
 # that has key as the test name (like 001-HelloWorld), and value as set of
 # variants that the test is disabled for.
@@ -307,7 +311,13 @@ def get_device_name():
                           stdout = subprocess.PIPE,
                           universal_newlines=True)
   # only wait 2 seconds.
-  output = proc.communicate(timeout = 2)[0]
+  timeout_val = 2
+
+  if env.ART_TEST_RUN_ON_ARM_FVP:
+    # Increase timeout to 200 seconds due to the emulation overhead on FVP.
+    timeout_val = 200
+
+  output = proc.communicate(timeout = timeout_val)[0]
   success = not proc.wait()
   if success:
     return output.strip()
