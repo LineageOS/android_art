@@ -14,6 +14,6 @@
     // If on-device signing has run, there may be oat / odex files for
     // the boot class path extensions and system_server in the ART APEX data
     // directory.
-    "/data/misc/apexdata/com.android.art/system/framework"
+    "/data/misc/apexdata/com.android.art/dalvik-cache"
   ]
 }
