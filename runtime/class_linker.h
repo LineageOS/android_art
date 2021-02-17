@@ -557,8 +557,9 @@ class ClassLinker {
       verifier::HardFailLogMode log_level = verifier::HardFailLogMode::kLogNone)
       REQUIRES_SHARED(Locks::mutator_lock_)
       REQUIRES(!Locks::dex_lock_);
-  bool VerifyClassUsingOatFile(const DexFile& dex_file,
-                               ObjPtr<mirror::Class> klass,
+  bool VerifyClassUsingOatFile(Thread* self,
+                               const DexFile& dex_file,
+                               Handle<mirror::Class> klass,
                                ClassStatus& oat_file_class_status)
       REQUIRES_SHARED(Locks::mutator_lock_)
       REQUIRES(!Locks::dex_lock_);
