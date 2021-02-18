@@ -432,7 +432,6 @@ OatFileAssistant::OatStatus OatFileAssistant::GivenOatFileStatus(const OatFile& 
 
 bool OatFileAssistant::AnonymousDexVdexLocation(const std::vector<const DexFile::Header*>& headers,
                                                 InstructionSet isa,
-                                                /* out */ uint32_t* location_checksum,
                                                 /* out */ std::string* dex_location,
                                                 /* out */ std::string* vdex_filename) {
   uint32_t checksum = adler32(0L, Z_NULL, 0);
@@ -441,7 +440,6 @@ bool OatFileAssistant::AnonymousDexVdexLocation(const std::vector<const DexFile:
                                header->checksum_,
                                header->file_size_ - DexFile::kNumNonChecksumBytes);
   }
-  *location_checksum = checksum;
 
   const std::string& data_dir = Runtime::Current()->GetProcessDataDirectory();
   if (data_dir.empty() || Runtime::Current()->IsZygote()) {
