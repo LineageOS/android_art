@@ -130,13 +130,13 @@ void MetricsReporter::ReportMetrics() const {
   }
 }
 
-ReportingConfig ReportingConfig::FromRuntimeArguments(const RuntimeArgumentMap& args) {
-  using M = RuntimeArgumentMap;
+ReportingConfig ReportingConfig::FromFlags() {
   return {
       .dump_to_logcat = gFlags.WriteMetricsToLog(),
-      .dump_to_file = args.GetOptional(M::WriteMetricsToFile),
-      .report_metrics_on_shutdown = !args.Exists(M::DisableFinalMetricsReport),
-      .periodic_report_seconds = args.GetOptional(M::MetricsReportingPeriod),
+      .dump_to_file = gFlags.WriteMetricsToFile.GetOptional(),
+      .dump_to_statsd = gFlags.WriteMetricsToStatsd(),
+      .report_metrics_on_shutdown = gFlags.ReportMetricsOnShutdown(),
+      .periodic_report_seconds = gFlags.MetricsReportingPeriod.GetOptional(),
   };
 }
 
