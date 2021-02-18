@@ -90,13 +90,11 @@ extern "C" JNIEXPORT bool JNICALL Java_Main_hasVdexFile(JNIEnv*,
         return true;
       });
 
-  uint32_t location_checksum;
   std::string dex_location;
   std::string vdex_filename;
   std::string error_msg;
   return OatFileAssistant::AnonymousDexVdexLocation(dex_headers,
                                                     kRuntimeISA,
-                                                    &location_checksum,
                                                     &dex_location,
                                                     &vdex_filename) &&
          OS::FileExists(vdex_filename.c_str());
