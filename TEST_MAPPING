@@ -15,11 +15,9 @@
     {
       "name": "ArtServiceTests"
     },
-    // ART gtests.
     {
       "name": "ArtGtestsTarget"
     },
-    // ART run-tests.
     {
       "name": "art-run-test-001-HelloWorld"
     },
@@ -214,7 +212,6 @@
     }
   ],
   "postsubmit": [
-    // ART run-tests.
     {
       "name": "art-run-test-093-serialization"
     },
