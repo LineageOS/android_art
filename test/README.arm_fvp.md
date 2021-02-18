@@ -149,7 +149,7 @@ export ART_TEST_CHROOT=/data/local/art-test-chroot
 export OVERRIDE_TARGET_FLATTEN_APEX=true
 export SOONG_ALLOW_MISSING_DEPENDENCIES=true
 export TARGET_BUILD_UNBUNDLED=true
-export ART_TEST_DONT_REBOOT_DEVICE=true
+export ART_TEST_RUN_ON_ARM_FVP=true
 
 . ./build/envsetup.sh
 lunch armv8-userdebug

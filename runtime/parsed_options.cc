@@ -23,6 +23,7 @@
 #include <android-base/strings.h>
 
 #include "base/file_utils.h"
+#include "base/flags.h"
 #include "base/indenter.h"
 #include "base/macros.h"
 #include "base/utils.h"
@@ -394,16 +395,10 @@ std::unique_ptr<RuntimeParser> ParsedOptions::MakeParser(bool ignore_unrecognize
           .IntoKey(M::CorePlatformApiPolicy)
       .Define("-Xuse-stderr-logger")
           .IntoKey(M::UseStderrLogger)
-      .Define("-Xwrite-metrics-to-log")
-          .WithHelp("Enables writing ART metrics to logcat")
-          .IntoKey(M::WriteMetricsToLog)
       .Define("-Xwrite-metrics-to-file=_")
           .WithHelp("Enables writing ART metrics to the given file")
           .WithType<std::string>()
           .IntoKey(M::WriteMetricsToFile)
-      .Define("-Xwrite-metrics-to-statsd")
-          .WithHelp("Enables writing ART metrics to statsd (only supported on Android)")
-          .IntoKey(M::WriteMetricsToStatsd)
       .Define("-Xdisable-final-metrics-report")
           .WithHelp("Disables reporting metrics when ART shuts down")
           .IntoKey(M::DisableFinalMetricsReport)
@@ -445,8 +440,11 @@ std::unique_ptr<RuntimeParser> ParsedOptions::MakeParser(bool ignore_unrecognize
       .Define("-XX:PerfettoJavaHeapStackProf=_")
           .WithType<bool>()
           .WithValueMap({{"false", false}, {"true", true}})
-          .IntoKey(M::PerfettoJavaHeapStackProf)
-      .Ignore({
+          .IntoKey(M::PerfettoJavaHeapStackProf);
+
+      FlagBase::AddFlagsToCmdlineParser(parser_builder.get());
+
+      parser_builder->Ignore({
           "-ea", "-da", "-enableassertions", "-disableassertions", "--runtime-arg", "-esa",
           "-dsa", "-enablesystemassertions", "-disablesystemassertions", "-Xrs", "-Xint:_",
           "-Xdexopt:_", "-Xnoquithandler", "-Xjnigreflimit:_", "-Xgenregmap", "-Xnogenregmap",

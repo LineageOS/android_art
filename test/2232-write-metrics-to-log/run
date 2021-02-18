@@ -15,4 +15,4 @@
 # limitations under the License.
 
 export ANDROID_LOG_TAGS="*:i"
-exec ${RUN} $@ --external-log-tags --runtime-option -Xwrite-metrics-to-log
+exec ${RUN} $@ --external-log-tags --runtime-option -Xmetrics-write-to-log=true

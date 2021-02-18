@@ -141,3 +141,5 @@ os.environ['PATH'] = ANDROID_JAVA_TOOLCHAIN + ':' + os.environ['PATH']
 
 DIST_DIR = _get_build_var('DIST_DIR')
 SOONG_OUT_DIR = _get_build_var('SOONG_OUT_DIR')
+
+ART_TEST_RUN_ON_ARM_FVP = _getEnvBoolean('ART_TEST_RUN_ON_ARM_FVP', False)
