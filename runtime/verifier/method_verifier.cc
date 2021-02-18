@@ -3909,9 +3909,8 @@ ArtMethod* MethodVerifier<kVerifierDebug>::ResolveMethodAndCheckAccess(
   ObjPtr<mirror::Class> klass = klass_type.GetClass();
   const RegType& referrer = GetDeclaringClass();
   ClassLinker* class_linker = GetClassLinker();
-  PointerSize pointer_size = class_linker->GetImagePointerSize();
 
-  ArtMethod* res_method = dex_cache_->GetResolvedMethod(dex_method_idx, pointer_size);
+  ArtMethod* res_method = dex_cache_->GetResolvedMethod(dex_method_idx);
   if (res_method == nullptr) {
     res_method = class_linker->FindResolvedMethod(
         klass, dex_cache_.Get(), class_loader_.Get(), dex_method_idx);
