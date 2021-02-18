@@ -35,7 +35,9 @@
 #pragma clang diagnostic error "-Wconversion"
 
 // COUNTER(counter_name)
-#define ART_COUNTERS(COUNTER) COUNTER(ClassVerificationTotalTime)
+#define ART_COUNTERS(COUNTER)    \
+  COUNTER(ClassLoadingTotalTime) \
+  COUNTER(ClassVerificationTotalTime)
 
 // HISTOGRAM(counter_name, num_buckets, minimum_value, maximum_value)
 //
