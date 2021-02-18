@@ -19,12 +19,42 @@
 #include <libgen.h>
 #include <stdlib.h>
 
+#include <optional>
+
 #include "base/stl_util.h"
 #include "common_art_test.h"
 
 namespace art {
 
 class FileUtilsTest : public CommonArtTest {};
+
+// Helper class that removes an environment variable whilst in scope.
+class ScopedUnsetEnvironmentVariable {
+ public:
+  explicit ScopedUnsetEnvironmentVariable(const char* variable)
+      : variable_{variable}, old_value_{GetOldValue(variable)} {
+    unsetenv(variable);
+  }
+
+  ~ScopedUnsetEnvironmentVariable() {
+    if (old_value_.has_value()) {
+      static constexpr int kReplace = 1;  // tidy-issue: replace argument has libc dependent name.
+      setenv(variable_, old_value_.value().c_str(), kReplace);
+    } else {
+      unsetenv(variable_);
+    }
+  }
+
+ private:
+  static std::optional<std::string> GetOldValue(const char* variable) {
+    const char* value = getenv(variable);
+    return value != nullptr ? std::optional<std::string>{value} : std::nullopt;
+  }
+
+  const char* variable_;
+  std::optional<std::string> old_value_;
+  DISALLOW_COPY_AND_ASSIGN(ScopedUnsetEnvironmentVariable);
+};
 
 TEST_F(FileUtilsTest, GetDalvikCacheFilename) {
   std::string name;
@@ -45,13 +75,6 @@ TEST_F(FileUtilsTest, GetDalvikCacheFilename) {
   EXPECT_TRUE(GetDalvikCacheFilename("/system/framework/boot.oat", "/foo", &name, &error)) << error;
   EXPECT_EQ("/foo/system@framework@boot.oat", name);
 }
-
-TEST_F(FileUtilsTest, GetDalvikCache) {
-  EXPECT_STREQ("", GetDalvikCache("should-not-exist123").c_str());
-
-  EXPECT_STREQ((android_data_ + "/dalvik-cache/.").c_str(), GetDalvikCache(".").c_str());
-}
-
 
 TEST_F(FileUtilsTest, GetSystemImageFilename) {
   EXPECT_STREQ("/system/framework/arm/boot.art",
@@ -163,6 +186,109 @@ TEST_F(FileUtilsTest, ReplaceFileExtension) {
   EXPECT_EQ("/.directory/file.vdex", ReplaceFileExtension("/.directory/file.oat", "vdex"));
   EXPECT_EQ("/directory/file.vdex", ReplaceFileExtension("/directory/file", "vdex"));
   EXPECT_EQ("/.directory/file.vdex", ReplaceFileExtension("/.directory/file", "vdex"));
+}
+
+TEST_F(FileUtilsTest, GetApexDataOatFilename) {
+  ScopedUnsetEnvironmentVariable android_root("ANDROID_ROOT");
+  ScopedUnsetEnvironmentVariable i18n_root("ANDROID_I18N_ROOT");
+  ScopedUnsetEnvironmentVariable art_apex_data("ART_APEX_DATA");
+
+  EXPECT_EQ(GetArtApexData() + "/dalvik-cache/arm/boot-beep.oat",
+            GetApexDataOatFilename("/product/javalib/beep.jar", InstructionSet::kArm));
+
+  const std::string art_apex_jar = std::string {kAndroidArtApexDefaultPath} + "/javalib/some.jar";
+  EXPECT_EQ(std::string{}, GetApexDataOatFilename(art_apex_jar.c_str(), InstructionSet::kArm));
+
+  const std::string i18n_jar =
+      std::string {kAndroidI18nApexDefaultPath} + "/javalib/core-icu4j.jar";
+  EXPECT_EQ(std::string{}, GetApexDataOatFilename(i18n_jar, InstructionSet::kArm));
+
+  const std::string system_jar_apexdata_oat = GetArtApexData() + "/dalvik-cache/x86/boot-lace.oat";
+  EXPECT_EQ(system_jar_apexdata_oat,
+            GetApexDataOatFilename("/system/framework/lace.jar", InstructionSet::kX86));
+}
+
+TEST_F(FileUtilsTest, GetApexDataOdexFilename) {
+  ScopedUnsetEnvironmentVariable android_root("ANDROID_ROOT");
+  ScopedUnsetEnvironmentVariable art_apex_data("ART_APEX_DATA");
+
+  EXPECT_EQ(GetArtApexData() + "/dalvik-cache/arm/data@some@code.odex",
+            GetApexDataOdexFilename("/data/some/code.dex", InstructionSet::kArm));
+
+  const std::string art_apex_jar = std::string {kAndroidArtApexDefaultPath} + "/javalib/some.jar";
+  EXPECT_EQ(std::string{}, GetApexDataOdexFilename(art_apex_jar.c_str(), InstructionSet::kArm));
+
+  const std::string i18n_jar =
+      std::string {kAndroidI18nApexDefaultPath} + "/javalib/core-icu4j.jar";
+  EXPECT_EQ(std::string{}, GetApexDataOdexFilename(i18n_jar.c_str(), InstructionSet::kArm));
+
+  const std::string system_jar_apexdata_odex =
+      GetArtApexData() + "/dalvik-cache/x86/system@framework@cookie.jar@classes.odex";
+  EXPECT_EQ(system_jar_apexdata_odex,
+            GetApexDataOdexFilename("/system/framework/cookie.jar", InstructionSet::kX86));
+}
+
+TEST_F(FileUtilsTest, GetApexDataBootImage) {
+  ScopedUnsetEnvironmentVariable android_root("ANDROID_ROOT");
+  ScopedUnsetEnvironmentVariable art_apex_data("ART_APEX_DATA");
+
+  EXPECT_EQ(std::string{},
+            GetApexDataBootImage(std::string {kAndroidI18nApexDefaultPath} + "/javalib/bar.jar"));
+
+  // Check image location has the prefix "boot-" in front of the basename of dex location and
+  // that image suffix is .art.
+  const std::string system_jar = "/system/framework/disk.jar";
+  const std::string boot_image = GetApexDataBootImage(system_jar.c_str());
+  EXPECT_EQ(GetArtApexData() + "/dalvik-cache/boot-disk.art", boot_image);
+
+  // Check the image filename corresponds to the oat file for the same system jar.
+  const InstructionSet isa = InstructionSet::kArm64;
+  const std::string boot_image_filename = GetSystemImageFilename(boot_image.c_str(), isa);
+  const std::string accompanying_oat_file = ReplaceFileExtension(boot_image_filename, "oat");
+  EXPECT_EQ(accompanying_oat_file, GetApexDataOatFilename(system_jar.c_str(), isa));
+}
+
+TEST_F(FileUtilsTest, GetApexDataImage) {
+  ScopedUnsetEnvironmentVariable android_root("ANDROID_ROOT");
+  ScopedUnsetEnvironmentVariable art_apex_data("ART_APEX_DATA");
+
+  EXPECT_EQ(std::string{},
+            GetApexDataImage(std::string {kAndroidI18nApexDefaultPath} + "/lib/javalib/bar.jar"));
+
+  // Check image has basename of dex location with the .art suffix.
+  const char* jar = "/system/framework/mcguffin/test.jar";
+  const std::string image = GetApexDataImage(jar);
+  EXPECT_EQ(GetArtApexData() + "/dalvik-cache/system@framework@mcguffin@test.jar@classes.art",
+            image);
+
+  // Check the image filename corresponds to the .odex file for the same system jar.
+  const InstructionSet isa = InstructionSet::kX86_64;
+  const std::string image_filename = GetSystemImageFilename(image.c_str(), isa);
+  const std::string accompanying_odex_file = ReplaceFileExtension(image_filename, "odex");
+  EXPECT_EQ(accompanying_odex_file, GetApexDataOdexFilename(jar, isa));
+}
+
+TEST_F(FileUtilsTest, GetApexDataDalvikCacheFilename) {
+  // Check /apex inputs return empty string
+  const std::string apex_jar = std::string {kAndroidI18nApexDefaultPath} + "/lib/javalib/bar.jar";
+  EXPECT_EQ(std::string{},
+            GetApexDataDalvikCacheFilename(apex_jar, InstructionSet::kX86_64, "art"));
+
+  // Check dalvik-cache filename follows convention.
+  const std::string non_apex_jar = "/vendor/javalib/test.jar";
+  const std::string art_filename =
+      GetApexDataDalvikCacheFilename(non_apex_jar, InstructionSet::kArm, "art");
+  CHECK_EQ(GetArtApexData() + "/dalvik-cache/arm/vendor@javalib@test.jar@classes.art",
+           art_filename);
+
+  // Check ".art", ".odex" and ".vdex" filenames are the same with the appropriate extensions
+  // substituted.
+  const std::string odex_filename =
+      GetApexDataDalvikCacheFilename(non_apex_jar, InstructionSet::kArm, "odex");
+  CHECK_EQ(odex_filename, ReplaceFileExtension(art_filename, "odex"));
+  const std::string vdex_filename =
+      GetApexDataDalvikCacheFilename(non_apex_jar, InstructionSet::kArm, "vdex");
+  CHECK_EQ(vdex_filename, ReplaceFileExtension(art_filename, "vdex"));
 }
 
 }  // namespace art
