@@ -271,6 +271,9 @@ class DexFile {
   const dex::StringId* FindStringId(const char* string) const;
 
   const dex::TypeId* FindTypeId(const char* string) const;
+  const dex::TypeId* FindTypeId(std::string_view string) const {
+    return FindTypeId(std::string(string).c_str());
+  }
 
   // Returns the number of type identifiers in the .dex file.
   uint32_t NumTypeIds() const {

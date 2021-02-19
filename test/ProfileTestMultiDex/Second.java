@@ -28,6 +28,7 @@ class Second {
 
 class SubC extends Super {
   int getValue() { return 24; }
+  int getIdentity() { return 42; }
 }
 
 class TestIntrinsicOatdump {
