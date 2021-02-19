@@ -726,11 +726,7 @@ bool ProfileCompilationInfo::AddMethod(const ProfileMethodInfo& pmi,
     return true;
   }
 
-  // Add inline caches. Do this only for regular profiles. The boot image profiles don't use
-  // them and they take up useless space.
-  if (IsForBootImage()) {
-    return true;  // early success return.
-  }
+  // Add inline caches.
   InlineCacheMap* inline_cache = data->FindOrAddHotMethod(pmi.ref.index);
   DCHECK(inline_cache != nullptr);
 
