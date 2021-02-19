@@ -17,7 +17,9 @@
 #ifndef ART_LIBDEXFILE_DEX_DEX_FILE_REFERENCE_H_
 #define ART_LIBDEXFILE_DEX_DEX_FILE_REFERENCE_H_
 
+#include <cstddef>
 #include <cstdint>
+#include <utility>
 
 namespace art {
 
@@ -46,7 +48,21 @@ inline bool operator<(const DexFileReference& a, const DexFileReference& b) {
 inline bool operator==(const DexFileReference& a, const DexFileReference& b) {
   return a.dex_file == b.dex_file && a.index == b.index;
 }
+inline bool operator!=(const DexFileReference& a, const DexFileReference& b) {
+  return !(a == b);
+}
 
 }  // namespace art
+
+namespace std {
+// Hash implementation used for std::set/std::map. Simply xor the hash of the dex-file and index
+template <>
+struct hash<art::DexFileReference> {
+  size_t operator()(const art::DexFileReference& ref) const {
+    return hash<decltype(ref.dex_file)>()(ref.dex_file) ^
+           hash<decltype(ref.index)>()(ref.index);
+  }
+};
+}  // namespace std
 
 #endif  // ART_LIBDEXFILE_DEX_DEX_FILE_REFERENCE_H_
