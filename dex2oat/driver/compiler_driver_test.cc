@@ -137,11 +137,9 @@ TEST_F(CompilerDriverTest, DISABLED_LARGE_CompileDexLibCore) {
   }
   EXPECT_TRUE(dex_cache->StaticMethodSize() == dex_cache->NumResolvedMethods()
       || dex.NumMethodIds() ==  dex_cache->NumResolvedMethods());
-  auto* cl = Runtime::Current()->GetClassLinker();
-  auto pointer_size = cl->GetImagePointerSize();
   for (size_t i = 0; i < dex_cache->NumResolvedMethods(); i++) {
     // FIXME: This is outdated for hash-based method array.
-    ArtMethod* method = dex_cache->GetResolvedMethod(i, pointer_size);
+    ArtMethod* method = dex_cache->GetResolvedMethod(i);
     EXPECT_TRUE(method != nullptr) << "method_idx=" << i
                                 << " " << dex.GetMethodDeclaringClassDescriptor(dex.GetMethodId(i))
                                 << " " << dex.GetMethodName(dex.GetMethodId(i));
@@ -153,7 +151,7 @@ TEST_F(CompilerDriverTest, DISABLED_LARGE_CompileDexLibCore) {
       || dex.NumFieldIds() ==  dex_cache->NumResolvedFields());
   for (size_t i = 0; i < dex_cache->NumResolvedFields(); i++) {
     // FIXME: This is outdated for hash-based field array.
-    ArtField* field = dex_cache->GetResolvedField(i, cl->GetImagePointerSize());
+    ArtField* field = dex_cache->GetResolvedField(i);
     EXPECT_TRUE(field != nullptr) << "field_idx=" << i
                                << " " << dex.GetFieldDeclaringClassDescriptor(dex.GetFieldId(i))
                                << " " << dex.GetFieldName(dex.GetFieldId(i));

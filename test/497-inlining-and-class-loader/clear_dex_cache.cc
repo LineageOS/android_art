@@ -48,7 +48,7 @@ extern "C" JNIEXPORT jobject JNICALL Java_Main_cloneResolvedMethods(JNIEnv* env,
   CHECK(array != nullptr);
   ObjPtr<mirror::Array> decoded_array = soa.Decode<mirror::Array>(array);
   for (size_t i = 0; i != num_methods; ++i) {
-    auto pair = mirror::DexCache::GetNativePairPtrSize(methods, i, kRuntimePointerSize);
+    auto pair = mirror::DexCache::GetNativePair(methods, i);
     uint32_t index = pair.index;
     ArtMethod* method = pair.object;
     if (sizeof(void*) == 4) {
@@ -87,7 +87,7 @@ extern "C" JNIEXPORT void JNICALL Java_Main_restoreResolvedMethods(
       method = reinterpret_cast64<ArtMethod*>(long_array->Get(2u * i + 1u));
     }
     mirror::MethodDexCachePair pair(method, index);
-    mirror::DexCache::SetNativePairPtrSize(methods, i, pair, kRuntimePointerSize);
+    mirror::DexCache::SetNativePair(methods, i, pair);
   }
 }
 

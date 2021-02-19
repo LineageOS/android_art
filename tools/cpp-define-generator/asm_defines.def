@@ -25,7 +25,6 @@
 #include "lockword.def"
 #include "mirror_array.def"
 #include "mirror_class.def"
-#include "mirror_dex_cache.def"
 #include "mirror_object.def"
 #include "mirror_string.def"
 #include "osr.def"
