@@ -148,6 +148,7 @@ class DexoptAnalyzer final {
  public:
   DexoptAnalyzer() :
       only_flatten_context_(false),
+      only_validate_bcp_(false),
       assume_profile_changed_(false),
       downgrade_(false) {}
 
