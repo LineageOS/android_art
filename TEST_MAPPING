@@ -15,11 +15,9 @@
     {
       "name": "ArtServiceTests"
     },
-    // ART gtests.
     {
       "name": "ArtGtestsTarget"
     },
-    // ART run-tests.
     {
       "name": "art-run-test-001-HelloWorld"
     },
@@ -211,10 +209,7 @@
     },
     {
       "name": "art-run-test-092-locale"
-    }
-  ],
-  "postsubmit": [
-    // ART run-tests.
+    },
     {
       "name": "art-run-test-093-serialization"
     },
@@ -406,7 +401,9 @@
     },
     {
       "name": "art-run-test-401-optimizing-compiler"
-    },
+    }
+  ],
+  "postsubmit": [
     {
       "name": "art-run-test-402-optimizing-control-flow"
     },
