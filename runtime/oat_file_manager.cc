@@ -526,12 +526,10 @@ std::vector<std::unique_ptr<const DexFile>> OatFileManager::OpenDexFilesFromOat_
   const std::vector<const DexFile::Header*> dex_headers = GetDexFileHeaders(dex_mem_maps);
 
   // Determine dex/vdex locations and the combined location checksum.
-  uint32_t location_checksum;
   std::string dex_location;
   std::string vdex_path;
   bool has_vdex = OatFileAssistant::AnonymousDexVdexLocation(dex_headers,
                                                              kRuntimeISA,
-                                                             &location_checksum,
                                                              &dex_location,
                                                              &vdex_path);
 
@@ -559,7 +557,7 @@ std::vector<std::unique_ptr<const DexFile>> OatFileManager::OpenDexFilesFromOat_
     const ArtDexFileLoader dex_file_loader;
     std::unique_ptr<const DexFile> dex_file(dex_file_loader.Open(
         DexFileLoader::GetMultiDexLocation(i, dex_location.c_str()),
-        location_checksum,
+        dex_headers[i]->checksum_,
         std::move(dex_mem_maps[i]),
         /* verify= */ (vdex_file == nullptr) && Runtime::Current()->IsVerificationEnabled(),
         kVerifyChecksum,
@@ -801,12 +799,10 @@ void OatFileManager::RunBackgroundVerification(const std::vector<const DexFile*>
     return;
   }
 
-  uint32_t location_checksum;
   std::string dex_location;
   std::string vdex_path;
   if (OatFileAssistant::AnonymousDexVdexLocation(GetDexFileHeaders(dex_files),
                                                  kRuntimeISA,
-                                                 &location_checksum,
                                                  &dex_location,
                                                  &vdex_path)) {
     if (verification_thread_pool_ == nullptr) {

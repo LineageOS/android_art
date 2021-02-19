@@ -54,7 +54,6 @@ void DexCache::InitializeNativeFields(const DexFile* dex_file, LinearAlloc* line
 
   ScopedAssertNoThreadSuspension sants(__FUNCTION__);
   Thread* self = Thread::Current();
-  const PointerSize image_pointer_size = kRuntimePointerSize;
 
   size_t num_strings = std::min<size_t>(kDexCacheStringCacheSize, dex_file->NumStringIds());
   size_t num_types = std::min<size_t>(kDexCacheTypeCacheSize, dex_file->NumTypeIds());
@@ -94,12 +93,12 @@ void DexCache::InitializeNativeFields(const DexFile* dex_file, LinearAlloc* line
       CHECK(types[i].load(std::memory_order_relaxed).object.IsNull());
     }
     for (size_t i = 0; i < num_methods; ++i) {
-      CHECK_EQ(GetNativePairPtrSize(methods, i, image_pointer_size).index, 0u);
-      CHECK(GetNativePairPtrSize(methods, i, image_pointer_size).object == nullptr);
+      CHECK_EQ(GetNativePair(methods, i).index, 0u);
+      CHECK(GetNativePair(methods, i).object == nullptr);
     }
     for (size_t i = 0; i < num_fields; ++i) {
-      CHECK_EQ(GetNativePairPtrSize(fields, i, image_pointer_size).index, 0u);
-      CHECK(GetNativePairPtrSize(fields, i, image_pointer_size).object == nullptr);
+      CHECK_EQ(GetNativePair(fields, i).index, 0u);
+      CHECK(GetNativePair(fields, i).object == nullptr);
     }
     for (size_t i = 0; i < num_method_types; ++i) {
       CHECK_EQ(method_types[i].load(std::memory_order_relaxed).index, 0u);
@@ -116,10 +115,10 @@ void DexCache::InitializeNativeFields(const DexFile* dex_file, LinearAlloc* line
     mirror::TypeDexCachePair::Initialize(types);
   }
   if (fields != nullptr) {
-    mirror::FieldDexCachePair::Initialize(fields, image_pointer_size);
+    mirror::FieldDexCachePair::Initialize(fields);
   }
   if (methods != nullptr) {
-    mirror::MethodDexCachePair::Initialize(methods, image_pointer_size);
+    mirror::MethodDexCachePair::Initialize(methods);
   }
   if (method_types != nullptr) {
     mirror::MethodTypeDexCachePair::Initialize(method_types);
@@ -147,7 +146,7 @@ void DexCache::ResetNativeFields() {
 void DexCache::VisitReflectiveTargets(ReflectiveValueVisitor* visitor) {
   bool wrote = false;
   for (size_t i = 0; i < NumResolvedFields(); i++) {
-    auto pair(GetNativePairPtrSize(GetResolvedFields(), i, kRuntimePointerSize));
+    auto pair(GetNativePair(GetResolvedFields(), i));
     if (pair.index == FieldDexCachePair::InvalidIndexForSlot(i)) {
       continue;
     }
@@ -159,12 +158,12 @@ void DexCache::VisitReflectiveTargets(ReflectiveValueVisitor* visitor) {
       } else {
         pair.object = new_val;
       }
-      SetNativePairPtrSize(GetResolvedFields(), i, pair, kRuntimePointerSize);
+      SetNativePair(GetResolvedFields(), i, pair);
       wrote = true;
     }
   }
   for (size_t i = 0; i < NumResolvedMethods(); i++) {
-    auto pair(GetNativePairPtrSize(GetResolvedMethods(), i, kRuntimePointerSize));
+    auto pair(GetNativePair(GetResolvedMethods(), i));
     if (pair.index == MethodDexCachePair::InvalidIndexForSlot(i)) {
       continue;
     }
@@ -176,7 +175,7 @@ void DexCache::VisitReflectiveTargets(ReflectiveValueVisitor* visitor) {
       } else {
         pair.object = new_val;
       }
-      SetNativePairPtrSize(GetResolvedMethods(), i, pair, kRuntimePointerSize);
+      SetNativePair(GetResolvedMethods(), i, pair);
       wrote = true;
     }
   }

@@ -1115,14 +1115,14 @@ void ImageWriter::ClearDexCache(ObjPtr<mirror::DexCache> dex_cache) {
   for (size_t slot_idx = 0, num = dex_cache->NumResolvedMethods(); slot_idx != num; ++slot_idx) {
     mirror::MethodDexCachePair invalid(nullptr,
                                        mirror::MethodDexCachePair::InvalidIndexForSlot(slot_idx));
-    mirror::DexCache::SetNativePairPtrSize(resolved_methods, slot_idx, invalid, target_ptr_size_);
+    mirror::DexCache::SetNativePair(resolved_methods, slot_idx, invalid);
   }
   // Clear fields.
   mirror::FieldDexCacheType* resolved_fields = dex_cache->GetResolvedFields();
   for (size_t slot_idx = 0, num = dex_cache->NumResolvedFields(); slot_idx != num; ++slot_idx) {
     mirror::FieldDexCachePair invalid(nullptr,
                                       mirror::FieldDexCachePair::InvalidIndexForSlot(slot_idx));
-    mirror::DexCache::SetNativePairPtrSize(resolved_fields, slot_idx, invalid, target_ptr_size_);
+    mirror::DexCache::SetNativePair(resolved_fields, slot_idx, invalid);
   }
   // Clear types.
   mirror::TypeDexCacheType* resolved_types = dex_cache->GetResolvedTypes();

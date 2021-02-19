@@ -35,10 +35,6 @@ cc_defaults {
     host_supported: false,
     srcs: ["perfetto_hprof.cc"],
     defaults: ["art_defaults"],
-    include_dirs: [
-        "external/perfetto/include",
-        "external/perfetto/protos",
-    ],
 
     // Note that this tool needs to be built for both 32-bit and 64-bit since it requires
     // to be same ISA as what it is attached to.
@@ -54,11 +50,7 @@ cc_defaults {
         "perfetto_trace_protos",
     ],
     generated_sources: [
-        "perfetto_protos_perfetto_config_profiling_zero_gen",
         "art_perfetto_hprof_operator_srcs",
-    ],
-    generated_headers: [
-        "perfetto_protos_perfetto_config_profiling_zero_gen_headers",
     ],
     target: {
         darwin: {
