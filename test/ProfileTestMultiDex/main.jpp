@@ -4,6 +4,9 @@ Main:
 TestInqline:
   @@com.android.jack.annotations.ForceInMainDex
   class TestInline
+Secret:
+  @@com.android.jack.annotations.ForceInMainDex
+  class Secret
 Super:
   @@com.android.jack.annotations.ForceInMainDex
   class Super

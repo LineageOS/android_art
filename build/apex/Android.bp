@@ -397,7 +397,6 @@ art_apex_test_host {
             enabled: false,
         },
         linux_bionic: {
-            enabled: true,
             multilib: {
                 both: {
                     native_shared_libs: bionic_native_shared_libs,
