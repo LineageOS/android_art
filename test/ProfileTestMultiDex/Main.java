@@ -46,26 +46,58 @@ class TestInline {
   public int noInlineCache(Super s) {
     return s.getValue();
   }
+
+  public int inlineMultiMonomorphic(Super s, Secret sec) {
+    return s.getValue() + sec.getIdentity();
+  }
+
+  public int inlineMultiPolymorphic(Super s, Secret sec) {
+    return s.getValue() + sec.getIdentity();
+  }
+
+  public int inlineTriplePolymorphic(Super s, Secret sec, Secret thr) {
+    return s.getValue() + sec.getIdentity() + thr.getIdentity();
+  }
+
+  public int inlineMultiMegamorphic(Super s, Secret sec) {
+    return s.getValue() + sec.getIdentity();
+  }
+
+  public int inlineMultiMissingTypes(Super s, Secret sec) {
+    return s.getValue() + sec.getIdentity();
+  }
+
+  public int noInlineCacheMulti(Super s, Secret sec) {
+    return s.getValue() + sec.getIdentity();
+  }
 }
 
-abstract class Super {
+abstract class Secret {
+  abstract int getIdentity();
+}
+
+abstract class Super extends Secret {
   abstract int getValue();
 }
 
 class SubA extends Super {
   int getValue() { return 42; }
+  int getIdentity() { return 24; }
 }
 
 class SubB extends Super {
   int getValue() { return 38; };
+  int getIdentity() { return 83; }
 }
 
 class SubD extends Super {
   int getValue() { return 20; };
+  int getIdentity() { return 2; };
 }
 
 class SubE extends Super {
   int getValue() { return 16; };
+  int getIdentity() { return 61; };
 }
 
 // Add a class with lots of methods so we can test profile guided compilation triggers.
