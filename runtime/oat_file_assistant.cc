@@ -476,12 +476,10 @@ bool OatFileAssistant::IsAnonymousVdexBasename(const std::string& basename) {
   return true;
 }
 
-static bool DexLocationToOdexNames(const std::string& location,
-                                   InstructionSet isa,
-                                   std::string* odex_filename,
-                                   std::string* oat_dir,
-                                   std::string* isa_dir,
-                                   std::string* error_msg) {
+bool OatFileAssistant::DexLocationToOdexFilename(const std::string& location,
+                                                 InstructionSet isa,
+                                                 std::string* odex_filename,
+                                                 std::string* error_msg) {
   CHECK(odex_filename != nullptr);
   CHECK(error_msg != nullptr);
 
@@ -500,14 +498,9 @@ static bool DexLocationToOdexNames(const std::string& location,
   std::string dir = location.substr(0, pos+1);
   // Add the oat directory.
   dir += "oat";
-  if (oat_dir != nullptr) {
-    *oat_dir = dir;
-  }
+
   // Add the isa directory
   dir += "/" + std::string(GetInstructionSetString(isa));
-  if (isa_dir != nullptr) {
-    *isa_dir = dir;
-  }
 
   // Get the base part of the file without the extension.
   std::string file = location.substr(pos+1);
@@ -522,19 +515,20 @@ static bool DexLocationToOdexNames(const std::string& location,
   return true;
 }
 
-bool OatFileAssistant::DexLocationToOdexFilename(const std::string& location,
-                                                 InstructionSet isa,
-                                                 std::string* odex_filename,
-                                                 std::string* error_msg) {
-  return DexLocationToOdexNames(location, isa, odex_filename, nullptr, nullptr, error_msg);
-}
-
 bool OatFileAssistant::DexLocationToOatFilename(const std::string& location,
                                                 InstructionSet isa,
                                                 std::string* oat_filename,
                                                 std::string* error_msg) {
   CHECK(oat_filename != nullptr);
   CHECK(error_msg != nullptr);
+
+  // Check if `location` could have an oat file in the ART APEX data directory. If so, and the
+  // file exists, use it.
+  std::string apex_data_file = GetApexDataOdexFilename(location, isa);
+  if (!apex_data_file.empty() && OS::FileExists(apex_data_file.c_str(), /*check_file_type=*/true)) {
+    *oat_filename = apex_data_file;
+    return true;
+  }
 
   // If ANDROID_DATA is not set, return false instead of aborting.
   // This can occur for preopt when using a class loader context.

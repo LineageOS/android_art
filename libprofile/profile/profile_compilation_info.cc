@@ -726,11 +726,7 @@ bool ProfileCompilationInfo::AddMethod(const ProfileMethodInfo& pmi,
     return true;
   }
 
-  // Add inline caches. Do this only for regular profiles. The boot image profiles don't use
-  // them and they take up useless space.
-  if (IsForBootImage()) {
-    return true;  // early success return.
-  }
+  // Add inline caches.
   InlineCacheMap* inline_cache = data->FindOrAddHotMethod(pmi.ref.index);
   DCHECK(inline_cache != nullptr);
 
@@ -739,14 +735,18 @@ bool ProfileCompilationInfo::AddMethod(const ProfileMethodInfo& pmi,
       FindOrAddDexPc(inline_cache, cache.dex_pc)->SetIsMissingTypes();
       continue;
     }
+    if  (cache.is_megamorphic) {
+      FindOrAddDexPc(inline_cache, cache.dex_pc)->SetIsMegamorphic();
+      continue;
+    }
     for (const TypeReference& class_ref : cache.classes) {
       DexFileData* class_dex_data = GetOrAddDexFileData(class_ref.dex_file, annotation);
       if (class_dex_data == nullptr) {  // checksum mismatch
         return false;
       }
       DexPcData* dex_pc_data = FindOrAddDexPc(inline_cache, cache.dex_pc);
-      if (dex_pc_data->is_missing_types) {
-        // Don't bother adding classes if we are missing types.
+      if (dex_pc_data->is_missing_types || dex_pc_data->is_megamorphic) {
+        // Don't bother adding classes if we are missing types or already megamorphic.
         break;
       }
       dex_pc_data->AddClass(class_dex_data->profile_index, class_ref.TypeIndex());
