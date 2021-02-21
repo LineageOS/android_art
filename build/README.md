@@ -37,15 +37,17 @@ the module. It is also mutually exclusive with the other ones.
 
     ```
     lunch art_module_<arch>
-    export SOONG_ALLOW_MISSING_DEPENDENCIES=true
     export TARGET_BUILD_APPS=com.android.art
+    export SOONG_ALLOW_MISSING_DEPENDENCIES=true
     ```
 
     For Google internal builds, specify instead the Google signed variant of the
-    module:
+    product and module:
 
     ```
+    lunch mainline_modules_<arch>
     export TARGET_BUILD_APPS=com.google.android.art
+    export SOONG_ALLOW_MISSING_DEPENDENCIES=true
     ```
 
     `<arch>` is the device architecture, one of `arm`, `arm64`, `x86`, or
