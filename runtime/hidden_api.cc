@@ -526,7 +526,7 @@ bool ShouldDenyAccessToMemberImpl(T* member, ApiList api_list, AccessMethod acce
           break;
         default:
           deny_access = IsSdkVersionSetAndMoreThan(runtime->GetTargetSdkVersion(),
-                                                         api_list.GetMaxAllowedSdkVersion());
+                                                   api_list.GetMaxAllowedSdkVersion());
       }
     }
   }
