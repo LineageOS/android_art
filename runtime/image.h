@@ -274,6 +274,8 @@ class PACKED(8) ImageHeader {
 
   ArtMethod* GetImageMethod(ImageMethod index) const;
 
+  static const char* GetImageSectionName(ImageSections index);
+
   ImageSection& GetImageSection(ImageSections index) {
     DCHECK_LT(static_cast<size_t>(index), kSectionCount);
     return sections_[index];
