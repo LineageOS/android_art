@@ -603,6 +603,14 @@ class Runtime {
     return core_platform_api_policy_;
   }
 
+  void SetTestApiEnforcementPolicy(hiddenapi::EnforcementPolicy policy) {
+    test_api_policy_ = policy;
+  }
+
+  hiddenapi::EnforcementPolicy GetTestApiEnforcementPolicy() const {
+    return test_api_policy_;
+  }
+
   void SetHiddenApiExemptions(const std::vector<std::string>& exemptions) {
     hidden_api_exemptions_ = exemptions;
   }
@@ -1230,6 +1238,9 @@ class Runtime {
 
   // Whether access checks on core platform API should be performed.
   hiddenapi::EnforcementPolicy core_platform_api_policy_;
+
+  // Whether access checks on test API should be performed.
+  hiddenapi::EnforcementPolicy test_api_policy_;
 
   // List of signature prefixes of methods that have been removed from the blacklist, and treated
   // as if whitelisted.
