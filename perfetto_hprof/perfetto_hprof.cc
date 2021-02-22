@@ -827,16 +827,6 @@ void DumpPerfetto(art::Thread* self) {
                   reference_object_ids->Reset();
                 });
 
-            for (const auto& p : interned_fields) {
-              const std::string& str = p.first;
-              uint64_t id = p.second;
-
-              perfetto::protos::pbzero::InternedString* field_proto =
-                writer.GetHeapGraph()->add_field_names();
-              field_proto->set_iid(id);
-              field_proto->set_str(
-                  reinterpret_cast<const uint8_t*>(str.c_str()), str.size());
-            }
             for (const auto& p : interned_locations) {
               const std::string& str = p.first;
               uint64_t id = p.second;
@@ -846,6 +836,16 @@ void DumpPerfetto(art::Thread* self) {
               location_proto->set_iid(id);
               location_proto->set_str(reinterpret_cast<const uint8_t*>(str.c_str()),
                                   str.size());
+            }
+            for (const auto& p : interned_fields) {
+              const std::string& str = p.first;
+              uint64_t id = p.second;
+
+              perfetto::protos::pbzero::InternedString* field_proto =
+                writer.GetHeapGraph()->add_field_names();
+              field_proto->set_iid(id);
+              field_proto->set_str(
+                  reinterpret_cast<const uint8_t*>(str.c_str()), str.size());
             }
 
             writer.Finalize();
