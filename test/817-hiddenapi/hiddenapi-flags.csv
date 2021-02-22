@@ -1,0 +1,2 @@
+LNotInAbstractParent;->methodPublicSdkNotInAbstractParent()I,blocked
+LOtherInterface;->methodPublicSdkNotInAbstractParent()I,blocked
