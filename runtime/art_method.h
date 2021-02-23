@@ -63,10 +63,6 @@ class Object;
 template <typename MirrorType> class ObjectArray;
 class PointerArray;
 class String;
-
-template <typename T> struct NativeDexCachePair;
-using MethodDexCachePair = NativeDexCachePair<ArtMethod>;
-using MethodDexCacheType = std::atomic<MethodDexCachePair>;
 }  // namespace mirror
 
 class ArtMethod final {
