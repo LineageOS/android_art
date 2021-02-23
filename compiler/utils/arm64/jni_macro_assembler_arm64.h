@@ -135,23 +135,20 @@ class Arm64JNIMacroAssembler final : public JNIMacroAssemblerFwd<Arm64Assembler,
   void GetCurrentThread(ManagedRegister dest) override;
   void GetCurrentThread(FrameOffset dest_offset) override;
 
-  // Set up out_reg to hold a Object** into the handle scope, or to be null if the
-  // value is null and null_allowed. in_reg holds a possibly stale reference
-  // that can be used to avoid loading the handle scope entry to see if the value is
-  // null.
-  void CreateHandleScopeEntry(ManagedRegister out_reg,
-                              FrameOffset handlescope_offset,
-                              ManagedRegister in_reg,
-                              bool null_allowed) override;
+  // Set up `out_reg` to hold a `jobject` (`StackReference<Object>*` to a spilled value),
+  // or to be null if the value is null and `null_allowed`. `in_reg` holds a possibly
+  // stale reference that can be used to avoid loading the spilled value to
+  // see if the value is null.
+  void CreateJObject(ManagedRegister out_reg,
+                     FrameOffset spilled_reference_offset,
+                     ManagedRegister in_reg,
+                     bool null_allowed) override;
 
-  // Set up out_off to hold a Object** into the handle scope, or to be null if the
-  // value is null and null_allowed.
-  void CreateHandleScopeEntry(FrameOffset out_off,
-                              FrameOffset handlescope_offset,
-                              bool null_allowed) override;
-
-  // src holds a handle scope entry (Object**) load this into dst.
-  void LoadReferenceFromHandleScope(ManagedRegister dst, ManagedRegister src) override;
+  // Set up `out_off` to hold a `jobject` (`StackReference<Object>*` to a spilled value),
+  // or to be null if the value is null and `null_allowed`.
+  void CreateJObject(FrameOffset out_off,
+                     FrameOffset spilled_reference_offset,
+                     bool null_allowed) override;
 
   // Heap::VerifyObject on src. In some cases (such as a reference to this) we
   // know that src may not be null.

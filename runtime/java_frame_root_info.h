@@ -41,6 +41,8 @@ class JavaFrameRootInfo final : public RootInfo {
   static constexpr size_t kMethodDeclaringClass = -3;
   // The root is from the argument to a Proxy invoke.
   static constexpr size_t kProxyReferenceArgument = -4;
+  // The root is from the argument to a native invoke.
+  static constexpr size_t kNativeReferenceArgument = -5;
   // The maximum precise vreg number
   static constexpr size_t kMaxVReg = std::numeric_limits<uint16_t>::max();
 
