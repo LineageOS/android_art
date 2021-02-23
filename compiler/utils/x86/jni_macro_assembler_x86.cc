@@ -308,18 +308,28 @@ void X86JNIMacroAssembler::MoveArguments(ArrayRef<ArgumentLocation> dests,
     const ArgumentLocation& src = srcs[i];
     const ArgumentLocation& dest = dests[i];
     DCHECK_EQ(src.GetSize(), dest.GetSize());
-    if (UNLIKELY(dest.IsRegister())) {
-      // Native ABI has only stack arguments but we may pass one "hidden arg" in register.
-      CHECK(!found_hidden_arg);
-      found_hidden_arg = true;
-      CHECK(src.IsRegister());
-      Move(dest.GetRegister(), src.GetRegister(), dest.GetSize());
-    } else {
-      if (src.IsRegister()) {
-        Store(dest.GetFrameOffset(), src.GetRegister(), dest.GetSize());
+    if (src.IsRegister()) {
+      if (UNLIKELY(dest.IsRegister())) {
+        // Native ABI has only stack arguments but we may pass one "hidden arg" in register.
+        CHECK(!found_hidden_arg);
+        found_hidden_arg = true;
+        DCHECK(
+            !dest.GetRegister().Equals(X86ManagedRegister::FromCpuRegister(GetScratchRegister())));
+        Move(dest.GetRegister(), src.GetRegister(), dest.GetSize());
       } else {
-        Copy(dest.GetFrameOffset(), src.GetFrameOffset(), dest.GetSize());
+        Store(dest.GetFrameOffset(), src.GetRegister(), dest.GetSize());
       }
+    } else {
+      // Delay copying until we have spilled all registers, including the scratch register ECX.
+    }
+  }
+  for (size_t i = 0, arg_count = srcs.size(); i != arg_count; ++i) {
+    const ArgumentLocation& src = srcs[i];
+    const ArgumentLocation& dest = dests[i];
+    DCHECK_EQ(src.GetSize(), dest.GetSize());
+    if (!src.IsRegister()) {
+      DCHECK(!dest.IsRegister());
+      Copy(dest.GetFrameOffset(), src.GetFrameOffset(), dest.GetSize());
     }
   }
 }

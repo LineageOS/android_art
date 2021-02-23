@@ -246,15 +246,23 @@ class JniCompilerTest : public CommonCompilerTest {
                       const char* method_name,
                       const char* method_sig) {
     ScopedObjectAccess soa(Thread::Current());
-    StackHandleScope<1> hs(soa.Self());
+    StackHandleScope<2> hs(soa.Self());
     Handle<mirror::ClassLoader> loader(
         hs.NewHandle(soa.Decode<mirror::ClassLoader>(class_loader)));
     // Compile the native method before starting the runtime
-    ObjPtr<mirror::Class> c = class_linker_->FindClass(soa.Self(), "LMyClassNatives;", loader);
+    Handle<mirror::Class> c =
+        hs.NewHandle(class_linker_->FindClass(soa.Self(), "LMyClassNatives;", loader));
     const auto pointer_size = class_linker_->GetImagePointerSize();
     ArtMethod* method = c->FindClassMethod(method_name, method_sig, pointer_size);
     ASSERT_TRUE(method != nullptr) << method_name << " " << method_sig;
     ASSERT_EQ(direct, method->IsDirect()) << method_name << " " << method_sig;
+    if (direct) {
+      // Class initialization could replace the entrypoint, so force
+      // the initialization before we set up the entrypoint below.
+      class_linker_->EnsureInitialized(
+          soa.Self(), c, /*can_init_fields=*/ true, /*can_init_parents=*/ true);
+      class_linker_->MakeInitializedClassesVisiblyInitialized(soa.Self(), /*wait=*/ true);
+    }
     if (check_generic_jni_) {
       method->SetEntryPointFromQuickCompiledCode(class_linker_->GetRuntimeQuickGenericJniStub());
     } else {
