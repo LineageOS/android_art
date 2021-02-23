@@ -26,7 +26,6 @@
 #pragma clang diagnostic error "-Wconversion"
 
 namespace {
-constexpr const char* kServerConfigurableFlagsPrefix = "persist.device_config.runtime_native_boot.";
 constexpr const char* kUndefinedValue = "UNSET";
 
 // The various ParseValue functions store the parsed value into *destination. If parsing fails for
@@ -72,11 +71,6 @@ Flag<Value>::Flag(const std::string& name, Value default_value) : default_{defau
   std::replace(command_line_argument_name_.begin(), command_line_argument_name_.end(), '.', '-');
   system_property_name_ = "dalvik.vm." + name;
 
-  std::string server_setting = name;
-  std::replace(server_setting.begin(), server_setting.end(), '.', '_');
-  std::replace(server_setting.begin(), server_setting.end(), '-', '_');
-  server_setting_name_ = kServerConfigurableFlagsPrefix + server_setting;
-
   ALL_FLAGS.push_front(this);
 }
 
@@ -99,9 +93,6 @@ std::optional<Value> Flag<Value>::GetOptional() {
   if (!initialized_) {
     Reload();
   }
-  if (from_server_setting_.has_value()) {
-    return from_server_setting_.value();
-  }
   if (from_system_property_.has_value()) {
     return from_system_property_.value();
   }
@@ -112,17 +103,6 @@ template <typename Value>
 void Flag<Value>::Reload() {
   initialized_ = true;
   // Command line argument cannot be reloaded. It must be set during initial command line parsing.
-
-  // Check the server-side configuration
-  from_server_setting_ = std::nullopt;
-  // Read the device_config setting directly to avoid a dependency on server_configurable_flags.
-  const std::string server_config =
-      ::android::base::GetProperty(server_setting_name_, kUndefinedValue);
-  if (server_config != kUndefinedValue) {
-    ParseValue(server_config, &from_server_setting_);
-    // Don't bother checking system properties if we have a server-configured value.
-    return;
-  }
 
   // Check system properties
   from_system_property_ = std::nullopt;
