@@ -1338,7 +1338,7 @@ bool Thread::InitStackHwm() {
 
     tlsPtr_.stack_begin += read_guard_size + kStackOverflowProtectedSize;
     tlsPtr_.stack_end += read_guard_size + kStackOverflowProtectedSize;
-    tlsPtr_.stack_size -= read_guard_size;
+    tlsPtr_.stack_size -= read_guard_size + kStackOverflowProtectedSize;
 
     InstallImplicitProtection();
   }
@@ -2541,16 +2541,82 @@ void Thread::RemoveFromThreadGroup(ScopedObjectAccessAlreadyRunnable& soa) {
   }
 }
 
-bool Thread::HandleScopeContains(jobject obj) const {
-  StackReference<mirror::Object>* hs_entry =
-      reinterpret_cast<StackReference<mirror::Object>*>(obj);
-  for (BaseHandleScope* cur = tlsPtr_.top_handle_scope; cur!= nullptr; cur = cur->GetLink()) {
-    if (cur->Contains(hs_entry)) {
+template <bool kPointsToStack>
+class JniTransitionReferenceVisitor : public StackVisitor {
+ public:
+  JniTransitionReferenceVisitor(Thread* thread, void* obj) REQUIRES_SHARED(Locks::mutator_lock_)
+      : StackVisitor(thread, /*context=*/ nullptr, StackVisitor::StackWalkKind::kSkipInlinedFrames),
+        obj_(obj),
+        found_(false) {}
+
+  bool VisitFrame() override REQUIRES_SHARED(Locks::mutator_lock_) {
+    ArtMethod* m = GetMethod();
+    if (!m->IsNative() || m->IsCriticalNative()) {
+      return true;
+    }
+    if (kPointsToStack) {
+      uint8_t* sp = reinterpret_cast<uint8_t*>(GetCurrentQuickFrame());
+      size_t frame_size = GetCurrentQuickFrameInfo().FrameSizeInBytes();
+      uint32_t* current_vreg = reinterpret_cast<uint32_t*>(sp + frame_size + sizeof(ArtMethod*));
+      if (!m->IsStatic()) {
+        if (current_vreg == obj_) {
+          found_ = true;
+          return false;
+        }
+        current_vreg += 1u;
+      }
+      const char* shorty = m->GetShorty();
+      for (size_t i = 1, len = strlen(shorty); i != len; ++i) {
+        switch (shorty[i]) {
+          case 'D':
+          case 'J':
+            current_vreg += 2u;
+            break;
+          case 'L':
+            if (current_vreg == obj_) {
+              found_ = true;
+              return false;
+            }
+            FALLTHROUGH_INTENDED;
+          default:
+            current_vreg += 1u;
+            break;
+        }
+      }
+      // Continue only if the object is somewhere higher on the stack.
+      return obj_ >= current_vreg;
+    } else {  // if (kPointsToStack)
+      if (m->IsStatic() && obj_ == m->GetDeclaringClassAddressWithoutBarrier()) {
+        found_ = true;
+        return false;
+      }
       return true;
     }
   }
-  // JNI code invoked from portable code uses shadow frames rather than the handle scope.
-  return tlsPtr_.managed_stack.ShadowFramesContain(hs_entry);
+
+  bool Found() const {
+    return found_;
+  }
+
+ private:
+  void* obj_;
+  bool found_;
+};
+
+bool Thread::IsJniTransitionReference(jobject obj) const {
+  DCHECK(obj != nullptr);
+  // We need a non-const pointer for stack walk even if we're not modifying the thread state.
+  Thread* thread = const_cast<Thread*>(this);
+  uint8_t* raw_obj = reinterpret_cast<uint8_t*>(obj);
+  if (static_cast<size_t>(raw_obj - tlsPtr_.stack_begin) < tlsPtr_.stack_size) {
+    JniTransitionReferenceVisitor</*kPointsToStack=*/ true> visitor(thread, raw_obj);
+    visitor.WalkStack();
+    return visitor.Found();
+  } else {
+    JniTransitionReferenceVisitor</*kPointsToStack=*/ false> visitor(thread, raw_obj);
+    visitor.WalkStack();
+    return visitor.Found();
+  }
 }
 
 void Thread::HandleScopeVisitRoots(RootVisitor* visitor, uint32_t thread_id) {
@@ -2574,10 +2640,12 @@ ObjPtr<mirror::Object> Thread::DecodeJObject(jobject obj) const {
     IndirectReferenceTable& locals = tlsPtr_.jni_env->locals_;
     // Local references do not need a read barrier.
     result = locals.Get<kWithoutReadBarrier>(ref);
-  } else if (kind == kHandleScopeOrInvalid) {
-    // Read from handle scope.
-    DCHECK(HandleScopeContains(obj));
-    result = reinterpret_cast<StackReference<mirror::Object>*>(obj)->AsMirrorPtr();
+  } else if (kind == kJniTransitionOrInvalid) {
+    // The `jclass` for a static method points to the CompressedReference<> in the
+    // `ArtMethod::declaring_class_`. Other `jobject` arguments point to spilled stack
+    // references but a StackReference<> is just a subclass of CompressedReference<>.
+    DCHECK(IsJniTransitionReference(obj));
+    result = reinterpret_cast<mirror::CompressedReference<mirror::Object>*>(obj)->AsMirrorPtr();
     VerifyObject(result);
   } else if (kind == kGlobal) {
     result = tlsPtr_.jni_env->vm_->DecodeGlobal(ref);
@@ -3808,8 +3876,63 @@ class ReferenceMapVisitor : public StackVisitor {
     ArtMethod* m = *cur_quick_frame;
     VisitDeclaringClass(m);
 
-    // Process register map (which native and runtime methods don't have)
-    if (!m->IsNative() && !m->IsRuntimeMethod() && (!m->IsProxyMethod() || m->IsConstructor())) {
+    if (m->IsNative()) {
+      // TODO: Spill the `this` reference in the AOT-compiled String.charAt()
+      // slow-path for throwing SIOOBE, so that we can remove this carve-out.
+      if (UNLIKELY(m->IsIntrinsic()) &&
+          m->GetIntrinsic() == enum_cast<uint32_t>(Intrinsics::kStringCharAt)) {
+        // The String.charAt() method is AOT-compiled with an intrinsic implementation
+        // instead of a JNI stub. It has a slow path that constructs a runtime frame
+        // for throwing SIOOBE and in that path we do not get the `this` pointer
+        // spilled on the stack, so there is nothing to visit. We can distinguish
+        // this from the GenericJni path by checking that the PC is in the boot image
+        // (PC shall be known thanks to the runtime frame for throwing SIOOBE).
+        // Note that JIT does not emit that intrinic implementation.
+        const void* pc = reinterpret_cast<const void*>(GetCurrentQuickFramePc());
+        if (pc != 0u && Runtime::Current()->GetHeap()->IsInBootImageOatFile(pc)) {
+          return;
+        }
+      }
+      // Native methods spill their arguments to the reserved vregs in the caller's frame
+      // and use pointers to these stack references as jobject, jclass, jarray, etc.
+      // Note: We can come here for a @CriticalNative method when it needs to resolve the
+      // target native function but there would be no references to visit below.
+      const size_t frame_size = GetCurrentQuickFrameInfo().FrameSizeInBytes();
+      const size_t method_pointer_size = static_cast<size_t>(kRuntimePointerSize);
+      uint32_t* current_vreg = reinterpret_cast<uint32_t*>(
+          reinterpret_cast<uint8_t*>(cur_quick_frame) + frame_size + method_pointer_size);
+      auto visit = [&]() REQUIRES_SHARED(Locks::mutator_lock_) {
+        auto* ref_addr = reinterpret_cast<StackReference<mirror::Object>*>(current_vreg);
+        mirror::Object* ref = ref_addr->AsMirrorPtr();
+        if (ref != nullptr) {
+          mirror::Object* new_ref = ref;
+          visitor_(&new_ref, /* vreg= */ JavaFrameRootInfo::kNativeReferenceArgument, this);
+          if (ref != new_ref) {
+            ref_addr->Assign(new_ref);
+          }
+        }
+      };
+      const char* shorty = m->GetShorty();
+      if (!m->IsStatic()) {
+        visit();
+        current_vreg += 1u;
+      }
+      for (shorty += 1u; *shorty != 0; ++shorty) {
+        switch (*shorty) {
+          case 'D':
+          case 'J':
+            current_vreg += 2u;
+            break;
+          case 'L':
+            visit();
+            FALLTHROUGH_INTENDED;
+          default:
+            current_vreg += 1u;
+            break;
+        }
+      }
+    } else if (!m->IsRuntimeMethod() && (!m->IsProxyMethod() || m->IsConstructor())) {
+      // Process register map (which native, runtime and proxy methods don't have)
       const OatQuickMethodHeader* method_header = GetCurrentOatQuickMethodHeader();
       DCHECK(method_header->IsOptimized());
       StackReference<mirror::Object>* vreg_base =

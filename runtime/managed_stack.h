@@ -119,10 +119,6 @@ class PACKED(4) ManagedStack {
     return OFFSETOF_MEMBER(ManagedStack, top_shadow_frame_);
   }
 
-  size_t NumJniShadowFrameReferences() const REQUIRES_SHARED(Locks::mutator_lock_);
-
-  bool ShadowFramesContain(StackReference<mirror::Object>* shadow_frame_entry) const;
-
  private:
   // Encodes the top quick frame (which must be at least 4-byte aligned)
   // and a flag that marks the GenericJNI trampoline.

@@ -91,11 +91,11 @@ typedef void* IndirectRef;
 //
 // For convenience these match up with enum jobjectRefType from jni.h.
 enum IndirectRefKind {
-  kHandleScopeOrInvalid = 0,           // <<stack indirect reference table or invalid reference>>
-  kLocal                = 1,           // <<local reference>>
-  kGlobal               = 2,           // <<global reference>>
-  kWeakGlobal           = 3,           // <<weak global reference>>
-  kLastKind             = kWeakGlobal
+  kJniTransitionOrInvalid = 0,  // <<JNI transition frame reference or invalid reference>>
+  kLocal                  = 1,  // <<local reference>>
+  kGlobal                 = 2,  // <<global reference>>
+  kWeakGlobal             = 3,  // <<weak global reference>>
+  kLastKind               = kWeakGlobal
 };
 std::ostream& operator<<(std::ostream& os, IndirectRefKind rhs);
 const char* GetIndirectRefKindString(const IndirectRefKind& kind);
