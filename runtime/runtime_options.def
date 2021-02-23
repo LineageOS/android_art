@@ -79,6 +79,9 @@ RUNTIME_OPTIONS_KEY (bool,                UseJitCompilation,              true)
 RUNTIME_OPTIONS_KEY (bool,                UseProfiledJitCompilation,      false)
 RUNTIME_OPTIONS_KEY (bool,                DumpNativeStackOnSigQuit,       true)
 RUNTIME_OPTIONS_KEY (bool,                MadviseRandomAccess,            false)
+RUNTIME_OPTIONS_KEY (unsigned int,        MadviseWillNeedVdexFileSize,    0)
+RUNTIME_OPTIONS_KEY (unsigned int,        MadviseWillNeedOdexFileSize,    0)
+RUNTIME_OPTIONS_KEY (unsigned int,        MadviseWillNeedArtFileSize,     0)
 RUNTIME_OPTIONS_KEY (JniIdType,           OpaqueJniIds,                   JniIdType::kDefault)  // -Xopaque-jni-ids:{true, false, swapable}
 RUNTIME_OPTIONS_KEY (bool,                AutoPromoteOpaqueJniIds,        true)  // testing use only. -Xauto-promote-opaque-jni-ids:{true, false}
 RUNTIME_OPTIONS_KEY (unsigned int,        JITCompileThreshold)

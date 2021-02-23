@@ -1,0 +1,1 @@
+Verify that passing madvise size limits argument to ART does not cause a crash

@@ -284,6 +284,9 @@ Runtime::Runtime()
       experimental_flags_(ExperimentalFlags::kNone),
       oat_file_manager_(nullptr),
       is_low_memory_mode_(false),
+      madvise_willneed_vdex_filesize_(0),
+      madvise_willneed_odex_filesize_(0),
+      madvise_willneed_art_filesize_(0),
       safe_mode_(false),
       hidden_api_policy_(hiddenapi::EnforcementPolicy::kDisabled),
       core_platform_api_policy_(hiddenapi::EnforcementPolicy::kDisabled),
@@ -1387,6 +1390,9 @@ bool Runtime::Init(RuntimeArgumentMap&& runtime_options_in) {
   experimental_flags_ = runtime_options.GetOrDefault(Opt::Experimental);
   is_low_memory_mode_ = runtime_options.Exists(Opt::LowMemoryMode);
   madvise_random_access_ = runtime_options.GetOrDefault(Opt::MadviseRandomAccess);
+  madvise_willneed_vdex_filesize_ = runtime_options.GetOrDefault(Opt::MadviseWillNeedVdexFileSize);
+  madvise_willneed_odex_filesize_ = runtime_options.GetOrDefault(Opt::MadviseWillNeedOdexFileSize);
+  madvise_willneed_art_filesize_ = runtime_options.GetOrDefault(Opt::MadviseWillNeedArtFileSize);
 
   jni_ids_indirection_ = runtime_options.GetOrDefault(Opt::OpaqueJniIds);
   automatically_set_jni_ids_indirection_ =
@@ -3124,6 +3130,52 @@ void Runtime::ProcessWeakClass(GcRoot<mirror::Class>* root_ptr,
     } else {
       // The class loader is not live, clear the entry.
       *root_ptr = GcRoot<mirror::Class>(update);
+    }
+  }
+}
+
+void Runtime::MadviseFileForRange(size_t madvise_size_limit_bytes,
+                                  size_t map_size_bytes,
+                                  const uint8_t* map_begin,
+                                  const uint8_t* map_end,
+                                  const std::string& file_name) {
+  // Ideal blockTransferSize for madvising files (128KiB)
+  static constexpr size_t kIdealIoTransferSizeBytes = 128*1024;
+
+  size_t target_size_bytes = std::min<size_t>(map_size_bytes, madvise_size_limit_bytes);
+
+  if (target_size_bytes > 0) {
+    ScopedTrace madvising_trace("madvising "
+                                + file_name
+                                + " size="
+                                + std::to_string(target_size_bytes));
+
+    // Based on requested size (target_size_bytes)
+    const uint8_t* target_pos = map_begin + target_size_bytes;
+
+    // Clamp endOfFile if its past map_end
+    if (target_pos < map_end) {
+        target_pos = map_end;
+    }
+
+    // Madvise the whole file up to target_pos in chunks of
+    // kIdealIoTransferSizeBytes (to MADV_WILLNEED)
+    // Note:
+    // madvise(MADV_WILLNEED) will prefetch max(fd readahead size, optimal
+    // block size for device) per call, hence the need for chunks. (128KB is a
+    // good default.)
+    for (const uint8_t* madvise_start = map_begin;
+         madvise_start < target_pos;
+         madvise_start += kIdealIoTransferSizeBytes) {
+      void* madvise_addr = const_cast<void*>(reinterpret_cast<const void*>(madvise_start));
+      size_t madvise_length = std::min(kIdealIoTransferSizeBytes,
+                                       static_cast<size_t>(target_pos - madvise_start));
+      int status = madvise(madvise_addr, madvise_length, MADV_WILLNEED);
+      // In case of error we stop madvising rest of the file
+      if (status < 0) {
+        LOG(ERROR) << "Failed to madvise file:" << file_name << " for size:" << map_size_bytes;
+        break;
+      }
     }
   }
 }
