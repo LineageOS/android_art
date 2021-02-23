@@ -2487,9 +2487,11 @@ jvmtiError Redefiner::Run() {
   // At this point we can no longer fail without corrupting the runtime state.
   for (RedefinitionDataIter data = holder.begin(); data != holder.end(); ++data) {
     art::ClassLinker* cl = runtime_->GetClassLinker();
-    cl->RegisterExistingDexCache(data.GetNewDexCache(), data.GetSourceClassLoader());
     if (data.GetSourceClassLoader() == nullptr) {
+      // AppendToBootClassPath includes dex file registration.
       cl->AppendToBootClassPath(self_, &data.GetRedefinition().GetDexFile());
+    } else {
+      cl->RegisterExistingDexCache(data.GetNewDexCache(), data.GetSourceClassLoader());
     }
   }
   UnregisterAllBreakpoints();
