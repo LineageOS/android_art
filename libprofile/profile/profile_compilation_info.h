@@ -106,7 +106,8 @@ class ProfileCompilationInfo {
 
     bool MatchesDex(const DexFile* dex_file) const {
       return dex_checksum == dex_file->GetLocationChecksum() &&
-           profile_key == GetProfileDexFileBaseKey(dex_file->GetLocation());
+             GetBaseKeyFromAugmentedKey(profile_key) ==
+                 GetProfileDexFileBaseKey(dex_file->GetLocation());
     }
 
     std::string profile_key;
