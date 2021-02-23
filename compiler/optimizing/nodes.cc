@@ -3204,6 +3204,8 @@ bool HInvokeVirtual::CanDoImplicitNullCheckOn(HInstruction* obj) const {
     return false;
   }
   switch (GetIntrinsic()) {
+    case Intrinsics::kNone:
+      return true;
     case Intrinsics::kReferenceRefersTo:
       return true;
     default:
