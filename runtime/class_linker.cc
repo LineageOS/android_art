@@ -43,6 +43,7 @@
 #include "base/hash_set.h"
 #include "base/leb128.h"
 #include "base/logging.h"
+#include "base/metrics/metrics.h"
 #include "base/mutex-inl.h"
 #include "base/os.h"
 #include "base/quasi_atomic.h"
@@ -3065,6 +3066,7 @@ ObjPtr<mirror::Class> ClassLinker::DefineClass(Thread* self,
                                                const dex::ClassDef& dex_class_def) {
   ScopedDefiningClass sdc(self);
   StackHandleScope<3> hs(self);
+  metrics::AutoTimer timer{GetMetrics()->ClassLoadingTotalTime()};
   auto klass = hs.NewHandle<mirror::Class>(nullptr);
 
   // Load the class from the dex file.
