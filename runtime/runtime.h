@@ -967,6 +967,8 @@ class Runtime {
 
   metrics::ArtMetrics* GetMetrics() { return &metrics_; }
 
+  void RequestMetricsReport(bool synchronous = true);
+
  private:
   static void InitPlatformSignalHandlers();
 

@@ -1857,6 +1857,12 @@ void Runtime::InitMetrics(const RuntimeArgumentMap& runtime_options) {
   metrics_reporter_ = metrics::MetricsReporter::Create(metrics_config, this);
 }
 
+void Runtime::RequestMetricsReport(bool synchronous) {
+  if (metrics_reporter_) {
+    metrics_reporter_->RequestMetricsReport(synchronous);
+  }
+}
+
 bool Runtime::EnsurePluginLoaded(const char* plugin_name, std::string* error_msg) {
   // Is the plugin already loaded?
   for (const Plugin& p : plugins_) {

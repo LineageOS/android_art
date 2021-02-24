@@ -83,6 +83,11 @@ class MetricsReporter {
   // has been started.
   void SetReportingPeriod(unsigned int period_seconds);
 
+  // Requests a metrics report
+  //
+  // If synchronous is set to true, this function will block until the report has completed.
+  void RequestMetricsReport(bool synchronous = true);
+
   static constexpr const char* kBackgroundThreadName = "Metrics Background Reporting Thread";
 
  private:
@@ -114,7 +119,24 @@ class MetricsReporter {
   // backends.
   struct BeginSessionMessage{ SessionData session_data; };
 
-  MessageQueue<ShutdownRequestedMessage, StartupCompletedMessage, BeginSessionMessage> messages_;
+  // A message requesting an explicit metrics report.
+  //
+  // The synchronous field specifies whether the reporting thread will send a message back when
+  // reporting is complete.
+  struct RequestMetricsReportMessage {
+    bool synchronous;
+  };
+
+  MessageQueue<ShutdownRequestedMessage,
+               StartupCompletedMessage,
+               BeginSessionMessage,
+               RequestMetricsReportMessage>
+      messages_;
+
+  // A message indicating a requested report has been finished.
+  struct ReportCompletedMessage {};
+
+  MessageQueue<ReportCompletedMessage> thread_to_host_messages_;
 };
 
 }  // namespace metrics
