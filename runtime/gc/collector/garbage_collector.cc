@@ -69,6 +69,7 @@ GarbageCollector::GarbageCollector(Heap* heap, const std::string& name)
       pause_histogram_((name_ + " paused").c_str(), kPauseBucketSize, kPauseBucketCount),
       rss_histogram_((name_ + " peak-rss").c_str(), kMemBucketSize, kMemBucketCount),
       freed_bytes_histogram_((name_ + " freed-bytes").c_str(), kMemBucketSize, kMemBucketCount),
+      gc_time_histogram_(nullptr),
       cumulative_timings_(name),
       pause_histogram_lock_("pause histogram lock", kDefaultMutexLevel, true),
       is_transaction_active_(false) {
@@ -177,10 +178,18 @@ void GarbageCollector::Run(GcCause gc_cause, bool clear_soft_references) {
     RegisterPause(current_iteration->GetDurationNs());
   }
   total_time_ns_ += current_iteration->GetDurationNs();
+  if (gc_time_histogram_ != nullptr) {
+    // Report GC time in milliseconds.
+    gc_time_histogram_->Add(NsToMs(current_iteration->GetDurationNs()));
+  }
+  uint64_t total_pause_time = 0;
   for (uint64_t pause_time : current_iteration->GetPauseTimes()) {
     MutexLock mu(self, pause_histogram_lock_);
     pause_histogram_.AdjustAndAddValue(pause_time);
+    total_pause_time += pause_time;
   }
+  // Report STW pause time in microseconds.
+  GetMetrics()->MutatorPauseTimeDuringGC()->Add(total_pause_time / 1'000);
   is_transaction_active_ = false;
 }
 
