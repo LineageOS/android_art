@@ -169,13 +169,13 @@ TEST_F(ArmVIXLAssemblerTest, VixlJniHelpers) {
   __ Move(hidden_arg_register, method_register, 4);
   __ VerifyObject(scratch_register, false);
 
-  __ CreateHandleScopeEntry(scratch_register, FrameOffset(48), scratch_register, true);
-  __ CreateHandleScopeEntry(scratch_register, FrameOffset(48), scratch_register, false);
-  __ CreateHandleScopeEntry(method_register, FrameOffset(48), scratch_register, true);
-  __ CreateHandleScopeEntry(FrameOffset(48), FrameOffset(64), true);
-  __ CreateHandleScopeEntry(method_register, FrameOffset(0), scratch_register, true);
-  __ CreateHandleScopeEntry(method_register, FrameOffset(1025), scratch_register, true);
-  __ CreateHandleScopeEntry(scratch_register, FrameOffset(1025), scratch_register, true);
+  __ CreateJObject(scratch_register, FrameOffset(48), scratch_register, true);
+  __ CreateJObject(scratch_register, FrameOffset(48), scratch_register, false);
+  __ CreateJObject(method_register, FrameOffset(48), scratch_register, true);
+  __ CreateJObject(FrameOffset(48), FrameOffset(64), true);
+  __ CreateJObject(method_register, FrameOffset(0), scratch_register, true);
+  __ CreateJObject(method_register, FrameOffset(1025), scratch_register, true);
+  __ CreateJObject(scratch_register, FrameOffset(1025), scratch_register, true);
 
   __ ExceptionPoll(0);
 

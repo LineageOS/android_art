@@ -150,19 +150,11 @@ ObjPtr<mirror::Object> StackVisitor::GetThisObject() const {
     return nullptr;
   } else if (m->IsNative()) {
     if (cur_quick_frame_ != nullptr) {
-      HandleScope* hs;
-      if (cur_oat_quick_method_header_ != nullptr) {
-        hs = reinterpret_cast<HandleScope*>(
-            reinterpret_cast<char*>(cur_quick_frame_) + sizeof(ArtMethod*));
-      } else {
-        // GenericJNI frames have the HandleScope under the managed frame.
-        uint32_t shorty_len;
-        const char* shorty = m->GetShorty(&shorty_len);
-        const size_t num_handle_scope_references =
-            /* this */ 1u + std::count(shorty + 1, shorty + shorty_len, 'L');
-        hs = GetGenericJniHandleScope(cur_quick_frame_, num_handle_scope_references);
-      }
-      return hs->GetReference(0);
+      // The `this` reference is stored in the first out vreg in the caller's frame.
+      const size_t frame_size = GetCurrentQuickFrameInfo().FrameSizeInBytes();
+      auto* stack_ref = reinterpret_cast<StackReference<mirror::Object>*>(
+          reinterpret_cast<uint8_t*>(cur_quick_frame_) + frame_size + sizeof(ArtMethod*));
+      return stack_ref->AsMirrorPtr();
     } else {
       return cur_shadow_frame_->GetVRegReference(0);
     }

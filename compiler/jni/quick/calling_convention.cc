@@ -19,6 +19,7 @@
 #include <android-base/logging.h>
 
 #include "arch/instruction_set.h"
+#include "indirect_reference_table.h"
 
 #ifdef ART_ENABLE_CODEGEN_arm
 #include "jni/quick/arm/calling_convention_arm.h"
@@ -173,25 +174,24 @@ size_t JniCallingConvention::ReferenceCount() const {
 }
 
 FrameOffset JniCallingConvention::SavedLocalReferenceCookieOffset() const {
-  size_t references_size = handle_scope_pointer_size_ * ReferenceCount();  // size excluding header
-  return FrameOffset(HandleReferencesOffset().Int32Value() + references_size);
+  // The cookie goes after the method pointer.
+  DCHECK_EQ(SavedLocalReferenceCookieSize(), sizeof(IRTSegmentState));
+  DCHECK(HasLocalReferenceSegmentState());
+  return FrameOffset(displacement_.SizeValue() + static_cast<size_t>(frame_pointer_size_));
 }
 
 FrameOffset JniCallingConvention::ReturnValueSaveLocation() const {
-  if (LIKELY(HasHandleScope())) {
-    // Initial offset already includes the displacement.
-    // -- Remove the additional local reference cookie offset if we don't have a handle scope.
-    const size_t saved_local_reference_cookie_offset =
-        SavedLocalReferenceCookieOffset().Int32Value();
-    // Segment state is 4 bytes long
-    const size_t segment_state_size = 4;
-    return FrameOffset(saved_local_reference_cookie_offset + segment_state_size);
-  } else {
-    // Include only the initial Method* as part of the offset.
-    CHECK_LT(displacement_.SizeValue(),
-             static_cast<size_t>(std::numeric_limits<int32_t>::max()));
-    return FrameOffset(displacement_.Int32Value() + static_cast<size_t>(frame_pointer_size_));
+  // The saved return value goes at a properly aligned slot after the cookie.
+  DCHECK(SpillsReturnValue());
+  size_t cookie_offset = SavedLocalReferenceCookieOffset().SizeValue() - displacement_.SizeValue();
+  size_t return_value_offset = cookie_offset + SavedLocalReferenceCookieSize();
+  const size_t return_value_size = SizeOfReturnValue();
+  DCHECK(return_value_size == 4u || return_value_size == 8u) << return_value_size;
+  DCHECK_ALIGNED(return_value_offset, 4u);
+  if (return_value_size == 8u) {
+    return_value_offset = RoundUp(return_value_offset, 8u);
   }
+  return FrameOffset(displacement_.SizeValue() + return_value_offset);
 }
 
 bool JniCallingConvention::HasNext() {
@@ -283,16 +283,6 @@ bool JniCallingConvention::IsCurrentParamALong() {
     int arg_pos = GetIteratorPositionWithinShorty();
     return IsParamALong(arg_pos);
   }
-}
-
-// Return position of handle scope entry holding reference at the current iterator
-// position
-FrameOffset JniCallingConvention::CurrentParamHandleScopeEntryOffset() {
-  CHECK(IsCurrentParamAReference());
-  CHECK_LT(HandleScopeLinkOffset(), HandleScopeNumRefsOffset());
-  int result = HandleReferencesOffset().Int32Value() + itr_refs_ * handle_scope_pointer_size_;
-  CHECK_GT(result, HandleScopeNumRefsOffset().Int32Value());
-  return FrameOffset(result);
 }
 
 size_t JniCallingConvention::CurrentParamSize() const {
