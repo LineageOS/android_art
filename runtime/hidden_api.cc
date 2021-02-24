@@ -512,9 +512,13 @@ bool ShouldDenyAccessToMemberImpl(T* member, ApiList api_list, AccessMethod acce
     return false;
   }
 
+  EnforcementPolicy testApiPolicy = runtime->GetTestApiEnforcementPolicy();
+
   bool deny_access = false;
   if (hiddenApiPolicy == EnforcementPolicy::kEnabled) {
-    if (api_list.IsTestApi() && compatFramework.IsChangeEnabled(kAllowTestApiAccess)) {
+    if (api_list.IsTestApi() &&
+      (testApiPolicy == EnforcementPolicy::kDisabled ||
+        compatFramework.IsChangeEnabled(kAllowTestApiAccess))) {
       deny_access = false;
     } else {
       switch (api_list.GetMaxAllowedSdkVersion()) {
