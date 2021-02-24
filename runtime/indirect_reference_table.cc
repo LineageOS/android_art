@@ -43,8 +43,8 @@ static constexpr size_t kMaxTableSizeInBytes = 128 * MB;
 
 const char* GetIndirectRefKindString(const IndirectRefKind& kind) {
   switch (kind) {
-    case kHandleScopeOrInvalid:
-      return "HandleScopeOrInvalid";
+    case kJniTransitionOrInvalid:
+      return "JniTransitionOrInvalid";
     case kLocal:
       return "Local";
     case kGlobal:
@@ -76,7 +76,7 @@ IndirectReferenceTable::IndirectReferenceTable(size_t max_count,
       current_num_holes_(0),
       resizable_(resizable) {
   CHECK(error_msg != nullptr);
-  CHECK_NE(desired_kind, kHandleScopeOrInvalid);
+  CHECK_NE(desired_kind, kJniTransitionOrInvalid);
 
   // Overflow and maximum check.
   CHECK_LE(max_count, kMaxTableSizeInBytes / sizeof(IrtEntry));
@@ -361,13 +361,16 @@ bool IndirectReferenceTable::Remove(IRTSegmentState previous_state, IndirectRef 
 
   DCHECK(table_ != nullptr);
 
-  if (GetIndirectRefKind(iref) == kHandleScopeOrInvalid) {
+  // TODO: We should eagerly check the ref kind against the `kind_` instead of
+  // relying on this weak check and postponing the rest until `CheckEntry()` below.
+  // Passing the wrong kind shall currently result in misleading warnings.
+  if (GetIndirectRefKind(iref) == kJniTransitionOrInvalid) {
     auto* self = Thread::Current();
-    if (self->HandleScopeContains(reinterpret_cast<jobject>(iref))) {
+    ScopedObjectAccess soa(self);
+    if (self->IsJniTransitionReference(reinterpret_cast<jobject>(iref))) {
       auto* env = self->GetJniEnv();
       DCHECK(env != nullptr);
       if (env->IsCheckJniEnabled()) {
-        ScopedObjectAccess soa(self);
         LOG(WARNING) << "Attempt to remove non-JNI local reference, dumping thread";
         if (kDumpStackOnNonLocalReference) {
           self->Dump(LOG_STREAM(WARNING));
@@ -376,6 +379,7 @@ bool IndirectReferenceTable::Remove(IRTSegmentState previous_state, IndirectRef 
       return true;
     }
   }
+
   const uint32_t idx = ExtractIndex(iref);
   if (idx < bottom_index) {
     // Wrong segment.

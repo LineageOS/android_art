@@ -650,68 +650,52 @@ void Arm64JNIMacroAssembler::CallFromThread(ThreadOffset64 offset ATTRIBUTE_UNUS
   UNIMPLEMENTED(FATAL) << "Unimplemented Call() variant";
 }
 
-void Arm64JNIMacroAssembler::CreateHandleScopeEntry(ManagedRegister m_out_reg,
-                                                    FrameOffset handle_scope_offs,
-                                                    ManagedRegister m_in_reg,
-                                                    bool null_allowed) {
+void Arm64JNIMacroAssembler::CreateJObject(ManagedRegister m_out_reg,
+                                           FrameOffset spilled_reference_offset,
+                                           ManagedRegister m_in_reg,
+                                           bool null_allowed) {
   Arm64ManagedRegister out_reg = m_out_reg.AsArm64();
   Arm64ManagedRegister in_reg = m_in_reg.AsArm64();
   // For now we only hold stale handle scope entries in x registers.
   CHECK(in_reg.IsNoRegister() || in_reg.IsXRegister()) << in_reg;
   CHECK(out_reg.IsXRegister()) << out_reg;
   if (null_allowed) {
-    // Null values get a handle scope entry value of 0.  Otherwise, the handle scope entry is
-    // the address in the handle scope holding the reference.
-    // e.g. out_reg = (handle == 0) ? 0 : (SP+handle_offset)
+    // Null values get a jobject value null. Otherwise, the jobject is
+    // the address of the spilled reference.
+    // e.g. out_reg = (in == 0) ? 0 : (SP+spilled_reference_offset)
     if (in_reg.IsNoRegister()) {
       LoadWFromOffset(kLoadWord, out_reg.AsOverlappingWRegister(), SP,
-                      handle_scope_offs.Int32Value());
+                      spilled_reference_offset.Int32Value());
       in_reg = out_reg;
     }
     ___ Cmp(reg_w(in_reg.AsOverlappingWRegister()), 0);
     if (!out_reg.Equals(in_reg)) {
       LoadImmediate(out_reg.AsXRegister(), 0, eq);
     }
-    AddConstant(out_reg.AsXRegister(), SP, handle_scope_offs.Int32Value(), ne);
+    AddConstant(out_reg.AsXRegister(), SP, spilled_reference_offset.Int32Value(), ne);
   } else {
-    AddConstant(out_reg.AsXRegister(), SP, handle_scope_offs.Int32Value(), al);
+    AddConstant(out_reg.AsXRegister(), SP, spilled_reference_offset.Int32Value(), al);
   }
 }
 
-void Arm64JNIMacroAssembler::CreateHandleScopeEntry(FrameOffset out_off,
-                                                    FrameOffset handle_scope_offset,
-                                                    bool null_allowed) {
+void Arm64JNIMacroAssembler::CreateJObject(FrameOffset out_off,
+                                           FrameOffset spilled_reference_offset,
+                                           bool null_allowed) {
   UseScratchRegisterScope temps(asm_.GetVIXLAssembler());
   Register scratch = temps.AcquireX();
   if (null_allowed) {
     Register scratch2 = temps.AcquireW();
-    ___ Ldr(scratch2, MEM_OP(reg_x(SP), handle_scope_offset.Int32Value()));
-    ___ Add(scratch, reg_x(SP), handle_scope_offset.Int32Value());
-    // Null values get a handle scope entry value of 0.  Otherwise, the handle scope entry is
-    // the address in the handle scope holding the reference.
-    // e.g. scratch = (scratch == 0) ? 0 : (SP+handle_scope_offset)
+    ___ Ldr(scratch2, MEM_OP(reg_x(SP), spilled_reference_offset.Int32Value()));
+    ___ Add(scratch, reg_x(SP), spilled_reference_offset.Int32Value());
+    // Null values get a jobject value null. Otherwise, the jobject is
+    // the address of the spilled reference.
+    // e.g. scratch = (scratch == 0) ? 0 : (SP+spilled_reference_offset)
     ___ Cmp(scratch2, 0);
     ___ Csel(scratch, scratch, xzr, ne);
   } else {
-    ___ Add(scratch, reg_x(SP), handle_scope_offset.Int32Value());
+    ___ Add(scratch, reg_x(SP), spilled_reference_offset.Int32Value());
   }
   ___ Str(scratch, MEM_OP(reg_x(SP), out_off.Int32Value()));
-}
-
-void Arm64JNIMacroAssembler::LoadReferenceFromHandleScope(ManagedRegister m_out_reg,
-                                                          ManagedRegister m_in_reg) {
-  Arm64ManagedRegister out_reg = m_out_reg.AsArm64();
-  Arm64ManagedRegister in_reg = m_in_reg.AsArm64();
-  CHECK(out_reg.IsXRegister()) << out_reg;
-  CHECK(in_reg.IsXRegister()) << in_reg;
-  vixl::aarch64::Label exit;
-  if (!out_reg.Equals(in_reg)) {
-    // FIXME: Who sets the flags here?
-    LoadImmediate(out_reg.AsXRegister(), 0, eq);
-  }
-  ___ Cbz(reg_x(in_reg.AsXRegister()), &exit);
-  LoadFromOffset(out_reg.AsXRegister(), in_reg.AsXRegister(), 0);
-  ___ Bind(&exit);
 }
 
 void Arm64JNIMacroAssembler::ExceptionPoll(size_t stack_adjust) {

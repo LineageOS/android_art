@@ -56,7 +56,7 @@ namespace art {
 // declared as a friend by JniVmExt and JniEnvExt.
 inline IndirectReferenceTable* GetIndirectReferenceTable(ScopedObjectAccess& soa,
                                                          IndirectRefKind kind) {
-  DCHECK_NE(kind, kHandleScopeOrInvalid);
+  DCHECK_NE(kind, kJniTransitionOrInvalid);
   JNIEnvExt* env = soa.Env();
   IndirectReferenceTable* irt =
       (kind == kLocal) ? &env->locals_
@@ -718,11 +718,14 @@ class ScopedCheck {
     return true;
   }
 
-  bool CheckReferenceKind(IndirectRefKind expected_kind, Thread* self, jobject obj) {
+  bool CheckReferenceKind(IndirectRefKind expected_kind, Thread* self, jobject obj)
+      REQUIRES_SHARED(Locks::mutator_lock_) {
     IndirectRefKind found_kind;
     if (expected_kind == kLocal) {
       found_kind = IndirectReferenceTable::GetIndirectRefKind(obj);
-      if (found_kind == kHandleScopeOrInvalid && self->HandleScopeContains(obj)) {
+      if (found_kind == kJniTransitionOrInvalid &&
+          obj != nullptr &&
+          self->IsJniTransitionReference(obj)) {
         found_kind = kLocal;
       }
     } else {
@@ -863,8 +866,8 @@ class ScopedCheck {
     bool expect_null = false;
     bool okay = true;
     std::string error_msg;
-    if (ref_kind == kHandleScopeOrInvalid) {
-      if (!soa.Self()->HandleScopeContains(java_object)) {
+    if (ref_kind == kJniTransitionOrInvalid) {
+      if (!soa.Self()->IsJniTransitionReference(java_object)) {
         okay = false;
         error_msg = "use of invalid jobject";
       } else {

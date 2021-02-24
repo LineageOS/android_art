@@ -31,20 +31,20 @@ static_assert(std::is_trivial<IRTSegmentState>::value, "IRTSegmentState not triv
 
 static inline void GoToRunnableFast(Thread* self) REQUIRES_SHARED(Locks::mutator_lock_);
 
-extern void ReadBarrierJni(mirror::CompressedReference<mirror::Object>* handle_on_stack,
+extern void ReadBarrierJni(mirror::CompressedReference<mirror::Class>* declaring_class,
                            Thread* self ATTRIBUTE_UNUSED) {
   DCHECK(kUseReadBarrier);
   if (kUseBakerReadBarrier) {
-    DCHECK(handle_on_stack->AsMirrorPtr() != nullptr)
+    DCHECK(declaring_class->AsMirrorPtr() != nullptr)
         << "The class of a static jni call must not be null";
     // Check the mark bit and return early if it's already marked.
-    if (LIKELY(handle_on_stack->AsMirrorPtr()->GetMarkBit() != 0)) {
+    if (LIKELY(declaring_class->AsMirrorPtr()->GetMarkBit() != 0)) {
       return;
     }
   }
   // Call the read barrier and update the handle.
-  mirror::Object* to_ref = ReadBarrier::BarrierForRoot(handle_on_stack);
-  handle_on_stack->Assign(to_ref);
+  mirror::Class* to_ref = ReadBarrier::BarrierForRoot(declaring_class);
+  declaring_class->Assign(to_ref);
 }
 
 // Called on entry to fast JNI, push a new local reference table only.
@@ -120,7 +120,6 @@ static void PopLocalReferences(uint32_t saved_local_ref_cookie, Thread* self)
   }
   env->SetLocalSegmentState(env->GetLocalRefCookie());
   env->SetLocalRefCookie(bit_cast<IRTSegmentState>(saved_local_ref_cookie));
-  self->PopHandleScope();
 }
 
 // TODO: annotalysis disabled as monitor semantics are maintained in Java code.
@@ -231,8 +230,7 @@ extern uint64_t GenericJniMethodEnd(Thread* self,
   // locked object.
   if (called->IsSynchronized()) {
     DCHECK(normal_native) << "@FastNative/@CriticalNative and synchronize is not supported";
-    HandleScope* handle_scope = down_cast<HandleScope*>(self->GetTopHandleScope());
-    jobject lock = handle_scope->GetHandle(0).ToJObject();
+    jobject lock = GetGenericJniSynchronizationObject(self, called);
     DCHECK(lock != nullptr);
     UnlockJniSynchronizedMethod(lock, self);
   }
@@ -242,7 +240,7 @@ extern uint64_t GenericJniMethodEnd(Thread* self,
         result.l, saved_local_ref_cookie, self));
   } else {
     if (LIKELY(!critical_native)) {
-      PopLocalReferences(saved_local_ref_cookie, self);  // Invalidates top handle scope.
+      PopLocalReferences(saved_local_ref_cookie, self);
     }
     switch (return_shorty_char) {
       case 'F': {

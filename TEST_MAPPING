@@ -3,6 +3,39 @@
   "mainline-presubmit": [
     {
       "name": "art-run-test-001-HelloWorld[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-001-Main[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-002-sleep[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-004-InterfaceTest[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-006-args[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-007-count10[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-009-instanceof[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-010-instance[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-011-array-copy[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-012-math[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-013-math2[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-014-math3[com.google.android.art.apex]"
     }
   ],
   "presubmit": [

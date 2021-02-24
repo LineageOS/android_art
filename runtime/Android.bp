@@ -154,7 +154,6 @@ libart_cc_defaults {
         "jni/jni_id_manager.cc",
         "jni/jni_internal.cc",
         "linear_alloc.cc",
-        "managed_stack.cc",
         "method_handles.cc",
         "metrics_reporter.cc",
         "mirror/array.cc",

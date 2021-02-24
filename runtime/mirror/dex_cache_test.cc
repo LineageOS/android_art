@@ -45,21 +45,15 @@ TEST_F(DexCacheTest, Open) {
   ASSERT_TRUE(java_lang_dex_file_ != nullptr);
   Handle<DexCache> dex_cache(
       hs.NewHandle(class_linker_->AllocAndInitializeDexCache(
-          soa.Self(),
-          *java_lang_dex_file_,
-          Runtime::Current()->GetLinearAlloc())));
+          soa.Self(), *java_lang_dex_file_, /*class_loader=*/nullptr)));
   ASSERT_TRUE(dex_cache != nullptr);
 
-  EXPECT_TRUE(dex_cache->StaticStringSize() == dex_cache->NumStrings()
-      || java_lang_dex_file_->NumStringIds() == dex_cache->NumStrings());
-  EXPECT_TRUE(dex_cache->StaticTypeSize() == dex_cache->NumResolvedTypes()
-      || java_lang_dex_file_->NumTypeIds() == dex_cache->NumResolvedTypes());
-  EXPECT_TRUE(dex_cache->StaticMethodSize() == dex_cache->NumResolvedMethods()
-      || java_lang_dex_file_->NumMethodIds() == dex_cache->NumResolvedMethods());
-  EXPECT_TRUE(dex_cache->StaticArtFieldSize() == dex_cache->NumResolvedFields()
-      || java_lang_dex_file_->NumFieldIds() ==  dex_cache->NumResolvedFields());
-  EXPECT_TRUE(dex_cache->StaticMethodTypeSize() == dex_cache->NumResolvedMethodTypes()
-      || java_lang_dex_file_->NumProtoIds() == dex_cache->NumResolvedMethodTypes());
+  // The cache is initially empty.
+  EXPECT_EQ(0u, dex_cache->NumStrings());
+  EXPECT_EQ(0u, dex_cache->NumResolvedTypes());
+  EXPECT_EQ(0u, dex_cache->NumResolvedMethods());
+  EXPECT_EQ(0u, dex_cache->NumResolvedFields());
+  EXPECT_EQ(0u, dex_cache->NumResolvedMethodTypes());
 }
 
 TEST_F(DexCacheMethodHandlesTest, Open) {
@@ -68,26 +62,9 @@ TEST_F(DexCacheMethodHandlesTest, Open) {
   ASSERT_TRUE(java_lang_dex_file_ != nullptr);
   Handle<DexCache> dex_cache(
       hs.NewHandle(class_linker_->AllocAndInitializeDexCache(
-          soa.Self(),
-          *java_lang_dex_file_,
-          Runtime::Current()->GetLinearAlloc())));
+          soa.Self(), *java_lang_dex_file_, /*class_loader=*/nullptr)));
 
-  EXPECT_TRUE(dex_cache->StaticMethodTypeSize() == dex_cache->NumResolvedMethodTypes()
-      || java_lang_dex_file_->NumProtoIds() == dex_cache->NumResolvedMethodTypes());
-}
-
-TEST_F(DexCacheTest, LinearAlloc) {
-  ScopedObjectAccess soa(Thread::Current());
-  jobject jclass_loader(LoadDex("Main"));
-  ASSERT_TRUE(jclass_loader != nullptr);
-  StackHandleScope<1> hs(soa.Self());
-  Handle<mirror::ClassLoader> class_loader(hs.NewHandle(
-      soa.Decode<mirror::ClassLoader>(jclass_loader)));
-  ObjPtr<mirror::Class> klass = class_linker_->FindClass(soa.Self(), "LMain;", class_loader);
-  ASSERT_TRUE(klass != nullptr);
-  LinearAlloc* const linear_alloc = klass->GetClassLoader()->GetAllocator();
-  EXPECT_NE(linear_alloc, runtime_->GetLinearAlloc());
-  EXPECT_TRUE(linear_alloc->Contains(klass->GetDexCache()->GetResolvedMethods()));
+  EXPECT_EQ(0u, dex_cache->NumResolvedMethodTypes());
 }
 
 TEST_F(DexCacheTest, TestResolvedFieldAccess) {

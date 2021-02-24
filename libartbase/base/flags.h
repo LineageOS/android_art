@@ -23,9 +23,8 @@
 #include <variant>
 
 // This file defines a set of flags that can be used to enable/disable features within ART or
-// otherwise tune ART's behavior. Flags can be set through command line options, server side
-// configuration, system properties, or default values. This flexibility enables easier development
-// and also larger experiments.
+// otherwise tune ART's behavior. Flags can be set through command line options, system properties,
+// or default values. This flexibility enables easier development and also larger experiments.
 //
 // The flags are defined in the Flags struct near the bottom of the file. To define a new flag, add
 // a Flag field to the struct. Then to read the value of the flag, use gFlag.MyNewFlag().
@@ -70,7 +69,6 @@ class FlagMetaBase {
 
   std::string command_line_argument_name_;
   std::string system_property_name_;
-  std::string server_setting_name_;
 
   virtual FlagValuePointer GetLocation() = 0;
 };
@@ -99,8 +97,8 @@ class Flag : public FlagBase {
   // Returns the value of the flag or an empty option if it was not set.
   std::optional<Value> GetOptional();
 
-  // Reload the server-configured value and system property values. In general this should not be
-  // used directly, but it can be used to support reloading the value without restarting the device.
+  // Reload the system property values. In general this should not be used directly, but it can be
+  // used to support reloading the value without restarting the device.
   void Reload();
 
  protected:
@@ -111,7 +109,6 @@ class Flag : public FlagBase {
   const Value default_;
   std::optional<Value> from_command_line_;
   std::optional<Value> from_system_property_;
-  std::optional<Value> from_server_setting_;
 };
 
 // This struct contains the list of ART flags. Flags are parameterized by the type of value they
@@ -131,10 +128,6 @@ class Flag : public FlagBase {
 // Command Line:
 //
 //     -Xmetrics-write-to-log=true
-//
-// Server Side Configuration:
-//
-//     runtime_native_boot.metrics_write_to_log
 //
 // System Property:
 //
