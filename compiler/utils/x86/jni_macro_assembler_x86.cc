@@ -308,18 +308,28 @@ void X86JNIMacroAssembler::MoveArguments(ArrayRef<ArgumentLocation> dests,
     const ArgumentLocation& src = srcs[i];
     const ArgumentLocation& dest = dests[i];
     DCHECK_EQ(src.GetSize(), dest.GetSize());
-    if (UNLIKELY(dest.IsRegister())) {
-      // Native ABI has only stack arguments but we may pass one "hidden arg" in register.
-      CHECK(!found_hidden_arg);
-      found_hidden_arg = true;
-      CHECK(src.IsRegister());
-      Move(dest.GetRegister(), src.GetRegister(), dest.GetSize());
-    } else {
-      if (src.IsRegister()) {
-        Store(dest.GetFrameOffset(), src.GetRegister(), dest.GetSize());
+    if (src.IsRegister()) {
+      if (UNLIKELY(dest.IsRegister())) {
+        // Native ABI has only stack arguments but we may pass one "hidden arg" in register.
+        CHECK(!found_hidden_arg);
+        found_hidden_arg = true;
+        DCHECK(
+            !dest.GetRegister().Equals(X86ManagedRegister::FromCpuRegister(GetScratchRegister())));
+        Move(dest.GetRegister(), src.GetRegister(), dest.GetSize());
       } else {
-        Copy(dest.GetFrameOffset(), src.GetFrameOffset(), dest.GetSize());
+        Store(dest.GetFrameOffset(), src.GetRegister(), dest.GetSize());
       }
+    } else {
+      // Delay copying until we have spilled all registers, including the scratch register ECX.
+    }
+  }
+  for (size_t i = 0, arg_count = srcs.size(); i != arg_count; ++i) {
+    const ArgumentLocation& src = srcs[i];
+    const ArgumentLocation& dest = dests[i];
+    DCHECK_EQ(src.GetSize(), dest.GetSize());
+    if (!src.IsRegister()) {
+      DCHECK(!dest.IsRegister());
+      Copy(dest.GetFrameOffset(), src.GetFrameOffset(), dest.GetSize());
     }
   }
 }
@@ -456,10 +466,10 @@ void X86JNIMacroAssembler::MemoryBarrier(ManagedRegister) {
   __ mfence();
 }
 
-void X86JNIMacroAssembler::CreateHandleScopeEntry(ManagedRegister mout_reg,
-                                                  FrameOffset handle_scope_offset,
-                                                  ManagedRegister min_reg,
-                                                  bool null_allowed) {
+void X86JNIMacroAssembler::CreateJObject(ManagedRegister mout_reg,
+                                         FrameOffset spilled_reference_offset,
+                                         ManagedRegister min_reg,
+                                         bool null_allowed) {
   X86ManagedRegister out_reg = mout_reg.AsX86();
   X86ManagedRegister in_reg = min_reg.AsX86();
   CHECK(in_reg.IsCpuRegister());
@@ -472,45 +482,28 @@ void X86JNIMacroAssembler::CreateHandleScopeEntry(ManagedRegister mout_reg,
     }
     __ testl(in_reg.AsCpuRegister(), in_reg.AsCpuRegister());
     __ j(kZero, &null_arg);
-    __ leal(out_reg.AsCpuRegister(), Address(ESP, handle_scope_offset));
+    __ leal(out_reg.AsCpuRegister(), Address(ESP, spilled_reference_offset));
     __ Bind(&null_arg);
   } else {
-    __ leal(out_reg.AsCpuRegister(), Address(ESP, handle_scope_offset));
+    __ leal(out_reg.AsCpuRegister(), Address(ESP, spilled_reference_offset));
   }
 }
 
-void X86JNIMacroAssembler::CreateHandleScopeEntry(FrameOffset out_off,
-                                                  FrameOffset handle_scope_offset,
-                                                  bool null_allowed) {
+void X86JNIMacroAssembler::CreateJObject(FrameOffset out_off,
+                                         FrameOffset spilled_reference_offset,
+                                         bool null_allowed) {
   Register scratch = GetScratchRegister();
   if (null_allowed) {
     Label null_arg;
-    __ movl(scratch, Address(ESP, handle_scope_offset));
+    __ movl(scratch, Address(ESP, spilled_reference_offset));
     __ testl(scratch, scratch);
     __ j(kZero, &null_arg);
-    __ leal(scratch, Address(ESP, handle_scope_offset));
+    __ leal(scratch, Address(ESP, spilled_reference_offset));
     __ Bind(&null_arg);
   } else {
-    __ leal(scratch, Address(ESP, handle_scope_offset));
+    __ leal(scratch, Address(ESP, spilled_reference_offset));
   }
   __ movl(Address(ESP, out_off), scratch);
-}
-
-// Given a handle scope entry, load the associated reference.
-void X86JNIMacroAssembler::LoadReferenceFromHandleScope(ManagedRegister mout_reg,
-                                                        ManagedRegister min_reg) {
-  X86ManagedRegister out_reg = mout_reg.AsX86();
-  X86ManagedRegister in_reg = min_reg.AsX86();
-  CHECK(out_reg.IsCpuRegister());
-  CHECK(in_reg.IsCpuRegister());
-  Label null_arg;
-  if (!out_reg.Equals(in_reg)) {
-    __ xorl(out_reg.AsCpuRegister(), out_reg.AsCpuRegister());
-  }
-  __ testl(in_reg.AsCpuRegister(), in_reg.AsCpuRegister());
-  __ j(kZero, &null_arg);
-  __ movl(out_reg.AsCpuRegister(), Address(in_reg.AsCpuRegister(), 0));
-  __ Bind(&null_arg);
 }
 
 void X86JNIMacroAssembler::VerifyObject(ManagedRegister /*src*/, bool /*could_be_null*/) {

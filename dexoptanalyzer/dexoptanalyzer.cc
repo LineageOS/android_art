@@ -371,7 +371,11 @@ class DexoptAnalyzer final {
     const auto& image_spaces = runtime->GetHeap()->GetBootImageSpaces();
     for (const auto& image_space : image_spaces) {
       const OatFile* oat_file = image_space->GetOatFile();
-      if (oat_file == nullptr || !ImageSpace::ValidateOatFile(*oat_file, &error_msg)) {
+      if (oat_file == nullptr) {
+        LOG(ERROR) << "NULL oat file encountered";
+        return ReturnCode::kDex2OatFromScratch;
+      }
+      if (!ImageSpace::ValidateOatFile(*oat_file, &error_msg)) {
         LOG(ERROR) << "Invalid oat file: " << oat_file->GetLocation() << " " << error_msg;
         return ReturnCode::kDex2OatFromScratch;
       }

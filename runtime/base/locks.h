@@ -97,6 +97,7 @@ enum LockLevel : uint8_t {
   kTracingStreamingLock,
   kClassLoaderClassesLock,
   kDefaultMutexLevel,
+  kDexCacheLock,
   kDexLock,
   kMarkSweepLargeObjectLock,
   kJdwpObjectRegistryLock,
@@ -289,6 +290,8 @@ class Locks {
   static Mutex* modify_ldt_lock_ ACQUIRED_AFTER(allocated_thread_ids_lock_);
 
   static ReaderWriterMutex* dex_lock_ ACQUIRED_AFTER(modify_ldt_lock_);
+
+  static Mutex* dex_cache_lock_ ACQUIRED_AFTER(dex_lock_);
 
   // Guards opened oat files in OatFileManager.
   static ReaderWriterMutex* oat_file_manager_lock_ ACQUIRED_AFTER(dex_lock_);

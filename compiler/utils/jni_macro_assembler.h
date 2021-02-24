@@ -208,23 +208,20 @@ class JNIMacroAssembler : public DeletableArenaObject<kArenaAllocAssembler> {
   virtual void GetCurrentThread(ManagedRegister dest) = 0;
   virtual void GetCurrentThread(FrameOffset dest_offset) = 0;
 
-  // Set up out_reg to hold a Object** into the handle scope, or to be null if the
-  // value is null and null_allowed. in_reg holds a possibly stale reference
-  // that can be used to avoid loading the handle scope entry to see if the value is
-  // null.
-  virtual void CreateHandleScopeEntry(ManagedRegister out_reg,
-                                      FrameOffset handlescope_offset,
-                                      ManagedRegister in_reg,
-                                      bool null_allowed) = 0;
+  // Set up `out_reg` to hold a `jobject` (`StackReference<Object>*` to a spilled value),
+  // or to be null if the value is null and `null_allowed`. `in_reg` holds a possibly
+  // stale reference that can be used to avoid loading the spilled value to
+  // see if the value is null.
+  virtual void CreateJObject(ManagedRegister out_reg,
+                             FrameOffset spilled_reference_offset,
+                             ManagedRegister in_reg,
+                             bool null_allowed) = 0;
 
-  // Set up out_off to hold a Object** into the handle scope, or to be null if the
-  // value is null and null_allowed.
-  virtual void CreateHandleScopeEntry(FrameOffset out_off,
-                                      FrameOffset handlescope_offset,
-                                      bool null_allowed) = 0;
-
-  // src holds a handle scope entry (Object**) load this into dst
-  virtual void LoadReferenceFromHandleScope(ManagedRegister dst, ManagedRegister src) = 0;
+  // Set up `out_off` to hold a `jobject` (`StackReference<Object>*` to a spilled value),
+  // or to be null if the value is null and `null_allowed`.
+  virtual void CreateJObject(FrameOffset out_off,
+                             FrameOffset spilled_reference_offset,
+                             bool null_allowed) = 0;
 
   // Heap::VerifyObject on src. In some cases (such as a reference to this) we
   // know that src may not be null.

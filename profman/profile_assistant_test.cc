@@ -1151,6 +1151,70 @@ TEST_F(ProfileAssistantTest, TestProfileRoundTrip) {
   ASSERT_EQ(ExecAndReturnCode(args, &error), 0) << error << " from " << text_two;
 }
 
+
+// Test that we can dump profiles in a way they can be re-constituted and
+// annotations don't interfere. Test goes 'txt -> ProfileWithAnnotations -> txt
+// -> prof' and then compares that to one that is 'txt ->
+// prof_without_annotations'.
+TEST_F(ProfileAssistantTest, TestProfileRoundTripWithAnnotations) {
+  // Create the profile content.
+  std::vector<std::string_view> methods = {
+    "HLTestInline;->inlineMonomorphic(LSuper;)I+LSubA;",
+    "HLTestInline;->inlinePolymorphic(LSuper;)I+LSubA;,LSubB;,LSubC;",
+    "HLTestInline;->inlineMegamorphic(LSuper;)I+LSubA;,LSubB;,LSubC;,LSubD;,LSubE;",
+    "HLTestInline;->inlineMissingTypes(LSuper;)I+missing_types",
+    "HLTestInline;->noInlineCache(LSuper;)I",
+    "HLTestInline;->inlineMultiMonomorphic(LSuper;LSecret;)I+[LSuper;LSubA;[LSecret;LSubB;",
+    "HLTestInline;->inlineMultiPolymorphic(LSuper;LSecret;)I+[LSuper;LSubA;,LSubB;,LSubC;[LSecret;LSubB;,LSubC;",
+    "HLTestInline;->inlineMultiMegamorphic(LSuper;LSecret;)I+[LSuper;LSubA;,LSubB;,LSubC;,LSubD;,LSubE;[LSecret;megamorphic_types",
+    "HLTestInline;->inlineMultiMissingTypes(LSuper;LSecret;)I+[LSuper;missing_types[LSecret;missing_types",
+    "HLTestInline;->inlineTriplePolymorphic(LSuper;LSecret;LSecret;)I+[LSuper;LSubA;,LSubB;,LSubC;[LSecret;LSubB;,LSubC;",
+    "HLTestInline;->noInlineCacheMulti(LSuper;LSecret;)I",
+  };
+  std::ostringstream no_annotation_input_file_contents;
+  std::ostringstream with_annotation_input_file_contents;
+  for (const std::string_view& m : methods) {
+    no_annotation_input_file_contents << m << "\n";
+    with_annotation_input_file_contents << "{foobar}" << m << "\n";
+  }
+
+  // Create the profile and save it to disk.
+  ScratchFile with_annotation_profile_file;
+  ASSERT_TRUE(CreateProfile(with_annotation_input_file_contents.str(),
+                            with_annotation_profile_file.GetFilename(),
+                            GetTestDexFileName("ProfileTestMultiDex")));
+  with_annotation_profile_file.GetFile()->ResetOffset();
+
+  ScratchFile no_annotation_profile_file;
+  ASSERT_TRUE(CreateProfile(no_annotation_input_file_contents.str(),
+                            no_annotation_profile_file.GetFilename(),
+                            GetTestDexFileName("ProfileTestMultiDex")));
+  with_annotation_profile_file.GetFile()->ResetOffset();
+
+  // Dump the file back into text.
+  std::string text_two;
+  ASSERT_TRUE(DumpClassesAndMethods(with_annotation_profile_file.GetFilename(),
+                                    &text_two,
+                                    GetTestDexFileName("ProfileTestMultiDex")));
+
+  // Create another profile and save it to the disk as well.
+  ScratchFile profile_two;
+  ASSERT_TRUE(CreateProfile(
+      text_two, profile_two.GetFilename(), GetTestDexFileName("ProfileTestMultiDex")));
+  profile_two.GetFile()->ResetOffset();
+
+  // These two profiles should be bit-identical.
+  // TODO We could compare the 'text_two' to the methods but since the order is
+  // arbitrary for many parts and there are multiple 'correct' dumps we'd need
+  // to basically parse everything and this is simply easier.
+  std::string error;
+  std::vector<std::string> args { kIsTargetBuild ? "/system/bin/cmp" : "/usr/bin/cmp",
+                                  "-s",
+                                  no_annotation_profile_file.GetFilename(),
+                                  profile_two.GetFilename() };
+  ASSERT_EQ(ExecAndReturnCode(args, &error), 0) << error << " from " << text_two;
+}
+
 TEST_F(ProfileAssistantTest, TestProfileCreateInlineCache) {
   // Create the profile content.
   std::vector<std::string_view> methods = {

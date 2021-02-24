@@ -93,9 +93,6 @@ class MethodHandlesLookup;
 class MethodType;
 template<class T> class ObjectArray;
 class StackTraceElement;
-template <typename T> struct NativeDexCachePair;
-using MethodDexCachePair = NativeDexCachePair<ArtMethod>;
-using MethodDexCacheType = std::atomic<MethodDexCachePair>;
 }  // namespace mirror
 
 class ClassVisitor {
@@ -952,7 +949,7 @@ class ClassLinker {
   // Used for tests and AppendToBootClassPath.
   ObjPtr<mirror::DexCache> AllocAndInitializeDexCache(Thread* self,
                                                       const DexFile& dex_file,
-                                                      LinearAlloc* linear_alloc)
+                                                      ObjPtr<mirror::ClassLoader> class_loader)
       REQUIRES_SHARED(Locks::mutator_lock_)
       REQUIRES(!Locks::dex_lock_)
       REQUIRES(!Roles::uninterruptible_);

@@ -174,7 +174,7 @@
   V(UpdateInlineCache, void, void) \
   V(CompileOptimized, void, ArtMethod*, Thread*) \
 \
-  V(ReadBarrierJni, void, mirror::CompressedReference<mirror::Object>*, Thread*) \
+  V(ReadBarrierJni, void, mirror::CompressedReference<mirror::Class>*, Thread*) \
   V(ReadBarrierMarkReg00, mirror::Object*, mirror::Object*) \
   V(ReadBarrierMarkReg01, mirror::Object*, mirror::Object*) \
   V(ReadBarrierMarkReg02, mirror::Object*, mirror::Object*) \

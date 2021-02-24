@@ -541,17 +541,17 @@ void X86_64JNIMacroAssembler::MemoryBarrier(ManagedRegister) {
   __ mfence();
 }
 
-void X86_64JNIMacroAssembler::CreateHandleScopeEntry(ManagedRegister mout_reg,
-                                                     FrameOffset handle_scope_offset,
-                                                     ManagedRegister min_reg,
-                                                     bool null_allowed) {
+void X86_64JNIMacroAssembler::CreateJObject(ManagedRegister mout_reg,
+                                            FrameOffset spilled_reference_offset,
+                                            ManagedRegister min_reg,
+                                            bool null_allowed) {
   X86_64ManagedRegister out_reg = mout_reg.AsX86_64();
   X86_64ManagedRegister in_reg = min_reg.AsX86_64();
   if (in_reg.IsNoRegister()) {  // TODO(64): && null_allowed
     // Use out_reg as indicator of null.
     in_reg = out_reg;
     // TODO: movzwl
-    __ movl(in_reg.AsCpuRegister(), Address(CpuRegister(RSP), handle_scope_offset));
+    __ movl(in_reg.AsCpuRegister(), Address(CpuRegister(RSP), spilled_reference_offset));
   }
   CHECK(in_reg.IsCpuRegister());
   CHECK(out_reg.IsCpuRegister());
@@ -563,45 +563,28 @@ void X86_64JNIMacroAssembler::CreateHandleScopeEntry(ManagedRegister mout_reg,
     }
     __ testl(in_reg.AsCpuRegister(), in_reg.AsCpuRegister());
     __ j(kZero, &null_arg);
-    __ leaq(out_reg.AsCpuRegister(), Address(CpuRegister(RSP), handle_scope_offset));
+    __ leaq(out_reg.AsCpuRegister(), Address(CpuRegister(RSP), spilled_reference_offset));
     __ Bind(&null_arg);
   } else {
-    __ leaq(out_reg.AsCpuRegister(), Address(CpuRegister(RSP), handle_scope_offset));
+    __ leaq(out_reg.AsCpuRegister(), Address(CpuRegister(RSP), spilled_reference_offset));
   }
 }
 
-void X86_64JNIMacroAssembler::CreateHandleScopeEntry(FrameOffset out_off,
-                                                     FrameOffset handle_scope_offset,
-                                                     bool null_allowed) {
+void X86_64JNIMacroAssembler::CreateJObject(FrameOffset out_off,
+                                            FrameOffset spilled_reference_offset,
+                                            bool null_allowed) {
   CpuRegister scratch = GetScratchRegister();
   if (null_allowed) {
     Label null_arg;
-    __ movl(scratch, Address(CpuRegister(RSP), handle_scope_offset));
+    __ movl(scratch, Address(CpuRegister(RSP), spilled_reference_offset));
     __ testl(scratch, scratch);
     __ j(kZero, &null_arg);
-    __ leaq(scratch, Address(CpuRegister(RSP), handle_scope_offset));
+    __ leaq(scratch, Address(CpuRegister(RSP), spilled_reference_offset));
     __ Bind(&null_arg);
   } else {
-    __ leaq(scratch, Address(CpuRegister(RSP), handle_scope_offset));
+    __ leaq(scratch, Address(CpuRegister(RSP), spilled_reference_offset));
   }
   __ movq(Address(CpuRegister(RSP), out_off), scratch);
-}
-
-// Given a handle scope entry, load the associated reference.
-void X86_64JNIMacroAssembler::LoadReferenceFromHandleScope(ManagedRegister mout_reg,
-                                                           ManagedRegister min_reg) {
-  X86_64ManagedRegister out_reg = mout_reg.AsX86_64();
-  X86_64ManagedRegister in_reg = min_reg.AsX86_64();
-  CHECK(out_reg.IsCpuRegister());
-  CHECK(in_reg.IsCpuRegister());
-  Label null_arg;
-  if (!out_reg.Equals(in_reg)) {
-    __ xorl(out_reg.AsCpuRegister(), out_reg.AsCpuRegister());
-  }
-  __ testl(in_reg.AsCpuRegister(), in_reg.AsCpuRegister());
-  __ j(kZero, &null_arg);
-  __ movq(out_reg.AsCpuRegister(), Address(in_reg.AsCpuRegister(), 0));
-  __ Bind(&null_arg);
 }
 
 void X86_64JNIMacroAssembler::VerifyObject(ManagedRegister /*src*/, bool /*could_be_null*/) {
