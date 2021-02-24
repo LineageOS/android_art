@@ -18,7 +18,6 @@
 #define ART_RUNTIME_MIRROR_DEX_CACHE_H_
 
 #include "array.h"
-#include "base/array_ref.h"
 #include "base/bit_utils.h"
 #include "base/locks.h"
 #include "dex/dex_file_types.h"
@@ -187,13 +186,29 @@ class MANAGED DexCache final : public Object {
     return sizeof(DexCache);
   }
 
-  void Initialize(const DexFile* dex_file, ObjPtr<ClassLoader> class_loader)
+  // Initialize native fields and allocate memory.
+  void InitializeNativeFields(const DexFile* dex_file, LinearAlloc* linear_alloc)
       REQUIRES_SHARED(Locks::mutator_lock_)
       REQUIRES(Locks::dex_lock_);
 
-  // Zero all array references.
-  // WARNING: This does not free the memory since it is in LinearAlloc.
-  void ResetNativeArrays() REQUIRES_SHARED(Locks::mutator_lock_);
+  // Clear all native fields.
+  void ResetNativeFields() REQUIRES_SHARED(Locks::mutator_lock_);
+
+  template <ReadBarrierOption kReadBarrierOption = kWithReadBarrier, typename Visitor>
+  void FixupStrings(StringDexCacheType* dest, const Visitor& visitor)
+      REQUIRES_SHARED(Locks::mutator_lock_);
+
+  template <ReadBarrierOption kReadBarrierOption = kWithReadBarrier, typename Visitor>
+  void FixupResolvedTypes(TypeDexCacheType* dest, const Visitor& visitor)
+      REQUIRES_SHARED(Locks::mutator_lock_);
+
+  template <ReadBarrierOption kReadBarrierOption = kWithReadBarrier, typename Visitor>
+  void FixupResolvedMethodTypes(MethodTypeDexCacheType* dest, const Visitor& visitor)
+      REQUIRES_SHARED(Locks::mutator_lock_);
+
+  template <ReadBarrierOption kReadBarrierOption = kWithReadBarrier, typename Visitor>
+  void FixupResolvedCallSites(GcRoot<mirror::CallSite>* dest, const Visitor& visitor)
+      REQUIRES_SHARED(Locks::mutator_lock_);
 
   ObjPtr<String> GetLocation() REQUIRES_SHARED(Locks::mutator_lock_);
 
@@ -263,6 +278,14 @@ class MANAGED DexCache final : public Object {
   void SetResolvedString(dex::StringIndex string_idx, ObjPtr<mirror::String> resolved) ALWAYS_INLINE
       REQUIRES_SHARED(Locks::mutator_lock_);
 
+  void SetPreResolvedString(dex::StringIndex string_idx,
+                            ObjPtr<mirror::String> resolved)
+      ALWAYS_INLINE REQUIRES_SHARED(Locks::mutator_lock_);
+
+  // Clear the preresolved string cache to prevent further usage.
+  void ClearPreResolvedStrings()
+      ALWAYS_INLINE REQUIRES_SHARED(Locks::mutator_lock_);
+
   // Clear a string for a string_idx, used to undo string intern transactions to make sure
   // the string isn't kept live.
   void ClearString(dex::StringIndex string_idx) REQUIRES_SHARED(Locks::mutator_lock_);
@@ -306,8 +329,19 @@ class MANAGED DexCache final : public Object {
     return GetFieldPtr64<StringDexCacheType*, kVerifyFlags>(StringsOffset());
   }
 
+  template<VerifyObjectFlags kVerifyFlags = kDefaultVerifyFlags>
+  GcRoot<mirror::String>* GetPreResolvedStrings() ALWAYS_INLINE
+      REQUIRES_SHARED(Locks::mutator_lock_) {
+    return GetFieldPtr64<GcRoot<mirror::String>*, kVerifyFlags>(PreResolvedStringsOffset());
+  }
+
   void SetStrings(StringDexCacheType* strings) ALWAYS_INLINE REQUIRES_SHARED(Locks::mutator_lock_) {
     SetFieldPtr<false>(StringsOffset(), strings);
+  }
+
+  void SetPreResolvedStrings(GcRoot<mirror::String>* strings)
+      ALWAYS_INLINE REQUIRES_SHARED(Locks::mutator_lock_) {
+    SetFieldPtr<false>(PreResolvedStringsOffset(), strings);
   }
 
   template<VerifyObjectFlags kVerifyFlags = kDefaultVerifyFlags>
@@ -430,17 +464,27 @@ class MANAGED DexCache final : public Object {
   uint32_t MethodSlotIndex(uint32_t method_idx) REQUIRES_SHARED(Locks::mutator_lock_);
   uint32_t MethodTypeSlotIndex(dex::ProtoIndex proto_idx) REQUIRES_SHARED(Locks::mutator_lock_);
 
+  // Returns true if we succeeded in adding the pre-resolved string array.
+  bool AddPreResolvedStringsArray() REQUIRES_SHARED(Locks::mutator_lock_);
+
   void VisitReflectiveTargets(ReflectiveValueVisitor* visitor) REQUIRES(Locks::mutator_lock_);
 
   void SetClassLoader(ObjPtr<ClassLoader> class_loader) REQUIRES_SHARED(Locks::mutator_lock_);
 
-  ObjPtr<ClassLoader> GetClassLoader() REQUIRES_SHARED(Locks::mutator_lock_);
-
  private:
-  // Allocate new array in linear alloc and save it in the given fields.
-  template<typename T, size_t kMaxCacheSize>
-  T* AllocArray(MemberOffset obj_offset, MemberOffset num_offset, size_t num)
-     REQUIRES_SHARED(Locks::mutator_lock_);
+  void SetNativeArrays(StringDexCacheType* strings,
+                       uint32_t num_strings,
+                       TypeDexCacheType* resolved_types,
+                       uint32_t num_resolved_types,
+                       MethodDexCacheType* resolved_methods,
+                       uint32_t num_resolved_methods,
+                       FieldDexCacheType* resolved_fields,
+                       uint32_t num_resolved_fields,
+                       MethodTypeDexCacheType* resolved_method_types,
+                       uint32_t num_resolved_method_types,
+                       GcRoot<CallSite>* resolved_call_sites,
+                       uint32_t num_resolved_call_sites)
+      REQUIRES_SHARED(Locks::mutator_lock_);
 
   // std::pair<> is not trivially copyable and as such it is unsuitable for atomic operations,
   // so we use a custom pair class for loading and storing the NativeDexCachePair<>.
