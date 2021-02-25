@@ -210,24 +210,6 @@ struct CmdlineParser {
       return parent_;
     }
 
-    // Write the results of this argument into a variable pointed to by destination.
-    // An optional is used to tell whether the command line argument was present.
-    CmdlineParser::Builder& IntoLocation(std::optional<TArg>* destination) {
-      save_value_ = [destination](TArg& value) {
-        *destination = value;
-      };
-
-      load_value_ = [destination]() -> TArg& {
-        return destination->value();
-      };
-
-      save_value_specified_ = true;
-      load_value_specified_ = true;
-
-      CompleteArgument();
-      return parent_;
-    }
-
     // Ensure we always move this when returning a new builder.
     ArgumentBuilder(ArgumentBuilder&&) = default;
 
