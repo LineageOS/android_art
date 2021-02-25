@@ -653,6 +653,7 @@ ART_TARGET_SHARED_LIBRARY_BENCHMARK := $(TARGET_OUT_SHARED_LIBRARIES)/libartbenc
 ART_TARGET_SHARED_LIBRARY_PALETTE_DEPENDENCIES := \
     $(TARGET_OUT_SHARED_LIBRARIES)/libcutils.so \
     $(TARGET_OUT_SHARED_LIBRARIES)/libprocessgroup.so \
+    $(TARGET_OUT_SHARED_LIBRARIES)/libselinux.so \
     $(TARGET_OUT_SHARED_LIBRARIES)/libtombstoned_client.so
 
 build-art-target-golem: $(RELEASE_ART_APEX) com.android.runtime $(CONSCRYPT_APEX) \
