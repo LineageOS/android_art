@@ -514,7 +514,8 @@ class RegionSpecializedBase<mirror::Object> : public RegionCommon<mirror::Object
   void DumpDirtyObjects() REQUIRES_SHARED(Locks::mutator_lock_) {
     for (mirror::Object* obj : dirty_objects_) {
       if (obj->IsClass()) {
-        os_ << "Private dirty object: " << obj->AsClass()->PrettyDescriptor() << "\n";
+        std::string temp;
+        os_ << "Private dirty object: " << obj->AsClass()->GetDescriptor(&temp) << "\n";
       }
     }
   }
