@@ -52,6 +52,9 @@ my_files += \
 include $(CLEAR_VARS)
 LOCAL_IS_HOST_MODULE := true
 LOCAL_MODULE := art_common
+LOCAL_LICENSE_KINDS := SPDX-license-identifier-Apache-2.0
+LOCAL_LICENSE_CONDITIONS := notice
+LOCAL_NOTICE_FILE := $(LOCAL_PATH)/../NOTICE
 LOCAL_MODULE_TAGS := tests
 LOCAL_MODULE_CLASS := NATIVE_TESTS
 LOCAL_MODULE_SUFFIX := .txt
@@ -71,6 +74,9 @@ include $(CLEAR_VARS)
 # Create a phony module that contains data needed for ART chroot-based testing.
 include $(CLEAR_VARS)
 LOCAL_MODULE := art_chroot
+LOCAL_LICENSE_KINDS := SPDX-license-identifier-Apache-2.0
+LOCAL_LICENSE_CONDITIONS := notice
+# LOCAL_NOTICE_FILE := $(LOCAL_PATH)/../NOTICE
 LOCAL_MODULE_TAGS := tests
 LOCAL_MODULE_CLASS := NATIVE_TESTS
 LOCAL_MODULE_SUFFIX := .txt
