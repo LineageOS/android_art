@@ -185,6 +185,11 @@ static bool ClassLoaderContextMatches(
   DCHECK(error_msg != nullptr);
   DCHECK(context != nullptr);
 
+  if (oat_file->IsBackedByVdexOnly()) {
+    // Only a vdex file, we don't depend on the class loader context.
+    return true;
+  }
+
   if (!CompilerFilter::IsVerificationEnabled(oat_file->GetCompilerFilter())) {
     // If verification is not enabled we don't need to check if class loader context matches
     // as the oat file is either extracted or assumed verified.
@@ -272,7 +277,7 @@ std::vector<std::unique_ptr<const DexFile>> OatFileManager::OpenDexFilesFromOat(
     // Proceed with oat file loading.
     std::unique_ptr<const OatFile> oat_file(oat_file_assistant.GetBestOatFile().release());
     VLOG(oat) << "OatFileAssistant(" << dex_location << ").GetBestOatFile()="
-              << reinterpret_cast<uintptr_t>(oat_file.get())
+              << (oat_file != nullptr ? oat_file->GetLocation() : "")
               << " (executable=" << (oat_file != nullptr ? oat_file->IsExecutable() : false) << ")";
 
     CHECK(oat_file == nullptr || odex_location == oat_file->GetLocation())
