@@ -384,7 +384,7 @@ known_failing_tests = frozenset(known_failing_tests)
 # the `presubmit` test group in `TEST_MAPPING` file -- the rest will be included
 # in `postsubmit` test group.
 # This value has to be a number between 0 and 100.
-presubmit_tests_percentage = 50
+presubmit_tests_percentage = 75
 
 # Percentage of ART run-tests (among the ones expected to succeed) to include in
 # the `mainline-presubmit` test group in `TEST_MAPPING` file.
