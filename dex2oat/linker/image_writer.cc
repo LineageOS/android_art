@@ -1641,7 +1641,8 @@ class ImageWriter::LayoutHelper::CollectClassesVisitor : public ClassVisitor {
       size_t oat_index = pair.second;
       DCHECK(image_writer->image_infos_[oat_index].class_table_.has_value());
       ClassTable::ClassSet& class_table = *image_writer->image_infos_[oat_index].class_table_;
-      bool inserted = class_table.insert(ClassTable::TableSlot(klass)).second;
+      uint32_t hash = ClassTable::TableSlot::HashDescriptor(klass);
+      bool inserted = class_table.InsertWithHash(ClassTable::TableSlot(klass, hash), hash).second;
       DCHECK(inserted) << "Class " << klass->PrettyDescriptor()
           << " (" << klass.Ptr() << ") already inserted";
     }
@@ -1656,7 +1657,8 @@ class ImageWriter::LayoutHelper::CollectClassesVisitor : public ClassVisitor {
         DCHECK(image_info.class_table_.has_value());
         ClassTable::ClassSet& table = *image_info.class_table_;
         for (mirror::Class* klass : boot_image_classes) {
-          bool inserted = table.insert(ClassTable::TableSlot(klass)).second;
+          uint32_t hash = ClassTable::TableSlot::HashDescriptor(klass);
+          bool inserted = table.InsertWithHash(ClassTable::TableSlot(klass, hash), hash).second;
           DCHECK(inserted) << "Boot image class " << klass->PrettyDescriptor()
               << " (" << klass << ") already inserted";
         }
