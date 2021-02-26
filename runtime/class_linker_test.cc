@@ -1544,9 +1544,8 @@ TEST_F(ClassLinkerTest, RegisterDexFileName) {
                                                         nullptr,
                                                         nullptr));
   // Make a copy of the dex cache with changed name.
-  dex_cache.Assign(class_linker->AllocAndInitializeDexCache(Thread::Current(),
-                                                            *dex_file,
-                                                            /* class_loader= */ nullptr));
+  LinearAlloc* alloc = Runtime::Current()->GetLinearAlloc();
+  dex_cache.Assign(class_linker->AllocAndInitializeDexCache(Thread::Current(), *dex_file, alloc));
   DCHECK_EQ(dex_cache->GetLocation()->CompareTo(location.Get()), 0);
   {
     WriterMutexLock mu(soa.Self(), *Locks::dex_lock_);
