@@ -151,6 +151,13 @@ ConcurrentCopying::ConcurrentCopying(Heap* heap,
     CHECK(sweep_array_free_buffer_mem_map_.IsValid())
         << "Couldn't allocate sweep array free buffer: " << error_msg;
   }
+  // Return type of these functions are different. And even though the base class
+  // is same, using ternary operator complains.
+  if (young_gen_) {
+    gc_time_histogram_ = GetMetrics()->YoungGcCollectionTime();
+  } else {
+    gc_time_histogram_ = GetMetrics()->FullGcCollectionTime();
+  }
 }
 
 void ConcurrentCopying::MarkHeapReference(mirror::HeapReference<mirror::Object>* field,
