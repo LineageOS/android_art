@@ -21,6 +21,7 @@
 #include <list>
 
 #include "base/histogram.h"
+#include "base/metrics/metrics.h"
 #include "base/mutex.h"
 #include "base/timing_logger.h"
 #include "gc/collector_type.h"
@@ -156,6 +157,7 @@ class GarbageCollector : public RootVisitor, public IsMarkedVisitor, public Mark
   Histogram<uint64_t> pause_histogram_ GUARDED_BY(pause_histogram_lock_);
   Histogram<uint64_t> rss_histogram_;
   Histogram<size_t> freed_bytes_histogram_;
+  metrics::MetricsBase<int64_t>* gc_time_histogram_;
   uint64_t total_thread_cpu_time_ns_;
   uint64_t total_time_ns_;
   uint64_t total_freed_objects_;
