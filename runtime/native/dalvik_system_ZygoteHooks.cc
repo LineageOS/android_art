@@ -434,11 +434,20 @@ static void ZygoteHooks_stopZygoteNoThreadCreation(JNIEnv* env ATTRIBUTE_UNUSED,
   Runtime::Current()->SetZygoteNoThreadSection(false);
 }
 
+static jboolean ZygoteHooks_nativeZygoteJitEnabled(JNIEnv* env ATTRIBUTE_UNUSED,
+                                                   jclass klass ATTRIBUTE_UNUSED) {
+  // Only called in zygote. Thus static is OK here.
+  static bool result = jit::Jit::InZygoteUsingJit();
+  return result ? JNI_TRUE : JNI_FALSE;
+}
+
+
 static JNINativeMethod gMethods[] = {
   NATIVE_METHOD(ZygoteHooks, nativePreFork, "()J"),
   NATIVE_METHOD(ZygoteHooks, nativePostZygoteFork, "()V"),
   NATIVE_METHOD(ZygoteHooks, nativePostForkSystemServer, "(I)V"),
   NATIVE_METHOD(ZygoteHooks, nativePostForkChild, "(JIZZLjava/lang/String;)V"),
+  NATIVE_METHOD(ZygoteHooks, nativeZygoteJitEnabled, "()Z"),
   NATIVE_METHOD(ZygoteHooks, startZygoteNoThreadCreation, "()V"),
   NATIVE_METHOD(ZygoteHooks, stopZygoteNoThreadCreation, "()V"),
 };
