@@ -48,8 +48,8 @@ cc_defaults {
     },
     tidy: true,
     tidy_flags: [
-        "-format-style='file'",
-        "--header-filter='system/apex/'",
+        "-format-style=file",
+        "-header-filter=(art/odrefresh/|system/apex/)",
     ],
 }
 
