@@ -88,6 +88,7 @@ ART_CORE_DEBUGGABLE_EXECUTABLES := \
     dexoptanalyzer \
     imgdiag \
     oatdump \
+    odrefresh \
     profman \
 
 ART_CORE_EXECUTABLES := \

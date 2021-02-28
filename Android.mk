@@ -349,6 +349,7 @@ LOCAL_REQUIRED_MODULES := \
     $(call art_module_lib,libart-compiler) \
     $(call art_module_lib,libopenjdkjvm) \
     $(call art_module_lib,libopenjdkjvmti) \
+    $(call art_module_lib,odrefresh) \
     $(call art_module_lib,profman) \
     $(call art_module_lib,libadbconnection) \
     $(call art_module_lib,libperfetto_hprof) \
@@ -652,6 +653,7 @@ ART_TARGET_SHARED_LIBRARY_BENCHMARK := $(TARGET_OUT_SHARED_LIBRARIES)/libartbenc
 ART_TARGET_SHARED_LIBRARY_PALETTE_DEPENDENCIES := \
     $(TARGET_OUT_SHARED_LIBRARIES)/libcutils.so \
     $(TARGET_OUT_SHARED_LIBRARIES)/libprocessgroup.so \
+    $(TARGET_OUT_SHARED_LIBRARIES)/libselinux.so \
     $(TARGET_OUT_SHARED_LIBRARIES)/libtombstoned_client.so
 
 build-art-target-golem: $(RELEASE_ART_APEX) com.android.runtime $(CONSCRYPT_APEX) \

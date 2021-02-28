@@ -28,7 +28,6 @@
 #include "class_linker.h"
 #include "dex/dex_file.h"
 #include "gc_root-inl.h"
-#include "linear_alloc.h"
 #include "mirror/call_site.h"
 #include "mirror/class.h"
 #include "mirror/method_type.h"
@@ -41,38 +40,6 @@
 
 namespace art {
 namespace mirror {
-
-template<typename DexCachePair>
-static void InitializeArray(std::atomic<DexCachePair>* array) {
-  DexCachePair::Initialize(array);
-}
-
-template<typename T>
-static void InitializeArray(GcRoot<T>*) {
-  // No special initialization is needed.
-}
-
-template<typename T, size_t kMaxCacheSize>
-T* DexCache::AllocArray(MemberOffset obj_offset, MemberOffset num_offset, size_t num) {
-  num = std::min<size_t>(num, kMaxCacheSize);
-  if (num == 0) {
-    return nullptr;
-  }
-  Thread* self = Thread::Current();
-  ClassLinker* linker = Runtime::Current()->GetClassLinker();
-  LinearAlloc* alloc = linker->GetOrCreateAllocatorForClassLoader(GetClassLoader());
-  MutexLock mu(self, *Locks::dex_cache_lock_);  // Avoid allocation by multiple threads.
-  T* array = GetFieldPtr64<T*>(obj_offset);
-  if (array != nullptr) {
-    DCHECK(alloc->Contains(array));
-    return array;  // Other thread just allocated the array.
-  }
-  array = reinterpret_cast<T*>(alloc->AllocAlign16(self, RoundUp(num * sizeof(T), 16)));
-  InitializeArray(array);  // Ensure other threads see the array initialized.
-  SetField32Volatile<false, false>(num_offset, num);
-  SetField64Volatile<false, false>(obj_offset, reinterpret_cast<uint64_t>(array));
-  return array;
-}
 
 template <typename T>
 inline DexCachePair<T>::DexCachePair(ObjPtr<T> object, uint32_t index)
@@ -116,22 +83,27 @@ inline uint32_t DexCache::StringSlotIndex(dex::StringIndex string_idx) {
 }
 
 inline String* DexCache::GetResolvedString(dex::StringIndex string_idx) {
-  StringDexCacheType* strings = GetStrings();
-  if (UNLIKELY(strings == nullptr)) {
-    return nullptr;
+  const uint32_t num_preresolved_strings = NumPreResolvedStrings();
+  if (num_preresolved_strings != 0u) {
+    GcRoot<mirror::String>* preresolved_strings = GetPreResolvedStrings();
+    // num_preresolved_strings can become 0 and preresolved_strings can become null in any order
+    // when ClearPreResolvedStrings is called.
+    if (preresolved_strings != nullptr) {
+      DCHECK_LT(string_idx.index_, num_preresolved_strings);
+      DCHECK_EQ(num_preresolved_strings, GetDexFile()->NumStringIds());
+      mirror::String* string = preresolved_strings[string_idx.index_].Read();
+      if (LIKELY(string != nullptr)) {
+        return string;
+      }
+    }
   }
-  return strings[StringSlotIndex(string_idx)].load(
+  return GetStrings()[StringSlotIndex(string_idx)].load(
       std::memory_order_relaxed).GetObjectForIndex(string_idx.index_);
 }
 
 inline void DexCache::SetResolvedString(dex::StringIndex string_idx, ObjPtr<String> resolved) {
   DCHECK(resolved != nullptr);
-  StringDexCacheType* strings = GetStrings();
-  if (UNLIKELY(strings == nullptr)) {
-    strings = AllocArray<StringDexCacheType, kDexCacheStringCacheSize>(
-        StringsOffset(), NumStringsOffset(), GetDexFile()->NumStringIds());
-  }
-  strings[StringSlotIndex(string_idx)].store(
+  GetStrings()[StringSlotIndex(string_idx)].store(
       StringDexCachePair(resolved, string_idx.index_), std::memory_order_relaxed);
   Runtime* const runtime = Runtime::Current();
   if (UNLIKELY(runtime->IsActiveTransaction())) {
@@ -142,14 +114,32 @@ inline void DexCache::SetResolvedString(dex::StringIndex string_idx, ObjPtr<Stri
   WriteBarrier::ForEveryFieldWrite(this);
 }
 
+inline void DexCache::SetPreResolvedString(dex::StringIndex string_idx, ObjPtr<String> resolved) {
+  DCHECK(resolved != nullptr);
+  DCHECK_LT(string_idx.index_, GetDexFile()->NumStringIds());
+  GetPreResolvedStrings()[string_idx.index_] = GcRoot<mirror::String>(resolved);
+  Runtime* const runtime = Runtime::Current();
+  CHECK(runtime->IsAotCompiler());
+  CHECK(!runtime->IsActiveTransaction());
+  // TODO: Fine-grained marking, so that we don't need to go through all arrays in full.
+  WriteBarrier::ForEveryFieldWrite(this);
+}
+
+inline void DexCache::ClearPreResolvedStrings() {
+  SetFieldPtr64</*kTransactionActive=*/false,
+                /*kCheckTransaction=*/false,
+                kVerifyNone,
+                GcRoot<mirror::String>*>(PreResolvedStringsOffset(), nullptr);
+  SetField32</*kTransactionActive=*/false,
+             /*bool kCheckTransaction=*/false,
+             kVerifyNone,
+             /*kIsVolatile=*/false>(NumPreResolvedStringsOffset(), 0);
+}
+
 inline void DexCache::ClearString(dex::StringIndex string_idx) {
   DCHECK(Runtime::Current()->IsAotCompiler());
   uint32_t slot_idx = StringSlotIndex(string_idx);
-  StringDexCacheType* strings = GetStrings();
-  if (UNLIKELY(strings == nullptr)) {
-    return;
-  }
-  StringDexCacheType* slot = &strings[slot_idx];
+  StringDexCacheType* slot = &GetStrings()[slot_idx];
   // This is racy but should only be called from the transactional interpreter.
   if (slot->load(std::memory_order_relaxed).index == string_idx.index_) {
     StringDexCachePair cleared(nullptr, StringDexCachePair::InvalidIndexForSlot(slot_idx));
@@ -167,27 +157,18 @@ inline uint32_t DexCache::TypeSlotIndex(dex::TypeIndex type_idx) {
 inline Class* DexCache::GetResolvedType(dex::TypeIndex type_idx) {
   // It is theorized that a load acquire is not required since obtaining the resolved class will
   // always have an address dependency or a lock.
-  TypeDexCacheType* resolved_types = GetResolvedTypes();
-  if (UNLIKELY(resolved_types == nullptr)) {
-    return nullptr;
-  }
-  return resolved_types[TypeSlotIndex(type_idx)].load(
+  return GetResolvedTypes()[TypeSlotIndex(type_idx)].load(
       std::memory_order_relaxed).GetObjectForIndex(type_idx.index_);
 }
 
 inline void DexCache::SetResolvedType(dex::TypeIndex type_idx, ObjPtr<Class> resolved) {
   DCHECK(resolved != nullptr);
   DCHECK(resolved->IsResolved()) << resolved->GetStatus();
-  TypeDexCacheType* resolved_types = GetResolvedTypes();
-  if (UNLIKELY(resolved_types == nullptr)) {
-    resolved_types = AllocArray<TypeDexCacheType, kDexCacheTypeCacheSize>(
-        ResolvedTypesOffset(), NumResolvedTypesOffset(), GetDexFile()->NumTypeIds());
-  }
   // TODO default transaction support.
   // Use a release store for SetResolvedType. This is done to prevent other threads from seeing a
   // class but not necessarily seeing the loaded members like the static fields array.
   // See b/32075261.
-  resolved_types[TypeSlotIndex(type_idx)].store(
+  GetResolvedTypes()[TypeSlotIndex(type_idx)].store(
       TypeDexCachePair(resolved, type_idx.index_), std::memory_order_release);
   // TODO: Fine-grained marking, so that we don't need to go through all arrays in full.
   WriteBarrier::ForEveryFieldWrite(this);
@@ -195,12 +176,8 @@ inline void DexCache::SetResolvedType(dex::TypeIndex type_idx, ObjPtr<Class> res
 
 inline void DexCache::ClearResolvedType(dex::TypeIndex type_idx) {
   DCHECK(Runtime::Current()->IsAotCompiler());
-  TypeDexCacheType* resolved_types = GetResolvedTypes();
-  if (UNLIKELY(resolved_types == nullptr)) {
-    return;
-  }
   uint32_t slot_idx = TypeSlotIndex(type_idx);
-  TypeDexCacheType* slot = &resolved_types[slot_idx];
+  TypeDexCacheType* slot = &GetResolvedTypes()[slot_idx];
   // This is racy but should only be called from the single-threaded ImageWriter and tests.
   if (slot->load(std::memory_order_relaxed).index == type_idx.index_) {
     TypeDexCachePair cleared(nullptr, TypeDexCachePair::InvalidIndexForSlot(slot_idx));
@@ -217,22 +194,13 @@ inline uint32_t DexCache::MethodTypeSlotIndex(dex::ProtoIndex proto_idx) {
 }
 
 inline MethodType* DexCache::GetResolvedMethodType(dex::ProtoIndex proto_idx) {
-  MethodTypeDexCacheType* methods = GetResolvedMethodTypes();
-  if (UNLIKELY(methods == nullptr)) {
-    return nullptr;
-  }
-  return methods[MethodTypeSlotIndex(proto_idx)].load(
+  return GetResolvedMethodTypes()[MethodTypeSlotIndex(proto_idx)].load(
       std::memory_order_relaxed).GetObjectForIndex(proto_idx.index_);
 }
 
 inline void DexCache::SetResolvedMethodType(dex::ProtoIndex proto_idx, MethodType* resolved) {
   DCHECK(resolved != nullptr);
-  MethodTypeDexCacheType* methods = GetResolvedMethodTypes();
-  if (UNLIKELY(methods == nullptr)) {
-    methods = AllocArray<MethodTypeDexCacheType, kDexCacheMethodTypeCacheSize>(
-        ResolvedMethodTypesOffset(), NumResolvedMethodTypesOffset(), GetDexFile()->NumProtoIds());
-  }
-  methods[MethodTypeSlotIndex(proto_idx)].store(
+  GetResolvedMethodTypes()[MethodTypeSlotIndex(proto_idx)].store(
       MethodTypeDexCachePair(resolved, proto_idx.index_), std::memory_order_relaxed);
   // TODO: Fine-grained marking, so that we don't need to go through all arrays in full.
   WriteBarrier::ForEveryFieldWrite(this);
@@ -241,11 +209,7 @@ inline void DexCache::SetResolvedMethodType(dex::ProtoIndex proto_idx, MethodTyp
 inline CallSite* DexCache::GetResolvedCallSite(uint32_t call_site_idx) {
   DCHECK(Runtime::Current()->IsMethodHandlesEnabled());
   DCHECK_LT(call_site_idx, GetDexFile()->NumCallSiteIds());
-  GcRoot<CallSite>* call_sites = GetResolvedCallSites();
-  if (UNLIKELY(call_sites == nullptr)) {
-    return nullptr;
-  }
-  GcRoot<mirror::CallSite>& target = call_sites[call_site_idx];
+  GcRoot<mirror::CallSite>& target = GetResolvedCallSites()[call_site_idx];
   Atomic<GcRoot<mirror::CallSite>>& ref =
       reinterpret_cast<Atomic<GcRoot<mirror::CallSite>>&>(target);
   return ref.load(std::memory_order_seq_cst).Read();
@@ -258,12 +222,7 @@ inline ObjPtr<CallSite> DexCache::SetResolvedCallSite(uint32_t call_site_idx,
 
   GcRoot<mirror::CallSite> null_call_site(nullptr);
   GcRoot<mirror::CallSite> candidate(call_site);
-  GcRoot<CallSite>* call_sites = GetResolvedCallSites();
-  if (UNLIKELY(call_sites == nullptr)) {
-    call_sites = AllocArray<GcRoot<CallSite>, std::numeric_limits<size_t>::max()>(
-        ResolvedCallSitesOffset(), NumResolvedCallSitesOffset(), GetDexFile()->NumCallSiteIds());
-  }
-  GcRoot<mirror::CallSite>& target = call_sites[call_site_idx];
+  GcRoot<mirror::CallSite>& target = GetResolvedCallSites()[call_site_idx];
 
   // The first assignment for a given call site wins.
   Atomic<GcRoot<mirror::CallSite>>& ref =
@@ -285,23 +244,14 @@ inline uint32_t DexCache::FieldSlotIndex(uint32_t field_idx) {
 }
 
 inline ArtField* DexCache::GetResolvedField(uint32_t field_idx) {
-  FieldDexCacheType* fields = GetResolvedFields();
-  if (UNLIKELY(fields == nullptr)) {
-    return nullptr;
-  }
-  auto pair = GetNativePair(fields, FieldSlotIndex(field_idx));
+  auto pair = GetNativePair(GetResolvedFields(), FieldSlotIndex(field_idx));
   return pair.GetObjectForIndex(field_idx);
 }
 
 inline void DexCache::SetResolvedField(uint32_t field_idx, ArtField* field) {
   DCHECK(field != nullptr);
   FieldDexCachePair pair(field, field_idx);
-  FieldDexCacheType* fields = GetResolvedFields();
-  if (UNLIKELY(fields == nullptr)) {
-    fields = AllocArray<FieldDexCacheType, kDexCacheFieldCacheSize>(
-        ResolvedFieldsOffset(), NumResolvedFieldsOffset(), GetDexFile()->NumFieldIds());
-  }
-  SetNativePair(fields, FieldSlotIndex(field_idx), pair);
+  SetNativePair(GetResolvedFields(), FieldSlotIndex(field_idx), pair);
 }
 
 inline uint32_t DexCache::MethodSlotIndex(uint32_t method_idx) {
@@ -312,23 +262,14 @@ inline uint32_t DexCache::MethodSlotIndex(uint32_t method_idx) {
 }
 
 inline ArtMethod* DexCache::GetResolvedMethod(uint32_t method_idx) {
-  MethodDexCacheType* methods = GetResolvedMethods();
-  if (UNLIKELY(methods == nullptr)) {
-    return nullptr;
-  }
-  auto pair = GetNativePair(methods, MethodSlotIndex(method_idx));
+  auto pair = GetNativePair(GetResolvedMethods(), MethodSlotIndex(method_idx));
   return pair.GetObjectForIndex(method_idx);
 }
 
 inline void DexCache::SetResolvedMethod(uint32_t method_idx, ArtMethod* method) {
   DCHECK(method != nullptr);
   MethodDexCachePair pair(method, method_idx);
-  MethodDexCacheType* methods = GetResolvedMethods();
-  if (UNLIKELY(methods == nullptr)) {
-    methods = AllocArray<MethodDexCacheType, kDexCacheMethodCacheSize>(
-        ResolvedMethodsOffset(), NumResolvedMethodsOffset(), GetDexFile()->NumMethodIds());
-  }
-  SetNativePair(methods, MethodSlotIndex(method_idx), pair);
+  SetNativePair(GetResolvedMethods(), MethodSlotIndex(method_idx), pair);
 }
 
 template <typename T>
@@ -369,7 +310,7 @@ inline void VisitDexCachePairs(std::atomic<DexCachePair<T>>* pairs,
                                size_t num_pairs,
                                const Visitor& visitor)
     REQUIRES_SHARED(Locks::mutator_lock_) REQUIRES(Locks::heap_bitmap_lock_) {
-  for (size_t i = 0; pairs != nullptr && i < num_pairs; ++i) {
+  for (size_t i = 0; i < num_pairs; ++i) {
     DexCachePair<T> source = pairs[i].load(std::memory_order_relaxed);
     // NOTE: We need the "template" keyword here to avoid a compilation
     // failure. GcRoot<T> is a template argument-dependent type and we need to
@@ -404,9 +345,65 @@ inline void DexCache::VisitReferences(ObjPtr<Class> klass, const Visitor& visito
 
     GcRoot<mirror::CallSite>* resolved_call_sites = GetResolvedCallSites<kVerifyFlags>();
     size_t num_call_sites = NumResolvedCallSites<kVerifyFlags>();
-    for (size_t i = 0; resolved_call_sites != nullptr && i != num_call_sites; ++i) {
+    for (size_t i = 0; i != num_call_sites; ++i) {
       visitor.VisitRootIfNonNull(resolved_call_sites[i].AddressWithoutBarrier());
     }
+
+    GcRoot<mirror::String>* const preresolved_strings = GetPreResolvedStrings();
+    if (preresolved_strings != nullptr) {
+      const size_t num_preresolved_strings = NumPreResolvedStrings();
+      for (size_t i = 0; i != num_preresolved_strings; ++i) {
+        visitor.VisitRootIfNonNull(preresolved_strings[i].AddressWithoutBarrier());
+      }
+    }
+  }
+}
+
+template <ReadBarrierOption kReadBarrierOption, typename Visitor>
+inline void DexCache::FixupStrings(StringDexCacheType* dest, const Visitor& visitor) {
+  StringDexCacheType* src = GetStrings();
+  for (size_t i = 0, count = NumStrings(); i < count; ++i) {
+    StringDexCachePair source = src[i].load(std::memory_order_relaxed);
+    String* ptr = source.object.Read<kReadBarrierOption>();
+    String* new_source = visitor(ptr);
+    source.object = GcRoot<String>(new_source);
+    dest[i].store(source, std::memory_order_relaxed);
+  }
+}
+
+template <ReadBarrierOption kReadBarrierOption, typename Visitor>
+inline void DexCache::FixupResolvedTypes(TypeDexCacheType* dest, const Visitor& visitor) {
+  TypeDexCacheType* src = GetResolvedTypes();
+  for (size_t i = 0, count = NumResolvedTypes(); i < count; ++i) {
+    TypeDexCachePair source = src[i].load(std::memory_order_relaxed);
+    Class* ptr = source.object.Read<kReadBarrierOption>();
+    Class* new_source = visitor(ptr);
+    source.object = GcRoot<Class>(new_source);
+    dest[i].store(source, std::memory_order_relaxed);
+  }
+}
+
+template <ReadBarrierOption kReadBarrierOption, typename Visitor>
+inline void DexCache::FixupResolvedMethodTypes(MethodTypeDexCacheType* dest,
+                                               const Visitor& visitor) {
+  MethodTypeDexCacheType* src = GetResolvedMethodTypes();
+  for (size_t i = 0, count = NumResolvedMethodTypes(); i < count; ++i) {
+    MethodTypeDexCachePair source = src[i].load(std::memory_order_relaxed);
+    MethodType* ptr = source.object.Read<kReadBarrierOption>();
+    MethodType* new_source = visitor(ptr);
+    source.object = GcRoot<MethodType>(new_source);
+    dest[i].store(source, std::memory_order_relaxed);
+  }
+}
+
+template <ReadBarrierOption kReadBarrierOption, typename Visitor>
+inline void DexCache::FixupResolvedCallSites(GcRoot<mirror::CallSite>* dest,
+                                             const Visitor& visitor) {
+  GcRoot<mirror::CallSite>* src = GetResolvedCallSites();
+  for (size_t i = 0, count = NumResolvedCallSites(); i < count; ++i) {
+    mirror::CallSite* source = src[i].Read<kReadBarrierOption>();
+    mirror::CallSite* new_source = visitor(source);
+    dest[i] = GcRoot<mirror::CallSite>(new_source);
   }
 }
 
