@@ -28,34 +28,6 @@ namespace art {
 
 class FileUtilsTest : public CommonArtTest {};
 
-// Helper class that removes an environment variable whilst in scope.
-class ScopedUnsetEnvironmentVariable {
- public:
-  explicit ScopedUnsetEnvironmentVariable(const char* variable)
-      : variable_{variable}, old_value_{GetOldValue(variable)} {
-    unsetenv(variable);
-  }
-
-  ~ScopedUnsetEnvironmentVariable() {
-    if (old_value_.has_value()) {
-      static constexpr int kReplace = 1;  // tidy-issue: replace argument has libc dependent name.
-      setenv(variable_, old_value_.value().c_str(), kReplace);
-    } else {
-      unsetenv(variable_);
-    }
-  }
-
- private:
-  static std::optional<std::string> GetOldValue(const char* variable) {
-    const char* value = getenv(variable);
-    return value != nullptr ? std::optional<std::string>{value} : std::nullopt;
-  }
-
-  const char* variable_;
-  std::optional<std::string> old_value_;
-  DISALLOW_COPY_AND_ASSIGN(ScopedUnsetEnvironmentVariable);
-};
-
 TEST_F(FileUtilsTest, GetDalvikCacheFilename) {
   std::string name;
   std::string error;

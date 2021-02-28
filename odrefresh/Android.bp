@@ -1,0 +1,119 @@
+//
+// Copyright (C) 2020 The Android Open Source Project
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+
+cc_defaults {
+    name: "odrefresh-defaults",
+    host_supported: true,
+    defaults: ["art_defaults"],
+    srcs: [
+        "odrefresh.cc",
+    ],
+    local_include_dirs: ["include"],
+    header_libs: ["dexoptanalyzer_headers"],
+    generated_sources: ["apex-info-list"],
+    shared_libs: [
+        "libartpalette",
+        "libbase",
+        "liblog",
+    ],
+    static_libs: ["libxml2"],
+    target: {
+        android: {
+            // Use the 32-bit version of odrefresh on devices.
+            compile_multilib: "prefer32",
+        },
+        linux: {
+            enabled: true,
+        },
+        host: {
+            shared_libs: [
+                // Both these libraries for libxml2 on host for code derived from apex-info-list.
+                "libicui18n",
+                "libicuuc",
+            ],
+        },
+    },
+    tidy: true,
+    tidy_flags: [
+        "-format-style='file'",
+        "--header-filter='system/apex/'",
+    ],
+}
+
+cc_library_headers {
+    name: "odrefresh_headers",
+    export_include_dirs: ["include"],
+    host_supported: true,
+    stl: "none",
+    system_shared_libs: [],
+    min_sdk_version: "29", // As part of mainline modules(APEX), it should support at least 29(Q).
+    sdk_version: "minimum", // The minimum sdk version required by users of this module.
+    apex_available: [
+        "//apex_available:platform", // For odsign.
+    ],
+    visibility: ["//visibility:public"],
+}
+
+art_cc_binary {
+    name: "odrefresh",
+    defaults: ["odrefresh-defaults"],
+    required: [
+        "dexoptanalyzer",
+        "dex2oat",
+    ],
+    shared_libs: [
+        "libart",
+        "libartbase",
+    ],
+    apex_available: [
+        "com.android.art",
+        "com.android.art.debug",
+    ],
+}
+
+art_cc_binary {
+    name: "odrefreshd",
+    defaults: [
+        "art_debug_defaults",
+        "odrefresh-defaults",
+    ],
+    required: [
+        "dexoptanalyzerd",
+        "dex2oatd",
+    ],
+    shared_libs: [
+        "libartd",
+        "libartbased",
+    ],
+    apex_available: [
+        "com.android.art.debug",
+    ],
+}
+
+art_cc_test {
+    name: "art_odrefresh_tests",
+    defaults: [
+        "art_gtest_defaults",
+    ],
+    header_libs: ["odrefresh_headers"],
+    srcs: [
+        "odr_artifacts_test.cc",
+        "odrefresh_test.cc",
+    ],
+    shared_libs: [
+        "libbase",
+    ],
+}
