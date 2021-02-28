@@ -114,9 +114,9 @@ ALWAYS_INLINE inline static bool GetFieldValue(const ScopedFastNativeObjectAcces
                      mirror::Reference::ReferentOffset() == offset)) {
           // PhantomReference's get() always returns null.
           value->SetL((class_flags & mirror::kClassFlagPhantomReference) != 0
-                      ? nullptr
-                      : Runtime::Current()->GetHeap()->GetReferenceProcessor()->GetReferent(
-                              soa.Self(), o->AsReference()));
+                          ? nullptr
+                          : Runtime::Current()->GetHeap()->GetReferenceProcessor()->GetReferent(
+                                  soa.Self(), o->AsReference()));
         } else {
           value->SetL(is_volatile ? o->GetFieldObjectVolatile<mirror::Object>(offset) :
                       o->GetFieldObject<mirror::Object>(offset));
