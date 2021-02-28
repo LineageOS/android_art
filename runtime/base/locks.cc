@@ -74,7 +74,6 @@ Mutex* Locks::user_code_suspension_lock_ = nullptr;
 Uninterruptible Roles::uninterruptible_;
 ReaderWriterMutex* Locks::jni_globals_lock_ = nullptr;
 Mutex* Locks::jni_weak_globals_lock_ = nullptr;
-Mutex* Locks::dex_cache_lock_ = nullptr;
 ReaderWriterMutex* Locks::dex_lock_ = nullptr;
 Mutex* Locks::native_debug_interface_lock_ = nullptr;
 ReaderWriterMutex* Locks::jni_id_lock_ = nullptr;
@@ -250,10 +249,6 @@ void Locks::Init() {
     UPDATE_CURRENT_LOCK_LEVEL(kDexLock);
     DCHECK(dex_lock_ == nullptr);
     dex_lock_ = new ReaderWriterMutex("ClassLinker dex lock", current_lock_level);
-
-    UPDATE_CURRENT_LOCK_LEVEL(kDexCacheLock);
-    DCHECK(dex_cache_lock_ == nullptr);
-    dex_cache_lock_ = new Mutex("DexCache lock", current_lock_level);
 
     UPDATE_CURRENT_LOCK_LEVEL(kOatFileManagerLock);
     DCHECK(oat_file_manager_lock_ == nullptr);

@@ -446,6 +446,10 @@ class ImageWriter final {
   // Remove unwanted classes from various roots.
   void PruneNonImageClasses() REQUIRES_SHARED(Locks::mutator_lock_);
 
+  // Remove everything from the DexCache.
+  void ClearDexCache(ObjPtr<mirror::DexCache> dex_cache)
+      REQUIRES_SHARED(Locks::mutator_lock_);
+
   // Find dex caches for pruning or preloading.
   std::vector<ObjPtr<mirror::DexCache>> FindDexCaches(Thread* self)
       REQUIRES_SHARED(Locks::mutator_lock_)
