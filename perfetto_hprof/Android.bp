@@ -20,6 +20,15 @@
 // to be backwards compatible, see
 // https://android.googlesource.com/platform/external/perfetto/+/refs/heads/master/protos/perfetto/ipc/producer_port.proto.
 
+package {
+    // See: http://go/android-license-faq
+    // A large-scale-change added 'default_applicable_licenses' to import
+    // all of the 'license_kinds' from "art_license"
+    // to get the below license kinds:
+    //   SPDX-license-identifier-Apache-2.0
+    default_applicable_licenses: ["art_license"],
+}
+
 gensrcs {
     name: "art_perfetto_hprof_operator_srcs",
     cmd: "$(location generate_operator_out) art/perfetto_hprof $(in) > $(out)",
