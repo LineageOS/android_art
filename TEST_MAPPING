@@ -54,6 +54,63 @@
     },
     {
       "name": "art-run-test-019-wrong-array-type[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-020-string[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-021-string2[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-022-interface[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-025-access-controller[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-026-access[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-027-arithmetic[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-028-array-write[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-029-assert[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-033-class-init-deadlock[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-035-enum[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-036-finalizer[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-037-inherit[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-039-join-main[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-040-miranda[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-041-narrowing[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-043-privates[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-045-reflect-array[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-046-reflect[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-047-returns[com.google.android.art.apex]"
     }
   ],
   "presubmit": [
