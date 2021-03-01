@@ -993,8 +993,12 @@ function write_dex2oat_cmdlines {
   if [ "$PROFILE" = "y" ] || [ "$RANDOM_PROFILE" = "y" ]; then
     vdex_cmdline="${dex2oat_cmdline} ${VDEX_ARGS} --input-vdex=$DEX_LOCATION/oat/$ISA/$name.vdex --output-vdex=$DEX_LOCATION/oat/$ISA/$name.vdex"
   elif [ "$TEST_VDEX" = "y" ]; then
-    # We delete the odex file so that the runtime only picks up the vdex file.
-    vdex_cmdline="rm $DEX_LOCATION/oat/$ISA/$name.odex"
+    if [ "$VDEX_ARGS" = "" ]; then
+      # If no arguments need to be passed, just delete the odex file so that the runtime only picks up the vdex file.
+      vdex_cmdline="rm $DEX_LOCATION/oat/$ISA/$name.odex"
+    else
+      vdex_cmdline="${dex2oat_cmdline} ${VDEX_ARGS} --input-vdex=$DEX_LOCATION/oat/$ISA/$name.vdex"
+    fi
   elif [ "$TEST_DM" = "y" ]; then
     dex2oat_cmdline="${dex2oat_cmdline} --copy-dex-files=false --output-vdex=$DEX_LOCATION/oat/$ISA/primary.vdex"
     dm_cmdline="zip -qj $DEX_LOCATION/oat/$ISA/$name.dm $DEX_LOCATION/oat/$ISA/primary.vdex"
