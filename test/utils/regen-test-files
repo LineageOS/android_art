@@ -565,8 +565,6 @@ class Generator:
   def regen_art_mts_files(self, art_run_tests):
     """Regenerate ART MTS definition files."""
 
-    run_test_module_names = [ART_RUN_TEST_MODULE_NAME_PREFIX + t for t in art_run_tests]
-
     # Regenerate `mts_art_tests_list_user_file.xml`.
 
     root = xml.dom.minidom.Document()
@@ -593,30 +591,60 @@ class Generator:
     root.appendChild(configuration)
     configuration.setAttribute("description", "List of ART MTS tests that do not need root access.")
 
+    # Test declarations.
+    # ------------------
+
+    def append_test_declaration(test):
+      option = root.createElement("option")
+      option.setAttribute("name", "compatibility:include-filter")
+      option.setAttribute("value", test)
+      configuration.appendChild(option)
+
     # ART run-tests.
+    art_run_test_module_names = [ART_RUN_TEST_MODULE_NAME_PREFIX + t for t in art_run_tests]
     art_run_test_header = root.createComment(" ART run-tests. ")
     configuration.appendChild(art_run_test_header)
     art_run_test_todo = root.createComment(
         " TODO(rpl): Find a way to express this list in a more concise fashion. ")
     configuration.appendChild(art_run_test_todo)
-    for run_test_module_name in run_test_module_names:
+    for art_run_test_module_name in art_run_test_module_names:
+      append_test_declaration(art_run_test_module_name)
+
+    # Libcore CTS tests.
+    # TODO(rpl): Progressively add more Libcore CTS tests.
+    libcore_cts_test_module_names = [
+        "CtsLibcoreTestCases",
+    ]
+    libcore_cts_test_header = root.createComment(" Libcore CTS tests. ")
+    configuration.appendChild(libcore_cts_test_header)
+    for libcore_cts_test_module_name in libcore_cts_test_module_names:
+      append_test_declaration(libcore_cts_test_module_name)
+
+    # `MainlineTestModuleController` configurations.
+    # ----------------------------------------------
+
+    def append_module_controller_configuration(test):
       option = root.createElement("option")
-      option.setAttribute("name", "compatibility:include-filter")
-      option.setAttribute("value", run_test_module_name)
+      option.setAttribute("name", "compatibility:module-arg")
+      option.setAttribute("value", f"{test}:enable:true")
       configuration.appendChild(option)
 
     # `MainlineTestModuleController` configuration for ART run-tests.
     art_run_test_module_controller_header = root.createComment(
-        " Enable MainlineTestModuleController. ")
+        " Enable MainlineTestModuleController for ART run-tests. ")
     configuration.appendChild(art_run_test_module_controller_header)
     art_run_test_module_controller_todo = root.createComment(
         " TODO(rpl): Find a way to express this list in a more concise fashion. ")
     configuration.appendChild(art_run_test_module_controller_todo)
-    for run_test_module_name in run_test_module_names:
-      option = root.createElement("option")
-      option.setAttribute("name", "compatibility:module-arg")
-      option.setAttribute("value", f"{run_test_module_name}:enable:true")
-      configuration.appendChild(option)
+    for art_run_test_module_name in art_run_test_module_names:
+      append_module_controller_configuration(art_run_test_module_name)
+
+    # `MainlineTestModuleController` configuration for Libcore CTS tests.
+    libcore_cts_test_module_controller_header = root.createComment(
+        " Enable MainlineTestModuleController for Libcore CTS tests. ")
+    configuration.appendChild(libcore_cts_test_module_controller_header)
+    for libcore_cts_test_module_name in libcore_cts_test_module_names:
+      append_module_controller_configuration(libcore_cts_test_module_name)
 
     xml_str = root.toprettyxml(indent = XML_INDENT, encoding = "utf-8")
 
