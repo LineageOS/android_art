@@ -14,6 +14,9 @@
       "name": "art-run-test-004-InterfaceTest[com.google.android.art.apex]"
     },
     {
+      "name": "art-run-test-004-checker-UnsafeTest18[com.google.android.art.apex]"
+    },
+    {
       "name": "art-run-test-006-args[com.google.android.art.apex]"
     },
     {
@@ -36,6 +39,21 @@
     },
     {
       "name": "art-run-test-014-math3[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-015-switch[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-016-intern[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-017-float[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-018-stack-overflow[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-019-wrong-array-type[com.google.android.art.apex]"
     }
   ],
   "presubmit": [
@@ -62,6 +80,9 @@
     },
     {
       "name": "art-run-test-004-InterfaceTest"
+    },
+    {
+      "name": "art-run-test-004-checker-UnsafeTest18"
     },
     {
       "name": "art-run-test-006-args"
@@ -262,6 +283,9 @@
       "name": "art-run-test-100-reflect2"
     },
     {
+      "name": "art-run-test-1004-checker-volatile-ref-load"
+    },
+    {
       "name": "art-run-test-101-fibonacci"
     },
     {
@@ -376,6 +400,12 @@
       "name": "art-run-test-176-app-image-string"
     },
     {
+      "name": "art-run-test-1960-checker-bounds-codegen"
+    },
+    {
+      "name": "art-run-test-1961-checker-loop-vectorizer"
+    },
+    {
       "name": "art-run-test-201-built-in-except-detail-messages"
     },
     {
@@ -418,6 +448,9 @@
       "name": "art-run-test-2030-long-running-child"
     },
     {
+      "name": "art-run-test-2231-checker-heap-poisoning"
+    },
+    {
       "name": "art-run-test-2232-write-metrics-to-log"
     },
     {
@@ -434,9 +467,7 @@
     },
     {
       "name": "art-run-test-401-optimizing-compiler"
-    }
-  ],
-  "postsubmit": [
+    },
     {
       "name": "art-run-test-402-optimizing-control-flow"
     },
@@ -463,6 +494,12 @@
     },
     {
       "name": "art-run-test-410-floats"
+    },
+    {
+      "name": "art-run-test-411-checker-hdiv-hrem-pow2"
+    },
+    {
+      "name": "art-run-test-411-checker-instruct-simplifier-hrem"
     },
     {
       "name": "art-run-test-411-optimizing-arith"
@@ -546,7 +583,28 @@
       "name": "art-run-test-440-stmp"
     },
     {
+      "name": "art-run-test-441-checker-inliner"
+    },
+    {
       "name": "art-run-test-443-not-bool-inline"
+    },
+    {
+      "name": "art-run-test-444-checker-nce"
+    },
+    {
+      "name": "art-run-test-445-checker-licm"
+    },
+    {
+      "name": "art-run-test-446-checker-inliner2"
+    },
+    {
+      "name": "art-run-test-447-checker-inliner3"
+    },
+    {
+      "name": "art-run-test-449-checker-bce-rem"
+    },
+    {
+      "name": "art-run-test-450-checker-types"
     },
     {
       "name": "art-run-test-451-regression-add-float"
@@ -555,10 +613,19 @@
       "name": "art-run-test-451-spill-splot"
     },
     {
+      "name": "art-run-test-455-checker-gvn"
+    },
+    {
       "name": "art-run-test-456-baseline-array-set"
     },
     {
       "name": "art-run-test-458-long-to-fpu"
+    },
+    {
+      "name": "art-run-test-464-checker-inline-sharpen-calls"
+    },
+    {
+      "name": "art-run-test-465-checker-clinit-gvn"
     },
     {
       "name": "art-run-test-469-condition-materialization"
@@ -568,12 +635,20 @@
     },
     {
       "name": "art-run-test-471-deopt-environment"
-    },
+    }
+  ],
+  "postsubmit": [
     {
       "name": "art-run-test-472-type-propagation"
     },
     {
+      "name": "art-run-test-473-checker-inliner-constants"
+    },
+    {
       "name": "art-run-test-473-remove-dead-block"
+    },
+    {
+      "name": "art-run-test-474-checker-boolean-input"
     },
     {
       "name": "art-run-test-474-fp-sub-neg"
@@ -582,13 +657,28 @@
       "name": "art-run-test-475-simplify-mul-zero"
     },
     {
+      "name": "art-run-test-476-checker-ctor-memory-barrier"
+    },
+    {
       "name": "art-run-test-476-clinit-inline-static-invoke"
+    },
+    {
+      "name": "art-run-test-477-checker-bound-type"
     },
     {
       "name": "art-run-test-477-long-2-float-convers-precision"
     },
     {
+      "name": "art-run-test-478-checker-inline-noreturn"
+    },
+    {
+      "name": "art-run-test-478-checker-inliner-nested-loop"
+    },
+    {
       "name": "art-run-test-479-regression-implicit-null-check"
+    },
+    {
+      "name": "art-run-test-480-checker-dead-blocks"
     },
     {
       "name": "art-run-test-481-regression-phi-cond"
@@ -597,10 +687,40 @@
       "name": "art-run-test-483-dce-block"
     },
     {
+      "name": "art-run-test-485-checker-dce-switch"
+    },
+    {
+      "name": "art-run-test-486-checker-must-do-null-check"
+    },
+    {
+      "name": "art-run-test-487-checker-inline-calls"
+    },
+    {
+      "name": "art-run-test-488-checker-inline-recursive-calls"
+    },
+    {
       "name": "art-run-test-489-current-method-regression"
     },
     {
+      "name": "art-run-test-490-checker-inline"
+    },
+    {
       "name": "art-run-test-491-current-method"
+    },
+    {
+      "name": "art-run-test-492-checker-inline-invoke-interface"
+    },
+    {
+      "name": "art-run-test-493-checker-inline-invoke-interface"
+    },
+    {
+      "name": "art-run-test-494-checker-instanceof-tests"
+    },
+    {
+      "name": "art-run-test-495-checker-checkcast-tests"
+    },
+    {
+      "name": "art-run-test-496-checker-inlining-class-loader"
     },
     {
       "name": "art-run-test-499-bce-phi-array-length"
@@ -618,6 +738,9 @@
       "name": "art-run-test-507-referrer"
     },
     {
+      "name": "art-run-test-508-checker-disassembly"
+    },
+    {
       "name": "art-run-test-508-referrer-method"
     },
     {
@@ -630,13 +753,28 @@
       "name": "art-run-test-519-bound-load-class"
     },
     {
+      "name": "art-run-test-521-checker-array-set-null"
+    },
+    {
       "name": "art-run-test-521-regression-integer-field-set"
     },
     {
       "name": "art-run-test-524-boolean-simplifier-regression"
     },
     {
+      "name": "art-run-test-525-checker-arrays-fields1"
+    },
+    {
+      "name": "art-run-test-525-checker-arrays-fields2"
+    },
+    {
       "name": "art-run-test-526-long-regalloc"
+    },
+    {
+      "name": "art-run-test-527-checker-array-access-simd"
+    },
+    {
+      "name": "art-run-test-527-checker-array-access-split"
     },
     {
       "name": "art-run-test-528-long-hint"
@@ -645,10 +783,55 @@
       "name": "art-run-test-529-long-split"
     },
     {
+      "name": "art-run-test-530-checker-loops1"
+    },
+    {
+      "name": "art-run-test-530-checker-loops2"
+    },
+    {
+      "name": "art-run-test-530-checker-loops3"
+    },
+    {
+      "name": "art-run-test-530-checker-loops4"
+    },
+    {
+      "name": "art-run-test-530-checker-loops5"
+    },
+    {
+      "name": "art-run-test-530-checker-lse-ctor-fences"
+    },
+    {
+      "name": "art-run-test-530-checker-lse-simd"
+    },
+    {
+      "name": "art-run-test-530-checker-lse2"
+    },
+    {
       "name": "art-run-test-530-instanceof-checkcast"
     },
     {
+      "name": "art-run-test-532-checker-nonnull-arrayset"
+    },
+    {
+      "name": "art-run-test-534-checker-bce-deoptimization"
+    },
+    {
       "name": "art-run-test-535-deopt-and-inlining"
+    },
+    {
+      "name": "art-run-test-536-checker-intrinsic-optimization"
+    },
+    {
+      "name": "art-run-test-537-checker-arraycopy"
+    },
+    {
+      "name": "art-run-test-537-checker-jump-over-jump"
+    },
+    {
+      "name": "art-run-test-538-checker-embed-constants"
+    },
+    {
+      "name": "art-run-test-540-checker-rtp-bug"
     },
     {
       "name": "art-run-test-542-bitfield-rotates"
@@ -663,16 +846,40 @@
       "name": "art-run-test-545-tracing-and-jit"
     },
     {
+      "name": "art-run-test-548-checker-inlining-and-dce"
+    },
+    {
+      "name": "art-run-test-549-checker-types-merge"
+    },
+    {
+      "name": "art-run-test-550-checker-multiply-accumulate"
+    },
+    {
       "name": "art-run-test-550-new-instance-clinit"
     },
     {
+      "name": "art-run-test-551-checker-clinit"
+    },
+    {
       "name": "art-run-test-551-implicit-null-checks"
+    },
+    {
+      "name": "art-run-test-552-checker-x86-avx2-bit-manipulation"
+    },
+    {
+      "name": "art-run-test-554-checker-rtp-checkcast"
+    },
+    {
+      "name": "art-run-test-557-checker-instruct-simplifier-ror"
     },
     {
       "name": "art-run-test-558-switch"
     },
     {
       "name": "art-run-test-559-bce-ssa"
+    },
+    {
+      "name": "art-run-test-559-checker-rtp-ifnotnull"
     },
     {
       "name": "art-run-test-560-packed-switch"
@@ -687,7 +894,43 @@
       "name": "art-run-test-562-bce-preheader"
     },
     {
+      "name": "art-run-test-563-checker-invoke-super"
+    },
+    {
+      "name": "art-run-test-564-checker-bitcount"
+    },
+    {
+      "name": "art-run-test-564-checker-inline-loop"
+    },
+    {
+      "name": "art-run-test-564-checker-negbitwise"
+    },
+    {
+      "name": "art-run-test-565-checker-condition-liveness"
+    },
+    {
+      "name": "art-run-test-566-checker-codegen-select"
+    },
+    {
+      "name": "art-run-test-567-checker-builder-intrinsics"
+    },
+    {
+      "name": "art-run-test-568-checker-onebit"
+    },
+    {
+      "name": "art-run-test-570-checker-select"
+    },
+    {
+      "name": "art-run-test-572-checker-array-get-regression"
+    },
+    {
+      "name": "art-run-test-573-checker-checkcast-regression"
+    },
+    {
       "name": "art-run-test-576-polymorphic-inlining"
+    },
+    {
+      "name": "art-run-test-577-checker-fp2int"
     },
     {
       "name": "art-run-test-578-bce-visit"
@@ -699,16 +942,43 @@
       "name": "art-run-test-579-inline-infinite"
     },
     {
+      "name": "art-run-test-580-checker-round"
+    },
+    {
       "name": "art-run-test-580-crc32"
     },
     {
       "name": "art-run-test-581-rtp"
     },
     {
+      "name": "art-run-test-582-checker-bce-length"
+    },
+    {
+      "name": "art-run-test-583-checker-zero"
+    },
+    {
+      "name": "art-run-test-584-checker-div-bool"
+    },
+    {
       "name": "art-run-test-589-super-imt"
     },
     {
+      "name": "art-run-test-590-checker-arr-set-null-regression"
+    },
+    {
+      "name": "art-run-test-591-checker-regression-dead-loop"
+    },
+    {
+      "name": "art-run-test-593-checker-long-2-float-regression"
+    },
+    {
+      "name": "art-run-test-594-checker-array-alias"
+    },
+    {
       "name": "art-run-test-594-load-string-regression"
+    },
+    {
+      "name": "art-run-test-603-checker-instanceof"
     },
     {
       "name": "art-run-test-605-new-string-from-bytes"
@@ -717,19 +987,103 @@
       "name": "art-run-test-607-daemon-stress"
     },
     {
+      "name": "art-run-test-609-checker-inline-interface"
+    },
+    {
+      "name": "art-run-test-609-checker-x86-bounds-check"
+    },
+    {
       "name": "art-run-test-610-arraycopy"
+    },
+    {
+      "name": "art-run-test-611-checker-simplify-if"
+    },
+    {
+      "name": "art-run-test-614-checker-dump-constant-location"
+    },
+    {
+      "name": "art-run-test-615-checker-arm64-store-zero"
     },
     {
       "name": "art-run-test-617-clinit-oome"
     },
     {
+      "name": "art-run-test-618-checker-induction"
+    },
+    {
+      "name": "art-run-test-619-checker-current-method"
+    },
+    {
+      "name": "art-run-test-620-checker-bce-intrinsics"
+    },
+    {
+      "name": "art-run-test-622-checker-bce-regressions"
+    },
+    {
+      "name": "art-run-test-625-checker-licm-regressions"
+    },
+    {
+      "name": "art-run-test-627-checker-unroll"
+    },
+    {
       "name": "art-run-test-628-vdex"
+    },
+    {
+      "name": "art-run-test-631-checker-get-class"
+    },
+    {
+      "name": "art-run-test-632-checker-char-at-bounds"
+    },
+    {
+      "name": "art-run-test-635-checker-arm64-volatile-load-cc"
     },
     {
       "name": "art-run-test-636-arm64-veneer-pool"
     },
     {
+      "name": "art-run-test-637-checker-throw-inline"
+    },
+    {
+      "name": "art-run-test-640-checker-boolean-simd"
+    },
+    {
+      "name": "art-run-test-640-checker-integer-valueof"
+    },
+    {
+      "name": "art-run-test-640-checker-simd"
+    },
+    {
+      "name": "art-run-test-641-checker-arraycopy"
+    },
+    {
       "name": "art-run-test-641-iterations"
+    },
+    {
+      "name": "art-run-test-643-checker-bogus-ic"
+    },
+    {
+      "name": "art-run-test-645-checker-abs-simd"
+    },
+    {
+      "name": "art-run-test-646-checker-arraycopy-large-cst-pos"
+    },
+    {
+      "name": "art-run-test-646-checker-long-const-to-int"
+    },
+    {
+      "name": "art-run-test-646-checker-simd-hadd"
+    },
+    {
+      "name": "art-run-test-650-checker-inline-access-thunks"
+    },
+    {
+      "name": "art-run-test-654-checker-periodic"
+    },
+    {
+      "name": "art-run-test-655-checker-simd-arm-opt"
+    },
+    {
+      "name": "art-run-test-656-checker-simd-opt"
     },
     {
       "name": "art-run-test-657-branches"
@@ -738,16 +1092,40 @@
       "name": "art-run-test-658-fp-read-barrier"
     },
     {
+      "name": "art-run-test-660-checker-sad"
+    },
+    {
+      "name": "art-run-test-660-checker-simd-sad"
+    },
+    {
+      "name": "art-run-test-661-checker-simd-reduc"
+    },
+    {
       "name": "art-run-test-662-regression-alias"
+    },
+    {
+      "name": "art-run-test-665-checker-simd-zero"
     },
     {
       "name": "art-run-test-666-dex-cache-itf"
     },
     {
+      "name": "art-run-test-667-checker-simd-alignment"
+    },
+    {
       "name": "art-run-test-667-out-of-bounds"
     },
     {
+      "name": "art-run-test-669-checker-break"
+    },
+    {
       "name": "art-run-test-671-npe-field-opts"
+    },
+    {
+      "name": "art-run-test-672-checker-throw-method"
+    },
+    {
+      "name": "art-run-test-673-checker-throw-vmethod"
     },
     {
       "name": "art-run-test-674-HelloWorld-Dm"
@@ -760,6 +1138,9 @@
     },
     {
       "name": "art-run-test-680-sink-regression"
+    },
+    {
+      "name": "art-run-test-684-checker-simd-dotprod"
     },
     {
       "name": "art-run-test-684-select-condition"
@@ -777,6 +1158,9 @@
       "name": "art-run-test-696-loop"
     },
     {
+      "name": "art-run-test-697-checker-string-append"
+    },
+    {
       "name": "art-run-test-698-selects"
     },
     {
@@ -790,6 +1174,9 @@
     },
     {
       "name": "art-run-test-705-register-conflict"
+    },
+    {
+      "name": "art-run-test-711-checker-type-conversion"
     },
     {
       "name": "art-run-test-718-zipfile-finalizer"
