@@ -18,6 +18,15 @@
 // we use gold as the linker (arm, x86, x86_64). The symbol is used by the debuggers to detect when
 // new jit code is generated. We don't want it to be called when a different function with the same
 // (empty) body is called.
+package {
+    // See: http://go/android-license-faq
+    // A large-scale-change added 'default_applicable_licenses' to import
+    // all of the 'license_kinds' from "art_license"
+    // to get the below license kinds:
+    //   SPDX-license-identifier-Apache-2.0
+    default_applicable_licenses: ["art_license"],
+}
+
 JIT_DEBUG_REGISTER_CODE_LDFLAGS = [
     "-Wl,--keep-unique,__jit_debug_register_code",
     "-Wl,--keep-unique,__dex_debug_register_code",

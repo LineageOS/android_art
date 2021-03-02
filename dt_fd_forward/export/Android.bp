@@ -14,6 +14,15 @@
 // limitations under the License.
 //
 
+package {
+    // See: http://go/android-license-faq
+    // A large-scale-change added 'default_applicable_licenses' to import
+    // all of the 'license_kinds' from "art_dt_fd_forward_license"
+    // to get the below license kinds:
+    //   SPDX-license-identifier-Apache-2.0
+    default_applicable_licenses: ["art_dt_fd_forward_license"],
+}
+
 cc_library_headers {
     name: "dt_fd_forward_export",
     export_include_dirs: ["."],
