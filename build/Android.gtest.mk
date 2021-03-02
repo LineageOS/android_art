@@ -17,6 +17,8 @@
 # Build rules are excluded from Mac, since we can not run ART tests there in the first place.
 ifneq ($(HOST_OS),darwin)
 
+LOCAL_PATH := $(call my-dir)
+
 ###################################################################################################
 # Create module in testcases to hold all common data and tools needed for ART host tests.
 
