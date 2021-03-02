@@ -299,6 +299,7 @@ class CodeInfo {
   static QuickMethodFrameInfo DecodeFrameInfo(const uint8_t* data);
   static CodeInfo DecodeGcMasksOnly(const OatQuickMethodHeader* header);
   static CodeInfo DecodeInlineInfoOnly(const OatQuickMethodHeader* header);
+  static uint32_t DecodeCodeSize(const OatQuickMethodHeader* header);
 
   ALWAYS_INLINE const BitTable<StackMap>& GetStackMaps() const {
     return stack_maps_;
@@ -447,6 +448,7 @@ class CodeInfo {
   ALWAYS_INLINE static void ForEachHeaderField(Callback callback) {
     size_t index = 0;
     callback(index++, &CodeInfo::flags_);
+    callback(index++, &CodeInfo::code_size_);
     callback(index++, &CodeInfo::packed_frame_size_);
     callback(index++, &CodeInfo::core_spill_mask_);
     callback(index++, &CodeInfo::fp_spill_mask_);
@@ -480,8 +482,9 @@ class CodeInfo {
   };
 
   // The CodeInfo starts with sequence of variable-length bit-encoded integers.
-  static constexpr size_t kNumHeaders = 6;
-  uint32_t flags_ = 0;
+  static constexpr size_t kNumHeaders = 7;
+  uint32_t flags_ = 0;      // Note that the space is limited to three bits.
+  uint32_t code_size_ = 0;  // The size of native PC range in bytes.
   uint32_t packed_frame_size_ = 0;  // Frame size in kStackAlignment units.
   uint32_t core_spill_mask_ = 0;
   uint32_t fp_spill_mask_ = 0;
