@@ -377,9 +377,7 @@ const uint8_t* JitMemoryRegion::CommitCode(ArrayRef<const uint8_t> reserved_code
   // Write the header.
   OatQuickMethodHeader* method_header =
       OatQuickMethodHeader::FromCodePointer(w_memory + header_size);
-  new (method_header) OatQuickMethodHeader(
-      (stack_map != nullptr) ? result - stack_map : 0u,
-      code.size());
+  new (method_header) OatQuickMethodHeader((stack_map != nullptr) ? result - stack_map : 0u);
   if (has_should_deoptimize_flag) {
     method_header->SetHasShouldDeoptimizeFlag();
   }
