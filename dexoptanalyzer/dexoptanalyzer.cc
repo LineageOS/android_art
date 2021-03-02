@@ -35,6 +35,7 @@
 #include "gc/heap.h"
 #include "gc/space/image_space.h"
 #include "noop_compiler_callbacks.h"
+#include "oat.h"
 #include "oat_file_assistant.h"
 #include "runtime.h"
 #include "thread-inl.h"
@@ -364,26 +365,43 @@ class DexoptAnalyzer final {
                                                   ArrayRef<const std::string>(bcp),
                                                   runtime->GetInstructionSet(),
                                                   &error_msg)) {
-      LOG(ERROR) << "Failed to verify boot class path checksums: " << error_msg;
+      LOG(INFO) << "Failed to verify boot class path checksums: " << error_msg;
       return ReturnCode::kDex2OatFromScratch;
     }
 
     const auto& image_spaces = runtime->GetHeap()->GetBootImageSpaces();
+    size_t bcp_component_count = 0;
     for (const auto& image_space : image_spaces) {
-      const OatFile* oat_file = image_space->GetOatFile();
-      if (oat_file == nullptr) {
-        LOG(ERROR) << "NULL oat file encountered";
+      if (!image_space->GetImageHeader().IsValid()) {
+        LOG(INFO) << "Image header is not valid: " << image_space->GetImageFilename();
         return ReturnCode::kDex2OatFromScratch;
       }
-      if (!ImageSpace::ValidateOatFile(*oat_file, &error_msg)) {
-        LOG(ERROR) << "Invalid oat file: " << oat_file->GetLocation() << " " << error_msg;
+      const OatFile* oat_file = image_space->GetOatFile();
+      if (oat_file == nullptr) {
+        const std::string oat_path = ReplaceFileExtension(image_space->GetImageFilename(), "oat");
+        LOG(INFO) << "Oat file missing: " << oat_path;
+        return ReturnCode::kDex2OatFromScratch;
+      }
+      if (!oat_file->GetOatHeader().IsValid() ||
+          !ImageSpace::ValidateOatFile(*oat_file, &error_msg)) {
+        LOG(INFO) << "Oat file is not valid: " << oat_file->GetLocation() << " " << error_msg;
         return ReturnCode::kDex2OatFromScratch;
       }
       const VdexFile* vdex_file = oat_file->GetVdexFile();
       if (vdex_file == nullptr || !vdex_file->IsValid()) {
-        LOG(ERROR) << "Invalid vdex file : " << oat_file->GetLocation();
+        LOG(INFO) << "Vdex file is not valid : " << oat_file->GetLocation();
         return ReturnCode::kDex2OatFromScratch;
       }
+      bcp_component_count += image_space->GetComponentCount();
+    }
+
+    // If the number of components encountered in the image spaces does not match the number
+    // of components expected from the boot classpath locations then something is missing.
+    if (bcp_component_count != bcp_locations.size()) {
+      for (size_t i = bcp_component_count; i < bcp_locations.size(); ++i) {
+        LOG(INFO) << "Missing image file for " << bcp_locations[i];
+      }
+      return ReturnCode::kDex2OatFromScratch;
     }
 
     return ReturnCode::kNoDexOptNeeded;

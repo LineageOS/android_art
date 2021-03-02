@@ -126,7 +126,10 @@ extern "C" JNIEXPORT jboolean JNICALL Java_Main_compiledWithOptimizing(JNIEnv* e
   CHECK(oat_file != nullptr);
 
   const char* cmd_line = oat_file->GetOatHeader().GetStoreValueByKey(OatHeader::kDex2OatCmdLineKey);
-  CHECK(cmd_line != nullptr);  // Huh? This should not happen.
+  if (cmd_line == nullptr) {
+    // Vdex-only execution, conservatively say no.
+    return JNI_FALSE;
+  }
 
   // Check the backend.
   constexpr const char* kCompilerBackend = "--compiler-backend=";

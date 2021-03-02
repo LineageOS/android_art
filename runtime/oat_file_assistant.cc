@@ -99,6 +99,8 @@ OatFileAssistant::OatFileAssistant(const char* dex_location,
       only_load_system_executable_(only_load_system_executable),
       odex_(this, /*is_oat_location=*/ false),
       oat_(this, /*is_oat_location=*/ true),
+      vdex_for_odex_(this, /*is_oat_location=*/ false),
+      vdex_for_oat_(this, /*is_oat_location=*/ true),
       zip_fd_(zip_fd) {
   CHECK(dex_location != nullptr) << "OatFileAssistant: null dex location";
 
@@ -122,6 +124,8 @@ OatFileAssistant::OatFileAssistant(const char* dex_location,
   std::string odex_file_name;
   if (DexLocationToOdexFilename(dex_location_, isa_, &odex_file_name, &error_msg)) {
     odex_.Reset(odex_file_name, UseFdToReadFiles(), zip_fd, vdex_fd, oat_fd);
+    std::string vdex_file_name = GetVdexFilename(odex_file_name);
+    vdex_for_odex_.Reset(vdex_file_name, UseFdToReadFiles(), zip_fd, vdex_fd, oat_fd);
   } else {
     LOG(WARNING) << "Failed to determine odex file name: " << error_msg;
   }
@@ -131,6 +135,8 @@ OatFileAssistant::OatFileAssistant(const char* dex_location,
     std::string oat_file_name;
     if (DexLocationToOatFilename(dex_location_, isa_, &oat_file_name, &error_msg)) {
       oat_.Reset(oat_file_name, /*use_fd=*/ false);
+      std::string vdex_file_name = GetVdexFilename(oat_file_name);
+      vdex_for_oat_.Reset(vdex_file_name, UseFdToReadFiles(), zip_fd, vdex_fd, oat_fd);
     } else {
       LOG(WARNING) << "Failed to determine oat file name for dex location "
                    << dex_location_ << ": " << error_msg;
@@ -406,7 +412,9 @@ OatFileAssistant::OatStatus OatFileAssistant::GivenOatFileStatus(const OatFile& 
   CompilerFilter::Filter current_compiler_filter = file.GetCompilerFilter();
 
   // Verify the image checksum
-  if (CompilerFilter::DependsOnImageChecksum(current_compiler_filter)) {
+  if (file.IsBackedByVdexOnly()) {
+    VLOG(oat) << "Image checksum test skipped for vdex file " << file.GetLocation();
+  } else if (CompilerFilter::DependsOnImageChecksum(current_compiler_filter)) {
     if (!ValidateBootClassPathChecksums(file)) {
       VLOG(oat) << "Oat image checksum does not match image checksum.";
       return kOatBootImageOutOfDate;
@@ -633,26 +641,41 @@ OatFileAssistant::OatFileInfo& OatFileAssistant::GetBestInfo() {
     // apps gets installed or when they load private, secondary dex file.
     // For apps on the system partition the odex location will not be
     // writable and thus the oat location might be more up to date.
+
+    // If the odex is not useable, and we have a useable vdex, return the vdex
+    // instead.
+    if (!odex_.IsUseable() && vdex_for_odex_.IsUseable()) {
+      return vdex_for_odex_;
+    }
     return odex_;
   }
 
   // We cannot write to the odex location. This must be a system app.
 
-  // If the oat location is usable take it.
+  // If the oat location is useable take it.
   if (oat_.IsUseable()) {
     return oat_;
   }
 
-  // The oat file is not usable but the odex file might be up to date.
+  // The oat file is not useable but the odex file might be up to date.
   // This is an indication that we are dealing with an up to date prebuilt
   // (that doesn't need relocation).
-  if (odex_.Status() == kOatUpToDate) {
+  if (odex_.IsUseable()) {
     return odex_;
   }
 
+  // Look for a useable vdex file.
+  if (vdex_for_oat_.IsUseable()) {
+    return vdex_for_oat_;
+  }
+  if (vdex_for_odex_.IsUseable()) {
+    return vdex_for_odex_;
+  }
+
   // We got into the worst situation here:
-  // - the oat location is not usable
+  // - the oat location is not useable
   // - the prebuild odex location is not up to date
+  // - the vdex-only file is not useable
   // - and we don't have the original dex file anymore (stripped).
   // Pick the odex if it exists, or the oat if not.
   return (odex_.Status() == kOatCannotOpen) ? oat_ : odex_;
@@ -705,47 +728,7 @@ OatFileAssistant::OatStatus OatFileAssistant::OatFileInfo::Status() {
     status_attempted_ = true;
     const OatFile* file = GetFile();
     if (file == nullptr) {
-      // Check to see if there is a vdex file we can make use of.
-      std::string error_msg;
-      std::string vdex_filename = GetVdexFilename(filename_);
-      std::unique_ptr<VdexFile> vdex;
-      if (use_fd_) {
-        if (vdex_fd_ >= 0) {
-          struct stat s;
-          int rc = TEMP_FAILURE_RETRY(fstat(vdex_fd_, &s));
-          if (rc == -1) {
-            error_msg = StringPrintf("Failed getting length of the vdex file %s.", strerror(errno));
-          } else {
-            vdex = VdexFile::Open(vdex_fd_,
-                                  s.st_size,
-                                  vdex_filename,
-                                  /*writable=*/ false,
-                                  /*low_4gb=*/ false,
-                                  /*unquicken=*/ false,
-                                  &error_msg);
-          }
-        }
-      } else {
-        vdex = VdexFile::Open(vdex_filename,
-                              /*writable=*/ false,
-                              /*low_4gb=*/ false,
-                              /*unquicken=*/ false,
-                              &error_msg);
-      }
-      if (vdex == nullptr) {
-        status_ = kOatCannotOpen;
-        VLOG(oat) << "unable to open vdex file " << vdex_filename << ": " << error_msg;
-      } else {
-        if (oat_file_assistant_->DexChecksumUpToDate(*vdex, &error_msg)) {
-          // The vdex file does not contain enough information to determine
-          // whether it is up to date with respect to the boot image, so we
-          // assume it is out of date.
-          VLOG(oat) << error_msg;
-          status_ = kOatBootImageOutOfDate;
-        } else {
-          status_ = kOatDexOutOfDate;
-        }
-      }
+      status_ = kOatCannotOpen;
     } else {
       status_ = oat_file_assistant_->GivenOatFileStatus(*file);
       VLOG(oat) << file->GetLocation() << " is " << status_
@@ -792,45 +775,86 @@ OatFileAssistant::DexOptNeeded OatFileAssistant::OatFileInfo::GetDexOptNeeded(
 
 const OatFile* OatFileAssistant::OatFileInfo::GetFile() {
   CHECK(!file_released_) << "GetFile called after oat file released.";
-  if (!load_attempted_) {
-    load_attempted_ = true;
-    if (filename_provided_) {
-      bool executable = oat_file_assistant_->load_executable_;
-      if (executable && oat_file_assistant_->only_load_system_executable_) {
-        executable = LocationIsOnSystem(filename_.c_str());
-      }
-      VLOG(oat) << "Loading " << filename_ << " with executable: " << executable;
-      std::string error_msg;
-      if (use_fd_) {
-        if (oat_fd_ >= 0 && vdex_fd_ >= 0) {
-          ArrayRef<const std::string> dex_locations(&oat_file_assistant_->dex_location_,
-                                                    /*size=*/ 1u);
-          file_.reset(OatFile::Open(zip_fd_,
-                                    vdex_fd_,
-                                    oat_fd_,
-                                    filename_.c_str(),
-                                    executable,
-                                    /*low_4gb=*/ false,
-                                    dex_locations,
-                                    /*reservation=*/ nullptr,
-                                    &error_msg));
+  if (load_attempted_) {
+    return file_.get();
+  }
+  load_attempted_ = true;
+  if (!filename_provided_) {
+    return nullptr;
+  }
+
+  std::string error_msg;
+  bool executable = oat_file_assistant_->load_executable_;
+  if (android::base::EndsWith(filename_, kVdexExtension)) {
+    executable = false;
+    // Check to see if there is a vdex file we can make use of.
+    std::unique_ptr<VdexFile> vdex;
+    if (use_fd_) {
+      if (vdex_fd_ >= 0) {
+        struct stat s;
+        int rc = TEMP_FAILURE_RETRY(fstat(vdex_fd_, &s));
+        if (rc == -1) {
+          error_msg = StringPrintf("Failed getting length of the vdex file %s.", strerror(errno));
+        } else {
+          vdex = VdexFile::Open(vdex_fd_,
+                                s.st_size,
+                                filename_,
+                                /*writable=*/ false,
+                                /*low_4gb=*/ false,
+                                /*unquicken=*/ false,
+                                &error_msg);
         }
-      } else {
-        file_.reset(OatFile::Open(/*zip_fd=*/ -1,
-                                  filename_.c_str(),
+      }
+    } else {
+      vdex = VdexFile::Open(filename_,
+                            /*writable=*/ false,
+                            /*low_4gb=*/ false,
+                            /*unquicken=*/ false,
+                            &error_msg);
+    }
+    if (vdex == nullptr) {
+      VLOG(oat) << "unable to open vdex file " << filename_ << ": " << error_msg;
+    } else {
+      file_.reset(OatFile::OpenFromVdex(zip_fd_,
+                                        std::move(vdex),
+                                        oat_file_assistant_->dex_location_,
+                                        &error_msg));
+    }
+  } else {
+    if (executable && oat_file_assistant_->only_load_system_executable_) {
+      executable = LocationIsOnSystem(filename_.c_str());
+    }
+    VLOG(oat) << "Loading " << filename_ << " with executable: " << executable;
+    if (use_fd_) {
+      if (oat_fd_ >= 0 && vdex_fd_ >= 0) {
+        ArrayRef<const std::string> dex_locations(&oat_file_assistant_->dex_location_,
+                                                  /*size=*/ 1u);
+        file_.reset(OatFile::Open(zip_fd_,
+                                  vdex_fd_,
+                                  oat_fd_,
                                   filename_.c_str(),
                                   executable,
                                   /*low_4gb=*/ false,
-                                  oat_file_assistant_->dex_location_,
+                                  dex_locations,
+                                  /*reservation=*/ nullptr,
                                   &error_msg));
       }
-      if (file_.get() == nullptr) {
-        VLOG(oat) << "OatFileAssistant test for existing oat file "
-          << filename_ << ": " << error_msg;
-      } else {
-        VLOG(oat) << "Successfully loaded " << filename_ << " with executable: " << executable;
-      }
+    } else {
+      file_.reset(OatFile::Open(/*zip_fd=*/ -1,
+                                filename_.c_str(),
+                                filename_.c_str(),
+                                executable,
+                                /*low_4gb=*/ false,
+                                oat_file_assistant_->dex_location_,
+                                &error_msg));
     }
+  }
+  if (file_.get() == nullptr) {
+    VLOG(oat) << "OatFileAssistant test for existing oat file "
+              << filename_
+              << ": " << error_msg;
+  } else {
+    VLOG(oat) << "Successfully loaded " << filename_ << " with executable: " << executable;
   }
   return file_.get();
 }
@@ -856,6 +880,11 @@ bool OatFileAssistant::OatFileInfo::ClassLoaderContextIsOkay(ClassLoaderContext*
   const OatFile* file = GetFile();
   if (file == nullptr) {
     // No oat file means we have nothing to verify.
+    return true;
+  }
+
+  if (file->IsBackedByVdexOnly()) {
+    // Only a vdex file, we don't depend on the class loader context.
     return true;
   }
 

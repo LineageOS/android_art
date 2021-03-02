@@ -1947,8 +1947,12 @@ class BuildGenericJniFrameVisitor final : public QuickArgumentVisitor {
       if (is_static) {
         // The `jclass` is a pointer to the method's declaring class.
         // The declaring class must be marked.
-        method->GetDeclaringClass<kWithReadBarrier>();
-        sm_.AdvancePointer(method->GetDeclaringClassAddressWithoutBarrier());
+        auto* declaring_class = reinterpret_cast<mirror::CompressedReference<mirror::Class>*>(
+            method->GetDeclaringClassAddressWithoutBarrier());
+        if (kUseReadBarrier) {
+          ReadBarrierJni(declaring_class, self);
+        }
+        sm_.AdvancePointer(declaring_class);
       }  // else "this" reference is already handled by QuickArgumentVisitor.
     }
   }
