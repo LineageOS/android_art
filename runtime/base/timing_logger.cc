@@ -20,7 +20,6 @@
 
 #include <android-base/logging.h>
 
-#include "base/histogram-inl.h"
 #include "base/mutex.h"
 #include "base/stl_util.h"
 #include "base/systrace.h"
@@ -34,8 +33,6 @@
 
 namespace art {
 
-constexpr size_t CumulativeLogger::kLowMemoryBucketCount;
-constexpr size_t CumulativeLogger::kDefaultBucketCount;
 constexpr size_t TimingLogger::kIndexNotFound;
 
 CumulativeLogger::CumulativeLogger(const std::string& name)
@@ -46,7 +43,7 @@ CumulativeLogger::CumulativeLogger(const std::string& name)
 }
 
 CumulativeLogger::~CumulativeLogger() {
-  STLDeleteElements(&histograms_);
+  cumulative_timers_.clear();
 }
 
 void CumulativeLogger::SetName(const std::string& name) {
@@ -66,7 +63,7 @@ void CumulativeLogger::Reset() {
   MutexLock mu(Thread::Current(), *GetLock());
   iterations_ = 0;
   total_time_ = 0;
-  STLDeleteElements(&histograms_);
+  cumulative_timers_.clear();
 }
 
 void CumulativeLogger::AddLogger(const TimingLogger &logger) {
@@ -88,46 +85,46 @@ size_t CumulativeLogger::GetIterations() const {
 
 void CumulativeLogger::Dump(std::ostream &os) const {
   MutexLock mu(Thread::Current(), *GetLock());
-  DumpHistogram(os);
+  DumpAverages(os);
 }
 
-void CumulativeLogger::AddPair(const std::string& label, uint64_t delta_time) {
+void CumulativeLogger::AddPair(const char* label, uint64_t delta_time) {
   // Convert delta time to microseconds so that we don't overflow our counters.
   delta_time /= kAdjust;
   total_time_ += delta_time;
-  Histogram<uint64_t>* histogram;
-  Histogram<uint64_t> candidate(label.c_str());
-  auto it = histograms_.find(&candidate);
-  if (it == histograms_.end()) {
-    const size_t max_buckets = Runtime::Current()->GetHeap()->IsLowMemoryMode() ?
-        kLowMemoryBucketCount : kDefaultBucketCount;
-    histogram = new Histogram<uint64_t>(label.c_str(), kInitialBucketSize, max_buckets);
-    histograms_.insert(histogram);
+  CumulativeTime candidate(label, delta_time);
+  auto it = std::lower_bound(cumulative_timers_.begin(), cumulative_timers_.end(), candidate);
+  // Maintain the vector sorted so that lookup above, which is more frequent can
+  // happen in log(n).
+  if (it == cumulative_timers_.end() || it->Name() != label) {
+    cumulative_timers_.insert(it, candidate);
   } else {
-    histogram = *it;
+    it->Add(delta_time);
   }
-  histogram->AddValue(delta_time);
 }
 
-class CompareHistorgramByTimeSpentDeclining {
- public:
-  bool operator()(const Histogram<uint64_t>* a, const Histogram<uint64_t>* b) const {
-    return a->Sum() > b->Sum();
-  }
-};
-
-void CumulativeLogger::DumpHistogram(std::ostream &os) const {
-  os << "Start Dumping histograms for " << iterations_ << " iterations"
+void CumulativeLogger::DumpAverages(std::ostream &os) const {
+  os << "Start Dumping Averages for " << iterations_ << " iterations"
      << " for " << name_ << "\n";
-  std::set<Histogram<uint64_t>*, CompareHistorgramByTimeSpentDeclining>
-      sorted_histograms(histograms_.begin(), histograms_.end());
-  for (Histogram<uint64_t>* histogram : sorted_histograms) {
-    Histogram<uint64_t>::CumulativeData cumulative_data;
-    // We don't expect DumpHistogram to be called often, so it is not performance critical.
-    histogram->CreateHistogram(&cumulative_data);
-    histogram->PrintConfidenceIntervals(os, 0.99, cumulative_data);
+  const size_t timers_sz = cumulative_timers_.size();
+  // Create an array of pointers to cumulative timers on stack and sort it in
+  // decreasing order of accumulated timer so that the most time consuming
+  // timer is printed first.
+  const CumulativeTime* sorted_timers[timers_sz];
+  for (size_t i = 0; i < timers_sz; i++) {
+    sorted_timers[i] = cumulative_timers_.data() + i;
   }
-  os << "Done Dumping histograms\n";
+  std::sort(sorted_timers,
+            sorted_timers + timers_sz,
+            [](const CumulativeTime* a, const CumulativeTime* b) { return a->Sum() > b->Sum(); });
+  for (size_t i = 0; i < timers_sz; i++) {
+    const CumulativeTime *timer = sorted_timers[i];
+    uint64_t total_time_ns = timer->Sum() * kAdjust;
+    os << timer->Name()
+       << ":\tSum: " << PrettyDuration(total_time_ns)
+       << " Avg: " << PrettyDuration(total_time_ns / iterations_) << "\n";
+  }
+  os << "Done Dumping Averages\n";
 }
 
 TimingLogger::TimingLogger(const char* name,
