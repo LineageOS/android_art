@@ -532,10 +532,14 @@ bool OatFileAssistant::DexLocationToOatFilename(const std::string& location,
 
   // Check if `location` could have an oat file in the ART APEX data directory. If so, and the
   // file exists, use it.
-  std::string apex_data_file = GetApexDataOdexFilename(location, isa);
-  if (!apex_data_file.empty() && OS::FileExists(apex_data_file.c_str(), /*check_file_type=*/true)) {
-    *oat_filename = apex_data_file;
-    return true;
+  const std::string apex_data_file = GetApexDataOdexFilename(location, isa);
+  if (!apex_data_file.empty()) {
+    if (OS::FileExists(apex_data_file.c_str(), /*check_file_type=*/true)) {
+      *oat_filename = apex_data_file;
+      return true;
+    } else if (errno != ENOENT) {
+      PLOG(ERROR) << "Could not check odex file " << apex_data_file;
+    }
   }
 
   // If ANDROID_DATA is not set, return false instead of aborting.
