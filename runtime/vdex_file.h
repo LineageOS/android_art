@@ -384,6 +384,12 @@ class VdexFile {
   ClassStatus ComputeClassStatus(Thread* self, Handle<mirror::Class> cls) const
       REQUIRES_SHARED(Locks::mutator_lock_);
 
+  // Return the name of the underlying `MemMap` of the vdex file, typically the
+  // location on disk of the vdex file.
+  const std::string& GetName() const {
+    return mmap_.GetName();
+  }
+
  private:
   uint32_t GetQuickeningInfoTableOffset(const uint8_t* source_dex_begin) const;
 

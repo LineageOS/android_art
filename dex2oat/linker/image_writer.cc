@@ -681,8 +681,12 @@ ImageWriter::Bin ImageWriter::AssignImageBinSlot(mirror::Object* object, size_t 
 
       // Move known dirty objects into their own sections. This includes:
       //   - classes with dirty static fields.
-      if (dirty_image_objects_ != nullptr &&
-          dirty_image_objects_->find(klass->PrettyDescriptor()) != dirty_image_objects_->end()) {
+      auto is_dirty = [&](ObjPtr<mirror::Class> k) REQUIRES_SHARED(Locks::mutator_lock_) {
+        std::string temp;
+        std::string_view descriptor = k->GetDescriptor(&temp);
+        return dirty_image_objects_->find(descriptor) != dirty_image_objects_->end();
+      };
+      if (dirty_image_objects_ != nullptr && is_dirty(klass)) {
         bin = Bin::kKnownDirty;
       } else if (klass->GetStatus() == ClassStatus::kVisiblyInitialized) {
         bin = Bin::kClassInitialized;

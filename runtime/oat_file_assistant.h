@@ -430,8 +430,18 @@ class OatFileAssistant {
   bool required_dex_checksums_found_;
   bool has_original_dex_files_;
 
+  // The AOT-compiled file of an app when the APK of the app is in /data.
   OatFileInfo odex_;
+  // The AOT-compiled file of an app when the APK of the app is on a read-only partition
+  // (for example /system).
   OatFileInfo oat_;
+
+  // The vdex-only file next to `odex_` when `odex_' cannot be used (for example
+  // it is out of date).
+  OatFileInfo vdex_for_odex_;
+  // The vdex-only file next to 'oat_` when `oat_' cannot be used (for example
+  // it is out of date).
+  OatFileInfo vdex_for_oat_;
 
   // File descriptor corresponding to apk, dex file, or zip.
   int zip_fd_;
