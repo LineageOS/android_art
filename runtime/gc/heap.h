@@ -26,6 +26,7 @@
 
 #include "allocator_type.h"
 #include "base/atomic.h"
+#include "base/histogram.h"
 #include "base/macros.h"
 #include "base/mutex.h"
 #include "base/runtime_debug.h"

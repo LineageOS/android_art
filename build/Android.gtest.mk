@@ -17,6 +17,10 @@
 # Build rules are excluded from Mac, since we can not run ART tests there in the first place.
 ifneq ($(HOST_OS),darwin)
 
+ifeq (true,$(my_art_module_source_build))
+
+LOCAL_PATH := $(call my-dir)
+
 ###################################################################################################
 # Create module in testcases to hold all common data and tools needed for ART host tests.
 
@@ -50,6 +54,9 @@ my_files += \
 include $(CLEAR_VARS)
 LOCAL_IS_HOST_MODULE := true
 LOCAL_MODULE := art_common
+LOCAL_LICENSE_KINDS := SPDX-license-identifier-Apache-2.0
+LOCAL_LICENSE_CONDITIONS := notice
+LOCAL_NOTICE_FILE := $(LOCAL_PATH)/../NOTICE
 LOCAL_MODULE_TAGS := tests
 LOCAL_MODULE_CLASS := NATIVE_TESTS
 LOCAL_MODULE_SUFFIX := .txt
@@ -69,6 +76,9 @@ include $(CLEAR_VARS)
 # Create a phony module that contains data needed for ART chroot-based testing.
 include $(CLEAR_VARS)
 LOCAL_MODULE := art_chroot
+LOCAL_LICENSE_KINDS := SPDX-license-identifier-Apache-2.0
+LOCAL_LICENSE_CONDITIONS := notice
+LOCAL_NOTICE_FILE := $(LOCAL_PATH)/../NOTICE
 LOCAL_MODULE_TAGS := tests
 LOCAL_MODULE_CLASS := NATIVE_TESTS
 LOCAL_MODULE_SUFFIX := .txt
@@ -84,6 +94,8 @@ $(LOCAL_BUILT_MODULE):
 
 include $(CLEAR_VARS)
 ###################################################################################################
+
+endif # ifeq (true,$(my_art_module_source_build))
 
 # The path for which all the dex files are relative, not actually the current directory.
 LOCAL_PATH := art/test
@@ -349,13 +361,15 @@ ifeq ($(ART_BUILD_TARGET),true)
     com.android.art.testing \
     com.android.conscrypt
 endif
-ifeq ($(ART_BUILD_HOST),true)
-  $(foreach file,$(ART_HOST_GTEST_FILES), $(eval $(call define-art-gtest-host,$(file),)))
-  ifneq ($(HOST_PREFER_32_BIT),true)
-    $(foreach file,$(2ND_ART_HOST_GTEST_FILES), $(eval $(call define-art-gtest-host,$(file),2ND_)))
+ifeq (true,$(my_art_module_source_build))
+  ifeq ($(ART_BUILD_HOST),true)
+    $(foreach file,$(ART_HOST_GTEST_FILES), $(eval $(call define-art-gtest-host,$(file),)))
+    ifneq ($(HOST_PREFER_32_BIT),true)
+      $(foreach file,$(2ND_ART_HOST_GTEST_FILES), $(eval $(call define-art-gtest-host,$(file),2ND_)))
+    endif
+    # Rules to run the different architecture versions of the gtest.
+    $(foreach file,$(ART_HOST_GTEST_FILES), $(eval $(call define-art-gtest-host-both,$$(notdir $$(basename $$(file))))))
   endif
-  # Rules to run the different architecture versions of the gtest.
-  $(foreach file,$(ART_HOST_GTEST_FILES), $(eval $(call define-art-gtest-host-both,$$(notdir $$(basename $$(file))))))
 endif
 
 # Define all the combinations of host/target and suffix such as:

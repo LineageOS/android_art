@@ -109,6 +109,9 @@ OatFileAssistant::OatFileAssistant(const char* dex_location,
       << " oat_fd=" << oat_fd;
     CHECK_LE(vdex_fd, 0) << "zip_fd must be provided with valid vdex_fd. zip_fd=" << zip_fd
       << " vdex_fd=" << vdex_fd;;
+    CHECK(!UseFdToReadFiles());
+  } else {
+    CHECK(UseFdToReadFiles());
   }
 
   dex_location_.assign(dex_location);
@@ -125,7 +128,12 @@ OatFileAssistant::OatFileAssistant(const char* dex_location,
   if (DexLocationToOdexFilename(dex_location_, isa_, &odex_file_name, &error_msg)) {
     odex_.Reset(odex_file_name, UseFdToReadFiles(), zip_fd, vdex_fd, oat_fd);
     std::string vdex_file_name = GetVdexFilename(odex_file_name);
-    vdex_for_odex_.Reset(vdex_file_name, UseFdToReadFiles(), zip_fd, vdex_fd, oat_fd);
+    // We dup FDs as the odex_ will claim ownership.
+    vdex_for_odex_.Reset(vdex_file_name,
+                         UseFdToReadFiles(),
+                         DupCloexec(zip_fd),
+                         DupCloexec(vdex_fd),
+                         DupCloexec(oat_fd));
   } else {
     LOG(WARNING) << "Failed to determine odex file name: " << error_msg;
   }
@@ -532,10 +540,14 @@ bool OatFileAssistant::DexLocationToOatFilename(const std::string& location,
 
   // Check if `location` could have an oat file in the ART APEX data directory. If so, and the
   // file exists, use it.
-  std::string apex_data_file = GetApexDataOdexFilename(location, isa);
-  if (!apex_data_file.empty() && OS::FileExists(apex_data_file.c_str(), /*check_file_type=*/true)) {
-    *oat_filename = apex_data_file;
-    return true;
+  const std::string apex_data_file = GetApexDataOdexFilename(location, isa);
+  if (!apex_data_file.empty()) {
+    if (OS::FileExists(apex_data_file.c_str(), /*check_file_type=*/true)) {
+      *oat_filename = apex_data_file;
+      return true;
+    } else if (errno != ENOENT) {
+      PLOG(ERROR) << "Could not check odex file " << apex_data_file;
+    }
   }
 
   // If ANDROID_DATA is not set, return false instead of aborting.
