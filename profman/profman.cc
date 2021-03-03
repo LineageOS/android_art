@@ -209,7 +209,7 @@ static const std::string kClassAllMethods = "*";  // NOLINT [runtime/string] [4]
 static constexpr char kAnnotationStart = '{';
 static constexpr char kAnnotationEnd = '}';
 static constexpr char kProfileParsingInlineChacheSep = '+';
-static constexpr char kProfileParsingInlineChacheTargetSep = '[';
+static constexpr char kProfileParsingInlineChacheTargetSep = ']';
 static constexpr char kProfileParsingTypeSep = ',';
 static constexpr char kProfileParsingFirstCharInSignature = '(';
 static constexpr char kMethodFlagStringHot = 'H';
@@ -1255,9 +1255,9 @@ class ProfMan final {
   // "LTestInline;->inlinePolymorphic(LSuper;)I+LSubA;,LSubB;,invalid_class".
   // "LTestInline;->inlineMissingTypes(LSuper;)I+missing_types".
   // // Note no ',' after [LTarget;
-  // "LTestInline;->multiInlinePolymorphic(LSuper;)I+[LTarget1;LResA;,LResB;[LTarget2;LResC;,LResD;".
-  // "LTestInline;->multiInlinePolymorphic(LSuper;)I+[LTarget1;LResA;,invalid_class[LTarget2;LResC;,LResD;".
-  // "LTestInline;->multiInlinePolymorphic(LSuper;)I+[LTarget1;missing_types[LTarget2;LResC;,LResD;".
+  // "LTestInline;->multiInlinePolymorphic(LSuper;)I+]LTarget1;LResA;,LResB;]LTarget2;LResC;,LResD;".
+  // "LTestInline;->multiInlinePolymorphic(LSuper;)I+]LTarget1;LResA;,invalid_class]LTarget2;LResC;,LResD;".
+  // "LTestInline;->multiInlinePolymorphic(LSuper;)I+]LTarget1;missing_types]LTarget2;LResC;,LResD;".
   // "{annotation}LTestInline;->inlineNoInlineCaches(LSuper;)I".
   // "LTestInline;->*".
   // "invalid_class".
