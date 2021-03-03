@@ -258,54 +258,20 @@ static JniCompiledMethod ArtJniCompileMethodInternal(const CompilerOptions& comp
     current_frame_size += main_out_arg_size;
   }
 
-  // 4. Call the read barrier for the declaring class in the method for a static call.
-  // Skip this for @CriticalNative because we're not passing a `jclass` to the native method.
-  // Note that we always have outgoing param space available for at least two params.
+  // 4. Check if we need to go to the slow path to emit the read barrier for the declaring class
+  //    in the method for a static call.
+  //    Skip this for @CriticalNative because we're not passing a `jclass` to the native method.
+  std::unique_ptr<JNIMacroLabel> jclass_read_barrier_slow_path;
+  std::unique_ptr<JNIMacroLabel> jclass_read_barrier_return;
   if (kUseReadBarrier && is_static && !is_critical_native) {
-    const bool kReadBarrierFastPath = true;  // Always true after Mips codegen was removed.
-    std::unique_ptr<JNIMacroLabel> skip_cold_path_label;
-    if (kReadBarrierFastPath) {
-      skip_cold_path_label = __ CreateLabel();
-      // Fast path for supported targets.
-      //
-      // Check if gc_is_marking is set -- if it's not, we don't need
-      // a read barrier so skip it.
-      // Jump over the slow path if gc is marking is false.
-      __ TestGcMarking(skip_cold_path_label.get(), JNIMacroUnaryCondition::kZero);
-    }
+    jclass_read_barrier_slow_path = __ CreateLabel();
+    jclass_read_barrier_return = __ CreateLabel();
 
-    // Construct slow path for read barrier:
-    //
-    // Call into the runtime's ReadBarrierJni and have it fix up
-    // the object address if it was moved.
-    //
-    // TODO: Move this to an actual slow path, so that the fast path is a branch-not-taken.
+    // Check if gc_is_marking is set -- if it's not, we don't need a read barrier.
+    __ TestGcMarking(jclass_read_barrier_slow_path.get(), JNIMacroUnaryCondition::kNotZero);
 
-    ThreadOffset<kPointerSize> read_barrier = QUICK_ENTRYPOINT_OFFSET(kPointerSize,
-                                                                      pReadBarrierJni);
-    main_jni_conv->ResetIterator(FrameOffset(main_out_arg_size));
-    // Pass the pointer to the method's declaring class as the first argument.
-    DCHECK_EQ(ArtMethod::DeclaringClassOffset().SizeValue(), 0u);
-    SetNativeParameter(jni_asm.get(), main_jni_conv.get(), method_register);
-    main_jni_conv->Next();
-    // Pass the current thread as the second argument and call.
-    if (main_jni_conv->IsCurrentParamInRegister()) {
-      __ GetCurrentThread(main_jni_conv->CurrentParamRegister());
-      __ Call(main_jni_conv->CurrentParamRegister(), Offset(read_barrier));
-    } else {
-      __ GetCurrentThread(main_jni_conv->CurrentParamStackOffset());
-      __ CallFromThread(read_barrier);
-    }
-    if (is_synchronized) {
-      // Reload the method pointer in the slow path because it is needed below.
-      __ Load(method_register,
-              FrameOffset(current_out_arg_size + mr_conv->MethodStackOffset().SizeValue()),
-              static_cast<size_t>(kPointerSize));
-    }
-
-    if (kReadBarrierFastPath) {
-      __ Bind(skip_cold_path_label.get());
-    }
+    // If marking, the slow path returns after the check.
+    __ Bind(jclass_read_barrier_return.get());
   }
 
   // 5. Call into appropriate JniMethodStart passing Thread* so that transition out of Runnable
@@ -628,7 +594,63 @@ static JniCompiledMethod ArtJniCompileMethodInternal(const CompilerOptions& comp
     DCHECK_EQ(jni_asm->cfi().GetCurrentCFAOffset(), static_cast<int>(current_frame_size));
   }
 
-  // 17. Finalize code generation
+  // 17. Read barrier slow path for the declaring class in the method for a static call.
+  //     Skip this for @CriticalNative because we're not passing a `jclass` to the native method.
+  if (kUseReadBarrier && is_static && !is_critical_native) {
+    __ Bind(jclass_read_barrier_slow_path.get());
+
+    // We do the marking check after adjusting for outgoing arguments. That ensures that
+    // we have space available for at least two params in case we need to pass the read
+    // barrier parameters on stack (only x86). But that means we must adjust the CFI
+    // offset accordingly as it does not include the outgoing args after `RemoveFrame().
+    if (main_out_arg_size != 0) {
+      // Note: The DW_CFA_def_cfa_offset emitted by `RemoveFrame()` above
+      // is useless when it is immediatelly overridden here but avoiding
+      // it adds a lot of code complexity for minimal gain.
+      jni_asm->cfi().AdjustCFAOffset(main_out_arg_size);
+    }
+
+    // We enter the slow path with the method register unclobbered.
+    method_register = mr_conv->MethodRegister();
+
+    // Construct slow path for read barrier:
+    //
+    // Call into the runtime's ReadBarrierJni and have it fix up
+    // the object address if it was moved.
+
+    ThreadOffset<kPointerSize> read_barrier = QUICK_ENTRYPOINT_OFFSET(kPointerSize,
+                                                                      pReadBarrierJni);
+    main_jni_conv->ResetIterator(FrameOffset(main_out_arg_size));
+    // Pass the pointer to the method's declaring class as the first argument.
+    DCHECK_EQ(ArtMethod::DeclaringClassOffset().SizeValue(), 0u);
+    SetNativeParameter(jni_asm.get(), main_jni_conv.get(), method_register);
+    main_jni_conv->Next();
+    // Pass the current thread as the second argument and call.
+    if (main_jni_conv->IsCurrentParamInRegister()) {
+      __ GetCurrentThread(main_jni_conv->CurrentParamRegister());
+      __ Call(main_jni_conv->CurrentParamRegister(), Offset(read_barrier));
+    } else {
+      __ GetCurrentThread(main_jni_conv->CurrentParamStackOffset());
+      __ CallFromThread(read_barrier);
+    }
+    if (is_synchronized) {
+      // Reload the method pointer in the slow path because it is needed
+      // as an argument for the `JniMethodStartSynchronized`.
+      __ Load(method_register,
+              FrameOffset(main_out_arg_size + mr_conv->MethodStackOffset().SizeValue()),
+              static_cast<size_t>(kPointerSize));
+    }
+
+    // Return to main path.
+    __ Jump(jclass_read_barrier_return.get());
+
+    // Undo the CFI offset adjustment at the start of the slow path.
+    if (main_out_arg_size != 0) {
+      jni_asm->cfi().AdjustCFAOffset(-main_out_arg_size);
+    }
+  }
+
+  // 18. Finalize code generation
   __ FinalizeCode();
   size_t cs = __ CodeSize();
   std::vector<uint8_t> managed_code(cs);
