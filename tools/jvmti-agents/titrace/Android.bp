@@ -16,6 +16,15 @@
 
 // Build variants {target,host} x {debug,ndebug} x {32,64}
 
+package {
+    // See: http://go/android-license-faq
+    // A large-scale-change added 'default_applicable_licenses' to import
+    // all of the 'license_kinds' from "art_license"
+    // to get the below license kinds:
+    //   SPDX-license-identifier-Apache-2.0
+    default_applicable_licenses: ["art_license"],
+}
+
 cc_defaults {
     name: "titrace-defaults",
     host_supported: true,

@@ -17,6 +17,19 @@
 ifndef ART_ANDROID_COMMON_PATH_MK
 ART_ANDROID_COMMON_PATH_MK := true
 
+# We cannot build things that require host core images from prebuilts, because
+# they aren't present there. Set up a variable to skip all build rules that
+# relate to them, because `m checkbuild` complains on rules with nonexisting
+# dependencies, even if they won't get called.
+# TODO(b/172480617): Remove this when ART sources are no longer in platform manifests.
+ifeq (true,$(SOONG_CONFIG_art_module_source_build))
+  my_art_module_source_build := true
+else ifeq (false,$(SOONG_CONFIG_art_module_source_build))
+  my_art_module_source_build := false
+else
+  $(error SOONG_CONFIG_art_module_source_build is neither true nor false - mk file ordering problem?)
+endif
+
 include art/build/Android.common.mk
 include art/build/Android.common_build.mk
 
@@ -48,16 +61,21 @@ endif
 HOST_CORE_IMG_DEX_FILES   := $(foreach jar,$(HOST_CORE_IMG_JARS),  $(call intermediates-dir-for,JAVA_LIBRARIES,$(jar),t,COMMON)/javalib.jar)
 TARGET_CORE_IMG_DEX_FILES := $(foreach jar,$(TARGET_CORE_IMG_JARS),$(call intermediates-dir-for,JAVA_LIBRARIES,$(jar).com.android.art.testing, ,COMMON)/javalib.jar)
 
+ifeq (true,$(my_art_module_source_build))
+
 # Also copy the jar files next to host boot.art image.
 HOST_BOOT_IMAGE_JARS := $(foreach jar,$(CORE_IMG_JARS),$(HOST_OUT)/apex/com.android.art/javalib/$(jar).jar)
 $(HOST_BOOT_IMAGE_JARS): $(HOST_OUT)/apex/com.android.art/javalib/%.jar : $(HOST_OUT_JAVA_LIBRARIES)/%-hostdex.jar
 	$(copy-file-to-target)
+
 HOST_BOOT_IMAGE_JARS += $(HOST_OUT)/apex/com.android.conscrypt/javalib/conscrypt.jar
 $(HOST_OUT)/apex/com.android.conscrypt/javalib/conscrypt.jar : $(HOST_OUT_JAVA_LIBRARIES)/conscrypt-hostdex.jar
 	$(copy-file-to-target)
 HOST_BOOT_IMAGE_JARS += $(HOST_OUT)/apex/com.android.i18n/javalib/core-icu4j.jar
 $(HOST_OUT)/apex/com.android.i18n/javalib/core-icu4j.jar : $(HOST_OUT_JAVA_LIBRARIES)/core-icu4j-hostdex.jar
 	$(copy-file-to-target)
+
+endif # ifeq (true,$(my_art_module_source_build))
 
 HOST_CORE_IMG_OUTS += $(HOST_BOOT_IMAGE_JARS) $(HOST_BOOT_IMAGE) $(2ND_HOST_BOOT_IMAGE)
 

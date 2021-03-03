@@ -57,6 +57,7 @@
 #include "com_android_apex.h"
 #include "dexoptanalyzer.h"
 #include "exec_utils.h"
+#include "log/log_main.h"
 #include "palette/palette.h"
 #include "palette/palette_types.h"
 
@@ -122,6 +123,21 @@ static std::string QuotePath(std::string_view path) {
   return Concatenate({"'", path, "'"});
 }
 
+// Create all directory and all required parents.
+static void EnsureDirectoryExists(const std::string& absolute_path) {
+  CHECK(absolute_path.size() > 0 && absolute_path[0] == '/');
+  std::string path;
+  for (const std::string& directory : android::base::Split(absolute_path, "/")) {
+    path.append("/").append(directory);
+    if (!OS::DirectoryExists(path.c_str())) {
+      static constexpr mode_t kDirectoryMode = S_IRWXU | S_IRGRP | S_IXGRP| S_IROTH | S_IXOTH;
+      if (mkdir(path.c_str(), kDirectoryMode) != 0) {
+        PLOG(FATAL) << "Could not create directory: " << path;
+      }
+    }
+  }
+}
+
 static void EraseFiles(const std::vector<std::unique_ptr<File>>& files) {
   for (auto& file : files) {
     file->Erase(/*unlink=*/true);
@@ -146,6 +162,14 @@ static bool MoveOrEraseFiles(const std::vector<std::unique_ptr<File>>& files,
     if (output_files.back() == nullptr) {
       PLOG(ERROR) << "Failed to open " << QuotePath(output_file_path);
       output_files.pop_back();
+      EraseFiles(output_files);
+      EraseFiles(files);
+      return false;
+    }
+
+    static constexpr mode_t kFileMode = S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH;
+    if (TEMP_FAILURE_RETRY(fchmod(output_files.back()->Fd(), kFileMode)) != 0) {
+      PLOG(ERROR) << "Could not set file mode on " << QuotePath(output_file_path);
       EraseFiles(output_files);
       EraseFiles(files);
       return false;
@@ -646,20 +670,6 @@ class OnDeviceRefresh final {
     }
   }
 
-  // Create all directory and all required parents.
-  static void EnsureDirectoryExists(const std::string& absolute_path) {
-    CHECK(absolute_path.size() > 0 && absolute_path[0] == '/');
-    std::string path;
-    for (const std::string& directory : android::base::Split(absolute_path, "/")) {
-      path.append("/").append(directory);
-      if (!OS::DirectoryExists(path.c_str())) {
-        if (mkdir(path.c_str(), S_IRWXU | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH) != 0) {
-          PLOG(FATAL) << "Could not create directory: " << path;
-        }
-      }
-    }
-  }
-
   static std::string GetBootImage() {
     // Typically "/apex/com.android.art/javalib/boot.art".
     return GetArtRoot() + "/javalib/boot.art";
@@ -759,6 +769,13 @@ class OnDeviceRefresh final {
         EraseFiles(staging_files);
         return false;
       }
+
+      if (TEMP_FAILURE_RETRY(fchmod(staging_file->Fd(), S_IRUSR | S_IWUSR)) != 0) {
+        PLOG(ERROR) << "Could not set file mode on " << QuotePath(staging_location);
+        EraseFiles(staging_files);
+        return false;
+      }
+
       args.emplace_back(android::base::StringPrintf("--%s-fd=%d", kind, staging_file->Fd()));
       staging_files.emplace_back(std::move(staging_file));
     }
@@ -1057,5 +1074,9 @@ class OnDeviceRefresh final {
 }  // namespace art
 
 int main(int argc, const char** argv) {
+  // odrefresh is launched by `init` which sets the umask of forked processed to
+  // 077 (S_IRWXG | S_IRWXO). This blocks the ability to make files and directories readable
+  // by others and prevents system_server from loading generated artifacts.
+  umask(S_IWGRP | S_IWOTH);
   return art::odrefresh::OnDeviceRefresh::main(argc, argv);
 }
