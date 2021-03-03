@@ -22,6 +22,7 @@ include art/build/Android.common_path.mk
 # doesn't run on darwin. Only build and run the tests for linux.
 # There are also issues with running under instrumentation.
 ifeq ($(HOST_OS),linux)
+ifeq (true,$(my_art_module_source_build))
 ifneq ($(EMMA_INSTRUMENT),true)
 
 # Determine the location of the test-dump.jar, test-dump.hprof, and proguard
@@ -113,12 +114,16 @@ LOCAL_STATIC_JAVA_LIBRARIES := ahat junit-host
 LOCAL_IS_HOST_MODULE := true
 LOCAL_MODULE_TAGS := tests
 LOCAL_MODULE := ahat-tests
+LOCAL_LICENSE_KINDS := SPDX-license-identifier-Apache-2.0
+LOCAL_LICENSE_CONDITIONS := notice
+LOCAL_NOTICE_FILE := $(LOCAL_PATH)/../../NOTICE
 LOCAL_TEST_CONFIG := ahat-tests.xml
 LOCAL_COMPATIBILITY_SUITE := general-tests
 include $(BUILD_HOST_JAVA_LIBRARY)
 AHAT_TEST_JAR := $(LOCAL_BUILT_MODULE)
 
 endif # EMMA_INSTRUMENT
+endif # my_art_module_source_build
 endif # linux
 
 # Clean up local variables.

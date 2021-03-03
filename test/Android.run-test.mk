@@ -94,13 +94,17 @@ ART_TEST_HOST_RUN_TEST_DEPENDENCIES += \
 
 endif
 
-test-art-host-run-test-dependencies : \
+ifeq (true,$(my_art_module_source_build))
+  test-art-host-run-test-dependencies : \
 	$(ART_TEST_HOST_RUN_TEST_DEPENDENCIES) $(TEST_ART_RUN_TEST_DEPENDENCIES) \
 	$(HOST_BOOT_IMAGE_JARS) $(HOST_BOOT_IMAGE) $(2ND_HOST_BOOT_IMAGE)
-.PHONY: test-art-host-run-test-dependencies
+  .PHONY: test-art-host-run-test-dependencies
+  test-art-run-test-dependencies : test-art-host-run-test-dependencies
+endif
+
 test-art-target-run-test-dependencies :
 .PHONY: test-art-target-run-test-dependencies
-test-art-run-test-dependencies : test-art-host-run-test-dependencies test-art-target-run-test-dependencies
+test-art-run-test-dependencies : test-art-target-run-test-dependencies
 .PHONY: test-art-run-test-dependencies
 
 # Create a rule to build and run a test group of the following form:
@@ -114,16 +118,15 @@ define define-test-art-host-or-target-run-test-group
 	./art/test/testrunner/testrunner.py $$(args)
   build_target :=
   args :=
+
+  test-art-run-test : $(build_target)
 endef  # define-test-art-host-or-target-run-test-group
 
-TARGET_TYPES := host target
-$(foreach target, $(TARGET_TYPES), $(eval \
-  $(call define-test-art-host-or-target-run-test-group,$(target))))
+$(eval $(call define-test-art-host-or-target-run-test-group,target))
 
-test-art-run-test : test-art-host-run-test test-art-target-run-test
+ifeq (true,$(my_art_module_source_build))
+  $(eval $(call define-test-art-host-or-target-run-test-group,host))
+endif
 
-host_prereq_rules :=
-core-image-dependencies :=
 define-test-art-host-or-target-run-test-group :=
-TARGET_TYPES :=
 LOCAL_PATH :=
