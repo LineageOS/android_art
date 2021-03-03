@@ -278,6 +278,7 @@ apex_defaults {
             enabled: false,
         },
     },
+    min_sdk_version: "S",
 }
 
 // Default values shared by (device) Debug and Testing ART APEXes.

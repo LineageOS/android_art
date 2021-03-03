@@ -287,6 +287,7 @@ cc_library_headers {
         "com.android.media",
         "com.android.runtime",
     ],
+    min_sdk_version: "S",
 }
 
 // Make dex_instruction_list.h available for tools/jvmti-agents/titrace
@@ -300,6 +301,7 @@ cc_library_headers {
         "com.android.art",
         "com.android.art.debug",
     ],
+    min_sdk_version: "S",
 }
 
 cc_defaults {
@@ -405,6 +407,7 @@ art_cc_library {
         "com.android.media.swcodec",
         "com.android.runtime",
     ],
+    min_sdk_version: "S",
 }
 
 art_cc_test {
