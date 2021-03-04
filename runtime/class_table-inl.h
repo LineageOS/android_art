@@ -20,12 +20,51 @@
 #include "class_table.h"
 
 #include "base/mutex-inl.h"
+#include "dex/utf.h"
 #include "gc_root-inl.h"
 #include "mirror/class.h"
 #include "oat_file.h"
 #include "obj_ptr-inl.h"
 
 namespace art {
+
+inline uint32_t ClassTable::ClassDescriptorHash::operator()(const TableSlot& slot) const {
+  std::string temp;
+  // No read barrier needed, we're reading a chain of constant references for comparison
+  // with null and retrieval of constant primitive data. See ReadBarrierOption.
+  return ComputeModifiedUtf8Hash(slot.Read<kWithoutReadBarrier>()->GetDescriptor(&temp));
+}
+
+inline uint32_t ClassTable::ClassDescriptorHash::operator()(const DescriptorHashPair& pair) const {
+  DCHECK_EQ(ComputeModifiedUtf8Hash(pair.first), pair.second);
+  return pair.second;
+}
+
+inline bool ClassTable::ClassDescriptorEquals::operator()(const TableSlot& a,
+                                                          const TableSlot& b) const {
+  // No read barrier needed, we're reading a chain of constant references for comparison
+  // with null and retrieval of constant primitive data. See ReadBarrierOption.
+  if (a.Hash() != b.Hash()) {
+    std::string temp;
+    DCHECK(!a.Read<kWithoutReadBarrier>()->DescriptorEquals(
+        b.Read<kWithoutReadBarrier>()->GetDescriptor(&temp)));
+    return false;
+  }
+  std::string temp;
+  return a.Read<kWithoutReadBarrier>()->DescriptorEquals(
+      b.Read<kWithoutReadBarrier>()->GetDescriptor(&temp));
+}
+
+inline bool ClassTable::ClassDescriptorEquals::operator()(const TableSlot& a,
+                                                          const DescriptorHashPair& b) const {
+  // No read barrier needed, we're reading a chain of constant references for comparison
+  // with null and retrieval of constant primitive data. See ReadBarrierOption.
+  if (!a.MaskedHashEquals(b.second)) {
+    DCHECK(!a.Read<kWithoutReadBarrier>()->DescriptorEquals(b.first));
+    return false;
+  }
+  return a.Read<kWithoutReadBarrier>()->DescriptorEquals(b.first);
+}
 
 template<class Visitor>
 void ClassTable::VisitRoots(Visitor& visitor) {
