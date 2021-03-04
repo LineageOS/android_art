@@ -78,6 +78,7 @@ apexes=(
   "com.android.i18n"
   "com.android.runtime"
   "com.android.tzdata"
+  "com.android.os.statsd"
 )
 
 if [[ $mode == "host" ]]; then
