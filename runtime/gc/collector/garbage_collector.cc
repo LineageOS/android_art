@@ -70,6 +70,8 @@ GarbageCollector::GarbageCollector(Heap* heap, const std::string& name)
       rss_histogram_((name_ + " peak-rss").c_str(), kMemBucketSize, kMemBucketCount),
       freed_bytes_histogram_((name_ + " freed-bytes").c_str(), kMemBucketSize, kMemBucketCount),
       gc_time_histogram_(nullptr),
+      metrics_gc_count_(nullptr),
+      gc_throughput_histogram_(nullptr),
       cumulative_timings_(name),
       pause_histogram_lock_("pause histogram lock", kDefaultMutexLevel, true),
       is_transaction_active_(false) {
@@ -140,6 +142,10 @@ uint64_t GarbageCollector::ExtractRssFromMincore(
   }
   rss *= kPageSize;
   rss_histogram_.AddValue(rss / KB);
+  // Add up all the GC meta-data in bytes. It doesn't make sense in itself as it
+  // cannot be accumulated over GCs. So must be divided by gc-count while
+  // reporting.
+  GetMetrics()->TotalGcMetaDataSize()->Add(rss);
 #endif
   return rss;
 }
@@ -147,6 +153,7 @@ uint64_t GarbageCollector::ExtractRssFromMincore(
 void GarbageCollector::Run(GcCause gc_cause, bool clear_soft_references) {
   ScopedTrace trace(android::base::StringPrintf("%s %s GC", PrettyCause(gc_cause), GetName()));
   Thread* self = Thread::Current();
+  Runtime* runtime = Runtime::Current();
   uint64_t start_time = NanoTime();
   uint64_t thread_cpu_start_time = ThreadCpuNanoTime();
   GetHeap()->CalculatePreGcWeightedAllocatedBytes();
@@ -154,7 +161,7 @@ void GarbageCollector::Run(GcCause gc_cause, bool clear_soft_references) {
   current_iteration->Reset(gc_cause, clear_soft_references);
   // Note transaction mode is single-threaded and there's no asynchronous GC and this flag doesn't
   // change in the middle of a GC.
-  is_transaction_active_ = Runtime::Current()->IsActiveTransaction();
+  is_transaction_active_ = runtime->IsActiveTransaction();
   RunPhases();  // Run all the GC phases.
   GetHeap()->CalculatePostGcWeightedAllocatedBytes();
   // Add the current timings to the cumulative timings.
@@ -188,8 +195,16 @@ void GarbageCollector::Run(GcCause gc_cause, bool clear_soft_references) {
     pause_histogram_.AdjustAndAddValue(pause_time);
     total_pause_time += pause_time;
   }
+  metrics::ArtMetrics* metrics = runtime->GetMetrics();
   // Report STW pause time in microseconds.
-  GetMetrics()->MutatorPauseTimeDuringGC()->Add(total_pause_time / 1'000);
+  metrics->MutatorPauseTimeDuringGC()->Add(total_pause_time / 1'000);
+  if (metrics_gc_count_ != nullptr) {
+    metrics_gc_count_->Add(1);
+  }
+  if (gc_throughput_histogram_ != nullptr) {
+    // Report GC throughput in MB/s.
+    gc_throughput_histogram_->Add(current_iteration->GetEstimatedThroughput() / MB);
+  }
   is_transaction_active_ = false;
 }
 
