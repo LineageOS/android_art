@@ -490,7 +490,6 @@ class Generator:
 
       // Build rules for ART run-test `{run_test}`.
 
-      // Test's Dex code.
       package {{
           // See: http://go/android-license-faq
           // A large-scale-change added 'default_applicable_licenses' to import
@@ -500,6 +499,7 @@ class Generator:
           default_applicable_licenses: ["art_license"],
       }}
 
+      // Test's Dex code.
       java_test {{
           name: "{run_test_module_name}",
           defaults: ["art-run-test-defaults"],
