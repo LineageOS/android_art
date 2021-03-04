@@ -506,6 +506,16 @@ art_cc_test {
             enabled: true,
         },
     },
+    // TODO(b/181740144): Enable a ubsan check to create a dependency on
+    // ubsan_minimal. It's needed to be able to link with the prebuilt
+    // libdexfile_external_static.a, which contains libziparchive.a, which is
+    // built with some ubsan checks
+    // (https://cs.android.com/android/platform/superproject/+/master:system/libziparchive/Android.bp;l=47-59;drc=c7b498fdf2002194709e40ea58ce39f43684fc14)
+    // that the SDK snapshots currently don't propagate properly for static
+    // libs.
+    sanitize: {
+        misc_undefined: ["shift"],
+    },
 }
 
 filegroup {
