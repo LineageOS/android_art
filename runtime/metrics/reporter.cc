@@ -137,7 +137,7 @@ ReportingConfig ReportingConfig::FromRuntimeArguments(const RuntimeArgumentMap& 
   using M = RuntimeArgumentMap;
   return {
       .dump_to_logcat = args.Exists(M::WriteMetricsToLog),
-      .dump_to_statsd = args.Exists(M::WriteMetricsToStatsd),
+      .dump_to_statsd = args.GetOrDefault(M::WriteMetricsToStatsd),
       .dump_to_file = args.GetOptional(M::WriteMetricsToFile),
       .report_metrics_on_shutdown = !args.Exists(M::DisableFinalMetricsReport),
       .periodic_report_seconds = args.GetOptional(M::MetricsReportingPeriod),
