@@ -158,7 +158,7 @@ class MetricsBackend {
 
  protected:
   // Called by the metrics reporter to indicate that a new metrics report is starting.
-  virtual void BeginReport(uint64_t timestamp_millis) = 0;
+  virtual void BeginReport(uint64_t timestamp_since_start_ms) = 0;
 
   // Called by the metrics reporter to give the current value of the counter with id counter_type.
   //
@@ -441,6 +441,14 @@ class ArtMetrics {
 
 // Returns a human readable name for the given DatumId.
 std::string DatumName(DatumId datum);
+
+// We also log the thread type for metrics so we can distinguish things that block the UI thread
+// from things that happen on the background thread. This enum keeps track of what thread types we
+// support.
+enum class ThreadType {
+  kMain,
+  kBackground,
+};
 
 }  // namespace metrics
 }  // namespace art

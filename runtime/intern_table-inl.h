@@ -19,11 +19,60 @@
 
 #include "intern_table.h"
 
+#include "dex/utf.h"
 #include "gc/space/image_space.h"
+#include "gc_root-inl.h"
 #include "image.h"
-#include "mirror/string-inl.h"  // Required for ToModifiedUtf8 below.
+#include "mirror/string-inl.h"
+#include "thread-current-inl.h"
 
 namespace art {
+
+inline std::size_t InternTable::StringHash::operator()(const GcRoot<mirror::String>& root) const {
+  if (kIsDebugBuild) {
+    Locks::mutator_lock_->AssertSharedHeld(Thread::Current());
+  }
+  // An additional cast to prevent undesired sign extension.
+  return static_cast<size_t>(
+      static_cast<uint32_t>(root.Read<kWithoutReadBarrier>()->GetHashCode()));
+}
+
+inline bool InternTable::StringEquals::operator()(const GcRoot<mirror::String>& a,
+                                                  const GcRoot<mirror::String>& b) const {
+  if (kIsDebugBuild) {
+    Locks::mutator_lock_->AssertSharedHeld(Thread::Current());
+  }
+  return a.Read<kWithoutReadBarrier>()->Equals(b.Read<kWithoutReadBarrier>());
+}
+
+inline bool InternTable::StringEquals::operator()(const GcRoot<mirror::String>& a,
+                                                  const Utf8String& b) const {
+  if (kIsDebugBuild) {
+    Locks::mutator_lock_->AssertSharedHeld(Thread::Current());
+  }
+  ObjPtr<mirror::String> a_string = a.Read<kWithoutReadBarrier>();
+  uint32_t a_length = static_cast<uint32_t>(a_string->GetLength());
+  if (a_length != b.GetUtf16Length()) {
+    return false;
+  }
+  if (a_string->IsCompressed()) {
+    size_t b_byte_count = strlen(b.GetUtf8Data());
+    size_t b_utf8_length = CountModifiedUtf8Chars(b.GetUtf8Data(), b_byte_count);
+    // Modified UTF-8 single byte character range is 0x01 .. 0x7f
+    // The string compression occurs on regular ASCII with same exact range,
+    // not on extended ASCII which up to 0xff
+    const bool is_b_regular_ascii = (b_byte_count == b_utf8_length);
+    if (is_b_regular_ascii) {
+      return memcmp(b.GetUtf8Data(),
+                    a_string->GetValueCompressed(), a_length * sizeof(uint8_t)) == 0;
+    } else {
+      return false;
+    }
+  } else {
+    const uint16_t* a_value = a_string->GetValue();
+    return CompareModifiedUtf8ToUtf16AsCodePointValues(b.GetUtf8Data(), a_value, a_length) == 0;
+  }
+}
 
 template <typename Visitor>
 inline void InternTable::AddImageStringsToTable(gc::space::ImageSpace* image_space,

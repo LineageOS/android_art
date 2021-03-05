@@ -164,7 +164,7 @@ libart_cc_defaults {
         "jni/jni_internal.cc",
         "linear_alloc.cc",
         "method_handles.cc",
-        "metrics_reporter.cc",
+        "metrics/reporter.cc",
         "mirror/array.cc",
         "mirror/class.cc",
         "mirror/class_ext.cc",
@@ -373,11 +373,16 @@ libart_cc_defaults {
                 "monitor_android.cc",
                 "runtime_android.cc",
                 "thread_android.cc",
+                "metrics/statsd.cc",
             ],
             shared_libs: [
                 "libdl_android",
                 "libicu",
+                "libstatssocket",
                 "libz", // For adler32.
+            ],
+            static_libs: [
+                "libstatslog_art",
             ],
         },
         android_arm: {
@@ -867,4 +872,42 @@ genrule {
         ":art_libdexfile_dex_instruction_list_header",
     ],
     cmd: "$(location interpreter/mterp/gen_mterp.py) $(out) $(in)",
+}
+
+cc_library_static {
+    name: "libstatslog_art",
+    generated_sources: ["statslog_art.cpp"],
+    generated_headers: ["statslog_art.h"],
+    cflags: [
+        "-Wall",
+        "-Werror",
+    ],
+    export_generated_headers: ["statslog_art.h"],
+    shared_libs: [
+        "liblog",
+        "libstatssocket",
+        "libutils",
+    ],
+    apex_available: [
+        "com.android.art",
+        "com.android.art.debug",
+    ],
+}
+
+genrule {
+    name: "statslog_art.h",
+    tools: ["stats-log-api-gen"],
+    cmd: "$(location stats-log-api-gen) --header $(genDir)/statslog_art.h --module art --namespace art,metrics,statsd",
+    out: [
+        "statslog_art.h",
+    ],
+}
+
+genrule {
+    name: "statslog_art.cpp",
+    tools: ["stats-log-api-gen"],
+    cmd: "$(location stats-log-api-gen) --cpp $(genDir)/statslog_art.cpp --module art --namespace art,metrics,statsd --importHeader statslog_art.h",
+    out: [
+        "statslog_art.cpp",
+    ],
 }
