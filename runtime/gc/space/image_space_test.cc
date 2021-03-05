@@ -24,7 +24,7 @@
 #include "class_linker.h"
 #include "dexopt_test.h"
 #include "dex/utf.h"
-#include "intern_table.h"
+#include "intern_table-inl.h"
 #include "noop_compiler_callbacks.h"
 #include "oat_file.h"
 

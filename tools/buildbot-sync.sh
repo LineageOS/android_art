@@ -76,7 +76,6 @@ adb push "$ANDROID_BUILD_TOP/art/tools/public.libraries.buildbot.txt" \
 # Create the framework directory if it doesn't exist. Some gtests need it.
 adb shell mkdir -p "$ART_TEST_CHROOT/system/framework"
 
-
 # APEX packages activation.
 # -------------------------
 
@@ -108,3 +107,4 @@ activate_apex com.android.i18n
 activate_apex com.android.runtime
 activate_apex com.android.tzdata
 activate_apex com.android.conscrypt
+activate_apex com.android.os.statsd
