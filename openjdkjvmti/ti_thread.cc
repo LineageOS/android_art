@@ -45,7 +45,7 @@
 #include "gc/system_weak.h"
 #include "gc_root-inl.h"
 #include "jni/jni_internal.h"
-#include "metrics_reporter.h"
+#include "metrics/reporter.h"
 #include "mirror/class.h"
 #include "mirror/object-inl.h"
 #include "mirror/string.h"
