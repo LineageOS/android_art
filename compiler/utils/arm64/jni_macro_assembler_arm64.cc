@@ -720,15 +720,26 @@ void Arm64JNIMacroAssembler::TestGcMarking(JNIMacroLabel* label, JNIMacroUnaryCo
   CHECK(label != nullptr);
 
   UseScratchRegisterScope temps(asm_.GetVIXLAssembler());
+  Register test_reg;
   DCHECK_EQ(Thread::IsGcMarkingSize(), 4u);
-  Register scratch = temps.AcquireW();
-  ___ Ldr(scratch, MEM_OP(reg_x(TR), Thread::IsGcMarkingOffset<kArm64PointerSize>().Int32Value()));
+  DCHECK(kUseReadBarrier);
+  if (kUseBakerReadBarrier) {
+    if (kIsDebugBuild && emit_run_time_checks_in_debug_mode_) {
+      Register temp = temps.AcquireW();
+      asm_.GenerateMarkingRegisterCheck(temp);
+    }
+    test_reg = reg_w(MR);
+  } else {
+    test_reg = temps.AcquireW();
+    int32_t is_gc_marking_offset = Thread::IsGcMarkingOffset<kArm64PointerSize>().Int32Value();
+    ___ Ldr(test_reg, MEM_OP(reg_x(TR), is_gc_marking_offset));
+  }
   switch (cond) {
     case JNIMacroUnaryCondition::kZero:
-      ___ Cbz(scratch, Arm64JNIMacroLabel::Cast(label)->AsArm64());
+      ___ Cbz(test_reg, Arm64JNIMacroLabel::Cast(label)->AsArm64());
       break;
     case JNIMacroUnaryCondition::kNotZero:
-      ___ Cbnz(scratch, Arm64JNIMacroLabel::Cast(label)->AsArm64());
+      ___ Cbnz(test_reg, Arm64JNIMacroLabel::Cast(label)->AsArm64());
       break;
     default:
       LOG(FATAL) << "Not implemented unary condition: " << static_cast<int>(cond);
