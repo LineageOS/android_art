@@ -67,7 +67,7 @@ class PACKED(4) OatQuickMethodHeader {
   }
 
   bool IsOptimized() const {
-    return GetCodeSize() != 0 && vmap_table_offset_ != 0;
+    return (code_size_ & kCodeSizeMask) != 0 && vmap_table_offset_ != 0;
   }
 
   const uint8_t* GetOptimizedCodeInfoPtr() const {
@@ -89,6 +89,10 @@ class PACKED(4) OatQuickMethodHeader {
     // accidentally use a function pointer to one of the stubs/trampolines.
     // We prefix those with 0xFF in the aseembly so that we can do DCHECKs.
     CHECK_NE(code_size_, 0xFFFFFFFF) << code_size_;
+    if (IsOptimized()) {
+      // Temporary code: Check that the code size in code info matches.
+      CHECK_EQ(code_size_ & kCodeSizeMask, CodeInfo::DecodeCodeSize(this));
+    }
     return code_size_ & kCodeSizeMask;
   }
 
