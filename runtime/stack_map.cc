@@ -87,6 +87,10 @@ CodeInfo CodeInfo::DecodeInlineInfoOnly(const OatQuickMethodHeader* header) {
   return copy;
 }
 
+uint32_t CodeInfo::DecodeCodeSize(const OatQuickMethodHeader* header) {
+  return CodeInfo(header->GetOptimizedCodeInfoPtr()).code_size_;
+}
+
 size_t CodeInfo::Deduper::Dedupe(const uint8_t* code_info_data) {
   writer_.ByteAlign();
   size_t deduped_offset = writer_.NumberOfWrittenBits() / kBitsPerByte;
@@ -263,6 +267,7 @@ void CodeInfo::Dump(VariableIndentationOutputStream* vios,
                     bool verbose,
                     InstructionSet instruction_set) const {
   vios->Stream() << "CodeInfo "
+    << " CodeSize:" << code_size_
     << " FrameSize:" << packed_frame_size_ * kStackAlignment
     << " CoreSpillMask:" << std::hex << core_spill_mask_
     << " FpSpillMask:" << std::hex << fp_spill_mask_
