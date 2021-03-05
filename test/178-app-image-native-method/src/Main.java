@@ -51,6 +51,8 @@ public class Main {
     $noinline$opt$testMissingCritical();
     $noinline$opt$testCriticalSignatures();
 
+    $noinline$regressionTestB181736463();
+
     new CriticalClinitCheck();
     sTestCriticalClinitCheckOtherThread.join();
   }
@@ -367,6 +369,15 @@ public class Main {
         251,
         0xf00000000L + 252L,
         254));
+  }
+
+  static void $noinline$regressionTestB181736463() {
+    // Regression test for bug 181736463 (GenericJNI crashing when class initializer throws).
+    try {
+      BadClassB181736463.nativeMethodVoid();
+      throw new Error("Unreachable");
+    } catch (B181736463Error expected) {
+    }
   }
 
   static void initializingCriticalClinitCheck() {
@@ -822,4 +833,18 @@ class CriticalClinitCheck {
   static {
     Main.initializingCriticalClinitCheck();
   }
+}
+
+class B181736463Error extends Error {
+}
+
+class BadClassB181736463 {
+  static {
+    // Deliberately throw from class initializer.
+    if (true) {
+      throw new B181736463Error();
+    }
+  }
+
+  public static native int nativeMethodVoid();
 }
