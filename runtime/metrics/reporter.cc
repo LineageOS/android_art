@@ -37,12 +37,25 @@ MetricsReporter::MetricsReporter(ReportingConfig config, Runtime* runtime)
 
 MetricsReporter::~MetricsReporter() { MaybeStopBackgroundThread(); }
 
-void MetricsReporter::MaybeStartBackgroundThread(SessionData session_data) {
+bool MetricsReporter::IsPeriodicReportingEnabled() const {
+  return config_.periodic_report_seconds.has_value();
+}
+
+void MetricsReporter::SetReportingPeriod(unsigned int period_seconds) {
+  DCHECK(!thread_.has_value()) << "The reporting period should not be changed after the background "
+                                  "reporting thread is started.";
+
+  config_.periodic_report_seconds = period_seconds;
+}
+
+bool MetricsReporter::MaybeStartBackgroundThread(SessionData session_data) {
+  if (!config_.ReportingEnabled()) {
+    return false;
+  }
   CHECK(!thread_.has_value());
-
   thread_.emplace(&MetricsReporter::BackgroundThreadRun, this);
-
   messages_.SendMessage(BeginSessionMessage{session_data});
+  return true;
 }
 
 void MetricsReporter::MaybeStopBackgroundThread() {
