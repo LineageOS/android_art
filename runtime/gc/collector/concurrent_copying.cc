@@ -153,10 +153,15 @@ ConcurrentCopying::ConcurrentCopying(Heap* heap,
   }
   // Return type of these functions are different. And even though the base class
   // is same, using ternary operator complains.
+  metrics::ArtMetrics* metrics = GetMetrics();
   if (young_gen_) {
-    gc_time_histogram_ = GetMetrics()->YoungGcCollectionTime();
+    gc_time_histogram_ = metrics->YoungGcCollectionTime();
+    metrics_gc_count_ = metrics->YoungGcCount();
+    gc_throughput_histogram_ = metrics->YoungGcThroughput();
   } else {
-    gc_time_histogram_ = GetMetrics()->FullGcCollectionTime();
+    gc_time_histogram_ = metrics->FullGcCollectionTime();
+    metrics_gc_count_ = metrics->FullGcCount();
+    gc_throughput_histogram_ = metrics->FullGcThroughput();
   }
 }
 

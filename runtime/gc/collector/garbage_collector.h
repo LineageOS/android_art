@@ -158,6 +158,8 @@ class GarbageCollector : public RootVisitor, public IsMarkedVisitor, public Mark
   Histogram<uint64_t> rss_histogram_;
   Histogram<size_t> freed_bytes_histogram_;
   metrics::MetricsBase<int64_t>* gc_time_histogram_;
+  metrics::MetricsBase<uint64_t>* metrics_gc_count_;
+  metrics::MetricsBase<int64_t>* gc_throughput_histogram_;
   uint64_t total_thread_cpu_time_ns_;
   uint64_t total_time_ns_;
   uint64_t total_freed_objects_;
