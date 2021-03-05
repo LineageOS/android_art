@@ -41,6 +41,92 @@ static constexpr uint64_t kHideMaxtargetsdkPHiddenApis = 149997251;
 static constexpr uint64_t kHideMaxtargetsdkQHiddenApis = 149994052;
 static constexpr uint64_t kAllowTestApiAccess = 166236554;
 
+
+static bool Copy(const std::string& src, const std::string& dst, /*out*/ std::string* error_msg) {
+  std::ifstream  src_stream(src, std::ios::binary);
+  std::ofstream  dst_stream(dst, std::ios::binary);
+  dst_stream << src_stream.rdbuf();
+  src_stream.close();
+  dst_stream.close();
+  if (src_stream.good() && dst_stream.good()) {
+    return true;
+  } else {
+    *error_msg = "Copy " + src + " => " + dst + " (src_good="
+        + (src_stream.good() ? "true" : "false") + ", dst_good="
+        + (dst_stream.good() ? "true" : "false") + ")";
+    return false;
+  }
+}
+
+static bool LoadDexFiles(const std::string& path,
+                         ScopedObjectAccess& soa,
+                         /* out */ std::vector<std::unique_ptr<const DexFile>>* dex_files,
+                         /* out */ ObjPtr<mirror::ClassLoader>* class_loader,
+                         /* out */ std::string* error_msg) REQUIRES_SHARED(Locks::mutator_lock_) {
+  if (!ArtDexFileLoader().Open(path.c_str(),
+                               path,
+                               /* verify= */ true,
+                               /* verify_checksum= */ true,
+                               error_msg,
+                               dex_files)) {
+    return false;
+  }
+
+  ClassLinker* const linker = Runtime::Current()->GetClassLinker();
+
+  StackHandleScope<2> hs(soa.Self());
+  Handle<mirror::Class> h_class = hs.NewHandle(soa.Decode<mirror::Class>(
+      WellKnownClasses::dalvik_system_PathClassLoader));
+  Handle<mirror::ClassLoader> h_loader = hs.NewHandle(linker->CreateWellKnownClassLoader(
+      soa.Self(),
+      MakeNonOwningPointerVector(*dex_files),
+      h_class,
+      /* parent_loader= */ ScopedNullHandle<mirror::ClassLoader>(),
+      /* shared_libraries= */ ScopedNullHandle<mirror::ObjectArray<mirror::ClassLoader>>()));
+  for (const auto& dex_file : *dex_files) {
+    linker->RegisterDexFile(*dex_file.get(), h_loader.Get());
+  }
+
+  *class_loader = h_loader.Get();
+  return true;
+}
+
+static bool Remove(const std::string& path, /*out*/ std::string* error_msg) {
+  if (TEMP_FAILURE_RETRY(remove(path.c_str())) == 0) {
+    return true;
+  }
+  *error_msg = StringPrintf("Unable to remove(\"%s\"): %s", path.c_str(), strerror(errno));
+  return false;
+}
+
+static bool CheckAllDexFilesInDomain(ObjPtr<mirror::ClassLoader> loader,
+                                     const std::vector<std::unique_ptr<const DexFile>>& dex_files,
+                                     hiddenapi::Domain expected_domain,
+                                     /* out */ std::string* error_msg)
+    REQUIRES_SHARED(Locks::mutator_lock_) {
+  for (const auto& dex_file : dex_files) {
+    hiddenapi::AccessContext context(loader, dex_file.get());
+    if (context.GetDomain() != expected_domain) {
+      std::stringstream ss;
+      ss << dex_file->GetLocation() << ": access context domain does not match "
+          << "(expected=" << static_cast<uint32_t>(expected_domain)
+          << ", actual=" << static_cast<uint32_t>(context.GetDomain()) << ")";
+      *error_msg = ss.str();
+      return false;
+    }
+    if (dex_file->GetHiddenapiDomain() != expected_domain) {
+      std::stringstream ss;
+      ss << dex_file->GetLocation() << ": dex file domain does not match "
+          << "(expected=" << static_cast<uint32_t>(expected_domain)
+          << ", actual=" << static_cast<uint32_t>(dex_file->GetHiddenapiDomain()) << ")";
+      *error_msg = ss.str();
+      return false;
+    }
+  }
+
+  return true;
+}
+
 class HiddenApiTest : public CommonRuntimeTest {
  protected:
   void SetUp() override {
@@ -52,23 +138,23 @@ class HiddenApiTest : public CommonRuntimeTest {
     bool started = runtime_->Start();
     CHECK(started);
 
-    class1_field1_ = getArtField("mypackage/packagea/Class1", "field1", "I");
-    class1_field12_ = getArtField("mypackage/packagea/Class1", "field12", "I");
-    class1_init_ = getArtMethod("mypackage/packagea/Class1", "<init>", "()V");
-    class1_method1_ = getArtMethod("mypackage/packagea/Class1", "method1", "()V");
-    class1_method1_i_ = getArtMethod("mypackage/packagea/Class1", "method1", "(I)V");
-    class1_method12_ = getArtMethod("mypackage/packagea/Class1", "method12", "()V");
-    class12_field1_ = getArtField("mypackage/packagea/Class12", "field1", "I");
-    class12_method1_ = getArtMethod("mypackage/packagea/Class12", "method1", "()V");
-    class2_field1_ = getArtField("mypackage/packagea/Class2", "field1", "I");
-    class2_method1_ = getArtMethod("mypackage/packagea/Class2", "method1", "()V");
-    class2_method1_i_ = getArtMethod("mypackage/packagea/Class2", "method1", "(I)V");
-    class3_field1_ = getArtField("mypackage/packageb/Class3", "field1", "I");
-    class3_method1_ = getArtMethod("mypackage/packageb/Class3", "method1", "()V");
-    class3_method1_i_ = getArtMethod("mypackage/packageb/Class3", "method1", "(I)V");
+    class1_field1_ = GetArtField("mypackage/packagea/Class1", "field1", "I");
+    class1_field12_ = GetArtField("mypackage/packagea/Class1", "field12", "I");
+    class1_init_ = GetArtMethod("mypackage/packagea/Class1", "<init>", "()V");
+    class1_method1_ = GetArtMethod("mypackage/packagea/Class1", "method1", "()V");
+    class1_method1_i_ = GetArtMethod("mypackage/packagea/Class1", "method1", "(I)V");
+    class1_method12_ = GetArtMethod("mypackage/packagea/Class1", "method12", "()V");
+    class12_field1_ = GetArtField("mypackage/packagea/Class12", "field1", "I");
+    class12_method1_ = GetArtMethod("mypackage/packagea/Class12", "method1", "()V");
+    class2_field1_ = GetArtField("mypackage/packagea/Class2", "field1", "I");
+    class2_method1_ = GetArtMethod("mypackage/packagea/Class2", "method1", "()V");
+    class2_method1_i_ = GetArtMethod("mypackage/packagea/Class2", "method1", "(I)V");
+    class3_field1_ = GetArtField("mypackage/packageb/Class3", "field1", "I");
+    class3_method1_ = GetArtMethod("mypackage/packageb/Class3", "method1", "()V");
+    class3_method1_i_ = GetArtMethod("mypackage/packageb/Class3", "method1", "(I)V");
   }
 
-  ArtMethod* getArtMethod(const char* class_name, const char* name, const char* signature) {
+  ArtMethod* GetArtMethod(const char* class_name, const char* name, const char* signature) {
     JNIEnv* env = Thread::Current()->GetJniEnv();
     jclass klass = env->FindClass(class_name);
     jmethodID method_id = env->GetMethodID(klass, name, signature);
@@ -76,7 +162,7 @@ class HiddenApiTest : public CommonRuntimeTest {
     return art_method;
   }
 
-  ArtField* getArtField(const char* class_name, const char* name, const char* signature) {
+  ArtField* GetArtField(const char* class_name, const char* name, const char* signature) {
     JNIEnv* env = Thread::Current()->GetJniEnv();
     jclass klass = env->FindClass(class_name);
     jfieldID field_id = env->GetFieldID(klass, name, signature);
@@ -84,7 +170,7 @@ class HiddenApiTest : public CommonRuntimeTest {
     return art_field;
   }
 
-  void setChangeIdState(uint64_t change, bool enabled) {
+  void SetChangeIdState(uint64_t change, bool enabled) {
     CompatFramework& compat_framework = runtime_->GetCompatFramework();
     std::set<uint64_t> disabled_changes = compat_framework.GetDisabledCompatChanges();
     if (enabled) {
@@ -102,6 +188,25 @@ class HiddenApiTest : public CommonRuntimeTest {
     return ShouldDenyAccessToMemberImpl(/* member= */ class1_field1_,
                                         list,
                                         /* access_method= */ hiddenapi::AccessMethod::kNone);
+  }
+
+  void TestLocation(const std::string& location, hiddenapi::Domain expected_domain) {
+    ScopedObjectAccess soa(Thread::Current());
+    std::vector<std::unique_ptr<const DexFile>> dex_files;
+    std::string error_msg;
+    ObjPtr<mirror::ClassLoader> class_loader;
+
+    ASSERT_TRUE(Copy(GetTestDexFileName("Main"), location, &error_msg)) << error_msg;
+    ASSERT_TRUE(LoadDexFiles(location, soa, &dex_files, &class_loader, &error_msg))
+        << error_msg;
+    ASSERT_GE(dex_files.size(), 1u);
+    ASSERT_TRUE(CheckAllDexFilesInDomain(class_loader,
+                                         dex_files,
+                                         expected_domain,
+                                         &error_msg)) << error_msg;
+
+    dex_files.clear();
+    ASSERT_TRUE(Remove(location, &error_msg)) << error_msg;
   }
 
  protected:
@@ -138,8 +243,8 @@ TEST_F(HiddenApiTest, CheckGetActionFromRuntimeFlags) {
   runtime_->SetHiddenApiEnforcementPolicy(hiddenapi::EnforcementPolicy::kEnabled);
   runtime_->SetTargetSdkVersion(
       static_cast<uint32_t>(hiddenapi::ApiList::MaxTargetO().GetMaxAllowedSdkVersion()));
-  setChangeIdState(kHideMaxtargetsdkPHiddenApis, false);
-  setChangeIdState(kHideMaxtargetsdkQHiddenApis, false);
+  SetChangeIdState(kHideMaxtargetsdkPHiddenApis, false);
+  SetChangeIdState(kHideMaxtargetsdkQHiddenApis, false);
   ASSERT_EQ(ShouldDenyAccess(hiddenapi::ApiList::Sdk()), false);
   ASSERT_EQ(ShouldDenyAccess(hiddenapi::ApiList::Unsupported()), false);
   ASSERT_EQ(ShouldDenyAccess(hiddenapi::ApiList::MaxTargetR()), false);
@@ -151,8 +256,8 @@ TEST_F(HiddenApiTest, CheckGetActionFromRuntimeFlags) {
   runtime_->SetHiddenApiEnforcementPolicy(hiddenapi::EnforcementPolicy::kEnabled);
   runtime_->SetTargetSdkVersion(
       static_cast<uint32_t>(hiddenapi::ApiList::MaxTargetO().GetMaxAllowedSdkVersion()) + 1);
-  setChangeIdState(kHideMaxtargetsdkPHiddenApis, false);
-  setChangeIdState(kHideMaxtargetsdkQHiddenApis, false);
+  SetChangeIdState(kHideMaxtargetsdkPHiddenApis, false);
+  SetChangeIdState(kHideMaxtargetsdkQHiddenApis, false);
   ASSERT_EQ(ShouldDenyAccess(hiddenapi::ApiList::Sdk()), false);
   ASSERT_EQ(ShouldDenyAccess(hiddenapi::ApiList::Unsupported()), false);
   ASSERT_EQ(ShouldDenyAccess(hiddenapi::ApiList::MaxTargetR()), false);
@@ -160,7 +265,7 @@ TEST_F(HiddenApiTest, CheckGetActionFromRuntimeFlags) {
   ASSERT_EQ(ShouldDenyAccess(hiddenapi::ApiList::MaxTargetP()), false);
   ASSERT_EQ(ShouldDenyAccess(hiddenapi::ApiList::MaxTargetO()), true);
   ASSERT_EQ(ShouldDenyAccess(hiddenapi::ApiList::Blocked()), true);
-  setChangeIdState(kHideMaxtargetsdkQHiddenApis, true);
+  SetChangeIdState(kHideMaxtargetsdkQHiddenApis, true);
   ASSERT_EQ(ShouldDenyAccess(hiddenapi::ApiList::Sdk()), false);
   ASSERT_EQ(ShouldDenyAccess(hiddenapi::ApiList::Unsupported()), false);
   ASSERT_EQ(ShouldDenyAccess(hiddenapi::ApiList::MaxTargetQ()), true);
@@ -171,8 +276,8 @@ TEST_F(HiddenApiTest, CheckGetActionFromRuntimeFlags) {
   runtime_->SetHiddenApiEnforcementPolicy(hiddenapi::EnforcementPolicy::kEnabled);
   runtime_->SetTargetSdkVersion(
       static_cast<uint32_t>(hiddenapi::ApiList::MaxTargetP().GetMaxAllowedSdkVersion()) + 1);
-  setChangeIdState(kHideMaxtargetsdkPHiddenApis, true);
-  setChangeIdState(kHideMaxtargetsdkQHiddenApis, false);
+  SetChangeIdState(kHideMaxtargetsdkPHiddenApis, true);
+  SetChangeIdState(kHideMaxtargetsdkQHiddenApis, false);
   ASSERT_EQ(ShouldDenyAccess(hiddenapi::ApiList::Sdk()), false);
   ASSERT_EQ(ShouldDenyAccess(hiddenapi::ApiList::Unsupported()), false);
   ASSERT_EQ(ShouldDenyAccess(hiddenapi::ApiList::MaxTargetR()), false);
@@ -184,8 +289,8 @@ TEST_F(HiddenApiTest, CheckGetActionFromRuntimeFlags) {
   runtime_->SetHiddenApiEnforcementPolicy(hiddenapi::EnforcementPolicy::kEnabled);
   runtime_->SetTargetSdkVersion(
       static_cast<uint32_t>(hiddenapi::ApiList::MaxTargetQ().GetMaxAllowedSdkVersion()) + 1);
-  setChangeIdState(kHideMaxtargetsdkPHiddenApis, true);
-  setChangeIdState(kHideMaxtargetsdkQHiddenApis, true);
+  SetChangeIdState(kHideMaxtargetsdkPHiddenApis, true);
+  SetChangeIdState(kHideMaxtargetsdkQHiddenApis, true);
   ASSERT_EQ(ShouldDenyAccess(hiddenapi::ApiList::Sdk()), false);
   ASSERT_EQ(ShouldDenyAccess(hiddenapi::ApiList::Unsupported()), false);
   ASSERT_EQ(ShouldDenyAccess(hiddenapi::ApiList::MaxTargetR()), false);
@@ -197,8 +302,8 @@ TEST_F(HiddenApiTest, CheckGetActionFromRuntimeFlags) {
   runtime_->SetHiddenApiEnforcementPolicy(hiddenapi::EnforcementPolicy::kEnabled);
   runtime_->SetTargetSdkVersion(
       static_cast<uint32_t>(hiddenapi::ApiList::MaxTargetR().GetMaxAllowedSdkVersion()) + 1);
-  setChangeIdState(kHideMaxtargetsdkPHiddenApis, true);
-  setChangeIdState(kHideMaxtargetsdkQHiddenApis, true);
+  SetChangeIdState(kHideMaxtargetsdkPHiddenApis, true);
+  SetChangeIdState(kHideMaxtargetsdkQHiddenApis, true);
   ASSERT_EQ(ShouldDenyAccess(hiddenapi::ApiList::Sdk()), false);
   ASSERT_EQ(ShouldDenyAccess(hiddenapi::ApiList::Unsupported()), false);
   ASSERT_EQ(ShouldDenyAccess(hiddenapi::ApiList::MaxTargetR()), true);
@@ -217,7 +322,7 @@ TEST_F(HiddenApiTest, CheckTestApiEnforcement) {
 
   // Default case where all TestApis are treated like non-TestApi.
   runtime_->SetTestApiEnforcementPolicy(hiddenapi::EnforcementPolicy::kEnabled);
-  setChangeIdState(kAllowTestApiAccess, false);
+  SetChangeIdState(kAllowTestApiAccess, false);
   ASSERT_EQ(
       ShouldDenyAccess(hiddenapi::ApiList::TestApi() | hiddenapi::ApiList::Sdk()), false);
   ASSERT_EQ(
@@ -235,7 +340,7 @@ TEST_F(HiddenApiTest, CheckTestApiEnforcement) {
 
   // A case where we want to allow access to TestApis.
   runtime_->SetTestApiEnforcementPolicy(hiddenapi::EnforcementPolicy::kDisabled);
-  setChangeIdState(kAllowTestApiAccess, false);
+  SetChangeIdState(kAllowTestApiAccess, false);
   ASSERT_EQ(
       ShouldDenyAccess(hiddenapi::ApiList::TestApi() | hiddenapi::ApiList::Sdk()), false);
   ASSERT_EQ(
@@ -253,7 +358,7 @@ TEST_F(HiddenApiTest, CheckTestApiEnforcement) {
 
   // A second case where we want to allow access to TestApis.
   runtime_->SetTestApiEnforcementPolicy(hiddenapi::EnforcementPolicy::kEnabled);
-  setChangeIdState(kAllowTestApiAccess, true);
+  SetChangeIdState(kAllowTestApiAccess, true);
   ASSERT_EQ(
       ShouldDenyAccess(hiddenapi::ApiList::TestApi() | hiddenapi::ApiList::Sdk()), false);
   ASSERT_EQ(
@@ -510,158 +615,35 @@ TEST_F(HiddenApiTest, CheckMemberSignatureForProxyClass) {
   ASSERT_EQ("L$Proxy1234;->interfaces:[Ljava/lang/Class;", ss_field.str());
 }
 
-static bool Copy(const std::string& src, const std::string& dst, /*out*/ std::string* error_msg) {
-  std::ifstream  src_stream(src, std::ios::binary);
-  std::ofstream  dst_stream(dst, std::ios::binary);
-  dst_stream << src_stream.rdbuf();
-  src_stream.close();
-  dst_stream.close();
-  if (src_stream.good() && dst_stream.good()) {
-    return true;
-  } else {
-    *error_msg = "Copy " + src + " => " + dst + " (src_good="
-        + (src_stream.good() ? "true" : "false") + ", dst_good="
-        + (dst_stream.good() ? "true" : "false") + ")";
-    return false;
-  }
-}
-
-static bool LoadDexFiles(const std::string& path,
-                         ScopedObjectAccess& soa,
-                         /* out */ std::vector<std::unique_ptr<const DexFile>>* dex_files,
-                         /* out */ ObjPtr<mirror::ClassLoader>* class_loader,
-                         /* out */ std::string* error_msg) REQUIRES_SHARED(Locks::mutator_lock_) {
-  if (!ArtDexFileLoader().Open(path.c_str(),
-                               path,
-                               /* verify= */ true,
-                               /* verify_checksum= */ true,
-                               error_msg,
-                               dex_files)) {
-    return false;
-  }
-
-  ClassLinker* const linker = Runtime::Current()->GetClassLinker();
-
-  StackHandleScope<2> hs(soa.Self());
-  Handle<mirror::Class> h_class = hs.NewHandle(soa.Decode<mirror::Class>(
-      WellKnownClasses::dalvik_system_PathClassLoader));
-  Handle<mirror::ClassLoader> h_loader = hs.NewHandle(linker->CreateWellKnownClassLoader(
-      soa.Self(),
-      MakeNonOwningPointerVector(*dex_files),
-      h_class,
-      /* parent_loader= */ ScopedNullHandle<mirror::ClassLoader>(),
-      /* shared_libraries= */ ScopedNullHandle<mirror::ObjectArray<mirror::ClassLoader>>()));
-  for (const auto& dex_file : *dex_files) {
-    linker->RegisterDexFile(*dex_file.get(), h_loader.Get());
-  }
-
-  *class_loader = h_loader.Get();
-  return true;
-}
-
-static bool Remove(const std::string& path, /*out*/ std::string* error_msg) {
-  if (TEMP_FAILURE_RETRY(remove(path.c_str())) == 0) {
-    return true;
-  }
-  *error_msg = StringPrintf("Unable to remove(\"%s\"): %s", path.c_str(), strerror(errno));
-  return false;
-}
-
-static bool CheckAllDexFilesInDomain(ObjPtr<mirror::ClassLoader> loader,
-                                     const std::vector<std::unique_ptr<const DexFile>>& dex_files,
-                                     hiddenapi::Domain expected_domain,
-                                     /* out */ std::string* error_msg)
-    REQUIRES_SHARED(Locks::mutator_lock_) {
-  for (const auto& dex_file : dex_files) {
-    hiddenapi::AccessContext context(loader, dex_file.get());
-    if (context.GetDomain() != expected_domain) {
-      std::stringstream ss;
-      ss << dex_file->GetLocation() << ": access context domain does not match "
-          << "(expected=" << static_cast<uint32_t>(expected_domain)
-          << ", actual=" << static_cast<uint32_t>(context.GetDomain()) << ")";
-      *error_msg = ss.str();
-      return false;
-    }
-    if (dex_file->GetHiddenapiDomain() != expected_domain) {
-      std::stringstream ss;
-      ss << dex_file->GetLocation() << ": dex file domain does not match "
-          << "(expected=" << static_cast<uint32_t>(expected_domain)
-          << ", actual=" << static_cast<uint32_t>(dex_file->GetHiddenapiDomain()) << ")";
-      *error_msg = ss.str();
-      return false;
-    }
-  }
-
-  return true;
-}
-
 TEST_F(HiddenApiTest, DexDomain_DataDir) {
   // Load file from a non-system directory and check that it is not flagged as framework.
   std::string data_location_path = android_data_ + "/foo.jar";
   ASSERT_FALSE(LocationIsOnSystemFramework(data_location_path.c_str()));
-
-  ScopedObjectAccess soa(Thread::Current());
-  std::vector<std::unique_ptr<const DexFile>> dex_files;
-  std::string error_msg;
-  ObjPtr<mirror::ClassLoader> class_loader;
-
-  ASSERT_TRUE(Copy(GetTestDexFileName("Main"), data_location_path, &error_msg)) << error_msg;
-  ASSERT_TRUE(LoadDexFiles(data_location_path, soa, &dex_files, &class_loader, &error_msg))
-      << error_msg;
-  ASSERT_GE(dex_files.size(), 1u);
-  ASSERT_TRUE(CheckAllDexFilesInDomain(class_loader,
-                                       dex_files,
-                                       hiddenapi::Domain::kApplication,
-                                       &error_msg)) << error_msg;
-
-  dex_files.clear();
-  ASSERT_TRUE(Remove(data_location_path, &error_msg)) << error_msg;
+  TestLocation(data_location_path, hiddenapi::Domain::kApplication);
 }
 
 TEST_F(HiddenApiTest, DexDomain_SystemDir) {
   // Load file from a system, non-framework directory and check that it is not flagged as framework.
   std::string system_location_path = GetAndroidRoot() + "/foo.jar";
   ASSERT_FALSE(LocationIsOnSystemFramework(system_location_path.c_str()));
-
-  ScopedObjectAccess soa(Thread::Current());
-  std::vector<std::unique_ptr<const DexFile>> dex_files;
-  std::string error_msg;
-  ObjPtr<mirror::ClassLoader> class_loader;
-
-  ASSERT_TRUE(Copy(GetTestDexFileName("Main"), system_location_path, &error_msg)) << error_msg;
-  ASSERT_TRUE(LoadDexFiles(system_location_path, soa, &dex_files, &class_loader, &error_msg))
-      << error_msg;
-  ASSERT_GE(dex_files.size(), 1u);
-  ASSERT_TRUE(CheckAllDexFilesInDomain(class_loader,
-                                       dex_files,
-                                       hiddenapi::Domain::kApplication,
-                                       &error_msg)) << error_msg;
-
-  dex_files.clear();
-  ASSERT_TRUE(Remove(system_location_path, &error_msg)) << error_msg;
+  TestLocation(system_location_path, hiddenapi::Domain::kApplication);
 }
 
 TEST_F(HiddenApiTest, DexDomain_SystemExtDir) {
-  // Load file from a system_ext, non-framework directory and check that it is not flagged as framework.
+  // Load file from a system_ext, non-framework directory and check that it is not flagged as
+  // framework.
   std::string system_ext_location_path = android_system_ext_ + "/foo.jar";
   ASSERT_FALSE(LocationIsOnSystemExtFramework(system_ext_location_path.c_str()));
+  TestLocation(system_ext_location_path, hiddenapi::Domain::kApplication);
+}
 
-  ScopedObjectAccess soa(Thread::Current());
-  std::vector<std::unique_ptr<const DexFile>> dex_files;
-  std::string error_msg;
-  ObjPtr<mirror::ClassLoader> class_loader;
-
-  ASSERT_TRUE(Copy(GetTestDexFileName("Main"), system_ext_location_path, &error_msg)) << error_msg;
-  ASSERT_TRUE(LoadDexFiles(system_ext_location_path, soa, &dex_files, &class_loader, &error_msg))
-      << error_msg;
-  ASSERT_GE(dex_files.size(), 1u);
-  ASSERT_TRUE(CheckAllDexFilesInDomain(class_loader,
-                                       dex_files,
-                                       hiddenapi::Domain::kApplication,
-                                       &error_msg)) << error_msg;
-
-  dex_files.clear();
-  ASSERT_TRUE(Remove(system_ext_location_path, &error_msg)) << error_msg;
+TEST_F(HiddenApiTest, DexDomain_SystemSystemExtDir) {
+  // Load file from a system/system_ext, non-framework directory and check that it is not flagged as
+  // framework.
+  std::filesystem::create_directory(GetAndroidRoot() + "/system_ext");
+  std::string system_ext_location_path =  GetAndroidRoot() + "/system_ext/foo.jar";
+  ASSERT_FALSE(LocationIsOnSystemExtFramework(system_ext_location_path.c_str()));
+  TestLocation(system_ext_location_path, hiddenapi::Domain::kApplication);
 }
 
 TEST_F(HiddenApiTest, DexDomain_SystemFrameworkDir) {
@@ -669,78 +651,32 @@ TEST_F(HiddenApiTest, DexDomain_SystemFrameworkDir) {
   std::filesystem::create_directory(GetAndroidRoot() + "/framework");
   std::string system_framework_location_path = GetAndroidRoot() + "/framework/foo.jar";
   ASSERT_TRUE(LocationIsOnSystemFramework(system_framework_location_path.c_str()));
-
-  ScopedObjectAccess soa(Thread::Current());
-  std::vector<std::unique_ptr<const DexFile>> dex_files;
-  std::string error_msg;
-  ObjPtr<mirror::ClassLoader> class_loader;
-
-  ASSERT_TRUE(Copy(GetTestDexFileName("Main"), system_framework_location_path, &error_msg))
-      << error_msg;
-  ASSERT_TRUE(LoadDexFiles(system_framework_location_path,
-                           soa,
-                           &dex_files,
-                           &class_loader,
-                           &error_msg)) << error_msg;
-  ASSERT_GE(dex_files.size(), 1u);
-  ASSERT_TRUE(CheckAllDexFilesInDomain(class_loader,
-                                       dex_files,
-                                       hiddenapi::Domain::kPlatform,
-                                       &error_msg)) << error_msg;
-
-  dex_files.clear();
-  ASSERT_TRUE(Remove(system_framework_location_path, &error_msg)) << error_msg;
+  TestLocation(system_framework_location_path, hiddenapi::Domain::kPlatform);
 }
 
 TEST_F(HiddenApiTest, DexDomain_SystemExtFrameworkDir) {
   // Load file from a system_ext/framework directory and check that it is flagged as a framework dex.
   std::string system_ext_framework_location_path = android_system_ext_ + "/framework/foo.jar";
   ASSERT_TRUE(LocationIsOnSystemExtFramework(system_ext_framework_location_path.c_str()));
+  TestLocation(system_ext_framework_location_path, hiddenapi::Domain::kPlatform);
+}
 
-  ScopedObjectAccess soa(Thread::Current());
-  std::vector<std::unique_ptr<const DexFile>> dex_files;
-  std::string error_msg;
-  ObjPtr<mirror::ClassLoader> class_loader;
-
-  ASSERT_TRUE(Copy(GetTestDexFileName("Main"), system_ext_framework_location_path, &error_msg))
-      << error_msg;
-  ASSERT_TRUE(LoadDexFiles(system_ext_framework_location_path,
-                           soa,
-                           &dex_files,
-                           &class_loader,
-                           &error_msg)) << error_msg;
-  ASSERT_GE(dex_files.size(), 1u);
-  ASSERT_TRUE(CheckAllDexFilesInDomain(class_loader,
-                                       dex_files,
-                                       hiddenapi::Domain::kPlatform,
-                                       &error_msg)) << error_msg;
-
-  dex_files.clear();
-  ASSERT_TRUE(Remove(system_ext_framework_location_path, &error_msg)) << error_msg;
+TEST_F(HiddenApiTest, DexDomain_SystemSystemExtFrameworkDir) {
+  // Load file from a system/system_ext/framework directory and check that it is flagged as a
+  // framework dex.
+  std::filesystem::create_directory(GetAndroidRoot() + "/system_ext");
+  std::filesystem::create_directory(GetAndroidRoot() + "/system_ext/framework");
+  std::string system_ext_framework_location_path =
+       GetAndroidRoot() + "/system_ext/framework/foo.jar";
+  ASSERT_TRUE(LocationIsOnSystemExtFramework(system_ext_framework_location_path.c_str()));
+  TestLocation(system_ext_framework_location_path, hiddenapi::Domain::kPlatform);
 }
 
 TEST_F(HiddenApiTest, DexDomain_DataDir_MultiDex) {
   // Load multidex file from a non-system directory and check that it is not flagged as framework.
   std::string data_multi_location_path = android_data_ + "/multifoo.jar";
   ASSERT_FALSE(LocationIsOnSystemFramework(data_multi_location_path.c_str()));
-
-  ScopedObjectAccess soa(Thread::Current());
-  std::vector<std::unique_ptr<const DexFile>> dex_files;
-  std::string error_msg;
-  ObjPtr<mirror::ClassLoader> class_loader;
-
-  ASSERT_TRUE(Copy(GetTestDexFileName("MultiDex"), data_multi_location_path, &error_msg))
-      << error_msg;
-  ASSERT_TRUE(LoadDexFiles(data_multi_location_path, soa, &dex_files, &class_loader, &error_msg))
-      << error_msg;
-  ASSERT_GE(dex_files.size(), 1u);
-  ASSERT_TRUE(CheckAllDexFilesInDomain(class_loader,
-                                       dex_files,
-                                       hiddenapi::Domain::kApplication,
-                                       &error_msg)) << error_msg;
-
-  dex_files.clear();
-  ASSERT_TRUE(Remove(data_multi_location_path, &error_msg)) << error_msg;
+  TestLocation(data_multi_location_path, hiddenapi::Domain::kApplication);
 }
 
 TEST_F(HiddenApiTest, DexDomain_SystemDir_MultiDex) {
@@ -748,24 +684,7 @@ TEST_F(HiddenApiTest, DexDomain_SystemDir_MultiDex) {
   // as framework.
   std::string system_multi_location_path = GetAndroidRoot() + "/multifoo.jar";
   ASSERT_FALSE(LocationIsOnSystemFramework(system_multi_location_path.c_str()));
-
-  ScopedObjectAccess soa(Thread::Current());
-  std::vector<std::unique_ptr<const DexFile>> dex_files;
-  std::string error_msg;
-  ObjPtr<mirror::ClassLoader> class_loader;
-
-  ASSERT_TRUE(Copy(GetTestDexFileName("MultiDex"), system_multi_location_path, &error_msg))
-      << error_msg;
-  ASSERT_TRUE(LoadDexFiles(system_multi_location_path, soa, &dex_files, &class_loader, &error_msg))
-      << error_msg;
-  ASSERT_GT(dex_files.size(), 1u);
-  ASSERT_TRUE(CheckAllDexFilesInDomain(class_loader,
-                                       dex_files,
-                                       hiddenapi::Domain::kApplication,
-                                       &error_msg)) << error_msg;
-
-  dex_files.clear();
-  ASSERT_TRUE(Remove(system_multi_location_path, &error_msg)) << error_msg;
+  TestLocation(system_multi_location_path, hiddenapi::Domain::kApplication);
 }
 
 TEST_F(HiddenApiTest, DexDomain_SystemExtDir_MultiDex) {
@@ -773,24 +692,16 @@ TEST_F(HiddenApiTest, DexDomain_SystemExtDir_MultiDex) {
   // as framework.
   std::string system_ext_multi_location_path = android_system_ext_ + "/multifoo.jar";
   ASSERT_FALSE(LocationIsOnSystemExtFramework(system_ext_multi_location_path.c_str()));
+  TestLocation(system_ext_multi_location_path, hiddenapi::Domain::kApplication);
+}
 
-  ScopedObjectAccess soa(Thread::Current());
-  std::vector<std::unique_ptr<const DexFile>> dex_files;
-  std::string error_msg;
-  ObjPtr<mirror::ClassLoader> class_loader;
-
-  ASSERT_TRUE(Copy(GetTestDexFileName("MultiDex"), system_ext_multi_location_path, &error_msg))
-      << error_msg;
-  ASSERT_TRUE(LoadDexFiles(system_ext_multi_location_path, soa, &dex_files, &class_loader, &error_msg))
-      << error_msg;
-  ASSERT_GT(dex_files.size(), 1u);
-  ASSERT_TRUE(CheckAllDexFilesInDomain(class_loader,
-                                       dex_files,
-                                       hiddenapi::Domain::kApplication,
-                                       &error_msg)) << error_msg;
-
-  dex_files.clear();
-  ASSERT_TRUE(Remove(system_ext_multi_location_path, &error_msg)) << error_msg;
+TEST_F(HiddenApiTest, DexDomain_SystemSystemExtDir_MultiDex) {
+  // Load multidex file from a system/system_ext, non-framework directory and check that it is not
+  // flagged as framework.
+  std::string system_ext_multi_location_path =
+      GetAndroidRoot() + "/system_ext/multifoo.jar";
+  ASSERT_FALSE(LocationIsOnSystemExtFramework(system_ext_multi_location_path.c_str()));
+  TestLocation(system_ext_multi_location_path, hiddenapi::Domain::kApplication);
 }
 
 TEST_F(HiddenApiTest, DexDomain_SystemFrameworkDir_MultiDex) {
@@ -798,57 +709,27 @@ TEST_F(HiddenApiTest, DexDomain_SystemFrameworkDir_MultiDex) {
   // framework dex.
   std::string system_framework_multi_location_path = GetAndroidRoot() + "/framework/multifoo.jar";
   ASSERT_TRUE(LocationIsOnSystemFramework(system_framework_multi_location_path.c_str()));
-
-  ScopedObjectAccess soa(Thread::Current());
-  std::vector<std::unique_ptr<const DexFile>> dex_files;
-  std::string error_msg;
-  ObjPtr<mirror::ClassLoader> class_loader;
-
-  ASSERT_TRUE(Copy(GetTestDexFileName("MultiDex"),
-                   system_framework_multi_location_path,
-                   &error_msg)) << error_msg;
-  ASSERT_TRUE(LoadDexFiles(system_framework_multi_location_path,
-                           soa,
-                           &dex_files,
-                           &class_loader,
-                           &error_msg)) << error_msg;
-  ASSERT_GT(dex_files.size(), 1u);
-  ASSERT_TRUE(CheckAllDexFilesInDomain(class_loader,
-                                       dex_files,
-                                       hiddenapi::Domain::kPlatform,
-                                       &error_msg)) << error_msg;
-
-  dex_files.clear();
-  ASSERT_TRUE(Remove(system_framework_multi_location_path, &error_msg)) << error_msg;
+  TestLocation(system_framework_multi_location_path, hiddenapi::Domain::kPlatform);
 }
 
 TEST_F(HiddenApiTest, DexDomain_SystemExtFrameworkDir_MultiDex) {
   // Load multidex file from a system_ext/framework directory and check that it is flagged as a
   // framework dex.
-  std::string system_ext_framework_multi_location_path = android_system_ext_ + "/framework/multifoo.jar";
+  std::string system_ext_framework_multi_location_path =
+      android_system_ext_ + "/framework/multifoo.jar";
   ASSERT_TRUE(LocationIsOnSystemExtFramework(system_ext_framework_multi_location_path.c_str()));
+  TestLocation(system_ext_framework_multi_location_path, hiddenapi::Domain::kPlatform);
+}
 
-  ScopedObjectAccess soa(Thread::Current());
-  std::vector<std::unique_ptr<const DexFile>> dex_files;
-  std::string error_msg;
-  ObjPtr<mirror::ClassLoader> class_loader;
-
-  ASSERT_TRUE(Copy(GetTestDexFileName("MultiDex"),
-                   system_ext_framework_multi_location_path,
-                   &error_msg)) << error_msg;
-  ASSERT_TRUE(LoadDexFiles(system_ext_framework_multi_location_path,
-                           soa,
-                           &dex_files,
-                           &class_loader,
-                           &error_msg)) << error_msg;
-  ASSERT_GT(dex_files.size(), 1u);
-  ASSERT_TRUE(CheckAllDexFilesInDomain(class_loader,
-                                       dex_files,
-                                       hiddenapi::Domain::kPlatform,
-                                       &error_msg)) << error_msg;
-
-  dex_files.clear();
-  ASSERT_TRUE(Remove(system_ext_framework_multi_location_path, &error_msg)) << error_msg;
+TEST_F(HiddenApiTest, DexDomain_SystemSystemExtFrameworkDir_MultiDex) {
+  // Load multidex file from a system/system_ext/framework directory and check that it is flagged
+  // as a framework dex.
+  std::filesystem::create_directory(GetAndroidRoot() + "/system_ext");
+  std::filesystem::create_directory(GetAndroidRoot() + "/system_ext/framework");
+  std::string system_ext_framework_multi_location_path =
+       GetAndroidRoot() + "/system_ext/framework/multifoo.jar";
+  ASSERT_TRUE(LocationIsOnSystemExtFramework(system_ext_framework_multi_location_path.c_str()));
+  TestLocation(system_ext_framework_multi_location_path, hiddenapi::Domain::kPlatform);
 }
 
 }  // namespace art
