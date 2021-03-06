@@ -35,6 +35,10 @@ enum TimeUnit {
   kTimeUnitSecond,
 };
 
+// Constants for common time periods.
+constexpr unsigned int kOneMinuteInSeconds = 60;
+constexpr unsigned int kOneHourInSeconds = 60 * kOneMinuteInSeconds;
+
 // Returns a human-readable time string which prints every nanosecond while trying to limit the
 // number of trailing zeros. Prints using the largest human readable unit up to a second.
 // e.g. "1ms", "1.000000001s", "1.001us"

@@ -62,7 +62,11 @@ class MetricsReporter {
   ~MetricsReporter();
 
   // Creates and runs the background reporting thread.
-  void MaybeStartBackgroundThread(SessionData session_data);
+  //
+  // Does nothing if the reporting config does not have any outputs enabled.
+  //
+  // Returns true if the thread was started, false otherwise.
+  bool MaybeStartBackgroundThread(SessionData session_data);
 
   // Sends a request to the background thread to shutdown.
   void MaybeStopBackgroundThread();
@@ -70,6 +74,14 @@ class MetricsReporter {
   // Causes metrics to be reported so we can see a snapshot of the metrics after app startup
   // completes.
   void NotifyStartupCompleted();
+
+  bool IsPeriodicReportingEnabled() const;
+
+  // Changes the reporting period.
+  //
+  // This function is not thread safe and may only be called before the background reporting thread
+  // has been started.
+  void SetReportingPeriod(unsigned int period_seconds);
 
   static constexpr const char* kBackgroundThreadName = "Metrics Background Reporting Thread";
 
@@ -85,7 +97,7 @@ class MetricsReporter {
   // Outputs the current state of the metrics to the destination set by config_.
   void ReportMetrics() const;
 
-  const ReportingConfig config_;
+  ReportingConfig config_;
   Runtime* runtime_;
   std::vector<std::unique_ptr<MetricsBackend>> backends_;
   std::optional<std::thread> thread_;
