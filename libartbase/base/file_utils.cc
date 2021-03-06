@@ -544,26 +544,26 @@ static bool EndsWithSlash(const char* str) {
 // Returns true if `full_path` is located in folder either provided with `env_var`
 // or in `default_path` otherwise. The caller may optionally provide a `subdir`
 // which will be appended to the tested prefix.
-// All of `default_path`, `subdir` and the value of environment variable `env_var`
+// `default_path` and the value of environment variable `env_var`
 // are expected to begin with a slash and not end with one. If this ever changes,
 // the path-building logic should be updated.
-static bool IsLocationOnModule(std::string_view full_path,
-                               const char* env_var,
-                               const char* default_path,
-                               const char* subdir = nullptr) {
+static bool IsLocationOn(std::string_view full_path,
+                         const char* env_var,
+                         const char* default_path,
+                         const char* subdir = nullptr) {
   std::string unused_error_msg;
-  const char* module_path = GetAndroidDirSafe(env_var,
-                                              default_path,
-                                              /* must_exist= */ kIsTargetBuild,
-                                              &unused_error_msg);
-  if (module_path == nullptr) {
+  const char* path = GetAndroidDirSafe(env_var,
+                                       default_path,
+                                       /* must_exist= */ kIsTargetBuild,
+                                       &unused_error_msg);
+  if (path == nullptr) {
     return false;
   }
 
   // Build the path which we will check is a prefix of `full_path`. The prefix must
   // end with a slash, so that "/foo/bar" does not match "/foo/barz".
-  DCHECK(StartsWithSlash(module_path)) << module_path;
-  std::string path_prefix(module_path);
+  DCHECK(StartsWithSlash(path)) << path;
+  std::string path_prefix(path);
   if (!EndsWithSlash(path_prefix.c_str())) {
     path_prefix.append("/");
   }
@@ -579,26 +579,32 @@ static bool IsLocationOnModule(std::string_view full_path,
 }
 
 bool LocationIsOnSystemFramework(std::string_view full_path) {
-  return IsLocationOnModule(full_path,
-                            kAndroidRootEnvVar,
-                            kAndroidRootDefaultPath,
-                            /* subdir= */ "framework/");
+  return IsLocationOn(full_path,
+                      kAndroidRootEnvVar,
+                      kAndroidRootDefaultPath,
+                      /* subdir= */ "framework/");
 }
 
 bool LocationIsOnSystemExtFramework(std::string_view full_path) {
-  return IsLocationOnModule(full_path,
-                            kAndroidSystemExtRootEnvVar,
-                            kAndroidSystemExtRootDefaultPath,
-                            /* subdir= */ "framework/");
+  return IsLocationOn(full_path,
+                      kAndroidSystemExtRootEnvVar,
+                      kAndroidSystemExtRootDefaultPath,
+                      /* subdir= */ "framework/") ||
+      // When the 'system_ext' partition is not present, builds will create
+      // '/system/system_ext' instead.
+      IsLocationOn(full_path,
+                   kAndroidRootEnvVar,
+                   kAndroidRootDefaultPath,
+                   /* subdir= */ "system_ext/framework/");
 }
 
 bool LocationIsOnConscryptModule(std::string_view full_path) {
-  return IsLocationOnModule(
+  return IsLocationOn(
       full_path, kAndroidConscryptRootEnvVar, kAndroidConscryptApexDefaultPath);
 }
 
 bool LocationIsOnI18nModule(std::string_view full_path) {
-  return IsLocationOnModule(
+  return IsLocationOn(
       full_path, kAndroidI18nRootEnvVar, kAndroidI18nApexDefaultPath);
 }
 

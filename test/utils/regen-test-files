@@ -490,6 +490,15 @@ class Generator:
 
       // Build rules for ART run-test `{run_test}`.
 
+      package {{
+          // See: http://go/android-license-faq
+          // A large-scale-change added 'default_applicable_licenses' to import
+          // all of the 'license_kinds' from "art_license"
+          // to get the below license kinds:
+          //   SPDX-license-identifier-Apache-2.0
+          default_applicable_licenses: ["art_license"],
+      }}
+
       // Test's Dex code.
       java_test {{
           name: "{run_test_module_name}",
@@ -549,10 +558,16 @@ class Generator:
     postsubmit_tests_dict = [{"name": t} for t in postsubmit_run_tests]
 
     # Use an `OrderedDict` container to preserve the order in which items are inserted.
+    # Do not produce an entry for a test group if it is empty.
     test_mapping_dict = collections.OrderedDict([
-        ("mainline-presubmit", mainline_presubmit_tests_dict),
-        ("presubmit", presubmit_tests_dict),
-        ("postsubmit", postsubmit_tests_dict),
+        (test_group_name, test_group_dict)
+        for (test_group_name, test_group_dict)
+        in [
+            ("mainline-presubmit", mainline_presubmit_tests_dict),
+            ("presubmit", presubmit_tests_dict),
+            ("postsubmit", postsubmit_tests_dict),
+        ]
+        if test_group_dict
     ])
     test_mapping_contents = json.dumps(test_mapping_dict, indent = INDENT)
 
