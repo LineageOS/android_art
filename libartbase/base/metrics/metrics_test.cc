@@ -212,18 +212,12 @@ TEST_F(MetricsTest, StreamBackendDumpAllMetrics) {
 
   metrics.ReportAllMetrics(&backend);
 
-  // Make sure the resulting string lists all the counters.
+  // Make sure the resulting string lists all the metrics.
   const std::string result = backend.GetAndResetBuffer();
-#define COUNTER(name) \
+#define METRIC(name, type, ...) \
   EXPECT_NE(result.find(DatumName(DatumId::k##name)), std::string::npos);
-  ART_COUNTERS(COUNTER);
-#undef COUNTER
-
-  // Make sure the resulting string lists all the histograms.
-#define HISTOGRAM(name, num_buckets, minimum_value, maximum_value) \
-  EXPECT_NE(result.find(DatumName(DatumId::k##name)), std::string::npos);
-  ART_HISTOGRAMS(HISTOGRAM);
-#undef HISTOGRAM
+  ART_METRICS(METRIC);
+#undef METRIC
 }
 
 }  // namespace metrics
