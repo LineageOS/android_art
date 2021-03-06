@@ -1053,6 +1053,10 @@ class OnDeviceRefresh final {
     for (int i = 0; i < argc; ++i) {
       std::string_view action(argv[i]);
       if (action == "--check") {
+        static constexpr bool kDisableArtifactChecks = true;  // Boot regression b/181689036.
+        if (kDisableArtifactChecks) {
+          return ExitCode::kOkay;
+        }
         return odr.CheckArtifactsAreUpToDate();
       } else if (action == "--compile") {
         return odr.Compile(/*force_compile=*/false);
