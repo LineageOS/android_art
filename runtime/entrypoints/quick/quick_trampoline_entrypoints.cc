@@ -2114,7 +2114,6 @@ extern "C" const void* artQuickGenericJniTrampoline(Thread* self,
       Handle<mirror::Class> h_class(hs.NewHandle(declaring_class));
       if (!runtime->GetClassLinker()->EnsureInitialized(self, h_class, true, true)) {
         DCHECK(Thread::Current()->IsExceptionPending()) << called->PrettyMethod();
-        self->PopHandleScope();
         return nullptr;  // Report error.
       }
     }
@@ -2130,7 +2129,6 @@ extern "C" const void* artQuickGenericJniTrampoline(Thread* self,
       jobject lock = GetGenericJniSynchronizationObject(self, called);
       cookie = JniMethodStartSynchronized(lock, self);
       if (self->IsExceptionPending()) {
-        self->PopHandleScope();
         return nullptr;  // Report error.
       }
     } else {

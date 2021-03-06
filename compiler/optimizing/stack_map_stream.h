@@ -63,7 +63,7 @@ class StackMapStream : public DeletableArenaObject<kArenaAllocStackMapStream> {
                    size_t fp_spill_mask,
                    uint32_t num_dex_registers,
                    bool baseline = false);
-  void EndMethod();
+  void EndMethod(size_t code_size);
 
   void BeginStackMapEntry(uint32_t dex_pc,
                           uint32_t native_pc_offset,
@@ -116,6 +116,7 @@ class StackMapStream : public DeletableArenaObject<kArenaAllocStackMapStream> {
 
   ScopedArenaAllocator* allocator_;
   const InstructionSet instruction_set_;
+  uint32_t code_size_ = 0;
   uint32_t packed_frame_size_ = 0;
   uint32_t core_spill_mask_ = 0;
   uint32_t fp_spill_mask_ = 0;

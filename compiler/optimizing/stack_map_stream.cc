@@ -65,9 +65,10 @@ void StackMapStream::BeginMethod(size_t frame_size_in_bytes,
   }
 }
 
-void StackMapStream::EndMethod() {
+void StackMapStream::EndMethod(size_t code_size) {
   DCHECK(in_method_) << "Mismatched Begin/End calls";
   in_method_ = false;
+  code_size_ = code_size;
 
   // Read the stack masks now. The compiler might have updated them.
   for (size_t i = 0; i < lazy_stack_masks_.size(); i++) {
@@ -76,6 +77,19 @@ void StackMapStream::EndMethod() {
       stack_maps_[i][StackMap::kStackMaskIndex] =
           stack_masks_.Dedup(stack_mask->GetRawStorage(), stack_mask->GetNumberOfBits());
     }
+  }
+
+  if (kIsDebugBuild) {
+    uint32_t packed_code_size = StackMap::PackNativePc(code_size, instruction_set_);
+    for (size_t i = 0; i < stack_maps_.size(); i++) {
+      DCHECK_LE(stack_maps_[i][StackMap::kPackedNativePc], packed_code_size);
+    }
+  }
+
+  if (kVerifyStackMaps) {
+    dchecks_.emplace_back([=](const CodeInfo& code_info) {
+        CHECK_EQ(code_info.code_size_, code_size);
+    });
   }
 }
 
@@ -302,6 +316,7 @@ ScopedArenaVector<uint8_t> StackMapStream::Encode() {
 
   uint32_t flags = (inline_infos_.size() > 0) ? CodeInfo::kHasInlineInfo : 0;
   flags |= baseline_ ? CodeInfo::kIsBaseline : 0;
+  DCHECK_LE(flags, kVarintMax);  // Ensure flags can be read directly as byte.
   uint32_t bit_table_flags = 0;
   ForEachBitTable([&bit_table_flags](size_t i, auto bit_table) {
     if (bit_table->size() != 0) {  // Record which bit-tables are stored.
@@ -313,6 +328,7 @@ ScopedArenaVector<uint8_t> StackMapStream::Encode() {
   BitMemoryWriter<ScopedArenaVector<uint8_t>> out(&buffer);
   out.WriteInterleavedVarints(std::array<uint32_t, CodeInfo::kNumHeaders>{
     flags,
+    code_size_,
     packed_frame_size_,
     core_spill_mask_,
     fp_spill_mask_,
@@ -330,6 +346,8 @@ ScopedArenaVector<uint8_t> StackMapStream::Encode() {
   CodeInfo code_info(buffer.data(), &number_of_read_bits);
   CHECK_EQ(number_of_read_bits, out.NumberOfWrittenBits());
   CHECK_EQ(code_info.GetNumberOfStackMaps(), stack_maps_.size());
+  CHECK_EQ(CodeInfo::HasInlineInfo(buffer.data()), inline_infos_.size() > 0);
+  CHECK_EQ(CodeInfo::IsBaseline(buffer.data()), baseline_);
 
   // Verify all written data (usually only in debug builds).
   if (kVerifyStackMaps) {
