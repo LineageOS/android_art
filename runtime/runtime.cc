@@ -1070,6 +1070,14 @@ void Runtime::InitNonZygoteOrPostFork(
   heap_->ResetGcPerformanceInfo();
 
   if (metrics_reporter_ != nullptr) {
+    if (IsSystemServer() && !metrics_reporter_->IsPeriodicReportingEnabled()) {
+      // For system server, we don't get startup metrics, so make sure we have periodic reporting
+      // enabled.
+      //
+      // Note that this does not override the command line argument if one is given.
+      metrics_reporter_->SetReportingPeriod(kOneHourInSeconds);
+    }
+
     metrics::SessionData session_data{metrics::SessionData::CreateDefault()};
     session_data.session_id = GetRandomNumber<int64_t>(0, std::numeric_limits<int64_t>::max());
     // TODO: set session_data.compilation_reason and session_data.compiler_filter
@@ -1846,9 +1854,7 @@ bool Runtime::Init(RuntimeArgumentMap&& runtime_options_in) {
 
 void Runtime::InitMetrics(const RuntimeArgumentMap& runtime_options) {
   auto metrics_config = metrics::ReportingConfig::FromRuntimeArguments(runtime_options);
-  if (metrics_config.ReportingEnabled()) {
-    metrics_reporter_ = metrics::MetricsReporter::Create(metrics_config, this);
-  }
+  metrics_reporter_ = metrics::MetricsReporter::Create(metrics_config, this);
 }
 
 bool Runtime::EnsurePluginLoaded(const char* plugin_name, std::string* error_msg) {

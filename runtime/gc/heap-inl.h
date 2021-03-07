@@ -214,6 +214,7 @@ inline mirror::Object* Heap::AllocObjectWithAllocator(Thread* self,
   } else {
     DCHECK(!Runtime::Current()->HasStatsEnabled());
   }
+  GetMetrics()->TotalBytesAllocated()->Add(bytes_allocated);
   if (kInstrumented) {
     if (IsAllocTrackingEnabled()) {
       // allocation_records_ is not null since it never becomes null after allocation tracking is
