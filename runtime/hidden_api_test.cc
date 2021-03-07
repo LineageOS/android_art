@@ -656,6 +656,7 @@ TEST_F(HiddenApiTest, DexDomain_SystemFrameworkDir) {
 
 TEST_F(HiddenApiTest, DexDomain_SystemExtFrameworkDir) {
   // Load file from a system_ext/framework directory and check that it is flagged as a framework dex.
+  std::filesystem::create_directory(android_system_ext_ + "/framework");
   std::string system_ext_framework_location_path = android_system_ext_ + "/framework/foo.jar";
   ASSERT_TRUE(LocationIsOnSystemExtFramework(system_ext_framework_location_path.c_str()));
   TestLocation(system_ext_framework_location_path, hiddenapi::Domain::kPlatform);
@@ -698,6 +699,7 @@ TEST_F(HiddenApiTest, DexDomain_SystemExtDir_MultiDex) {
 TEST_F(HiddenApiTest, DexDomain_SystemSystemExtDir_MultiDex) {
   // Load multidex file from a system/system_ext, non-framework directory and check that it is not
   // flagged as framework.
+  std::filesystem::create_directory(GetAndroidRoot() + "/system_ext");
   std::string system_ext_multi_location_path =
       GetAndroidRoot() + "/system_ext/multifoo.jar";
   ASSERT_FALSE(LocationIsOnSystemExtFramework(system_ext_multi_location_path.c_str()));
@@ -707,6 +709,7 @@ TEST_F(HiddenApiTest, DexDomain_SystemSystemExtDir_MultiDex) {
 TEST_F(HiddenApiTest, DexDomain_SystemFrameworkDir_MultiDex) {
   // Load multidex file from a system/framework directory and check that it is flagged as a
   // framework dex.
+  std::filesystem::create_directory(GetAndroidRoot() + "/framework");
   std::string system_framework_multi_location_path = GetAndroidRoot() + "/framework/multifoo.jar";
   ASSERT_TRUE(LocationIsOnSystemFramework(system_framework_multi_location_path.c_str()));
   TestLocation(system_framework_multi_location_path, hiddenapi::Domain::kPlatform);
@@ -715,6 +718,7 @@ TEST_F(HiddenApiTest, DexDomain_SystemFrameworkDir_MultiDex) {
 TEST_F(HiddenApiTest, DexDomain_SystemExtFrameworkDir_MultiDex) {
   // Load multidex file from a system_ext/framework directory and check that it is flagged as a
   // framework dex.
+  std::filesystem::create_directory(android_system_ext_ + "/framework");
   std::string system_ext_framework_multi_location_path =
       android_system_ext_ + "/framework/multifoo.jar";
   ASSERT_TRUE(LocationIsOnSystemExtFramework(system_ext_framework_multi_location_path.c_str()));
