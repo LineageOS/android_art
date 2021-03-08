@@ -593,6 +593,10 @@ PRIVATE_I18N_APEX_DEPENDENCY_LIBS := \
   lib64/libicu_jni.so \
   lib64/libicuuc.so \
 
+PRIVATE_STATSD_APEX_DEPENDENCY_LIBS := \
+  lib/libstatssocket.so \
+  lib64/libstatssocket.so \
+
 # Extracts files from an APEX into a location. The APEX can be either a .apex
 # file in $(TARGET_OUT)/apex, or a directory in the same location. Files are
 # extracted to $(TARGET_OUT) with the same relative paths as under the APEX
@@ -640,6 +644,7 @@ standalone-apex-files: deapexer \
                        $(RUNTIME_APEX) \
                        $(CONSCRYPT_APEX) \
                        $(I18N_APEX) \
+                       $(STATSD_APEX) \
                        $(TZDATA_APEX)
 	$(call extract-from-apex,$(RELEASE_ART_APEX),\
 	  $(PRIVATE_ART_APEX_DEPENDENCY_LIBS) $(PRIVATE_ART_APEX_DEPENDENCY_FILES))
@@ -662,6 +667,8 @@ standalone-apex-files: deapexer \
 	  $(PRIVATE_CONSCRYPT_APEX_DEPENDENCY_LIBS))
 	$(call extract-from-apex,$(I18N_APEX),\
 	  $(PRIVATE_I18N_APEX_DEPENDENCY_LIBS))
+	$(call extract-from-apex,$(STATSD_APEX),\
+	  $(PRIVATE_STATSD_APEX_DEPENDENCY_LIBS))
 	$(call extract-from-apex,$(TZDATA_APEX),)
 
 ########################################################################
