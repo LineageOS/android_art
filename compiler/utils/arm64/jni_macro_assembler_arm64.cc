@@ -724,6 +724,7 @@ void Arm64JNIMacroAssembler::TestGcMarking(JNIMacroLabel* label, JNIMacroUnaryCo
   DCHECK_EQ(Thread::IsGcMarkingSize(), 4u);
   DCHECK(kUseReadBarrier);
   if (kUseBakerReadBarrier) {
+    // TestGcMarking() is used in the JNI stub entry when the marking register is up to date.
     if (kIsDebugBuild && emit_run_time_checks_in_debug_mode_) {
       Register temp = temps.AcquireW();
       asm_.GenerateMarkingRegisterCheck(temp);
