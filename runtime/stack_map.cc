@@ -21,7 +21,7 @@
 
 #include "art_method.h"
 #include "base/indenter.h"
-#include "base/stats.h"
+#include "base/stats-inl.h"
 #include "oat_quick_method_header.h"
 #include "scoped_thread_state_change-inl.h"
 
@@ -227,26 +227,26 @@ void CodeInfo::DecodeDexRegisterMap(uint32_t stack_map_index,
 }
 
 // Decode the CodeInfo while collecting size statistics.
-void CodeInfo::CollectSizeStats(const uint8_t* code_info_data, /*out*/ Stats* parent) {
-  Stats* codeinfo_stats = parent->Child("CodeInfo");
+void CodeInfo::CollectSizeStats(const uint8_t* code_info_data, /*out*/ Stats& stats) {
   BitMemoryReader reader(code_info_data);
   reader.ReadInterleavedVarints<kNumHeaders>();
-  codeinfo_stats->Child("Header")->AddBits(reader.NumberOfReadBits());
+  stats["Header"].AddBits(reader.NumberOfReadBits());
   size_t num_bits;
   CodeInfo code_info(code_info_data, &num_bits, [&](size_t i, auto* table, BitMemoryRegion region) {
     if (!code_info.IsBitTableDeduped(i)) {
-      Stats* table_stats = codeinfo_stats->Child(table->GetName());
-      table_stats->AddBits(region.size_in_bits());
+      Stats& table_stats = stats[table->GetName()];
+      table_stats.AddBits(region.size_in_bits());
+      table_stats["Header"].AddBits(region.size_in_bits() - table->DataBitSize());
       const char* const* column_names = table->GetColumnNames();
       for (size_t c = 0; c < table->NumColumns(); c++) {
         if (table->NumColumnBits(c) > 0) {
-          Stats* column_stats = table_stats->Child(column_names[c]);
-          column_stats->AddBits(table->NumRows() * table->NumColumnBits(c), table->NumRows());
+          Stats& column_stats = table_stats[column_names[c]];
+          column_stats.AddBits(table->NumRows() * table->NumColumnBits(c), table->NumRows());
         }
       }
     }
   });
-  codeinfo_stats->AddBytes(BitsToBytesRoundUp(num_bits));
+  stats.AddBytes(BitsToBytesRoundUp(num_bits));
 }
 
 void DexRegisterMap::Dump(VariableIndentationOutputStream* vios) const {
