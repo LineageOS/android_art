@@ -68,14 +68,14 @@ extern uint32_t JniMethodStart(Thread* self) {
   DCHECK(env != nullptr);
   uint32_t saved_local_ref_cookie = bit_cast<uint32_t>(env->GetLocalRefCookie());
   env->SetLocalRefCookie(env->GetLocalsSegmentState());
-  ArtMethod* native_method = *self->GetManagedStack()->GetTopQuickFrame();
-  // TODO: Introduce special entrypoint for synchronized @FastNative methods?
-  //       Or ban synchronized @FastNative outright to avoid the extra check here?
-  DCHECK(!native_method->IsFastNative() || native_method->IsSynchronized());
-  if (!native_method->IsFastNative()) {
-    // When not fast JNI we transition out of runnable.
-    self->TransitionFromRunnableToSuspended(kNative);
+
+  if (kIsDebugBuild) {
+    ArtMethod* native_method = *self->GetManagedStack()->GetTopQuickFrame();
+    CHECK(!native_method->IsFastNative()) << native_method->PrettyMethod();
   }
+
+  // Transition out of runnable.
+  self->TransitionFromRunnableToSuspended(kNative);
   return saved_local_ref_cookie;
 }
 
