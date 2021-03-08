@@ -18,17 +18,20 @@
 #define ART_LIBARTBASE_BASE_STATS_H_
 
 #include <unordered_map>
+#include <string>
 
 #include "globals.h"
 
 namespace art {
+
+class VariableIndentationOutputStream;
 
 // Simple structure to record tree of statistical values.
 class Stats {
  public:
   double Value() const { return value_; }
   size_t Count() const { return count_; }
-  Stats* Child(const char* name) { return &children_[name]; }
+  Stats& operator[](const char* name) { return children_[name]; }
   const std::unordered_map<const char*, Stats>& Children() const { return children_; }
 
   void AddBytes(double bytes, size_t count = 1) { Add(bytes, count); }
@@ -44,11 +47,19 @@ class Stats {
     return sum;
   }
 
+  inline void DumpSizes(VariableIndentationOutputStream& os, std::string_view name) const;
+
  private:
   void Add(double value, size_t count = 1) {
     value_ += value;
     count_ += count;
   }
+
+  inline void Dump(VariableIndentationOutputStream& os,
+                   std::string_view name,
+                   double total,
+                   double unit_size,
+                   const char* unit) const;
 
   double value_ = 0.0;  // Commutative sum of the collected statistic in basic units.
   size_t count_ = 0;    // The number of samples for this node.
