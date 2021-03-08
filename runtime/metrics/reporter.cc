@@ -90,7 +90,10 @@ void MetricsReporter::BackgroundThreadRun() {
     backends_.emplace_back(new FileBackend(config_.dump_to_file.value()));
   }
   if (config_.dump_to_statsd) {
-    backends_.emplace_back(CreateStatsdBackend());
+    auto backend = CreateStatsdBackend();
+    if (backend != nullptr) {
+      backends_.emplace_back(std::move(backend));
+    }
   }
 
   MaybeResetTimeout();
