@@ -187,15 +187,6 @@ class HInliner : public HOptimization {
       /*out*/Handle<mirror::ObjectArray<mirror::Class>>* inline_cache)
     REQUIRES_SHARED(Locks::mutator_lock_);
 
-  // Extract the mirror classes from the offline profile and add them to the `inline_cache`.
-  // Note that even if we have profile data for the invoke the inline_cache might contain
-  // only null entries if the types cannot be resolved.
-  InlineCacheType ExtractClassesFromOfflineProfile(
-      const HInvoke* invoke_instruction,
-      const ProfileCompilationInfo::OfflineProfileMethodInfo& offline_profile,
-      /*out*/Handle<mirror::ObjectArray<mirror::Class>> inline_cache)
-    REQUIRES_SHARED(Locks::mutator_lock_);
-
   // Compute the inline cache type.
   InlineCacheType GetInlineCacheType(
       const Handle<mirror::ObjectArray<mirror::Class>>& classes)
