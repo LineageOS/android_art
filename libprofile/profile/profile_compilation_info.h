@@ -92,10 +92,13 @@ class ProfileCompilationInfo {
   // (see compiler/optimizing/inliner.cc).
 
   // A profile reference to the dex file (profile key, dex checksum and number of methods).
+  //
+  // This contains references to internal std::string data of a profile key. The profile
+  // key must not be modified or destroyed for the entire lifetime of a `DexReference`.
   struct DexReference {
     DexReference() : dex_checksum(0), num_method_ids(0) {}
 
-    DexReference(const std::string& key, uint32_t checksum, uint32_t num_methods)
+    DexReference(std::string_view key, uint32_t checksum, uint32_t num_methods)
         : profile_key(key), dex_checksum(checksum), num_method_ids(num_methods) {}
 
     bool operator==(const DexReference& other) const {
@@ -106,11 +109,11 @@ class ProfileCompilationInfo {
 
     bool MatchesDex(const DexFile* dex_file) const {
       return dex_checksum == dex_file->GetLocationChecksum() &&
-             GetBaseKeyFromAugmentedKey(profile_key) ==
-                 GetProfileDexFileBaseKey(dex_file->GetLocation());
+             GetBaseKeyViewFromAugmentedKey(profile_key) ==
+                 GetProfileDexFileBaseKeyView(dex_file->GetLocation());
     }
 
-    std::string profile_key;
+    std::string_view profile_key;
     uint32_t dex_checksum;
     uint32_t num_method_ids;
   };
@@ -286,9 +289,15 @@ class ProfileCompilationInfo {
   };
 
   // Encodes the full set of inline caches for a given method.
-  // The dex_references vector is indexed according to the ClassReference::dex_profile_index.
+  //
+  // The `dex_references` vector is indexed according to the ClassReference::dex_profile_index.
   // i.e. the dex file of any ClassReference present in the inline caches can be found at
   // dex_references[ClassReference::dex_profile_index].
+  //
+  // The `dex_references` contains references to internal std::string data of profile keys.
+  // Those profile keys must not be modified or destroyed for the entire lifetime of the
+  // `OfflineProfileMethodInfo`. To ensure that, the `ProfileCompilationInfo` should not
+  // be modified or destroyed while an `OfflineProfileMethodInfo` is in use.
   struct OfflineProfileMethodInfo {
     explicit OfflineProfileMethodInfo(const InlineCacheMap* inline_cache_map)
         : inline_caches(inline_cache_map) {}
@@ -935,6 +944,13 @@ class ProfileCompilationInfo {
   // Returns the threshold size (in bytes) which will cause save/load failures.
   size_t GetSizeErrorThresholdBytes() const;
 
+  // Implementation of `GetProfileDexFileBaseKey()` but returning a subview
+  // referencing the same underlying data to avoid excessive heap allocations.
+  static std::string_view GetProfileDexFileBaseKeyView(std::string_view dex_location);
+
+  // Implementation of `GetBaseKeyFromAugmentedKey()` but returning a subview
+  // referencing the same underlying data to avoid excessive heap allocations.
+  static std::string_view GetBaseKeyViewFromAugmentedKey(std::string_view dex_location);
 
   // Returns the augmented profile key associated with the given dex location.
   // The return key will contain a serialized form of the information from the provided
