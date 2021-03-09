@@ -1888,6 +1888,7 @@ class ImageDumper {
     os << "\n";
 
     stats_.oat_file_bytes = oat_file->Size();
+    stats_.oat_file_stats.AddBytes(oat_file->Size());
 
     oat_dumper_.reset(new OatDumper(*oat_file, *oat_dumper_options_));
 
@@ -1941,67 +1942,31 @@ class ImageDumper {
     if (file == nullptr) {
       LOG(WARNING) << "Failed to find image in " << image_filename;
     } else {
-      stats_.file_bytes = file->GetLength();
+      size_t file_bytes = file->GetLength();
       // If the image is compressed, adjust to decompressed size.
       size_t uncompressed_size = image_header_.GetImageSize() - sizeof(ImageHeader);
       if (!image_header_.HasCompressedBlock()) {
         DCHECK_EQ(uncompressed_size, data_size) << "Sizes should match for uncompressed image";
       }
-      stats_.file_bytes += uncompressed_size - data_size;
-    }
-    size_t header_bytes = sizeof(ImageHeader);
-    const auto& object_section = image_header_.GetObjectsSection();
-    const auto& field_section = image_header_.GetFieldsSection();
-    const auto& method_section = image_header_.GetMethodsSection();
-    const auto& runtime_method_section = image_header_.GetRuntimeMethodsSection();
-    const auto& intern_section = image_header_.GetInternedStringsSection();
-    const auto& class_table_section = image_header_.GetClassTableSection();
-    const auto& sro_section = image_header_.GetImageStringReferenceOffsetsSection();
-    const auto& metadata_section = image_header_.GetMetadataSection();
-    const auto& bitmap_section = image_header_.GetImageBitmapSection();
-
-    stats_.header_bytes = header_bytes;
-
-    // Objects are kObjectAlignment-aligned.
-    // CHECK_EQ(RoundUp(header_bytes, kObjectAlignment), object_section.Offset());
-    if (object_section.Offset() > header_bytes) {
-      stats_.alignment_bytes += object_section.Offset() - header_bytes;
+      file_bytes += uncompressed_size - data_size;
+      stats_.art_file_stats.AddBytes(file_bytes);
+      stats_.art_file_stats["Header"].AddBytes(sizeof(ImageHeader));
     }
 
-    // Field section is 4-byte aligned.
-    constexpr size_t kFieldSectionAlignment = 4U;
-    uint32_t end_objects = object_section.Offset() + object_section.Size();
-    CHECK_EQ(RoundUp(end_objects, kFieldSectionAlignment), field_section.Offset());
-    stats_.alignment_bytes += field_section.Offset() - end_objects;
+    size_t pointer_size = static_cast<size_t>(image_header_.GetPointerSize());
+    CHECK_ALIGNED(image_header_.GetFieldsSection().Offset(), 4);
+    CHECK_ALIGNED_PARAM(image_header_.GetMethodsSection().Offset(), pointer_size);
+    CHECK_ALIGNED(image_header_.GetInternedStringsSection().Offset(), 8);
+    CHECK_ALIGNED(image_header_.GetImageBitmapSection().Offset(), kPageSize);
 
-    // Method section is 4/8 byte aligned depending on target. Just check for 4-byte alignment.
-    uint32_t end_fields = field_section.Offset() + field_section.Size();
-    CHECK_ALIGNED(method_section.Offset(), 4);
-    stats_.alignment_bytes += method_section.Offset() - end_fields;
+    for (size_t i = 0; i < ImageHeader::ImageSections::kSectionCount; i++) {
+      ImageHeader::ImageSections index = ImageHeader::ImageSections(i);
+      const char* name = ImageHeader::GetImageSectionName(index);
+      stats_.art_file_stats[name].AddBytes(image_header_.GetImageSection(index).Size());
+    }
 
-    // Intern table is 8-byte aligned.
-    uint32_t end_methods = runtime_method_section.Offset() + runtime_method_section.Size();
-    CHECK_EQ(RoundUp(end_methods, 8U), intern_section.Offset());
-    stats_.alignment_bytes += intern_section.Offset() - end_methods;
-
-    // Add space between intern table and class table.
-    uint32_t end_intern = intern_section.Offset() + intern_section.Size();
-    stats_.alignment_bytes += class_table_section.Offset() - end_intern;
-
-    // Add space between end of image data and bitmap. Expect the bitmap to be page-aligned.
-    const size_t bitmap_offset = sizeof(ImageHeader) + data_size;
-    CHECK_ALIGNED(bitmap_section.Offset(), kPageSize);
-    stats_.alignment_bytes += RoundUp(bitmap_offset, kPageSize) - bitmap_offset;
-
-    stats_.bitmap_bytes += bitmap_section.Size();
-    stats_.art_field_bytes += field_section.Size();
-    stats_.art_method_bytes += method_section.Size();
-    stats_.interned_strings_bytes += intern_section.Size();
-    stats_.class_table_bytes += class_table_section.Size();
-    stats_.sro_offset_bytes += sro_section.Size();
-    stats_.metadata_bytes += metadata_section.Size();
-
-    stats_.Dump(os, indent_os);
+    stats_.object_stats.AddBytes(image_header_.GetObjectsSection().Size());
+    stats_.Dump(os);
     os << "\n";
 
     os << std::flush;
@@ -2145,11 +2110,6 @@ class ImageDumper {
       return;
     }
 
-    size_t object_bytes = obj->SizeOf();
-    size_t alignment_bytes = RoundUp(object_bytes, kObjectAlignment) - object_bytes;
-    stats_.object_bytes += object_bytes;
-    stats_.alignment_bytes += alignment_bytes;
-
     std::ostream& os = vios_.Stream();
 
     ObjPtr<mirror::Class> obj_class = obj->GetClass();
@@ -2211,7 +2171,9 @@ class ImageDumper {
       }
     }
     std::string temp;
-    stats_.Update(obj_class->GetDescriptor(&temp), object_bytes);
+    const char* desc = obj_class->GetDescriptor(&temp);
+    desc = stats_.descriptors.emplace(desc).first->c_str();  // Dedup and keep alive.
+    stats_.object_stats[desc].AddBytes(obj->SizeOf());
   }
 
   void DumpMethod(ArtMethod* method, std::ostream& indent_os)
@@ -2224,7 +2186,7 @@ class ImageDumper {
       uint32_t quick_oat_code_size = GetQuickOatCodeSize(method);
       ComputeOatSize(quick_oat_code_begin, &first_occurrence);
       if (first_occurrence) {
-        stats_.native_to_managed_code_bytes += quick_oat_code_size;
+        stats_.oat_file_stats["native_code"].AddBytes(quick_oat_code_size);
       }
       if (quick_oat_code_begin != method->GetEntryPointFromQuickCompiledCodePtrSize(
           image_header_.GetPointerSize())) {
@@ -2275,14 +2237,16 @@ class ImageDumper {
       ComputeOatSize(quick_oat_code_begin, &first_occurrence);
       if (first_occurrence) {
         stats_.managed_code_bytes += quick_oat_code_size;
+        art::Stats& managed_code_stats = stats_.oat_file_stats["managed_code"];
+        managed_code_stats.AddBytes(quick_oat_code_size);
         if (method->IsConstructor()) {
           if (method->IsStatic()) {
-            stats_.class_initializer_code_bytes += quick_oat_code_size;
+            managed_code_stats["class_initializer"].AddBytes(quick_oat_code_size);
           } else if (dex_instruction_bytes > kLargeConstructorDexBytes) {
-            stats_.large_initializer_code_bytes += quick_oat_code_size;
+            managed_code_stats["large_initializer"].AddBytes(quick_oat_code_size);
           }
         } else if (dex_instruction_bytes > kLargeMethodDexBytes) {
-          stats_.large_method_code_bytes += quick_oat_code_size;
+          managed_code_stats["large_method"].AddBytes(quick_oat_code_size);
         }
       }
       stats_.managed_code_bytes_ignoring_deduplication += quick_oat_code_size;
@@ -2319,26 +2283,14 @@ class ImageDumper {
 
  public:
   struct Stats {
+    art::Stats art_file_stats;
+    art::Stats oat_file_stats;
+    art::Stats object_stats;
+    std::set<std::string> descriptors;
+
     size_t oat_file_bytes = 0u;
-    size_t file_bytes = 0u;
-
-    size_t header_bytes = 0u;
-    size_t object_bytes = 0u;
-    size_t art_field_bytes = 0u;
-    size_t art_method_bytes = 0u;
-    size_t interned_strings_bytes = 0u;
-    size_t class_table_bytes = 0u;
-    size_t sro_offset_bytes = 0u;
-    size_t metadata_bytes = 0u;
-    size_t bitmap_bytes = 0u;
-    size_t alignment_bytes = 0u;
-
     size_t managed_code_bytes = 0u;
     size_t managed_code_bytes_ignoring_deduplication = 0u;
-    size_t native_to_managed_code_bytes = 0u;
-    size_t class_initializer_code_bytes = 0u;
-    size_t large_initializer_code_bytes = 0u;
-    size_t large_method_code_bytes = 0u;
 
     size_t vmap_table_bytes = 0u;
 
@@ -2351,34 +2303,8 @@ class ImageDumper {
 
     Stats() {}
 
-    struct SizeAndCount {
-      SizeAndCount(size_t bytes_in, size_t count_in) : bytes(bytes_in), count(count_in) {}
-      size_t bytes;
-      size_t count;
-    };
-    using SizeAndCountTable = SafeMap<std::string, SizeAndCount>;
-    SizeAndCountTable sizes_and_counts;
-
-    void Update(const char* descriptor, size_t object_bytes_in) {
-      SizeAndCountTable::iterator it = sizes_and_counts.find(descriptor);
-      if (it != sizes_and_counts.end()) {
-        it->second.bytes += object_bytes_in;
-        it->second.count += 1;
-      } else {
-        sizes_and_counts.Put(descriptor, SizeAndCount(object_bytes_in, 1));
-      }
-    }
-
     double PercentOfOatBytes(size_t size) {
       return (static_cast<double>(size) / static_cast<double>(oat_file_bytes)) * 100;
-    }
-
-    double PercentOfFileBytes(size_t size) {
-      return (static_cast<double>(size) / static_cast<double>(file_bytes)) * 100;
-    }
-
-    double PercentOfObjectBytes(size_t size) {
-      return (static_cast<double>(size) / static_cast<double>(object_bytes)) * 100;
     }
 
     void ComputeOutliers(size_t total_size, double expansion, ArtMethod* method) {
@@ -2491,69 +2417,16 @@ class ImageDumper {
       os << "\n" << std::flush;
     }
 
-    void Dump(std::ostream& os, std::ostream& indent_os)
+    void Dump(std::ostream& os)
         REQUIRES_SHARED(Locks::mutator_lock_) {
-      {
-        os << "art_file_bytes = " << PrettySize(file_bytes) << "\n\n"
-           << "art_file_bytes = header_bytes + object_bytes + alignment_bytes\n";
-        indent_os << StringPrintf("header_bytes           =  %8zd (%2.0f%% of art file bytes)\n"
-                                  "object_bytes           =  %8zd (%2.0f%% of art file bytes)\n"
-                                  "art_field_bytes        =  %8zd (%2.0f%% of art file bytes)\n"
-                                  "art_method_bytes       =  %8zd (%2.0f%% of art file bytes)\n"
-                                  "interned_string_bytes  =  %8zd (%2.0f%% of art file bytes)\n"
-                                  "class_table_bytes      =  %8zd (%2.0f%% of art file bytes)\n"
-                                  "sro_bytes              =  %8zd (%2.0f%% of art file bytes)\n"
-                                  "metadata_bytes         =  %8zd (%2.0f%% of art file bytes)\n"
-                                  "bitmap_bytes           =  %8zd (%2.0f%% of art file bytes)\n"
-                                  "alignment_bytes        =  %8zd (%2.0f%% of art file bytes)\n\n",
-                                  header_bytes, PercentOfFileBytes(header_bytes),
-                                  object_bytes, PercentOfFileBytes(object_bytes),
-                                  art_field_bytes, PercentOfFileBytes(art_field_bytes),
-                                  art_method_bytes, PercentOfFileBytes(art_method_bytes),
-                                  interned_strings_bytes,
-                                  PercentOfFileBytes(interned_strings_bytes),
-                                  class_table_bytes, PercentOfFileBytes(class_table_bytes),
-                                  sro_offset_bytes, PercentOfFileBytes(sro_offset_bytes),
-                                  metadata_bytes, PercentOfFileBytes(metadata_bytes),
-                                  bitmap_bytes, PercentOfFileBytes(bitmap_bytes),
-                                  alignment_bytes, PercentOfFileBytes(alignment_bytes))
-            << std::flush;
-      }
-
-      os << "object_bytes breakdown:\n";
-      size_t object_bytes_total = 0;
-      for (const auto& sizes_and_count : sizes_and_counts) {
-        const std::string& descriptor(sizes_and_count.first);
-        double average = static_cast<double>(sizes_and_count.second.bytes) /
-            static_cast<double>(sizes_and_count.second.count);
-        double percent = PercentOfObjectBytes(sizes_and_count.second.bytes);
-        os << StringPrintf("%32s %8zd bytes %6zd instances "
-                           "(%4.0f bytes/instance) %2.0f%% of object_bytes\n",
-                           descriptor.c_str(), sizes_and_count.second.bytes,
-                           sizes_and_count.second.count, average, percent);
-        object_bytes_total += sizes_and_count.second.bytes;
-      }
+      VariableIndentationOutputStream vios(&os);
+      art_file_stats.DumpSizes(vios, "ArtFile");
       os << "\n" << std::flush;
-      CHECK_EQ(object_bytes, object_bytes_total);
+      object_stats.DumpSizes(vios, "Objects");
+      os << "\n" << std::flush;
+      oat_file_stats.DumpSizes(vios, "OatFile");
+      os << "\n" << std::flush;
 
-      os << StringPrintf("oat_file_bytes               = %8zd\n"
-                         "managed_code_bytes           = %8zd (%2.0f%% of oat file bytes)\n"
-                         "native_to_managed_code_bytes = %8zd (%2.0f%% of oat file bytes)\n\n"
-                         "class_initializer_code_bytes = %8zd (%2.0f%% of oat file bytes)\n"
-                         "large_initializer_code_bytes = %8zd (%2.0f%% of oat file bytes)\n"
-                         "large_method_code_bytes      = %8zd (%2.0f%% of oat file bytes)\n\n",
-                         oat_file_bytes,
-                         managed_code_bytes,
-                         PercentOfOatBytes(managed_code_bytes),
-                         native_to_managed_code_bytes,
-                         PercentOfOatBytes(native_to_managed_code_bytes),
-                         class_initializer_code_bytes,
-                         PercentOfOatBytes(class_initializer_code_bytes),
-                         large_initializer_code_bytes,
-                         PercentOfOatBytes(large_initializer_code_bytes),
-                         large_method_code_bytes,
-                         PercentOfOatBytes(large_method_code_bytes))
-            << "DexFile sizes:\n";
       for (const std::pair<std::string, size_t>& oat_dex_file_size : oat_dex_file_sizes) {
         os << StringPrintf("%s = %zd (%2.0f%% of oat file bytes)\n",
                            oat_dex_file_size.first.c_str(), oat_dex_file_size.second,
