@@ -200,4 +200,21 @@ bool ImageHeader::Block::Decompress(uint8_t* out_ptr,
   return true;
 }
 
+const char* ImageHeader::GetImageSectionName(ImageSections index) {
+  switch (index) {
+    case kSectionObjects: return "Objects";
+    case kSectionArtFields: return "ArtFields";
+    case kSectionArtMethods: return "ArtMethods";
+    case kSectionRuntimeMethods: return "RuntimeMethods";
+    case kSectionImTables: return "ImTables";
+    case kSectionIMTConflictTables: return "IMTConflictTables";
+    case kSectionInternedStrings: return "InternedStrings";
+    case kSectionClassTable: return "ClassTable";
+    case kSectionStringReferenceOffsets: return "StringReferenceOffsets";
+    case kSectionMetadata: return "Metadata";
+    case kSectionImageBitmap: return "ImageBitmap";
+    case kSectionCount: return nullptr;
+  }
+}
+
 }  // namespace art
