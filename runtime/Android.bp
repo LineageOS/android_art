@@ -380,6 +380,7 @@ libart_cc_defaults {
                 "libicu",
                 "libstatssocket",
                 "libz", // For adler32.
+                "heapprofd_client_api",
             ],
             static_libs: [
                 "libstatslog_art",

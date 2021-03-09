@@ -172,9 +172,14 @@ class ProfileCompilationInfoTest : public CommonRuntimeTest {
         dex_pc_data.AddClass(dex_profile_index, class_ref.TypeIndex());
         if (dex_profile_index >= offline_pmi.dex_references.size()) {
           // This is a new dex.
-          const std::string& dex_key = ProfileCompilationInfo::GetProfileDexFileBaseKey(
-              class_ref.dex_file->GetLocation());
-          offline_pmi.dex_references.emplace_back(dex_key,
+          const std::string& location = class_ref.dex_file->GetLocation();
+          std::string dex_key = ProfileCompilationInfo::GetProfileDexFileBaseKey(location);
+          // The `dex_key` is a temporary that shall cease to exist soon. Create a view
+          // using the dex file's location as the backing data.
+          CHECK(EndsWith(location, dex_key));
+          size_t dex_key_start = location.size() - dex_key.size();
+          std::string_view dex_key_view(location.data() + dex_key_start, dex_key.size());
+          offline_pmi.dex_references.emplace_back(dex_key_view,
                                                   class_ref.dex_file->GetLocationChecksum(),
                                                   class_ref.dex_file->NumMethodIds());
         }
