@@ -424,7 +424,7 @@ class CodeInfo {
             InstructionSet instruction_set) const;
 
   // Accumulate code info size statistics into the given Stats tree.
-  static void CollectSizeStats(const uint8_t* code_info, /*out*/ Stats* parent);
+  static void CollectSizeStats(const uint8_t* code_info, /*out*/ Stats& parent);
 
   ALWAYS_INLINE static bool HasInlineInfo(const uint8_t* code_info_data) {
     return (*code_info_data & kHasInlineInfo) != 0;
