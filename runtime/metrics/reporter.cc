@@ -49,9 +49,6 @@ void MetricsReporter::SetReportingPeriod(unsigned int period_seconds) {
 }
 
 bool MetricsReporter::MaybeStartBackgroundThread(SessionData session_data) {
-  if (!config_.ReportingEnabled()) {
-    return false;
-  }
   CHECK(!thread_.has_value());
   thread_.emplace(&MetricsReporter::BackgroundThreadRun, this);
   messages_.SendMessage(BeginSessionMessage{session_data});
