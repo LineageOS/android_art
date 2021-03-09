@@ -74,6 +74,8 @@ ThreadPoolWorker::ThreadPoolWorker(ThreadPool* thread_pool, const std::string& n
   CHECK_PTHREAD_CALL(pthread_attr_init, (&attr), reason);
   if (kUseCustomThreadPoolStack) {
     CHECK_PTHREAD_CALL(pthread_attr_setstack, (&attr, stack_.Begin(), stack_.Size()), reason);
+  } else {
+    CHECK_PTHREAD_CALL(pthread_attr_setstacksize, (&attr, stack_size), reason);
   }
   CHECK_PTHREAD_CALL(pthread_create, (&pthread_, &attr, &Callback, this), reason);
   CHECK_PTHREAD_CALL(pthread_attr_destroy, (&attr), reason);

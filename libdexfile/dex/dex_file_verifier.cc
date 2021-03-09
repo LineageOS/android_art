@@ -2758,16 +2758,16 @@ bool DexFileVerifier::CheckInterClassDefItem() {
 
       // Check that a class is defined after its super class (if the
       // latter is defined in the same Dex file).
-      const dex::ClassDef* superclass_def = dex_file_->FindClassDef(item->superclass_idx_);
-      if (superclass_def != nullptr) {
+      uint16_t superclass_idx = item->superclass_idx_.index_;
+      if (defined_classes_[superclass_idx]) {
         // The superclass is defined in this Dex file.
-        if (superclass_def > item) {
+        if (&dex_file_->GetClassDef(defined_class_indexes_[superclass_idx]) > item) {
           // ClassDef item for super class appearing after the class' ClassDef item.
           ErrorStringPrintf("Invalid class definition ordering:"
                             " class with type idx: '%d' defined before"
                             " superclass with type idx: '%d'",
                             item->class_idx_.index_,
-                            item->superclass_idx_.index_);
+                            superclass_idx);
           return false;
         }
       }
@@ -2796,17 +2796,16 @@ bool DexFileVerifier::CheckInterClassDefItem() {
 
         // Check that a class is defined after the interfaces it implements
         // (if they are defined in the same Dex file).
-        const dex::ClassDef* interface_def =
-            dex_file_->FindClassDef(interfaces->GetTypeItem(i).type_idx_);
-        if (interface_def != nullptr) {
+        uint16_t interface_idx = interfaces->GetTypeItem(i).type_idx_.index_;
+        if (defined_classes_[interface_idx]) {
           // The interface is defined in this Dex file.
-          if (interface_def > item) {
+          if (&dex_file_->GetClassDef(defined_class_indexes_[interface_idx]) > item) {
             // ClassDef item for interface appearing after the class' ClassDef item.
             ErrorStringPrintf("Invalid class definition ordering:"
                               " class with type idx: '%d' defined before"
                               " implemented interface with type idx: '%d'",
                               item->class_idx_.index_,
-                              interfaces->GetTypeItem(i).type_idx_.index_);
+                              interface_idx);
             return false;
           }
         }

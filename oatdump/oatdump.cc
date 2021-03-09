@@ -39,7 +39,7 @@
 #include "base/indenter.h"
 #include "base/os.h"
 #include "base/safe_map.h"
-#include "base/stats.h"
+#include "base/stats-inl.h"
 #include "base/stl_util.h"
 #include "base/unix_file/fd_file.h"
 #include "class_linker-inl.h"
@@ -696,7 +696,7 @@ class OatDumper {
       os << "OAT FILE STATS:\n";
       VariableIndentationOutputStream vios(&os);
       stats_.AddBytes(oat_file_.Size());
-      DumpStats(vios, "OatFile", stats_, stats_.Value());
+      stats_.DumpSizes(vios, "OatFile");
     }
 
     os << std::flush;
@@ -815,39 +815,6 @@ class OatDumper {
 
   bool AddStatsObject(const void* address) {
     return seen_stats_objects_.insert(address).second;  // Inserted new entry.
-  }
-
-  void DumpStats(VariableIndentationOutputStream& os,
-                 const std::string& name,
-                 const Stats& stats,
-                 double total) {
-    if (std::fabs(stats.Value()) > 0 || !stats.Children().empty()) {
-      double percent = 100.0 * stats.Value() / total;
-      os.Stream()
-          << std::setw(40 - os.GetIndentation()) << std::left << name << std::right << " "
-          << std::setw(8) << stats.Count() << " "
-          << std::setw(12) << std::fixed << std::setprecision(3) << stats.Value() / KB << "KB "
-          << std::setw(8) << std::fixed << std::setprecision(1) << percent << "%\n";
-
-      // Sort all children by largest value first, than by name.
-      std::map<std::pair<double, std::string>, const Stats&> sorted_children;
-      for (const auto& it : stats.Children()) {
-        sorted_children.emplace(std::make_pair(-it.second.Value(), it.first), it.second);
-      }
-
-      // Add "other" row to represent any amount not account for by the children.
-      Stats other;
-      other.AddBytes(stats.Value() - stats.SumChildrenValues(), stats.Count());
-      if (std::fabs(other.Value()) > 0 && !stats.Children().empty()) {
-        sorted_children.emplace(std::make_pair(-other.Value(), "(other)"), other);
-      }
-
-      // Print the data.
-      ScopedIndentation indent1(&os);
-      for (const auto& it : sorted_children) {
-        DumpStats(os, it.first.second, it.second, total);
-      }
-    }
   }
 
  private:
@@ -1215,7 +1182,7 @@ class OatDumper {
       uint32_t method_header_offset = oat_method.GetOatQuickMethodHeaderOffset();
       const OatQuickMethodHeader* method_header = oat_method.GetOatQuickMethodHeader();
       if (AddStatsObject(method_header)) {
-        stats_.Child("QuickMethodHeader")->AddBytes(sizeof(*method_header));
+        stats_["QuickMethodHeader"].AddBytes(sizeof(*method_header));
       }
       if (options_.absolute_addresses_) {
         vios->Stream() << StringPrintf("%p ", method_header);
@@ -1289,7 +1256,7 @@ class OatDumper {
         uint32_t aligned_code_begin = AlignCodeOffset(code_offset);
         uint64_t aligned_code_end = aligned_code_begin + code_size;
         if (AddStatsObject(code)) {
-          stats_.Child("Code")->AddBytes(code_size);
+          stats_["Code"].AddBytes(code_size);
         }
 
         if (options_.absolute_addresses_) {
@@ -1639,7 +1606,7 @@ class OatDumper {
       // The optimizing compiler outputs its CodeInfo data in the vmap table.
       StackMapsHelper helper(oat_method.GetVmapTable(), instruction_set_);
       if (AddStatsObject(oat_method.GetVmapTable())) {
-        helper.GetCodeInfo().CollectSizeStats(oat_method.GetVmapTable(), &stats_);
+        helper.GetCodeInfo().CollectSizeStats(oat_method.GetVmapTable(), stats_["CodeInfo"]);
       }
       const uint8_t* quick_native_pc = reinterpret_cast<const uint8_t*>(quick_code);
       size_t offset = 0;
