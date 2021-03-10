@@ -1045,6 +1045,28 @@ END_FUNCTION \name
    movq %rax, \dest
 .endm
 
+.macro GET_SHORTY_SLOW_PATH dest, is_interface
+   // Save all registers that can hold arguments in the fast path.
+   push %rdi
+   push %rsi
+   push %rdx
+   subq MACRO_LITERAL(8), %rsp
+   mov %xmm0, (%rsp)
+   .if \is_interface
+   movq 32(%rsp), %rdi
+   movzwl 2(rPC), %esi
+   call SYMBOL(NterpGetShortyFromMethodId)
+   .else
+   call SYMBOL(NterpGetShorty)
+   .endif
+   mov (%rsp), %xmm0
+   addq MACRO_LITERAL(8), %rsp
+   pop %rdx
+   pop %rsi
+   pop %rdi
+   movq %rax, \dest
+.endm
+
 // Uses r9 as temporary.
 .macro DO_ENTRY_POINT_CHECK call_compiled_code
    // On entry, the method is %rdi, the instance is %rsi
@@ -1089,6 +1111,54 @@ END_FUNCTION \name
    .endif
 
 .Lcall_compiled_code_\suffix:
+   .if \is_polymorphic
+   // No fast path for polymorphic calls.
+   .elseif \is_custom
+   // No fast path for custom calls.
+   .elseif \is_string_init
+   // No fast path for string.init.
+   .else
+     // Fast path when we have zero or one argument (modulo 'this'). If there
+     // is one argument, we can put it in both floating point and core register.
+     movzbl 1(rPC), %r9d
+     shrl MACRO_LITERAL(4), %r9d # Number of arguments
+     .if \is_static
+     cmpl MACRO_LITERAL(1), %r9d
+     jl .Lfast_path_\suffix
+     jne .Lget_shorty_\suffix
+     movzwl 4(rPC), %r9d
+     andl MACRO_LITERAL(0xf), %r9d  // dex register of first argument
+     GET_VREG %esi, %r9
+     movd %esi, %xmm0
+     .else
+     cmpl MACRO_LITERAL(2), %r9d
+     jl .Lfast_path_\suffix
+     jne .Lget_shorty_\suffix
+     movzwl 4(rPC), %r9d
+     shrl MACRO_LITERAL(4), %r9d
+     andl MACRO_LITERAL(0xf), %r9d  // dex register of second argument
+     GET_VREG %edx, %r9
+     movd %edx, %xmm0
+     .endif
+.Lfast_path_\suffix:
+     // Check if the next instruction is move-result or move-result-wide.
+     // If it is, we fetch the shorty and jump to the regular invocation.
+     movzwq  6(rPC), %r9
+     andl MACRO_LITERAL(0xfe), %r9d
+     cmpl MACRO_LITERAL(0x0a), %r9d
+     je .Lget_shorty_and_invoke_\suffix
+     call *ART_METHOD_QUICK_CODE_OFFSET_64(%rdi) // Call the method.
+     ADVANCE_PC_FETCH_AND_GOTO_NEXT 3
+.Lget_shorty_and_invoke_\suffix:
+     .if \is_interface
+     // Save interface method, used for conflict resolution, in a callee-save register.
+     movq %rax, %xmm12
+     .endif
+     GET_SHORTY_SLOW_PATH rINSTq, \is_interface
+     jmp .Lgpr_setup_finished_\suffix
+   .endif
+
+.Lget_shorty_\suffix:
    .if \is_interface
    // Save interface method, used for conflict resolution, in a callee-save register.
    movq %rax, %xmm12
@@ -1186,6 +1256,51 @@ END_FUNCTION \name
    .endif
 
 .Lcall_compiled_code_range_\suffix:
+   .if \is_polymorphic
+   // No fast path for polymorphic calls.
+   .elseif \is_custom
+   // No fast path for custom calls.
+   .elseif \is_string_init
+   // No fast path for string.init.
+   .else
+     // Fast path when we have zero or one argument (modulo 'this'). If there
+     // is one argument, we can put it in both floating point and core register.
+     movzbl 1(rPC), %r9d # Number of arguments
+     .if \is_static
+     cmpl MACRO_LITERAL(1), %r9d
+     jl .Lfast_path_range_\suffix
+     jne .Lget_shorty_range_\suffix
+     movzwl 4(rPC), %r9d  // Dex register of first argument
+     GET_VREG %esi, %r9
+     movd %esi, %xmm0
+     .else
+     cmpl MACRO_LITERAL(2), %r9d
+     jl .Lfast_path_range_\suffix
+     jne .Lget_shorty_range_\suffix
+     movzwl 4(rPC), %r9d
+     addl MACRO_LITERAL(1), %r9d  // dex register of second argument
+     GET_VREG %edx, %r9
+     movd %edx, %xmm0
+     .endif
+.Lfast_path_range_\suffix:
+     // Check if the next instruction is move-result or move-result-wide.
+     // If it is, we fetch the shorty and jump to the regular invocation.
+     movzwq  6(rPC), %r9
+     and MACRO_LITERAL(0xfe), %r9d
+     cmpl MACRO_LITERAL(0x0a), %r9d
+     je .Lget_shorty_and_invoke_range_\suffix
+     call *ART_METHOD_QUICK_CODE_OFFSET_64(%rdi) // Call the method.
+     ADVANCE_PC_FETCH_AND_GOTO_NEXT 3
+.Lget_shorty_and_invoke_range_\suffix:
+     .if \is_interface
+     // Save interface method, used for conflict resolution, in a callee-save register.
+     movq %rax, %xmm12
+     .endif
+     GET_SHORTY_SLOW_PATH rINSTq, \is_interface
+     jmp .Lgpr_setup_finished_range_\suffix
+   .endif
+
+.Lget_shorty_range_\suffix:
    .if \is_interface
    // Save interface method, used for conflict resolution, in a callee-saved register.
    movq %rax, %xmm12
