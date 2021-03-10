@@ -92,6 +92,9 @@
 #include "mirror/var_handle.h"
 #include "nativehelper/scoped_local_ref.h"
 #include "obj_ptr-inl.h"
+#ifdef ART_TARGET_ANDROID
+#include "perfetto/heap_profile.h"
+#endif
 #include "reflection.h"
 #include "runtime.h"
 #include "javaheapprof/javaheapsampler.h"
@@ -101,6 +104,36 @@
 #include "well_known_classes.h"
 
 namespace art {
+
+#ifdef ART_TARGET_ANDROID
+namespace {
+
+// Enable the heap sampler Callback function used by Perfetto.
+void EnableHeapSamplerCallback(void* enable_ptr,
+                               const AHeapProfileEnableCallbackInfo* enable_info_ptr) {
+  HeapSampler* sampler_self = reinterpret_cast<HeapSampler*>(enable_ptr);
+  // Set the ART profiler sampling interval to the value from Perfetto.
+  uint64_t interval = AHeapProfileEnableCallbackInfo_getSamplingInterval(enable_info_ptr);
+  if (interval > 0) {
+    sampler_self->SetSamplingInterval(interval);
+  }
+  // Else default is 4K sampling interval. However, default case shouldn't happen for Perfetto API.
+  // AHeapProfileEnableCallbackInfo_getSamplingInterval should always give the requested
+  // (non-negative) sampling interval. It is a uint64_t and gets checked for != 0
+  // Do not call heap as a temp here, it will build but test run will silently fail.
+  // Heap is not fully constructed yet in some cases.
+  sampler_self->EnableHeapSampler();
+}
+
+// Disable the heap sampler Callback function used by Perfetto.
+void DisableHeapSamplerCallback(void* disable_ptr,
+                                const AHeapProfileDisableCallbackInfo* info_ptr ATTRIBUTE_UNUSED) {
+  HeapSampler* sampler_self = reinterpret_cast<HeapSampler*>(disable_ptr);
+  sampler_self->DisableHeapSampler();
+}
+
+}  // namespace
+#endif
 
 namespace gc {
 
@@ -349,7 +382,6 @@ Heap::Heap(size_t initial_size,
                                         kGcCountRateMaxBucketCount),
       alloc_tracking_enabled_(false),
       alloc_record_depth_(AllocRecordObjectMap::kDefaultAllocStackDepth),
-      perfetto_javaheapprof_heapid_(0),
       backtrace_lock_(nullptr),
       seen_backtrace_count_(0u),
       unique_backtrace_count_(0u),
@@ -750,7 +782,7 @@ Heap::Heap(size_t initial_size,
     InitPerfettoJavaHeapProf();
   } else {
     // Disable the Java Heap Profiler.
-    GetHeapSampler().DisableHeapSampler(/*disable_ptr=*/nullptr, /*disable_info_ptr=*/nullptr);
+    GetHeapSampler().DisableHeapSampler();
   }
 
   instrumentation::Instrumentation* const instrumentation = runtime->GetInstrumentation();
@@ -4046,15 +4078,25 @@ void Heap::BroadcastForNewAllocationRecords() const {
 
 // Perfetto initialization.
 void Heap::InitPerfettoJavaHeapProf() {
-  // Register the heap and create the heapid.
-  // Use a heap name = "HeapSampler".
   // Initialize Perfetto Heap info and Heap id.
-  static uint32_t heap_id = 1;  // Initialize to 1, to be overwritten by Perfetto heap id.
-  SetPerfettoJavaHeapProfHeapID(heap_id);
-  // Enable the Java Heap Profiler.
-  GetHeapSampler().EnableHeapSampler(/*enable_ptr=*/nullptr, /*enable_info_ptr=*/nullptr);
+  uint32_t heap_id = 1;  // Initialize to 1, to be overwritten by Perfetto heap id.
+#ifdef ART_TARGET_ANDROID
+  // Register the heap and create the heapid.
+  // Use a Perfetto heap name = "com.android.art" for the Java Heap Profiler.
+  AHeapInfo* info = AHeapInfo_create("com.android.art");
   // Set the Enable Callback, there is no callback data ("nullptr").
+  AHeapInfo_setEnabledCallback(info, &EnableHeapSamplerCallback, &heap_sampler_);
   // Set the Disable Callback.
+  AHeapInfo_setDisabledCallback(info, &DisableHeapSamplerCallback, &heap_sampler_);
+  heap_id = AHeapProfile_registerHeap(info);
+  // Do not enable the Java Heap Profiler in this case, wait for Perfetto to enable it through
+  // the callback function.
+#else
+  // This is the host case, enable the Java Heap Profiler for host testing.
+  // Perfetto API is currently not available on host.
+  heap_sampler_.EnableHeapSampler();
+#endif
+  heap_sampler_.SetHeapID(heap_id);
   VLOG(heap) << "Java Heap Profiler Initialized";
 }
 
