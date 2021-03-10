@@ -266,7 +266,7 @@ void CodeInfo::Dump(VariableIndentationOutputStream* vios,
                     uint32_t code_offset,
                     bool verbose,
                     InstructionSet instruction_set) const {
-  vios->Stream() << "CodeInfo "
+  vios->Stream() << "CodeInfo"
     << " CodeSize:" << code_size_
     << " FrameSize:" << packed_frame_size_ * kStackAlignment
     << " CoreSpillMask:" << std::hex << core_spill_mask_
