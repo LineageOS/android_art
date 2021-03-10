@@ -71,6 +71,15 @@ void MetricsReporter::NotifyStartupCompleted() {
   }
 }
 
+void MetricsReporter::RequestMetricsReport(bool synchronous) {
+  if (thread_.has_value()) {
+    messages_.SendMessage(RequestMetricsReportMessage{synchronous});
+    if (synchronous) {
+      thread_to_host_messages_.ReceiveMessage();
+    }
+  }
+}
+
 void MetricsReporter::BackgroundThreadRun() {
   LOG_STREAM(DEBUG) << "Metrics reporting thread started";
 
@@ -114,6 +123,13 @@ void MetricsReporter::BackgroundThreadRun() {
           // Do one final metrics report, if enabled.
           if (config_.report_metrics_on_shutdown) {
             ReportMetrics();
+          }
+        },
+        [&](RequestMetricsReportMessage message) {
+          LOG_STREAM(DEBUG) << "Explicit report request received";
+          ReportMetrics();
+          if (message.synchronous) {
+            thread_to_host_messages_.SendMessage(ReportCompletedMessage{});
           }
         },
         [&]([[maybe_unused]] TimeoutExpiredMessage message) {
