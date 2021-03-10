@@ -141,7 +141,11 @@ if [[ $mode == "target" ]]; then
   # testing, we need to install an implementation of the libraries (and cannot
   # rely on the one already installed on the device, if the device is post R and
   # has it).
-  implementation_libs="libartpalette-system.so liblog.so"
+  implementation_libs=(
+    "heapprofd_client_api.so"
+    "libartpalette-system.so"
+    "liblog.so"
+  )
   if [ -d prebuilts/runtime/mainline/platform/impl ]; then
     if [[ $TARGET_ARCH = arm* ]]; then
       arch32=arm
@@ -150,7 +154,7 @@ if [[ $mode == "target" ]]; then
       arch32=x86
       arch64=x86_64
     fi
-    for so in $implementation_libs; do
+    for so in ${implementation_libs[@]}; do
       if [ -d "$ANDROID_PRODUCT_OUT/system/lib" ]; then
         cmd="cp -p prebuilts/runtime/mainline/platform/impl/$arch32/$so $ANDROID_PRODUCT_OUT/system/lib/$so"
         echo "Executing $cmd"
