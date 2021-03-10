@@ -34,13 +34,19 @@ namespace art {
                    double unit_size,
                    const char* unit) const {
     double percent = total > 0 ? 100.0 * Value() / total : 0;
+    const size_t name_width = 52 - os.GetIndentation();
+    if (name.length() > name_width) {
+      // Handle very long names by printing them on their own line.
+      os.Stream() << name << " \\\n";
+      name = "";
+    }
     os.Stream()
-        << std::setw(40 - os.GetIndentation()) << std::left << name << std::right << " "
-        << std::setw(8) << Count() << " "
-        << std::setw(12) << std::fixed << std::setprecision(3) << Value() / unit_size << unit
-        << std::setw(8) << std::fixed << std::setprecision(1) << percent << "%\n";
+        << std::setw(name_width) << std::left << name << " "
+        << std::setw(6) << std::right << Count() << " "
+        << std::setw(10) << std::fixed << std::setprecision(3) << Value() / unit_size << unit << " "
+        << std::setw(6) << std::fixed << std::setprecision(1) << percent << "%\n";
 
-    // Sort all children by largest value first, than by name.
+    // Sort all children by largest value first, then by name.
     std::map<std::pair<double, std::string_view>, const Stats&> sorted_children;
     for (const auto& it : Children()) {
       sorted_children.emplace(std::make_pair(-it.second.Value(), it.first), it.second);
