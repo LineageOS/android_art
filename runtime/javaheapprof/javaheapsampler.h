@@ -42,6 +42,15 @@ class HeapSampler {
     thread_local size_t bytes_until_sample = 0;
     return &bytes_until_sample;
   }
+  void SetHeapID(uint32_t heap_id) {
+    perfetto_heap_id_ = heap_id;
+  }
+  void EnableHeapSampler() {
+    enabled_.store(true, std::memory_order_release);
+  }
+  void DisableHeapSampler() {
+    enabled_.store(false, std::memory_order_release);
+  }
   // Report a sample to Perfetto.
   void ReportSample(art::mirror::Object* obj, size_t allocation_size);
   // Check whether we should take a sample or not at this allocation, and return the
@@ -60,16 +69,10 @@ class HeapSampler {
   void AdjustSampleOffset(size_t adjustment);
   // Is heap sampler enabled?
   bool IsEnabled();
-  void EnableHeapSampler(void* enable_ptr, const void* enable_info_ptr);
-  void DisableHeapSampler(void* disable_ptr, const void* disable_info_ptr);
   // Set the sampling interval.
-  void SetSamplingInterval(int sampling_interval) REQUIRES(geo_dist_rng_lock_);
+  void SetSamplingInterval(int sampling_interval) REQUIRES(!geo_dist_rng_lock_);
   // Return the sampling interval.
   int GetSamplingInterval();
-  // Set the Perfetto Session Info.
-  void SetSessionInfo(void* info);
-  // Get the Perfetto Session Info.
-  void* GetSessionInfo();
 
  private:
   size_t NextGeoDistRandSample() REQUIRES(!geo_dist_rng_lock_);
@@ -81,7 +84,6 @@ class HeapSampler {
   // Default sampling interval is 4kb.
   // Writes guarded by geo_dist_rng_lock_.
   std::atomic<int> p_sampling_interval_{4 * 1024};
-  void* perfetto_session_info_;
   uint32_t perfetto_heap_id_ = 0;
   // std random number generator.
   std::minstd_rand rng_ GUARDED_BY(geo_dist_rng_lock_);  // Holds the state

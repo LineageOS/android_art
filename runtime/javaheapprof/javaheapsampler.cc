@@ -18,6 +18,9 @@
 #include "base/locks.h"
 #include "gc/heap.h"
 #include "javaheapprof/javaheapsampler.h"
+#ifdef ART_TARGET_ANDROID
+#include "perfetto/heap_profile.h"
+#endif
 #include "runtime.h"
 
 namespace art {
@@ -58,8 +61,13 @@ size_t HeapSampler::PickAndAdjustNextSample(size_t sample_adjust_bytes) {
 // Also bytes_until_sample can only be updated after the allocation and reporting is done.
 // Thus next bytes_until_sample is previously calculated (before allocation) to be able to
 // get the next tlab_size, but only saved/updated here.
-void HeapSampler::ReportSample(art::mirror::Object* obj ATTRIBUTE_UNUSED, size_t allocation_size) {
+void HeapSampler::ReportSample(art::mirror::Object* obj, size_t allocation_size) {
   VLOG(heap) << "JHP:***Report Perfetto Allocation: alloc_size: " << allocation_size;
+  uint64_t perf_alloc_id = reinterpret_cast<uint64_t>(obj);
+  VLOG(heap) << "JHP:***Report Perfetto Allocation: obj: " << perf_alloc_id;
+#ifdef ART_TARGET_ANDROID
+  AHeapProfile_reportSample(perfetto_heap_id_, perf_alloc_id, allocation_size);
+#endif
 }
 
 // Check whether we should take a sample or not at this allocation and calculate the sample
@@ -123,34 +131,8 @@ void HeapSampler::AdjustSampleOffset(size_t adjustment) {
              << " next_bytes_until_sample = " << next_bytes_until_sample;
 }
 
-// Enable the heap sampler and initialize/set the sampling interval.
-void HeapSampler::EnableHeapSampler(void* enable_ptr ATTRIBUTE_UNUSED,
-                                    const void* enable_info_ptr ATTRIBUTE_UNUSED) {
-  uint64_t interval = 4 * 1024;
-  // Set the ART profiler sampling interval to the value from AHeapProfileSessionInfo
-  // Set interval to sampling interval from AHeapProfileSessionInfo
-  if (interval > 0) {
-    // Make sure that rng_ and geo_dist are thread safe by acquiring a lock to access.
-    art::MutexLock mu(art::Thread::Current(), geo_dist_rng_lock_);
-    SetSamplingInterval(interval);
-  }
-  // Else default is 4K sampling interval. However, default case shouldn't happen for Perfetto API.
-  // AHeapProfileEnableCallbackInfo_getSamplingInterval should always give the requested
-  // (non-negative) sampling interval. It is a uint64_t and gets checked for != 0
-  // Do not call heap->GetPerfettoJavaHeapProfHeapID() as a temp here, it will build but test run
-  // will silently fail. Heap is not fully constructed yet.
-  // heap_id will be set through the Perfetto API.
-  perfetto_heap_id_ = 1;  // To be set by Perfetto API
-  enabled_.store(true, std::memory_order_release);
-}
-
 bool HeapSampler::IsEnabled() {
   return enabled_.load(std::memory_order_acquire);
-}
-
-void HeapSampler::DisableHeapSampler(void* disable_ptr ATTRIBUTE_UNUSED,
-                                     const void* disable_info_ptr ATTRIBUTE_UNUSED) {
-  enabled_.store(false, std::memory_order_release);
 }
 
 int HeapSampler::GetSamplingInterval() {
@@ -158,16 +140,10 @@ int HeapSampler::GetSamplingInterval() {
 }
 
 void HeapSampler::SetSamplingInterval(int sampling_interval) {
+  // Make sure that rng_ and geo_dist are thread safe by acquiring a lock to access.
+  art::MutexLock mu(art::Thread::Current(), geo_dist_rng_lock_);
   p_sampling_interval_.store(sampling_interval, std::memory_order_release);
   geo_dist_.param(std::geometric_distribution<size_t>::param_type(1.0/p_sampling_interval_));
-}
-
-void HeapSampler::SetSessionInfo(void* info) {
-  perfetto_session_info_ = info;
-}
-
-void* HeapSampler::GetSessionInfo() {
-  return perfetto_session_info_;
 }
 
 }  // namespace art
