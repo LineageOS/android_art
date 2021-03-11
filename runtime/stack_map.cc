@@ -332,6 +332,12 @@ void StackMap::Dump(VariableIndentationOutputStream* vios,
   for (size_t i = 0, e = stack_mask.size_in_bits(); i < e; ++i) {
     vios->Stream() << stack_mask.LoadBit(e - i - 1);
   }
+  switch (static_cast<Kind>(GetKind())) {
+    case Kind::Default: break;
+    case Kind::Catch: vios->Stream() << ", Catch"; break;
+    case Kind::OSR: vios->Stream() << ", OSR"; break;
+    case Kind::Debug: vios->Stream() << ", Debug"; break;
+  }
   vios->Stream() << ")\n";
   code_info.GetDexRegisterMapOf(*this).Dump(vios);
   for (InlineInfo inline_info : code_info.GetInlineInfosOf(*this)) {
