@@ -240,21 +240,6 @@ public class Test1940 {
       System.out.println("Saw expected thread events.");
     }
 
-    // Test heap chunks are sent.
-    AwaitChunkHandler hpif = new AwaitChunkHandler((x) -> x.type == TYPE_HPIF, (type, cdata) -> {
-      // The actual data is far to noisy for this test as it includes information about global heap
-      // state.
-      if (type == TYPE_HPIF) {
-        System.out.println("Expected chunk type published: " + type);
-      }
-    });
-    CURRENT_HANDLER = hpif;
-    final int HPIF_WHEN_NOW = 1;
-    if (!DdmVmInternal.heapInfoNotify(HPIF_WHEN_NOW)) {
-      System.out.println("Unexpected failure for heapInfoNotify!");
-    }
-    hpif.Await();
-
     // method Tracing
     AwaitChunkHandler mpse = new AwaitChunkHandler((x) -> x.type == TYPE_MPSE, (type, cdata) -> {
       // This chunk includes timing and thread information so we just check the type.
