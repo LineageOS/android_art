@@ -1576,6 +1576,9 @@ OAT_ENTRY ExecuteNterpImpl, EndExecuteNterpImpl
     .text
     .align  2
 
+// Enclose all code below in a symbol (which gets printed in backtraces).
+NAME_START nterp_helper
+
 // Note: mterp also uses the common_* names below for helpers, but that's OK
 // as the assembler compiled each interpreter separately.
 common_errDivideByZero:
@@ -1759,6 +1762,8 @@ nterp_to_nterp_instance_range:
     SETUP_STACK_FOR_INVOKE
     SETUP_RANGE_ARGUMENTS_AND_EXECUTE is_static=0, is_string_init=0
     .cfi_endproc
+
+NAME_END nterp_helper
 
 // This is the end of PCs contained by the OatQuickMethodHeader created for the interpreter
 // entry point.
