@@ -47,14 +47,15 @@ struct UnwindHelper : public TLSData {
   static constexpr const char* kTlsKey = "UnwindHelper::kTlsKey";
 
   explicit UnwindHelper(size_t max_depth)
-      : memory_(unwindstack::Memory::CreateProcessMemory(getpid())),
-        jit_(memory_),
-        dex_(memory_),
+      : arch_(unwindstack::Regs::CurrentArch()),
+        memory_(unwindstack::Memory::CreateProcessMemory(getpid())),
+        jit_(unwindstack::CreateJitDebug(arch_, memory_)),
+        dex_(unwindstack::CreateDexFiles(arch_, memory_)),
         unwinder_(max_depth, &maps_, memory_) {
     CHECK(maps_.Parse());
-    unwinder_.SetArch(unwindstack::Regs::CurrentArch());
-    unwinder_.SetJitDebug(&jit_);
-    unwinder_.SetDexFiles(&dex_);
+    unwinder_.SetArch(arch_);
+    unwinder_.SetJitDebug(jit_.get());
+    unwinder_.SetDexFiles(dex_.get());
     unwinder_.SetResolveNames(false);
     unwindstack::Elf::SetCachingEnabled(true);
   }
@@ -75,9 +76,10 @@ struct UnwindHelper : public TLSData {
 
  private:
   unwindstack::LocalUpdatableMaps maps_;
+  unwindstack::ArchEnum arch_;
   std::shared_ptr<unwindstack::Memory> memory_;
-  unwindstack::JitDebug jit_;
-  unwindstack::DexFiles dex_;
+  std::unique_ptr<unwindstack::JitDebug> jit_;
+  std::unique_ptr<unwindstack::DexFiles> dex_;
   unwindstack::Unwinder unwinder_;
 };
 
