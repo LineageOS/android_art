@@ -1376,9 +1376,9 @@
     },
     {
         "tests": ["053-wait-some"],
-        "variant": "interp-ac",
+        "variant": "gcstress | interp-ac",
         "bug": "b/175435088",
-        "description": ["Test is time-sensitive and fails on interpreter-access-checks",
-                        "configuration."]
+        "description": ["Test is time-sensitive and fails on gcstress and",
+                        "interpreter-access-checks configurations."]
     }
 ]
