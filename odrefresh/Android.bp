@@ -32,10 +32,14 @@ cc_defaults {
     ],
     local_include_dirs: ["include"],
     header_libs: ["dexoptanalyzer_headers"],
-    generated_sources: ["apex-info-list"],
+    generated_sources: [
+        "apex-info-list",
+        "art-apex-cache-info",
+    ],
     shared_libs: [
         "libartpalette",
         "libbase",
+        "libdexfile",
         "liblog",
     ],
     static_libs: ["libxml2"],
@@ -125,4 +129,12 @@ art_cc_test {
     shared_libs: [
         "libbase",
     ],
+}
+
+xsd_config {
+    name: "art-apex-cache-info",
+    srcs: ["CacheInfo.xsd"],
+    package_name: "com.android.art",
+    api_dir: "schema",
+    gen_writer: true,
 }
