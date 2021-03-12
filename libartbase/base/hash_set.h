@@ -193,20 +193,13 @@ class HashSet {
   }
 
   HashSet() : HashSet(kDefaultMinLoadFactor, kDefaultMaxLoadFactor) {}
+  explicit HashSet(const allocator_type& alloc) noexcept
+      : HashSet(kDefaultMinLoadFactor, kDefaultMaxLoadFactor, alloc) {}
 
   HashSet(double min_load_factor, double max_load_factor) noexcept
-      : num_elements_(0u),
-        num_buckets_(0u),
-        elements_until_expand_(0u),
-        owns_data_(false),
-        data_(nullptr),
-        min_load_factor_(min_load_factor),
-        max_load_factor_(max_load_factor) {
-    DCHECK_GT(min_load_factor, 0.0);
-    DCHECK_LT(max_load_factor, 1.0);
-  }
+      : HashSet(min_load_factor, max_load_factor, allocator_type()) {}
 
-  explicit HashSet(const allocator_type& alloc) noexcept
+  HashSet(double min_load_factor, double max_load_factor, const allocator_type& alloc) noexcept
       : allocfn_(alloc),
         hashfn_(),
         emptyfn_(),
@@ -216,8 +209,10 @@ class HashSet {
         elements_until_expand_(0u),
         owns_data_(false),
         data_(nullptr),
-        min_load_factor_(kDefaultMinLoadFactor),
-        max_load_factor_(kDefaultMaxLoadFactor) {
+        min_load_factor_(min_load_factor),
+        max_load_factor_(max_load_factor) {
+    DCHECK_GT(min_load_factor, 0.0);
+    DCHECK_LT(max_load_factor, 1.0);
   }
 
   HashSet(const HashSet& other) noexcept
@@ -263,8 +258,17 @@ class HashSet {
   // to avoid malloc/free overhead for small HashSet<>s.
   HashSet(value_type* buffer, size_t buffer_size)
       : HashSet(kDefaultMinLoadFactor, kDefaultMaxLoadFactor, buffer, buffer_size) {}
+  HashSet(value_type* buffer, size_t buffer_size, const allocator_type& alloc)
+      : HashSet(kDefaultMinLoadFactor, kDefaultMaxLoadFactor, buffer, buffer_size, alloc) {}
   HashSet(double min_load_factor, double max_load_factor, value_type* buffer, size_t buffer_size)
-      : num_elements_(0u),
+      : HashSet(min_load_factor, max_load_factor, buffer, buffer_size, allocator_type()) {}
+  HashSet(double min_load_factor,
+          double max_load_factor,
+          value_type* buffer,
+          size_t buffer_size,
+          const allocator_type& alloc)
+      : allocfn_(alloc),
+        num_elements_(0u),
         num_buckets_(buffer_size),
         elements_until_expand_(buffer_size * max_load_factor),
         owns_data_(false),
