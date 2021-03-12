@@ -675,33 +675,31 @@ standalone-apex-files: deapexer \
 # Phony target for only building what go/lem requires for pushing ART on /data.
 
 .PHONY: build-art-target-golem
+
+# TODO(b/129332183): Clean this up when Golem runs can mount the APEXes directly
+# in the chroot.
+
+ART_TARGET_PLATFORM_DEPENDENCIES := \
+  $(TARGET_OUT)/etc/public.libraries.txt \
+  $(TARGET_OUT_SHARED_LIBRARIES)/heapprofd_client_api.so \
+  $(TARGET_OUT_SHARED_LIBRARIES)/libartpalette-system.so \
+  $(TARGET_OUT_SHARED_LIBRARIES)/libcutils.so \
+  $(TARGET_OUT_SHARED_LIBRARIES)/liblz4.so \
+  $(TARGET_OUT_SHARED_LIBRARIES)/libprocessgroup.so \
+  $(TARGET_OUT_SHARED_LIBRARIES)/libprocinfo.so \
+  $(TARGET_OUT_SHARED_LIBRARIES)/libselinux.so \
+  $(TARGET_OUT_SHARED_LIBRARIES)/libtombstoned_client.so \
+  $(TARGET_OUT_SHARED_LIBRARIES)/libz.so \
+
 # Also include libartbenchmark, we always include it when running golem.
 # libstdc++ is needed when building for ART_TARGET_LINUX.
-
-# Also include the Bionic libraries (libc, libdl, libdl_android, libm) and
-# linker.
-#
-# TODO(b/129332183): Remove this when Golem has full support for the
-# ART APEX.
-
 ART_TARGET_SHARED_LIBRARY_BENCHMARK := $(TARGET_OUT_SHARED_LIBRARIES)/libartbenchmark.so
-ART_TARGET_SHARED_LIBRARY_PALETTE_DEPENDENCIES := \
-    $(TARGET_OUT_SHARED_LIBRARIES)/libcutils.so \
-    $(TARGET_OUT_SHARED_LIBRARIES)/libprocessgroup.so \
-    $(TARGET_OUT_SHARED_LIBRARIES)/libselinux.so \
-    $(TARGET_OUT_SHARED_LIBRARIES)/libtombstoned_client.so
 
 build-art-target-golem: $(RELEASE_ART_APEX) com.android.runtime $(CONSCRYPT_APEX) \
                         $(TARGET_OUT_EXECUTABLES)/art \
                         $(TARGET_OUT_EXECUTABLES)/dex2oat_wrapper \
-                        $(TARGET_OUT)/etc/public.libraries.txt \
+                        $(ART_TARGET_PLATFORM_DEPENDENCIES) \
                         $(ART_TARGET_SHARED_LIBRARY_BENCHMARK) \
-                        $(ART_TARGET_SHARED_LIBRARY_PALETTE_DEPENDENCIES) \
-                        $(TARGET_OUT_SHARED_LIBRARIES)/libz.so \
-                        $(TARGET_OUT_SHARED_LIBRARIES)/liblz4.so \
-                        $(TARGET_OUT_SHARED_LIBRARIES)/libprocinfo.so \
-                        heapprofd_client_api \
-                        libartpalette-system \
                         standalone-apex-files
 	# remove debug libraries from public.libraries.txt because golem builds
 	# won't have it.
