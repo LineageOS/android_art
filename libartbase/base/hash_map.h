@@ -84,18 +84,8 @@ class HashMap : public HashSet<std::pair<Key, Value>,
                        Alloc>;
 
  public:
-  HashMap() : Base() { }
-  HashMap(double min_load_factor, double max_load_factor)
-      : Base(min_load_factor, max_load_factor) {}
-  HashMap(typename Base::value_type* buffer, size_t buffer_size) : Base(buffer, buffer_size) {}
-  HashMap(double min_load_factor,
-          double max_load_factor,
-          typename Base::value_type* buffer,
-          size_t buffer_size)
-      : Base(min_load_factor, max_load_factor, buffer, buffer_size) {}
-
-  explicit HashMap(const Alloc& alloc)
-      : Base(alloc) { }
+  // Inherit constructors.
+  using Base::Base;
 
   // Used to insert a new mapping.
   typename Base::iterator Overwrite(const Key& k, const Value& v) {
