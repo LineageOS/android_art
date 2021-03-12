@@ -885,6 +885,18 @@ class Runtime {
     return madvise_random_access_;
   }
 
+  size_t GetMadviseWillNeedSizeVdex() const {
+    return madvise_willneed_vdex_filesize_;
+  }
+
+  size_t GetMadviseWillNeedSizeOdex() const {
+    return madvise_willneed_odex_filesize_;
+  }
+
+  size_t GetMadviseWillNeedSizeArt() const {
+    return madvise_willneed_art_filesize_;
+  }
+
   const std::string& GetJdwpOptions() {
     return jdwp_options_;
   }
@@ -968,6 +980,12 @@ class Runtime {
   metrics::ArtMetrics* GetMetrics() { return &metrics_; }
 
   void RequestMetricsReport(bool synchronous = true);
+
+  static void MadviseFileForRange(size_t madvise_size_limit_bytes,
+                                  size_t map_size_bytes,
+                                  const uint8_t* map_begin,
+                                  const uint8_t* map_end,
+                                  const std::string& file_name);
 
  private:
   static void InitPlatformSignalHandlers();
@@ -1231,6 +1249,18 @@ class Runtime {
   // Whether or not we use MADV_RANDOM on files that are thought to have random access patterns.
   // This is beneficial for low RAM devices since it reduces page cache thrashing.
   bool madvise_random_access_;
+
+  // Limiting size (in bytes) for applying MADV_WILLNEED on vdex files
+  // A 0 for this will turn off madvising to MADV_WILLNEED
+  size_t madvise_willneed_vdex_filesize_;
+
+  // Limiting size (in bytes) for applying MADV_WILLNEED on odex files
+  // A 0 for this will turn off madvising to MADV_WILLNEED
+  size_t madvise_willneed_odex_filesize_;
+
+  // Limiting size (in bytes) for applying MADV_WILLNEED on art files
+  // A 0 for this will turn off madvising to MADV_WILLNEED
+  size_t madvise_willneed_art_filesize_;
 
   // Whether the application should run in safe mode, that is, interpreter only.
   bool safe_mode_;

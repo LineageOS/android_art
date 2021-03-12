@@ -1380,5 +1380,10 @@
         "bug": "b/175435088",
         "description": ["Test is time-sensitive and fails on gcstress and",
                         "interpreter-access-checks configurations."]
+    },
+    {
+        "tests": ["821-madvise-willneed"],
+        "variant": "jvm",
+        "description": ["Adding custom madvise flags. Not to be tested on default jvm"]
     }
 ]
