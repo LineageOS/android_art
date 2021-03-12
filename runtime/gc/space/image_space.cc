@@ -964,6 +964,18 @@ class ImageSpace::Loader {
         return MemMap::Invalid();
       }
 
+      Runtime* runtime = Runtime::Current();
+      // The runtime might not be available at this point if we're running
+      // dex2oat or oatdump.
+      if (runtime != nullptr) {
+        size_t madvise_size_limit = runtime->GetMadviseWillNeedSizeArt();
+        Runtime::MadviseFileForRange(madvise_size_limit,
+                                     temp_map.Size(),
+                                     temp_map.Begin(),
+                                     temp_map.End(),
+                                     image_filename);
+      }
+
       if (is_compressed) {
         memcpy(map.Begin(), &image_header, sizeof(ImageHeader));
 
