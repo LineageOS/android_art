@@ -46,6 +46,11 @@ struct ReportingConfig {
 
   // If set, metrics will be reported every time this many seconds elapses.
   std::optional<unsigned int> periodic_report_seconds;
+
+  // Returns whether any options are set that enables metrics reporting.
+  constexpr bool ReportingEnabled() const {
+    return dump_to_logcat || dump_to_file.has_value() || dump_to_statsd;
+  }
 };
 
 // MetricsReporter handles periodically reporting ART metrics.
