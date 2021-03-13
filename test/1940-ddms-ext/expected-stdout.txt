@@ -21,5 +21,4 @@ Target thread started!
 Target thread finished!
 threadNotify Disabled!
 Saw expected thread events.
-Expected chunk type published: 1213221190
 Expected chunk type published: 1297109829

@@ -1,1 +1,0 @@
-Tests of private org.apache.harmony.dalvik.ddmc.* APIs used for ddms support.

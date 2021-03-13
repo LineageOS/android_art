@@ -47,7 +47,7 @@ public class Test925 {
     printThreadGroupInfo(curGroup);
     printThreadGroupInfo(rootGroup);
 
-    waitGroupChildren(rootGroup, 6 /* # daemons */, 30 /* timeout in seconds */);
+    waitGroupChildren(rootGroup, 5 /* # daemons */, 30 /* timeout in seconds */);
 
     checkChildren(curGroup);
 
