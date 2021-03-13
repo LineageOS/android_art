@@ -29,6 +29,8 @@ import sys
 import textwrap
 import xml.dom.minidom
 
+logging.basicConfig(format='%(levelname)s: %(message)s')
+
 ME = os.path.basename(sys.argv[0])
 
 # Common advisory placed at the top of all generated files.
@@ -459,6 +461,7 @@ class Generator:
       # Remove any previously generated file.
       bp_file = os.path.join(self.art_test_dir, run_test, "Android.bp")
       if os.path.exists(bp_file):
+        logging.debug(f"Removing `{bp_file}`.")
         os.remove(bp_file)
 
     for run_test in buildable_tests:
@@ -485,6 +488,7 @@ class Generator:
     else:
       include_src = ""
     with open(bp_file, "w") as f:
+      logging.debug(f"Writing `{bp_file}`.")
       f.write(textwrap.dedent(f"""\
       // {ADVISORY}
 
@@ -573,6 +577,7 @@ class Generator:
 
     test_mapping_file = os.path.join(self.art_dir, "TEST_MAPPING")
     with open(test_mapping_file, "w") as f:
+      logging.debug(f"Writing `{test_mapping_file}`.")
       f.write(f"// {ADVISORY}\n")
       f.write(test_mapping_contents)
       f.write("\n")
@@ -665,6 +670,7 @@ class Generator:
 
     mts_art_tests_list_user_file = os.path.join(self.mts_config_dir, "mts-art-tests-list-user.xml")
     with open(mts_art_tests_list_user_file, "wb") as f:
+      logging.debug(f"Writing `{mts_art_tests_list_user_file}`.")
       f.write(xml_str)
 
   def regen_test_files(self, regen_art_mts):
@@ -752,9 +758,13 @@ def main():
         Regenerate ART run-tests Blueprint files, ART's `TEST_MAPPING` file, and
         optionally the ART MTS (Mainline Test Suite) definition.
         """))
-  parser.add_argument("-m", "--regen-art-mts", help="Regenerate the ART MTS definition as well",
+  parser.add_argument("-m", "--regen-art-mts", help="regenerate the ART MTS definition as well",
                       action="store_true")
+  parser.add_argument("-v", "--verbose", help="enable verbose output", action="store_true")
   args = parser.parse_args()
+
+  if args.verbose:
+    logging.getLogger().setLevel(logging.DEBUG)
 
   generator = Generator(os.path.join(os.environ["ANDROID_BUILD_TOP"]))
   generator.regen_test_files(args.regen_art_mts)
