@@ -33,21 +33,16 @@
 
 namespace art {
 
-static Thread* GetSelf(JNIEnv* env) {
-  return static_cast<JNIEnvExt*>(env)->GetSelf();
-}
-
 static void DdmVmInternal_enableRecentAllocations(JNIEnv*, jclass, jboolean enable) {
   Dbg::SetAllocTrackingEnabled(enable);
 }
 
-static jbyteArray DdmVmInternal_getRecentAllocations(JNIEnv* env, jclass) {
-  ScopedFastNativeObjectAccess soa(env);
-  return Dbg::GetRecentAllocations();
+static void DdmVmInternal_threadNotify(JNIEnv*, jclass, jboolean enable) {
+  Dbg::DdmSetThreadNotification(enable);
 }
 
-static jboolean DdmVmInternal_getRecentAllocationStatus(JNIEnv*, jclass) {
-  return Runtime::Current()->GetHeap()->IsAllocTrackingEnabled();
+static Thread* GetSelf(JNIEnv* env) {
+  return static_cast<JNIEnvExt*>(env)->GetSelf();
 }
 
 /*
@@ -214,28 +209,11 @@ static jbyteArray DdmVmInternal_getThreadStats(JNIEnv* env, jclass) {
   return result;
 }
 
-static jboolean DdmVmInternal_heapInfoNotify(JNIEnv* env, jclass, jint when) {
-  ScopedFastNativeObjectAccess soa(env);
-  return Dbg::DdmHandleHpifChunk(static_cast<Dbg::HpifWhen>(when));
-}
-
-static jboolean DdmVmInternal_heapSegmentNotify(JNIEnv*, jclass, jint when, jint what, jboolean native) {
-  return Dbg::DdmHandleHpsgNhsgChunk(static_cast<Dbg::HpsgWhen>(when), static_cast<Dbg::HpsgWhat>(what), native);
-}
-
-static void DdmVmInternal_threadNotify(JNIEnv*, jclass, jboolean enable) {
-  Dbg::DdmSetThreadNotification(enable);
-}
-
 static JNINativeMethod gMethods[] = {
   NATIVE_METHOD(DdmVmInternal, enableRecentAllocations, "(Z)V"),
-  FAST_NATIVE_METHOD(DdmVmInternal, getRecentAllocations, "()[B"),
-  FAST_NATIVE_METHOD(DdmVmInternal, getRecentAllocationStatus, "()Z"),
+  NATIVE_METHOD(DdmVmInternal, threadNotify, "(Z)V"),
   NATIVE_METHOD(DdmVmInternal, getStackTraceById, "(I)[Ljava/lang/StackTraceElement;"),
   NATIVE_METHOD(DdmVmInternal, getThreadStats, "()[B"),
-  FAST_NATIVE_METHOD(DdmVmInternal, heapInfoNotify, "(I)Z"),
-  NATIVE_METHOD(DdmVmInternal, heapSegmentNotify, "(IIZ)Z"),
-  NATIVE_METHOD(DdmVmInternal, threadNotify, "(Z)V"),
 };
 
 void register_org_apache_harmony_dalvik_ddmc_DdmVmInternal(JNIEnv* env) {
