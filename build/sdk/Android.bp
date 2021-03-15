@@ -69,13 +69,11 @@ art_module_sdk {
                 "libnativebridge",
                 "libnativehelper",
                 "libnativeloader",
+                "libsigchain",
             ],
 
             native_libs: [
                 "libdexfile_support",
-
-                // TODO(b/142944043): Convert to APEX stubs and export as a shared lib, once linker support is in place.
-                "libsigchain",
             ],
 
             native_static_libs: [
