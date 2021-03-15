@@ -19,6 +19,7 @@
 
 #include "dex/dex_file_types.h"
 #include "dex/invoke_type.h"
+#include "jit/profiling_info.h"
 #include "optimization.h"
 #include "profile/profile_compilation_info.h"
 
@@ -174,8 +175,7 @@ class HInliner : public HOptimization {
   // invoke info was found in the profile info.
   InlineCacheType GetInlineCacheJIT(
       HInvoke* invoke_instruction,
-      StackHandleScope<1>* hs,
-      /*out*/Handle<mirror::ObjectArray<mirror::Class>>* inline_cache)
+      /*out*/StackHandleScope<InlineCache::kIndividualCacheSize>* classes)
     REQUIRES_SHARED(Locks::mutator_lock_);
 
   // Try getting the inline cache from AOT offline profile.
@@ -183,13 +183,12 @@ class HInliner : public HOptimization {
   // invoke info was found in the profile info.
   InlineCacheType GetInlineCacheAOT(
       HInvoke* invoke_instruction,
-      StackHandleScope<1>* hs,
-      /*out*/Handle<mirror::ObjectArray<mirror::Class>>* inline_cache)
+      /*out*/StackHandleScope<InlineCache::kIndividualCacheSize>* classes)
     REQUIRES_SHARED(Locks::mutator_lock_);
 
   // Compute the inline cache type.
-  InlineCacheType GetInlineCacheType(
-      const Handle<mirror::ObjectArray<mirror::Class>>& classes)
+  static InlineCacheType GetInlineCacheType(
+      const StackHandleScope<InlineCache::kIndividualCacheSize>& classes)
     REQUIRES_SHARED(Locks::mutator_lock_);
 
   // Try to inline the target of a monomorphic call. If successful, the code
@@ -197,16 +196,17 @@ class HInliner : public HOptimization {
   // if (receiver.getClass() != ic.GetMonomorphicType()) deopt
   // ... // inlined code
   bool TryInlineMonomorphicCall(HInvoke* invoke_instruction,
-                                Handle<mirror::ObjectArray<mirror::Class>> classes)
+                                const StackHandleScope<InlineCache::kIndividualCacheSize>& classes)
     REQUIRES_SHARED(Locks::mutator_lock_);
 
   // Try to inline targets of a polymorphic call.
   bool TryInlinePolymorphicCall(HInvoke* invoke_instruction,
-                                Handle<mirror::ObjectArray<mirror::Class>> classes)
+                                const StackHandleScope<InlineCache::kIndividualCacheSize>& classes)
     REQUIRES_SHARED(Locks::mutator_lock_);
 
-  bool TryInlinePolymorphicCallToSameTarget(HInvoke* invoke_instruction,
-                                            Handle<mirror::ObjectArray<mirror::Class>> classes)
+  bool TryInlinePolymorphicCallToSameTarget(
+      HInvoke* invoke_instruction,
+      const StackHandleScope<InlineCache::kIndividualCacheSize>& classes)
     REQUIRES_SHARED(Locks::mutator_lock_);
 
   // Returns whether or not we should use only polymorphic inlining with no deoptimizations.
