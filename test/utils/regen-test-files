@@ -46,8 +46,40 @@ def reindent(str, indent = ""):
   """Reindent literal string while removing common leading spaces."""
   return textwrap.indent(textwrap.dedent(str), indent)
 
+def copyright_header_text(year):
+  """Return the copyright header text used in XML files."""
+  return reindent(f"""\
+    Copyright (C) {year} The Android Open Source Project
+
+        Licensed under the Apache License, Version 2.0 (the "License");
+        you may not use this file except in compliance with the License.
+        You may obtain a copy of the License at
+
+             http://www.apache.org/licenses/LICENSE-2.0
+
+        Unless required by applicable law or agreed to in writing, software
+        distributed under the License is distributed on an "AS IS" BASIS,
+        WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+        See the License for the specific language governing permissions and
+        limitations under the License.
+    """, " ")
+
+def split_list(l, n):
+  """Return a list of `n` sublists of (contiguous) elements of list `l`."""
+  assert n > 0
+  (d, m) = divmod(len(l), n)
+  # If the length of `l` is divisible by `n`, use that that divisor (`d`) as size of each sublist;
+  # otherwise, the next integer value (`d + 1`).
+  s = d if m == 0 else d + 1
+  result = [l[i:i + s] for i in range(0, len(l), s)]
+  assert len(result) == n
+  return result
+
 # The prefix used in the Soong module name of all ART run-tests.
 ART_RUN_TEST_MODULE_NAME_PREFIX = "art-run-test-"
+
+# Number of shards used to declare ART run-tests in the sharded ART MTS test plan.
+NUM_MTS_ART_RUN_TEST_SHARDS = 1
 
 # Known failing ART run-tests.
 # TODO(rpl): Investigate and address the causes of failures.
@@ -582,89 +614,142 @@ class Generator:
       f.write(test_mapping_contents)
       f.write("\n")
 
-  def regen_art_mts_files(self, art_run_tests):
-    """Regenerate ART MTS definition files."""
+  def create_mts_test_shard(self, description, tests, shard_num, copyright_year, comments = []):
+    """Factory method instantiating an `MtsTestShard`."""
+    return self.MtsTestShard(self.mts_config_dir,
+                             description, tests, shard_num, copyright_year, comments)
 
-    # Regenerate `mts_art_tests_list_user_file.xml`.
+  class MtsTestShard:
+    """Class encapsulating data and generation logic for an ART MTS test shard."""
 
+    def __init__(self, mts_config_dir, description, tests, shard_num, copyright_year, comments):
+      self.mts_config_dir = mts_config_dir
+      self.description = description
+      self.tests = tests
+      self.shard_num = shard_num
+      self.copyright_year = copyright_year
+      self.comments = comments
+
+    def shard_id(self):
+      return f"{self.shard_num:02}"
+
+    def test_plan_name(self):
+      return "mts-art-shard-" + self.shard_id()
+
+    def test_list_name(self):
+      return "mts-art-tests-list-user-shard-" + self.shard_id()
+
+    def regen_test_plan_file(self):
+      """Regenerate ART MTS test plan file shard (`mts-art-shard-<shard_num>.xml`)."""
+      root = xml.dom.minidom.Document()
+
+      advisory_header = root.createComment(f" {ADVISORY} ")
+      root.appendChild(advisory_header)
+      copyright_header = root.createComment(copyright_header_text(self.copyright_year))
+      root.appendChild(copyright_header)
+
+      configuration = root.createElement("configuration")
+      root.appendChild(configuration)
+      configuration.setAttribute(
+          "description",
+          f"Run mts-art-shard-{self.shard_id()} from a preexisting MTS installation.")
+
+      # Included XML files.
+      included_xml_files = ["mts", self.test_list_name()]
+      for xml_file in included_xml_files:
+        include = root.createElement("include")
+        include.setAttribute("name", xml_file)
+        configuration.appendChild(include)
+
+      # Test plan name.
+      option = root.createElement("option")
+      option.setAttribute("name", "plan")
+      option.setAttribute("value", self.test_plan_name())
+      configuration.appendChild(option)
+
+      xml_str = root.toprettyxml(indent = XML_INDENT, encoding = "utf-8")
+
+      test_plan_file = os.path.join(self.mts_config_dir, self.test_plan_name() + ".xml")
+      with open(test_plan_file, "wb") as f:
+        logging.debug(f"Writing `{test_plan_file}`.")
+        f.write(xml_str)
+
+    def regen_test_list_file(self):
+      """Regenerate ART MTS test list file (`mts-art-tests-list-user-shard-<shard_num>.xml`)."""
+      root = xml.dom.minidom.Document()
+
+      advisory_header = root.createComment(f" {ADVISORY} ")
+      root.appendChild(advisory_header)
+      copyright_header = root.createComment(copyright_header_text(self.copyright_year))
+      root.appendChild(copyright_header)
+
+      configuration = root.createElement("configuration")
+      root.appendChild(configuration)
+      configuration.setAttribute(
+          "description",
+          f"List of ART MTS tests that do not need root access (shard {self.shard_id()})"
+      )
+
+      # Test declarations.
+      # ------------------
+
+      def append_test_declaration(test):
+        option = root.createElement("option")
+        option.setAttribute("name", "compatibility:include-filter")
+        option.setAttribute("value", test)
+        configuration.appendChild(option)
+
+      test_declarations_comments = [self.description + "."]
+      test_declarations_comments.extend(self.comments)
+      for c in test_declarations_comments:
+        xml_comment = root.createComment(f" {c} ")
+        configuration.appendChild(xml_comment)
+      for t in self.tests:
+        append_test_declaration(t)
+
+      # `MainlineTestModuleController` configurations.
+      # ----------------------------------------------
+
+      def append_module_controller_configuration(test):
+        option = root.createElement("option")
+        option.setAttribute("name", "compatibility:module-arg")
+        option.setAttribute("value", f"{test}:enable:true")
+        configuration.appendChild(option)
+
+      module_controller_configuration_comments = [
+          f"Enable MainlineTestModuleController for {self.description}."]
+      module_controller_configuration_comments.extend(self.comments)
+      for c in module_controller_configuration_comments:
+        xml_comment = root.createComment(f" {c} ")
+        configuration.appendChild(xml_comment)
+      for t in self.tests:
+        append_module_controller_configuration(t)
+
+      xml_str = root.toprettyxml(indent = XML_INDENT, encoding = "utf-8")
+
+      test_list_file = os.path.join(self.mts_config_dir, self.test_list_name() + ".xml")
+      with open(test_list_file, "wb") as f:
+        logging.debug(f"Writing `{test_list_file}`.")
+        f.write(xml_str)
+
+  def regen_mts_art_tests_list_user_file(self, num_mts_art_run_test_shards):
+    """Regenerate ART MTS test list file (`mts-art-tests-list-user.xml`)."""
     root = xml.dom.minidom.Document()
-    configuration = root.createElement("configuration")
+
     advisory_header = root.createComment(f" {ADVISORY} ")
     root.appendChild(advisory_header)
-    copyright_header = root.createComment(reindent("""\
-      Copyright (C) 2020 The Android Open Source Project
-
-          Licensed under the Apache License, Version 2.0 (the "License");
-          you may not use this file except in compliance with the License.
-          You may obtain a copy of the License at
-
-               http://www.apache.org/licenses/LICENSE-2.0
-
-          Unless required by applicable law or agreed to in writing, software
-          distributed under the License is distributed on an "AS IS" BASIS,
-          WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-          See the License for the specific language governing permissions and
-          limitations under the License.
-      """, " "))
+    copyright_header = root.createComment(copyright_header_text(2020))
     root.appendChild(copyright_header)
 
+    configuration = root.createElement("configuration")
     root.appendChild(configuration)
     configuration.setAttribute("description", "List of ART MTS tests that do not need root access.")
 
-    # Test declarations.
-    # ------------------
-
-    def append_test_declaration(test):
-      option = root.createElement("option")
-      option.setAttribute("name", "compatibility:include-filter")
-      option.setAttribute("value", test)
-      configuration.appendChild(option)
-
-    # ART run-tests.
-    art_run_test_module_names = [ART_RUN_TEST_MODULE_NAME_PREFIX + t for t in art_run_tests]
-    art_run_test_header = root.createComment(" ART run-tests. ")
-    configuration.appendChild(art_run_test_header)
-    art_run_test_todo = root.createComment(
-        " TODO(rpl): Find a way to express this list in a more concise fashion. ")
-    configuration.appendChild(art_run_test_todo)
-    for art_run_test_module_name in art_run_test_module_names:
-      append_test_declaration(art_run_test_module_name)
-
-    # Libcore CTS tests.
-    # TODO(rpl): Progressively add more Libcore CTS tests.
-    libcore_cts_test_module_names = [
-        "CtsLibcoreTestCases",
-    ]
-    libcore_cts_test_header = root.createComment(" Libcore CTS tests. ")
-    configuration.appendChild(libcore_cts_test_header)
-    for libcore_cts_test_module_name in libcore_cts_test_module_names:
-      append_test_declaration(libcore_cts_test_module_name)
-
-    # `MainlineTestModuleController` configurations.
-    # ----------------------------------------------
-
-    def append_module_controller_configuration(test):
-      option = root.createElement("option")
-      option.setAttribute("name", "compatibility:module-arg")
-      option.setAttribute("value", f"{test}:enable:true")
-      configuration.appendChild(option)
-
-    # `MainlineTestModuleController` configuration for ART run-tests.
-    art_run_test_module_controller_header = root.createComment(
-        " Enable MainlineTestModuleController for ART run-tests. ")
-    configuration.appendChild(art_run_test_module_controller_header)
-    art_run_test_module_controller_todo = root.createComment(
-        " TODO(rpl): Find a way to express this list in a more concise fashion. ")
-    configuration.appendChild(art_run_test_module_controller_todo)
-    for art_run_test_module_name in art_run_test_module_names:
-      append_module_controller_configuration(art_run_test_module_name)
-
-    # `MainlineTestModuleController` configuration for Libcore CTS tests.
-    libcore_cts_test_module_controller_header = root.createComment(
-        " Enable MainlineTestModuleController for Libcore CTS tests. ")
-    configuration.appendChild(libcore_cts_test_module_controller_header)
-    for libcore_cts_test_module_name in libcore_cts_test_module_names:
-      append_module_controller_configuration(libcore_cts_test_module_name)
+    # Included XML files.
+    for s in range(num_mts_art_run_test_shards):
+      include = root.createElement("include")
+      include.setAttribute("name", f"mts-art-tests-list-user-shard-{s:02}")
+      configuration.appendChild(include)
 
     xml_str = root.toprettyxml(indent = XML_INDENT, encoding = "utf-8")
 
@@ -672,6 +757,44 @@ class Generator:
     with open(mts_art_tests_list_user_file, "wb") as f:
       logging.debug(f"Writing `{mts_art_tests_list_user_file}`.")
       f.write(xml_str)
+
+  def regen_art_mts_files(self, art_run_tests):
+    """Regenerate ART MTS definition files."""
+
+    # Remove any previously MTS ART test plan shard (`mts-art-shard-[0-9]+.xml`)
+    # and any test list shard (`mts-art-tests-list-user-shard-[0-9]+.xml`).
+    old_test_plan_shards = sorted([
+        test_plan_shard
+        for test_plan_shard in os.listdir(self.mts_config_dir)
+        if re.match("^mts-art-(tests-list-user-)?shard-[0-9]+.xml$", test_plan_shard)])
+    for shard in old_test_plan_shards:
+      shard_path = os.path.join(self.mts_config_dir, shard)
+      if os.path.exists(shard_path):
+        logging.debug(f"Removing `{shard_path}`.")
+        os.remove(shard_path)
+
+    mts_test_shards = []
+
+    # ART run-test shard(s).
+    art_run_test_module_names = [ART_RUN_TEST_MODULE_NAME_PREFIX + t for t in art_run_tests]
+    art_run_test_shards = split_list(art_run_test_module_names, NUM_MTS_ART_RUN_TEST_SHARDS)
+    for i in range(len(art_run_test_shards)):
+      art_run_test_shard = self.create_mts_test_shard(
+          "ART run-tests", art_run_test_shards[i], i, 2020,
+          ["TODO(rpl): Find a way to express this list in a more concise fashion."])
+      mts_test_shards.append(art_run_test_shard)
+
+    # Libcore CTS test shard.
+    libcore_cts_test_shard_num = len(mts_test_shards)
+    libcore_cts_test_shard = self.create_mts_test_shard(
+        "Libcore CTS tests", ["CtsLibcoreTestCases"], libcore_cts_test_shard_num, 2020)
+    mts_test_shards.append(libcore_cts_test_shard)
+
+    for s in mts_test_shards:
+      s.regen_test_plan_file()
+      s.regen_test_list_file()
+
+    self.regen_mts_art_tests_list_user_file(len(mts_test_shards))
 
   def regen_test_files(self, regen_art_mts):
     """Regenerate ART test files.
