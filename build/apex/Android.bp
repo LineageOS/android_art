@@ -54,6 +54,7 @@ art_runtime_base_native_shared_libs = [
     "libnativebridge",
     "libnativehelper",
     "libnativeloader",
+    "libsigchain",
     // libadbconnection is internal and loaded with dlopen(), but it cannot use
     // "required" because of cyclic dependency (b/124505714).
     "libadbconnection",
