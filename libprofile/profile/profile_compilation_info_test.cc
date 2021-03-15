@@ -102,19 +102,12 @@ class ProfileCompilationInfoTest : public CommonArtTest {
     return static_cast<uint32_t>(file.GetFd());
   }
 
-  std::unique_ptr<ProfileCompilationInfo::OfflineProfileMethodInfo> GetMethod(
+  ProfileCompilationInfo::MethodHotness GetMethod(
       const ProfileCompilationInfo& info,
       const DexFile* dex,
       uint16_t method_idx,
       const ProfileSampleAnnotation& annotation = ProfileSampleAnnotation::kNone) {
-    return info.GetHotMethodInfo(MethodReference(dex, method_idx), annotation);
-  }
-
-  // Creates an inline cache which will be destructed at the end of the test.
-  ProfileCompilationInfo::InlineCacheMap* CreateInlineCacheMap() {
-    used_inline_caches.emplace_back(new ProfileCompilationInfo::InlineCacheMap(
-        std::less<uint16_t>(), allocator_->Adapter(kArenaAllocProfile)));
-    return used_inline_caches.back().get();
+    return info.GetMethodHotness(MethodReference(dex, method_idx), annotation);
   }
 
   // Creates the default inline caches used in tests.
@@ -123,7 +116,7 @@ class ProfileCompilationInfoTest : public CommonArtTest {
     // Monomorphic
     for (uint16_t dex_pc = 0; dex_pc < 11; dex_pc++) {
       std::vector<TypeReference> types = {TypeReference(dex1, dex::TypeIndex(0))};
-      inline_caches.push_back(ProfileInlineCache(dex_pc, /* missing_types*/ false, types));
+      inline_caches.push_back(ProfileInlineCache(dex_pc, /*missing_types=*/ false, types));
     }
     // Polymorphic
     for (uint16_t dex_pc = 11; dex_pc < 22; dex_pc++) {
@@ -131,23 +124,24 @@ class ProfileCompilationInfoTest : public CommonArtTest {
           TypeReference(dex1, dex::TypeIndex(0)),
           TypeReference(dex2, dex::TypeIndex(1)),
           TypeReference(dex3, dex::TypeIndex(2))};
-      inline_caches.push_back(ProfileInlineCache(dex_pc, /* missing_types*/ false, types));
+      inline_caches.push_back(ProfileInlineCache(dex_pc, /*missing_types=*/ false, types));
     }
     // Megamorphic
     for (uint16_t dex_pc = 22; dex_pc < 33; dex_pc++) {
-      // we need 5 types to make the cache megamorphic
+      // We need 5 types to make the cache megamorphic.
+      // The `is_megamorphic` flag shall be `false`; it is not used for testing.
       std::vector<TypeReference> types = {
           TypeReference(dex1, dex::TypeIndex(0)),
           TypeReference(dex1, dex::TypeIndex(1)),
           TypeReference(dex1, dex::TypeIndex(2)),
           TypeReference(dex1, dex::TypeIndex(3)),
           TypeReference(dex1, dex::TypeIndex(4))};
-      inline_caches.push_back(ProfileInlineCache(dex_pc, /* missing_types*/ false, types));
+      inline_caches.push_back(ProfileInlineCache(dex_pc, /*missing_types=*/ false, types));
     }
     // Missing types
     for (uint16_t dex_pc = 33; dex_pc < 44; dex_pc++) {
       std::vector<TypeReference> types;
-      inline_caches.push_back(ProfileInlineCache(dex_pc, /* missing_types*/ true, types));
+      inline_caches.push_back(ProfileInlineCache(dex_pc, /*missing_types=*/ true, types));
     }
 
     return inline_caches;
@@ -524,14 +518,14 @@ TEST_F(ProfileCompilationInfoTest, SaveInlineCaches) {
 
   ASSERT_TRUE(loaded_info.Equals(saved_info));
 
-  std::unique_ptr<ProfileCompilationInfo::OfflineProfileMethodInfo> loaded_pmi1 =
+  ProfileCompilationInfo::MethodHotness loaded_hotness1 =
       GetMethod(loaded_info, dex1, /* method_idx= */ 3);
-  ASSERT_TRUE(loaded_pmi1 != nullptr);
-  ASSERT_TRUE(*loaded_pmi1 == inline_caches);
-  std::unique_ptr<ProfileCompilationInfo::OfflineProfileMethodInfo> loaded_pmi2 =
+  ASSERT_TRUE(loaded_hotness1.IsHot());
+  ASSERT_TRUE(EqualInlineCaches(inline_caches, loaded_hotness1, loaded_info));
+  ProfileCompilationInfo::MethodHotness loaded_hotness2 =
       GetMethod(loaded_info, dex4, /* method_idx= */ 3);
-  ASSERT_TRUE(loaded_pmi2 != nullptr);
-  ASSERT_TRUE(*loaded_pmi2 == inline_caches);
+  ASSERT_TRUE(loaded_hotness2.IsHot());
+  ASSERT_TRUE(EqualInlineCaches(inline_caches, loaded_hotness2, loaded_info));
 }
 
 TEST_F(ProfileCompilationInfoTest, MegamorphicInlineCaches) {
@@ -569,11 +563,11 @@ TEST_F(ProfileCompilationInfoTest, MegamorphicInlineCaches) {
 
   ASSERT_TRUE(loaded_info.Equals(saved_info));
 
-  std::unique_ptr<ProfileCompilationInfo::OfflineProfileMethodInfo> loaded_pmi1 =
+  ProfileCompilationInfo::MethodHotness loaded_hotness1 =
       GetMethod(loaded_info, dex1, /* method_idx= */ 3);
 
-  ASSERT_TRUE(loaded_pmi1 != nullptr);
-  ASSERT_TRUE(*loaded_pmi1 == inline_caches_extra);
+  ASSERT_TRUE(loaded_hotness1.IsHot());
+  ASSERT_TRUE(EqualInlineCaches(inline_caches_extra, loaded_hotness1, loaded_info));
 }
 
 TEST_F(ProfileCompilationInfoTest, MissingTypesInlineCaches) {
@@ -619,10 +613,10 @@ TEST_F(ProfileCompilationInfoTest, MissingTypesInlineCaches) {
 
   ASSERT_TRUE(loaded_info.Equals(saved_info));
 
-  std::unique_ptr<ProfileCompilationInfo::OfflineProfileMethodInfo> loaded_pmi1 =
+  ProfileCompilationInfo::MethodHotness loaded_hotness1 =
       GetMethod(loaded_info, dex1, /* method_idx= */ 3);
-  ASSERT_TRUE(loaded_pmi1 != nullptr);
-  ASSERT_TRUE(*loaded_pmi1 == missing_types);
+  ASSERT_TRUE(loaded_hotness1.IsHot());
+  ASSERT_TRUE(EqualInlineCaches(missing_types, loaded_hotness1, loaded_info));
 }
 
 TEST_F(ProfileCompilationInfoTest, InvalidChecksumInInlineCache) {
@@ -681,14 +675,12 @@ TEST_F(ProfileCompilationInfoTest, MergeInlineCacheTriggerReindex) {
   // Merging should have no effect as we're adding the exact same stuff.
   ASSERT_TRUE(info.Equals(info_backup));
   for (uint16_t method_idx = 0; method_idx < 10; method_idx++) {
-    std::unique_ptr<ProfileCompilationInfo::OfflineProfileMethodInfo> loaded_pmi1 =
-        GetMethod(info, dex1, method_idx);
-    ASSERT_TRUE(loaded_pmi1 != nullptr);
-    ASSERT_TRUE(*loaded_pmi1 == inline_caches);
-    std::unique_ptr<ProfileCompilationInfo::OfflineProfileMethodInfo> loaded_pmi2 =
-        GetMethod(info, dex2, method_idx);
-    ASSERT_TRUE(loaded_pmi2 != nullptr);
-    ASSERT_TRUE(*loaded_pmi2 == inline_caches);
+    ProfileCompilationInfo::MethodHotness loaded_hotness1 = GetMethod(info, dex1, method_idx);
+    ASSERT_TRUE(loaded_hotness1.IsHot());
+    ASSERT_TRUE(EqualInlineCaches(inline_caches, loaded_hotness1, info));
+    ProfileCompilationInfo::MethodHotness loaded_hotness2 = GetMethod(info, dex2, method_idx);
+    ASSERT_TRUE(loaded_hotness2.IsHot());
+    ASSERT_TRUE(EqualInlineCaches(inline_caches, loaded_hotness2, info));
   }
 }
 
@@ -919,9 +911,9 @@ TEST_F(ProfileCompilationInfoTest, UpdateProfileKeyOk) {
 
   // Verify that we find the methods when searched with the original dex files.
   for (const std::unique_ptr<const DexFile>& dex : dex_files) {
-    std::unique_ptr<ProfileCompilationInfo::OfflineProfileMethodInfo> loaded_pmi =
+    ProfileCompilationInfo::MethodHotness loaded_hotness =
         GetMethod(info, dex.get(), /* method_idx= */ 0);
-    ASSERT_TRUE(loaded_pmi != nullptr);
+    ASSERT_TRUE(loaded_hotness.IsHot());
   }
 
   // Release the ownership as this is held by the test class;
@@ -943,15 +935,15 @@ TEST_F(ProfileCompilationInfoTest, UpdateProfileKeyOkButNoUpdate) {
   // Verify that we did not perform any update and that we cannot find anything with the new
   // location.
   for (const std::unique_ptr<const DexFile>& dex : dex_files) {
-    std::unique_ptr<ProfileCompilationInfo::OfflineProfileMethodInfo> loaded_pmi =
+    ProfileCompilationInfo::MethodHotness loaded_hotness =
         GetMethod(info, dex.get(), /* method_idx= */ 0);
-    ASSERT_TRUE(loaded_pmi == nullptr);
+    ASSERT_FALSE(loaded_hotness.IsHot());
   }
 
   // Verify that we can find the original entry.
-  std::unique_ptr<ProfileCompilationInfo::OfflineProfileMethodInfo> loaded_pmi =
+  ProfileCompilationInfo::MethodHotness loaded_hotness =
         GetMethod(info, dex2, /* method_idx= */ 0);
-  ASSERT_TRUE(loaded_pmi != nullptr);
+  ASSERT_TRUE(loaded_hotness.IsHot());
 
   // Release the ownership as this is held by the test class;
   for (std::unique_ptr<const DexFile>& dex : dex_files) {
@@ -1009,64 +1001,62 @@ TEST_F(ProfileCompilationInfoTest, FilteredLoading) {
   ASSERT_TRUE(loaded_info.Load(GetFd(profile), true, filter_fn));
 
   // Verify that we filtered out locations during load.
+  ASSERT_EQ(2u, loaded_info.GetNumberOfDexFiles());
 
   // Dex location 2 and 4 should have been filtered out
   for (uint16_t method_idx = 0; method_idx < 10; method_idx++) {
-    ASSERT_TRUE(nullptr == GetMethod(loaded_info, dex2, method_idx));
-    ASSERT_TRUE(nullptr == GetMethod(loaded_info, dex4, method_idx));
+    ASSERT_FALSE(GetMethod(loaded_info, dex2, method_idx).IsHot());
+    ASSERT_FALSE(GetMethod(loaded_info, dex4, method_idx).IsHot());
   }
 
   // Dex location 1 should have all all the inline caches referencing dex location 2 set to
   // missing types.
   for (uint16_t method_idx = 0; method_idx < 10; method_idx++) {
     // The methods for dex location 1 should be in the profile data.
-    std::unique_ptr<ProfileCompilationInfo::OfflineProfileMethodInfo> loaded_pmi1 =
+    ProfileCompilationInfo::MethodHotness loaded_hotness1 =
         GetMethod(loaded_info, dex1, method_idx);
-    ASSERT_TRUE(loaded_pmi1 != nullptr);
+    ASSERT_TRUE(loaded_hotness1.IsHot());
 
     // Verify the inline cache.
     // Everything should be as constructed by GetTestInlineCaches with the exception
     // of the inline caches referring types from dex_location2.
     // These should be set to IsMissingType.
-    ProfileCompilationInfo::InlineCacheMap* ic_map = CreateInlineCacheMap();
+    std::vector<ProfileInlineCache> expected_ics;
 
     // Monomorphic types should remain the same as dex_location1 was kept.
     for (uint16_t dex_pc = 0; dex_pc < 11; dex_pc++) {
-      ProfileCompilationInfo::DexPcData dex_pc_data(allocator_.get());
-      dex_pc_data.AddClass(0, dex::TypeIndex(0));
-      ic_map->Put(dex_pc, dex_pc_data);
+      std::vector<TypeReference> types = {TypeReference(dex1, dex::TypeIndex(0))};
+      expected_ics.push_back(ProfileInlineCache(dex_pc, /*missing_types=*/ false, types));
     }
+
     // Polymorphic inline cache should have been transformed to IsMissingType due to
     // the removal of dex_location2.
     for (uint16_t dex_pc = 11; dex_pc < 22; dex_pc++) {
-      ProfileCompilationInfo::DexPcData dex_pc_data(allocator_.get());
-      dex_pc_data.SetIsMissingTypes();
-      ic_map->Put(dex_pc, dex_pc_data);
+      std::vector<TypeReference> types;
+      expected_ics.push_back(ProfileInlineCache(dex_pc, /*missing_types=*/ true, types));
     }
 
     // Megamorphic are not affected by removal of dex files.
     for (uint16_t dex_pc = 22; dex_pc < 33; dex_pc++) {
-      ProfileCompilationInfo::DexPcData dex_pc_data(allocator_.get());
-      dex_pc_data.SetIsMegamorphic();
-      ic_map->Put(dex_pc, dex_pc_data);
+      // We need 5 types to make the cache megamorphic.
+      // The `is_megamorphic` flag shall be `false`; it is not used for testing.
+      std::vector<TypeReference> types = {
+          TypeReference(dex1, dex::TypeIndex(0)),
+          TypeReference(dex1, dex::TypeIndex(1)),
+          TypeReference(dex1, dex::TypeIndex(2)),
+          TypeReference(dex1, dex::TypeIndex(3)),
+          TypeReference(dex1, dex::TypeIndex(4))};
+      expected_ics.push_back(ProfileInlineCache(dex_pc, /*missing_types=*/ false, types));
     }
+
     // Missing types are not affected be removal of dex files.
     for (uint16_t dex_pc = 33; dex_pc < 44; dex_pc++) {
-      ProfileCompilationInfo::DexPcData dex_pc_data(allocator_.get());
-      dex_pc_data.SetIsMissingTypes();
-      ic_map->Put(dex_pc, dex_pc_data);
+      std::vector<TypeReference> types;
+      expected_ics.push_back(ProfileInlineCache(dex_pc, /*missing_types=*/ true, types));
     }
 
-    ProfileCompilationInfo::OfflineProfileMethodInfo expected_pmi(ic_map);
-
-    // The dex references should not have  dex_location2 in the list.
-    expected_pmi.dex_references.emplace_back(
-        dex1->GetLocation(), dex1->GetLocationChecksum(), dex1->NumMethodIds());
-    expected_pmi.dex_references.emplace_back(
-        dex3->GetLocation(), dex3->GetLocationChecksum(), dex3->NumMethodIds());
-
     // Now check that we get back what we expect.
-    ASSERT_TRUE(*loaded_pmi1 == expected_pmi);
+    ASSERT_TRUE(EqualInlineCaches(expected_ics, loaded_hotness1, loaded_info));
   }
 }
 
@@ -1132,16 +1122,16 @@ TEST_F(ProfileCompilationInfoTest, FilteredLoadingKeepAll) {
   ASSERT_TRUE(loaded_info.Equals(saved_info));
 
   for (uint16_t method_idx = 0; method_idx < 10; method_idx++) {
-    std::unique_ptr<ProfileCompilationInfo::OfflineProfileMethodInfo> loaded_pmi1 =
+    ProfileCompilationInfo::MethodHotness loaded_hotness1 =
         GetMethod(loaded_info, dex1, method_idx);
-    ASSERT_TRUE(loaded_pmi1 != nullptr);
-    ASSERT_TRUE(*loaded_pmi1 == inline_caches);
+    ASSERT_TRUE(loaded_hotness1.IsHot());
+    ASSERT_TRUE(EqualInlineCaches(inline_caches, loaded_hotness1, loaded_info));
   }
   for (uint16_t method_idx = 0; method_idx < 10; method_idx++) {
-    std::unique_ptr<ProfileCompilationInfo::OfflineProfileMethodInfo> loaded_pmi2 =
+    ProfileCompilationInfo::MethodHotness loaded_hotness2 =
         GetMethod(loaded_info, dex4, method_idx);
-    ASSERT_TRUE(loaded_pmi2 != nullptr);
-    ASSERT_TRUE(*loaded_pmi2 == inline_caches);
+    ASSERT_TRUE(loaded_hotness2.IsHot());
+    ASSERT_TRUE(EqualInlineCaches(inline_caches, loaded_hotness2, loaded_info));
   }
 }
 
@@ -1414,14 +1404,13 @@ TEST_F(ProfileCompilationInfoTest, AddMethodsProfileMethodInfoInlineCaches) {
   info.AddMethod(ProfileMethodInfo(startup, inline_caches), Hotness::kFlagStartup);
 
   // Check the hot method's inline cache.
-  std::unique_ptr<ProfileCompilationInfo::OfflineProfileMethodInfo> hot_pmi =
-      GetMethod(info, dex1, hot.index);
-  ASSERT_TRUE(hot_pmi != nullptr);
-  ASSERT_EQ(hot_pmi->inline_caches->size(), 1u);
-  ASSERT_TRUE(hot_pmi->inline_caches->Get(0).is_missing_types);
+  ProfileCompilationInfo::MethodHotness hot_hotness = GetMethod(info, dex1, hot.index);
+  ASSERT_TRUE(hot_hotness.IsHot());
+  ASSERT_EQ(hot_hotness.GetInlineCacheMap()->size(), 1u);
+  ASSERT_TRUE(hot_hotness.GetInlineCacheMap()->Get(0).is_missing_types);
 
   // Check there's no inline caches for the startup method.
-  ASSERT_TRUE(GetMethod(info, dex1, startup.index) == nullptr);
+  ASSERT_FALSE(GetMethod(info, dex1, startup.index).IsHot());
 }
 
 // Verifies that we correctly add methods to the profile according to their flags.
@@ -1453,37 +1442,37 @@ TEST_F(ProfileCompilationInfoTest, AddAnnotationsToMethods) {
     // Check that all methods are in.
     for (uint16_t i = 0; i < 10; i++) {
       EXPECT_TRUE(info.GetMethodHotness(MethodReference(dex1, i), psa1).IsInProfile());
-      EXPECT_TRUE(info.GetHotMethodInfo(MethodReference(dex1, i), psa1) != nullptr);
+      EXPECT_TRUE(info.GetMethodHotness(MethodReference(dex1, i), psa1).IsHot());
     }
     for (uint16_t i = 5; i < 15; i++) {
       EXPECT_TRUE(info.GetMethodHotness(MethodReference(dex1, i), psa2).IsInProfile());
-      EXPECT_TRUE(info.GetHotMethodInfo(MethodReference(dex1, i), psa2) != nullptr);
+      EXPECT_TRUE(info.GetMethodHotness(MethodReference(dex1, i), psa2).IsHot());
     }
     // Check that the non-overlapping methods are not added with a wrong annotation.
     for (uint16_t i = 10; i < 15; i++) {
       EXPECT_FALSE(info.GetMethodHotness(MethodReference(dex1, i), psa1).IsInProfile());
-      EXPECT_FALSE(info.GetHotMethodInfo(MethodReference(dex1, i), psa1) != nullptr);
+      EXPECT_FALSE(info.GetMethodHotness(MethodReference(dex1, i), psa1).IsHot());
     }
     for (uint16_t i = 0; i < 5; i++) {
       EXPECT_FALSE(info.GetMethodHotness(MethodReference(dex1, i), psa2).IsInProfile());
-      EXPECT_FALSE(info.GetHotMethodInfo(MethodReference(dex1, i), psa2) != nullptr);
+      EXPECT_FALSE(info.GetMethodHotness(MethodReference(dex1, i), psa2).IsHot());
     }
     // Check that when querying without an annotation only the first one is searched.
     for (uint16_t i = 0; i < 10; i++) {
       EXPECT_TRUE(info.GetMethodHotness(MethodReference(dex1, i)).IsInProfile());
-      EXPECT_TRUE(info.GetHotMethodInfo(MethodReference(dex1, i)) != nullptr);
+      EXPECT_TRUE(info.GetMethodHotness(MethodReference(dex1, i)).IsHot());
     }
     // ... this should be false because they belong the second appearance of dex1.
     for (uint16_t i = 10; i < 15; i++) {
       EXPECT_FALSE(info.GetMethodHotness(MethodReference(dex1, i)).IsInProfile());
-      EXPECT_FALSE(info.GetHotMethodInfo(MethodReference(dex1, i)) != nullptr);
+      EXPECT_FALSE(info.GetMethodHotness(MethodReference(dex1, i)).IsHot());
     }
 
     // Check that the methods cannot be found with a non existing annotation.
     MethodReference ref(dex1, 0);
-    ProfileSampleAnnotation not_exisiting("A");
-    EXPECT_FALSE(info.GetMethodHotness(ref, not_exisiting).IsInProfile());
-    EXPECT_FALSE(info.GetHotMethodInfo(ref, not_exisiting) != nullptr);
+    ProfileSampleAnnotation not_existing("A");
+    EXPECT_FALSE(info.GetMethodHotness(ref, not_existing).IsInProfile());
+    EXPECT_FALSE(info.GetMethodHotness(ref, not_existing).IsHot());
   };
 
   // Run the test before save.
@@ -1653,9 +1642,9 @@ TEST_F(ProfileCompilationInfoTest, MergeWithInlineCaches) {
   for (uint16_t i = 0; i < 10; i++) {
     EXPECT_TRUE(info_12.GetMethodHotness(MethodReference(dex1, i), psa1).IsInProfile());
     EXPECT_TRUE(info_12.ContainsClass(*dex1, dex::TypeIndex(i), psa1));
-    std::unique_ptr<ProfileCompilationInfo::OfflineProfileMethodInfo> loaded_ic_12 =
+    ProfileCompilationInfo::MethodHotness loaded_ic_12 =
         GetMethod(info_12, dex1, /* method_idx= */ i);
-    ASSERT_TRUE(loaded_ic_12 != nullptr);
+    ASSERT_TRUE(loaded_ic_12.IsHot());
     std::vector<TypeReference> cls_pc12;
     cls_pc12.resize(dex1_type_12.size() + dex2_type_48.size(),
                     TypeReference(nullptr, dex::TypeIndex(-1)));
@@ -1674,9 +1663,8 @@ TEST_F(ProfileCompilationInfoTest, MergeWithInlineCaches) {
                                                       /* pc= */ 15,
                                                       /* missing_types= */ false,
                                                       /* profile_classes= */ cls_pc15) };
-    EXPECT_EQ(loaded_ic_12->dex_references.size(), 2u);
-    EXPECT_EQ(loaded_ic_12->inline_caches->size(), expected.size());
-    EXPECT_TRUE(*loaded_ic_12 == expected) << i;
+    EXPECT_EQ(loaded_ic_12.GetInlineCacheMap()->size(), expected.size());
+    EXPECT_TRUE(EqualInlineCaches(expected, loaded_ic_12, info_12)) << i;
   }
 }
 

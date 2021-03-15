@@ -1614,28 +1614,6 @@ ProfileCompilationInfo::MethodHotness ProfileCompilationInfo::GetMethodHotness(
       : MethodHotness();
 }
 
-std::unique_ptr<ProfileCompilationInfo::OfflineProfileMethodInfo>
-ProfileCompilationInfo::GetHotMethodInfo(const MethodReference& method_ref,
-                                         const ProfileSampleAnnotation& annotation) const {
-  MethodHotness hotness(GetMethodHotness(method_ref, annotation));
-  if (!hotness.IsHot()) {
-    return nullptr;
-  }
-  const InlineCacheMap* inline_caches = hotness.GetInlineCacheMap();
-  DCHECK(inline_caches != nullptr);
-  std::unique_ptr<OfflineProfileMethodInfo> pmi(new OfflineProfileMethodInfo(inline_caches));
-
-  pmi->dex_references.resize(info_.size());
-  for (const DexFileData* dex_data : info_) {
-    pmi->dex_references[dex_data->profile_index].profile_key = dex_data->profile_key;
-    pmi->dex_references[dex_data->profile_index].dex_checksum = dex_data->checksum;
-    pmi->dex_references[dex_data->profile_index].num_method_ids = dex_data->num_method_ids;
-  }
-
-  return pmi;
-}
-
-
 bool ProfileCompilationInfo::ContainsClass(const DexFile& dex_file,
                                            dex::TypeIndex type_idx,
                                            const ProfileSampleAnnotation& annotation) const {
@@ -1906,111 +1884,6 @@ bool ProfileCompilationInfo::GenerateTestProfile(
   return info.Save(fd);
 }
 
-bool ProfileCompilationInfo::OfflineProfileMethodInfo::operator==(
-      const OfflineProfileMethodInfo& other) const {
-  if (inline_caches->size() != other.inline_caches->size()) {
-    return false;
-  }
-
-  // We can't use a simple equality test because we need to match the dex files
-  // of the inline caches which might have different profile indexes.
-  for (const auto& inline_cache_it : *inline_caches) {
-    uint16_t dex_pc = inline_cache_it.first;
-    const DexPcData dex_pc_data = inline_cache_it.second;
-    const auto& other_it = other.inline_caches->find(dex_pc);
-    if (other_it == other.inline_caches->end()) {
-      return false;
-    }
-    const DexPcData& other_dex_pc_data = other_it->second;
-    if (dex_pc_data.is_megamorphic != other_dex_pc_data.is_megamorphic ||
-        dex_pc_data.is_missing_types != other_dex_pc_data.is_missing_types) {
-      return false;
-    }
-    for (const ClassReference& class_ref : dex_pc_data.classes) {
-      bool found = false;
-      for (const ClassReference& other_class_ref : other_dex_pc_data.classes) {
-        CHECK_LE(class_ref.dex_profile_index, dex_references.size());
-        CHECK_LE(other_class_ref.dex_profile_index, other.dex_references.size());
-        const DexReference& dex_ref = dex_references[class_ref.dex_profile_index];
-        const DexReference& other_dex_ref = other.dex_references[other_class_ref.dex_profile_index];
-        if (class_ref.type_index == other_class_ref.type_index &&
-            dex_ref == other_dex_ref) {
-          found = true;
-          break;
-        }
-      }
-      if (!found) {
-        return false;
-      }
-    }
-  }
-  return true;
-}
-
-bool ProfileCompilationInfo::OfflineProfileMethodInfo::operator==(
-      const std::vector<ProfileMethodInfo::ProfileInlineCache>& runtime_caches) const {
-  if (inline_caches->size() != runtime_caches.size()) {
-    return false;
-  }
-
-  for (const auto& inline_cache_it : *inline_caches) {
-    uint16_t dex_pc = inline_cache_it.first;
-    const DexPcData dex_pc_data = inline_cache_it.second;
-
-    // Find the corresponding inline cahce.
-    const ProfileMethodInfo::ProfileInlineCache* runtime_cache = nullptr;
-    for (const ProfileMethodInfo::ProfileInlineCache& pic : runtime_caches) {
-      if (pic.dex_pc == dex_pc) {
-        runtime_cache = &pic;
-        break;
-      }
-    }
-    // If not found, returnb false.
-    if (runtime_cache == nullptr) {
-      return false;
-    }
-    // Check that the inline cache properties match up.
-    if (dex_pc_data.is_missing_types) {
-      if (!runtime_cache->is_missing_types) {
-        return false;
-      } else {
-        // If the inline cache is megamorphic do not check the classes (they don't matter).
-        continue;
-      }
-    }
-
-    if (dex_pc_data.is_megamorphic) {
-      if (runtime_cache->classes.size() < ProfileCompilationInfo::kIndividualInlineCacheSize) {
-        return false;
-      } else {
-        // If the inline cache is megamorphic do not check the classes (they don't matter).
-        continue;
-      }
-    }
-
-    if (dex_pc_data.classes.size() != runtime_cache->classes.size()) {
-      return false;
-    }
-    // Verify that all classes matches.
-    for (const ClassReference& class_ref : dex_pc_data.classes) {
-      bool found = false;
-      const DexReference& dex_ref = dex_references[class_ref.dex_profile_index];
-      for (const TypeReference& type_ref : runtime_cache->classes) {
-        if (class_ref.type_index == type_ref.TypeIndex() &&
-            dex_ref.MatchesDex(type_ref.dex_file)) {
-          found = true;
-          break;
-        }
-      }
-      if (!found) {
-        return false;
-      }
-    }
-  }
-  // If we didn't fail until now, then the two inline caches are equal.
-  return true;
-}
-
 bool ProfileCompilationInfo::IsEmpty() const {
   DCHECK_EQ(info_.empty(), profile_key_map_.empty());
   return info_.empty();
@@ -2251,10 +2124,10 @@ size_t ProfileCompilationInfo::GetSizeErrorThresholdBytes() const {
 }
 
 std::ostream& operator<<(std::ostream& stream,
-                         const ProfileCompilationInfo::DexReference& dex_ref) {
-  stream << "[profile_key=" << dex_ref.profile_key
-         << ",dex_checksum=" << std::hex << dex_ref.dex_checksum << std::dec
-         << ",num_method_ids=" << dex_ref.num_method_ids
+                         ProfileCompilationInfo::DexReferenceDumper dumper) {
+  stream << "[profile_key=" << dumper.GetProfileKey()
+         << ",dex_checksum=" << std::hex << dumper.GetDexChecksum() << std::dec
+         << ",num_method_ids=" << dumper.GetNumMethodIds()
          << "]";
   return stream;
 }
