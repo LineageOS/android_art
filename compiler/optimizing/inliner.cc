@@ -1327,6 +1327,13 @@ bool HInliner::TryInlineAndReplace(HInvoke* invoke_instruction,
         return false;
       }
 
+      if (method->IsDefault() && method->IsDefaultConflicting()) {
+        // Changing to invoke-virtual cannot be done on default conflict method
+        // since it's not in any vtable.
+        DCHECK(cha_devirtualize);
+        return false;
+      }
+
       uint32_t dex_method_index = FindMethodIndexIn(
           method,
           *invoke_instruction->GetMethodReference().dex_file,
