@@ -3838,6 +3838,17 @@ void ClassLinker::LoadMethod(const DexFile& dex_file,
     } else {
       dst->SetCodeItem(dst->GetDexFile()->GetCodeItem(method.GetCodeItemOffset()));
     }
+    bool has_all_references = true;
+    const char* shorty = dst->GetShorty();
+    for (size_t i = 1, e = strlen(shorty); i < e; ++i) {
+      if (shorty[i] != 'L') {
+        has_all_references = false;
+        break;
+      }
+    }
+    if (has_all_references) {
+      dst->SetNterpEntryPointFastPathFlag();
+    }
   } else {
     dst->SetDataPtrSize(nullptr, image_pointer_size_);
     DCHECK_EQ(method.GetCodeItemOffset(), 0u);
