@@ -65,7 +65,7 @@ class OatDumpTest : public CommonRuntimeTest {
   }
 
   // Linking flavor.
-  enum Flavor {
+  enum class Flavor {
     kDynamic,  // oatdump(d), dex2oat(d)
     kStatic,   // oatdump(d)s, dex2oat(d)s
   };
@@ -86,7 +86,7 @@ class OatDumpTest : public CommonRuntimeTest {
   }
 
   std::string GetExecutableFilePath(Flavor flavor, const char* name, bool bitness) {
-    return GetExecutableFilePath(name, kIsDebugBuild, flavor == kStatic, bitness);
+    return GetExecutableFilePath(name, kIsDebugBuild, flavor == Flavor::kStatic, bitness);
   }
 
   enum Mode {

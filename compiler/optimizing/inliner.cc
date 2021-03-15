@@ -673,63 +673,57 @@ HInliner::InlineCacheType HInliner::GetInlineCacheAOT(
     return kInlineCacheNoData;
   }
 
-  std::unique_ptr<ProfileCompilationInfo::OfflineProfileMethodInfo> offline_profile =
-      pci->GetHotMethodInfo(MethodReference(
-          caller_compilation_unit_.GetDexFile(), caller_compilation_unit_.GetDexMethodIndex()));
-  if (offline_profile == nullptr) {
+  ProfileCompilationInfo::MethodHotness hotness = pci->GetMethodHotness(MethodReference(
+      caller_compilation_unit_.GetDexFile(), caller_compilation_unit_.GetDexMethodIndex()));
+  if (!hotness.IsHot()) {
     return kInlineCacheNoData;  // no profile information for this invocation.
   }
 
-  *inline_cache = AllocateInlineCacheHolder(caller_compilation_unit_, hs);
-  if (inline_cache == nullptr) {
-    // We can't extract any data if we failed to allocate;
-    return kInlineCacheNoData;
-  } else {
-    return ExtractClassesFromOfflineProfile(invoke_instruction,
-                                            *(offline_profile.get()),
-                                            *inline_cache);
-  }
-}
-
-HInliner::InlineCacheType HInliner::ExtractClassesFromOfflineProfile(
-    const HInvoke* invoke_instruction,
-    const ProfileCompilationInfo::OfflineProfileMethodInfo& offline_profile,
-    /*out*/Handle<mirror::ObjectArray<mirror::Class>> inline_cache)
-    REQUIRES_SHARED(Locks::mutator_lock_) {
-  const auto it = offline_profile.inline_caches->find(invoke_instruction->GetDexPc());
-  if (it == offline_profile.inline_caches->end()) {
+  const ProfileCompilationInfo::InlineCacheMap* inline_caches = hotness.GetInlineCacheMap();
+  DCHECK(inline_caches != nullptr);
+  const auto it = inline_caches->find(invoke_instruction->GetDexPc());
+  if (it == inline_caches->end()) {
     return kInlineCacheUninitialized;
   }
 
   const ProfileCompilationInfo::DexPcData& dex_pc_data = it->second;
-
   if (dex_pc_data.is_missing_types) {
     return kInlineCacheMissingTypes;
   }
   if (dex_pc_data.is_megamorphic) {
     return kInlineCacheMegamorphic;
   }
-
   DCHECK_LE(dex_pc_data.classes.size(), InlineCache::kIndividualCacheSize);
+
+  Handle<mirror::ObjectArray<mirror::Class>> ic =
+      AllocateInlineCacheHolder(caller_compilation_unit_, hs);
+  if (ic == nullptr) {
+    // We can't extract any data if we failed to allocate;
+    return kInlineCacheNoData;
+  }
+
   Thread* self = Thread::Current();
   // We need to resolve the class relative to the containing dex file.
   // So first, build a mapping from the index of dex file in the profile to
   // its dex cache. This will avoid repeating the lookup when walking over
   // the inline cache types.
-  std::vector<ObjPtr<mirror::DexCache>> dex_profile_index_to_dex_cache(
-        offline_profile.dex_references.size());
-  for (size_t i = 0; i < offline_profile.dex_references.size(); i++) {
-    bool found = false;
-    for (const DexFile* dex_file : codegen_->GetCompilerOptions().GetDexFilesForOatFile()) {
-      if (offline_profile.dex_references[i].MatchesDex(dex_file)) {
-        dex_profile_index_to_dex_cache[i] =
-            caller_compilation_unit_.GetClassLinker()->FindDexCache(self, *dex_file);
-        found = true;
+  ScopedArenaAllocator allocator(graph_->GetArenaStack());
+  ScopedArenaVector<ObjPtr<mirror::DexCache>> dex_profile_index_to_dex_cache(
+        pci->GetNumberOfDexFiles(), nullptr, allocator.Adapter(kArenaAllocMisc));
+  const std::vector<const DexFile*>& dex_files =
+      codegen_->GetCompilerOptions().GetDexFilesForOatFile();
+  for (const ProfileCompilationInfo::ClassReference& class_ref : dex_pc_data.classes) {
+    if (dex_profile_index_to_dex_cache[class_ref.dex_profile_index] == nullptr) {
+      ProfileCompilationInfo::ProfileIndexType profile_index = class_ref.dex_profile_index;
+      const DexFile* dex_file = pci->FindDexFileForProfileIndex(profile_index, dex_files);
+      if (dex_file == nullptr) {
+        VLOG(compiler) << "Could not find profiled dex file: "
+            << pci->DumpDexReference(profile_index);
+        return kInlineCacheMissingTypes;
       }
-    }
-    if (!found) {
-      VLOG(compiler) << "Could not find profiled dex file: " << offline_profile.dex_references[i];
-      return kInlineCacheMissingTypes;
+      dex_profile_index_to_dex_cache[class_ref.dex_profile_index] =
+          caller_compilation_unit_.GetClassLinker()->FindDexCache(self, *dex_file);
+      DCHECK(dex_profile_index_to_dex_cache[class_ref.dex_profile_index] != nullptr);
     }
   }
 
@@ -751,7 +745,7 @@ HInliner::InlineCacheType HInliner::ExtractClassesFromOfflineProfile(
           dex_cache,
           caller_compilation_unit_.GetClassLoader().Get());
     if (clazz != nullptr) {
-      inline_cache->Set(ic_index++, clazz);
+      ic->Set(ic_index++, clazz);
     } else {
       VLOG(compiler) << "Could not resolve class from inline cache in AOT mode "
           << invoke_instruction->GetMethodReference().PrettyMethod()
@@ -761,7 +755,9 @@ HInliner::InlineCacheType HInliner::ExtractClassesFromOfflineProfile(
       return kInlineCacheMissingTypes;
     }
   }
-  return GetInlineCacheType(inline_cache);
+
+  *inline_cache = ic;
+  return GetInlineCacheType(ic);
 }
 
 HInstanceFieldGet* HInliner::BuildGetReceiverClass(ClassLinker* class_linker,
