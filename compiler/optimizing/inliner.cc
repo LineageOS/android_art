@@ -321,15 +321,9 @@ static dex::TypeIndex FindClassIndexIn(ObjPtr<mirror::Class> cls,
 }
 
 HInliner::InlineCacheType HInliner::GetInlineCacheType(
-    const Handle<mirror::ObjectArray<mirror::Class>>& classes)
-  REQUIRES_SHARED(Locks::mutator_lock_) {
-  uint8_t number_of_types = 0;
-  for (; number_of_types < InlineCache::kIndividualCacheSize; ++number_of_types) {
-    if (classes->Get(number_of_types) == nullptr) {
-      break;
-    }
-  }
-
+    const StackHandleScope<InlineCache::kIndividualCacheSize>& classes) {
+  DCHECK_EQ(classes.NumberOfReferences(), InlineCache::kIndividualCacheSize);
+  uint8_t number_of_types = InlineCache::kIndividualCacheSize - classes.RemainingSlots();
   if (number_of_types == 0) {
     return kInlineCacheUninitialized;
   } else if (number_of_types == 1) {
@@ -341,10 +335,11 @@ HInliner::InlineCacheType HInliner::GetInlineCacheType(
   }
 }
 
-static ObjPtr<mirror::Class> GetMonomorphicType(Handle<mirror::ObjectArray<mirror::Class>> classes)
+static inline ObjPtr<mirror::Class> GetMonomorphicType(
+    const StackHandleScope<InlineCache::kIndividualCacheSize>& classes)
     REQUIRES_SHARED(Locks::mutator_lock_) {
-  DCHECK(classes->Get(0) != nullptr);
-  return classes->Get(0);
+  DCHECK(classes.GetReference(0) != nullptr);
+  return classes.GetReference(0)->AsClass();
 }
 
 ArtMethod* HInliner::TryCHADevirtualization(ArtMethod* resolved_method) {
@@ -522,26 +517,6 @@ bool HInliner::TryInline(HInvoke* invoke_instruction) {
   return result;
 }
 
-static Handle<mirror::ObjectArray<mirror::Class>> AllocateInlineCacheHolder(
-    const DexCompilationUnit& compilation_unit,
-    StackHandleScope<1>* hs)
-    REQUIRES_SHARED(Locks::mutator_lock_) {
-  Thread* self = Thread::Current();
-  ClassLinker* class_linker = compilation_unit.GetClassLinker();
-  Handle<mirror::ObjectArray<mirror::Class>> inline_cache = hs->NewHandle(
-      mirror::ObjectArray<mirror::Class>::Alloc(
-          self,
-          GetClassRoot<mirror::ObjectArray<mirror::Class>>(class_linker),
-          InlineCache::kIndividualCacheSize));
-  if (inline_cache == nullptr) {
-    // We got an OOME. Just clear the exception, and don't inline.
-    DCHECK(self->IsExceptionPending());
-    self->ClearException();
-    VLOG(compiler) << "Out of memory in the compiler when trying to inline";
-  }
-  return inline_cache;
-}
-
 bool HInliner::UseOnlyPolymorphicInliningWithNoDeopt() {
   // If we are compiling AOT or OSR, pretend the call using inline caches is polymorphic and
   // do not generate a deopt.
@@ -575,14 +550,13 @@ bool HInliner::TryInlineFromInlineCache(HInvoke* invoke_instruction)
     return false;
   }
 
-  StackHandleScope<1> hs(Thread::Current());
-  Handle<mirror::ObjectArray<mirror::Class>> inline_cache;
+  StackHandleScope<InlineCache::kIndividualCacheSize> classes(Thread::Current());
   // The Zygote JIT compiles based on a profile, so we shouldn't use runtime inline caches
   // for it.
   InlineCacheType inline_cache_type =
       (Runtime::Current()->IsAotCompiler() || Runtime::Current()->IsZygote())
-          ? GetInlineCacheAOT(invoke_instruction, &hs, &inline_cache)
-          : GetInlineCacheJIT(invoke_instruction, &hs, &inline_cache);
+          ? GetInlineCacheAOT(invoke_instruction, &classes)
+          : GetInlineCacheJIT(invoke_instruction, &classes);
 
   switch (inline_cache_type) {
     case kInlineCacheNoData: {
@@ -603,15 +577,15 @@ bool HInliner::TryInlineFromInlineCache(HInvoke* invoke_instruction)
     case kInlineCacheMonomorphic: {
       MaybeRecordStat(stats_, MethodCompilationStat::kMonomorphicCall);
       if (UseOnlyPolymorphicInliningWithNoDeopt()) {
-        return TryInlinePolymorphicCall(invoke_instruction, inline_cache);
+        return TryInlinePolymorphicCall(invoke_instruction, classes);
       } else {
-        return TryInlineMonomorphicCall(invoke_instruction, inline_cache);
+        return TryInlineMonomorphicCall(invoke_instruction, classes);
       }
     }
 
     case kInlineCachePolymorphic: {
       MaybeRecordStat(stats_, MethodCompilationStat::kPolymorphicCall);
-      return TryInlinePolymorphicCall(invoke_instruction, inline_cache);
+      return TryInlinePolymorphicCall(invoke_instruction, classes);
     }
 
     case kInlineCacheMegamorphic: {
@@ -636,9 +610,7 @@ bool HInliner::TryInlineFromInlineCache(HInvoke* invoke_instruction)
 
 HInliner::InlineCacheType HInliner::GetInlineCacheJIT(
     HInvoke* invoke_instruction,
-    StackHandleScope<1>* hs,
-    /*out*/Handle<mirror::ObjectArray<mirror::Class>>* inline_cache)
-    REQUIRES_SHARED(Locks::mutator_lock_) {
+    /*out*/StackHandleScope<InlineCache::kIndividualCacheSize>* classes) {
   DCHECK(codegen_->GetCompilerOptions().IsJitCompiler());
 
   ArtMethod* caller = graph_->GetArtMethod();
@@ -651,91 +623,72 @@ HInliner::InlineCacheType HInliner::GetInlineCacheJIT(
     return kInlineCacheNoData;
   }
 
-  *inline_cache = AllocateInlineCacheHolder(caller_compilation_unit_, hs);
-  if (inline_cache->Get() == nullptr) {
-    // We can't extract any data if we failed to allocate;
-    return kInlineCacheNoData;
-  } else {
-    Runtime::Current()->GetJit()->GetCodeCache()->CopyInlineCacheInto(
-        *profiling_info->GetInlineCache(invoke_instruction->GetDexPc()),
-        *inline_cache);
-    return GetInlineCacheType(*inline_cache);
-  }
+  Runtime::Current()->GetJit()->GetCodeCache()->CopyInlineCacheInto(
+      *profiling_info->GetInlineCache(invoke_instruction->GetDexPc()),
+      classes);
+  return GetInlineCacheType(*classes);
 }
 
 HInliner::InlineCacheType HInliner::GetInlineCacheAOT(
     HInvoke* invoke_instruction,
-    StackHandleScope<1>* hs,
-    /*out*/Handle<mirror::ObjectArray<mirror::Class>>* inline_cache)
-    REQUIRES_SHARED(Locks::mutator_lock_) {
+    /*out*/StackHandleScope<InlineCache::kIndividualCacheSize>* classes) {
+  DCHECK_EQ(classes->NumberOfReferences(), InlineCache::kIndividualCacheSize);
+  DCHECK_EQ(classes->RemainingSlots(), InlineCache::kIndividualCacheSize);
+
   const ProfileCompilationInfo* pci = codegen_->GetCompilerOptions().GetProfileCompilationInfo();
   if (pci == nullptr) {
     return kInlineCacheNoData;
   }
 
-  std::unique_ptr<ProfileCompilationInfo::OfflineProfileMethodInfo> offline_profile =
-      pci->GetHotMethodInfo(MethodReference(
-          caller_compilation_unit_.GetDexFile(), caller_compilation_unit_.GetDexMethodIndex()));
-  if (offline_profile == nullptr) {
+  ProfileCompilationInfo::MethodHotness hotness = pci->GetMethodHotness(MethodReference(
+      caller_compilation_unit_.GetDexFile(), caller_compilation_unit_.GetDexMethodIndex()));
+  if (!hotness.IsHot()) {
     return kInlineCacheNoData;  // no profile information for this invocation.
   }
 
-  *inline_cache = AllocateInlineCacheHolder(caller_compilation_unit_, hs);
-  if (inline_cache == nullptr) {
-    // We can't extract any data if we failed to allocate;
-    return kInlineCacheNoData;
-  } else {
-    return ExtractClassesFromOfflineProfile(invoke_instruction,
-                                            *(offline_profile.get()),
-                                            *inline_cache);
-  }
-}
-
-HInliner::InlineCacheType HInliner::ExtractClassesFromOfflineProfile(
-    const HInvoke* invoke_instruction,
-    const ProfileCompilationInfo::OfflineProfileMethodInfo& offline_profile,
-    /*out*/Handle<mirror::ObjectArray<mirror::Class>> inline_cache)
-    REQUIRES_SHARED(Locks::mutator_lock_) {
-  const auto it = offline_profile.inline_caches->find(invoke_instruction->GetDexPc());
-  if (it == offline_profile.inline_caches->end()) {
+  const ProfileCompilationInfo::InlineCacheMap* inline_caches = hotness.GetInlineCacheMap();
+  DCHECK(inline_caches != nullptr);
+  const auto it = inline_caches->find(invoke_instruction->GetDexPc());
+  if (it == inline_caches->end()) {
     return kInlineCacheUninitialized;
   }
 
   const ProfileCompilationInfo::DexPcData& dex_pc_data = it->second;
-
   if (dex_pc_data.is_missing_types) {
     return kInlineCacheMissingTypes;
   }
   if (dex_pc_data.is_megamorphic) {
     return kInlineCacheMegamorphic;
   }
-
   DCHECK_LE(dex_pc_data.classes.size(), InlineCache::kIndividualCacheSize);
+
   Thread* self = Thread::Current();
   // We need to resolve the class relative to the containing dex file.
   // So first, build a mapping from the index of dex file in the profile to
   // its dex cache. This will avoid repeating the lookup when walking over
   // the inline cache types.
-  std::vector<ObjPtr<mirror::DexCache>> dex_profile_index_to_dex_cache(
-        offline_profile.dex_references.size());
-  for (size_t i = 0; i < offline_profile.dex_references.size(); i++) {
-    bool found = false;
-    for (const DexFile* dex_file : codegen_->GetCompilerOptions().GetDexFilesForOatFile()) {
-      if (offline_profile.dex_references[i].MatchesDex(dex_file)) {
-        dex_profile_index_to_dex_cache[i] =
-            caller_compilation_unit_.GetClassLinker()->FindDexCache(self, *dex_file);
-        found = true;
+  ScopedArenaAllocator allocator(graph_->GetArenaStack());
+  ScopedArenaVector<ObjPtr<mirror::DexCache>> dex_profile_index_to_dex_cache(
+        pci->GetNumberOfDexFiles(), nullptr, allocator.Adapter(kArenaAllocMisc));
+  const std::vector<const DexFile*>& dex_files =
+      codegen_->GetCompilerOptions().GetDexFilesForOatFile();
+  for (const ProfileCompilationInfo::ClassReference& class_ref : dex_pc_data.classes) {
+    if (dex_profile_index_to_dex_cache[class_ref.dex_profile_index] == nullptr) {
+      ProfileCompilationInfo::ProfileIndexType profile_index = class_ref.dex_profile_index;
+      const DexFile* dex_file = pci->FindDexFileForProfileIndex(profile_index, dex_files);
+      if (dex_file == nullptr) {
+        VLOG(compiler) << "Could not find profiled dex file: "
+            << pci->DumpDexReference(profile_index);
+        return kInlineCacheMissingTypes;
       }
-    }
-    if (!found) {
-      VLOG(compiler) << "Could not find profiled dex file: " << offline_profile.dex_references[i];
-      return kInlineCacheMissingTypes;
+      dex_profile_index_to_dex_cache[class_ref.dex_profile_index] =
+          caller_compilation_unit_.GetClassLinker()->FindDexCache(self, *dex_file);
+      DCHECK(dex_profile_index_to_dex_cache[class_ref.dex_profile_index] != nullptr);
     }
   }
 
   // Walk over the classes and resolve them. If we cannot find a type we return
   // kInlineCacheMissingTypes.
-  int ic_index = 0;
   for (const ProfileCompilationInfo::ClassReference& class_ref : dex_pc_data.classes) {
     ObjPtr<mirror::DexCache> dex_cache =
         dex_profile_index_to_dex_cache[class_ref.dex_profile_index];
@@ -751,7 +704,8 @@ HInliner::InlineCacheType HInliner::ExtractClassesFromOfflineProfile(
           dex_cache,
           caller_compilation_unit_.GetClassLoader().Get());
     if (clazz != nullptr) {
-      inline_cache->Set(ic_index++, clazz);
+      DCHECK_NE(classes->RemainingSlots(), 0u);
+      classes->NewHandle(clazz);
     } else {
       VLOG(compiler) << "Could not resolve class from inline cache in AOT mode "
           << invoke_instruction->GetMethodReference().PrettyMethod()
@@ -761,7 +715,8 @@ HInliner::InlineCacheType HInliner::ExtractClassesFromOfflineProfile(
       return kInlineCacheMissingTypes;
     }
   }
-  return GetInlineCacheType(inline_cache);
+
+  return GetInlineCacheType(*classes);
 }
 
 HInstanceFieldGet* HInliner::BuildGetReceiverClass(ClassLinker* class_linker,
@@ -810,8 +765,9 @@ static ArtMethod* ResolveMethodFromInlineCache(Handle<mirror::Class> klass,
   return resolved_method;
 }
 
-bool HInliner::TryInlineMonomorphicCall(HInvoke* invoke_instruction,
-                                        Handle<mirror::ObjectArray<mirror::Class>> classes) {
+bool HInliner::TryInlineMonomorphicCall(
+    HInvoke* invoke_instruction,
+    const StackHandleScope<InlineCache::kIndividualCacheSize>& classes) {
   DCHECK(invoke_instruction->IsInvokeVirtual() || invoke_instruction->IsInvokeInterface())
       << invoke_instruction->DebugName();
 
@@ -831,14 +787,13 @@ bool HInliner::TryInlineMonomorphicCall(HInvoke* invoke_instruction,
       graph_->GetHandleCache()->NewHandle(GetMonomorphicType(classes));
   ArtMethod* resolved_method = ResolveMethodFromInlineCache(
       monomorphic_type, invoke_instruction, pointer_size);
-
   if (resolved_method == nullptr) {
     // Bogus AOT profile, bail.
     DCHECK(Runtime::Current()->IsAotCompiler());
     return false;
   }
-  LOG_NOTE() << "Try inline monomorphic call to " << resolved_method->PrettyMethod();
 
+  LOG_NOTE() << "Try inline monomorphic call to " << resolved_method->PrettyMethod();
   HInstruction* receiver = invoke_instruction->InputAt(0);
   HInstruction* cursor = invoke_instruction->GetPrevious();
   HBasicBlock* bb_cursor = invoke_instruction->GetBlock();
@@ -970,8 +925,9 @@ HInstruction* HInliner::AddTypeGuard(HInstruction* receiver,
   return compare;
 }
 
-bool HInliner::TryInlinePolymorphicCall(HInvoke* invoke_instruction,
-                                        Handle<mirror::ObjectArray<mirror::Class>> classes) {
+bool HInliner::TryInlinePolymorphicCall(
+    HInvoke* invoke_instruction,
+    const StackHandleScope<InlineCache::kIndividualCacheSize>& classes) {
   DCHECK(invoke_instruction->IsInvokeVirtual() || invoke_instruction->IsInvokeInterface())
       << invoke_instruction->DebugName();
 
@@ -984,14 +940,13 @@ bool HInliner::TryInlinePolymorphicCall(HInvoke* invoke_instruction,
 
   bool all_targets_inlined = true;
   bool one_target_inlined = false;
-  for (size_t i = 0; i < InlineCache::kIndividualCacheSize; ++i) {
-    if (classes->Get(i) == nullptr) {
-      break;
-    }
-    ArtMethod* method = nullptr;
-
-    Handle<mirror::Class> handle = graph_->GetHandleCache()->NewHandle(classes->Get(i));
-    method = ResolveMethodFromInlineCache(handle, invoke_instruction, pointer_size);
+  DCHECK_EQ(classes.NumberOfReferences(), InlineCache::kIndividualCacheSize);
+  uint8_t number_of_types = InlineCache::kIndividualCacheSize - classes.RemainingSlots();
+  for (size_t i = 0; i != number_of_types; ++i) {
+    DCHECK(classes.GetReference(i) != nullptr);
+    Handle<mirror::Class> handle =
+        graph_->GetHandleCache()->NewHandle(classes.GetReference(i)->AsClass());
+    ArtMethod* method = ResolveMethodFromInlineCache(handle, invoke_instruction, pointer_size);
     if (method == nullptr) {
       DCHECK(Runtime::Current()->IsAotCompiler());
       // AOT profile is bogus. This loop expects to iterate over all entries,
@@ -1024,8 +979,7 @@ bool HInliner::TryInlinePolymorphicCall(HInvoke* invoke_instruction,
       // we deoptimize instead of keeping the original invoke instruction.
       bool deoptimize = !UseOnlyPolymorphicInliningWithNoDeopt() &&
           all_targets_inlined &&
-          (i != InlineCache::kIndividualCacheSize - 1) &&
-          (classes->Get(i + 1) == nullptr);
+          (i + 1 == number_of_types);
 
       HInstruction* compare = AddTypeGuard(receiver,
                                            cursor,
@@ -1145,7 +1099,7 @@ void HInliner::CreateDiamondPatternForPolymorphicInline(HInstruction* compare,
 
 bool HInliner::TryInlinePolymorphicCallToSameTarget(
     HInvoke* invoke_instruction,
-    Handle<mirror::ObjectArray<mirror::Class>> classes) {
+    const StackHandleScope<InlineCache::kIndividualCacheSize>& classes) {
   // This optimization only works under JIT for now.
   if (!codegen_->GetCompilerOptions().IsJitCompiler()) {
     return false;
@@ -1161,13 +1115,13 @@ bool HInliner::TryInlinePolymorphicCallToSameTarget(
 
   // Check whether we are actually calling the same method among
   // the different types seen.
-  for (size_t i = 0; i < InlineCache::kIndividualCacheSize; ++i) {
-    if (classes->Get(i) == nullptr) {
-      break;
-    }
+  DCHECK_EQ(classes.NumberOfReferences(), InlineCache::kIndividualCacheSize);
+  uint8_t number_of_types = InlineCache::kIndividualCacheSize - classes.RemainingSlots();
+  for (size_t i = 0; i != number_of_types; ++i) {
+    DCHECK(classes.GetReference(i) != nullptr);
     ArtMethod* new_method = nullptr;
     if (invoke_instruction->IsInvokeInterface()) {
-      new_method = classes->Get(i)->GetImt(pointer_size)->Get(
+      new_method = classes.GetReference(i)->AsClass()->GetImt(pointer_size)->Get(
           method_index, pointer_size);
       if (new_method->IsRuntimeMethod()) {
         // Bail out as soon as we see a conflict trampoline in one of the target's
@@ -1176,7 +1130,8 @@ bool HInliner::TryInlinePolymorphicCallToSameTarget(
       }
     } else {
       DCHECK(invoke_instruction->IsInvokeVirtual());
-      new_method = classes->Get(i)->GetEmbeddedVTableEntry(method_index, pointer_size);
+      new_method =
+          classes.GetReference(i)->AsClass()->GetEmbeddedVTableEntry(method_index, pointer_size);
     }
     DCHECK(new_method != nullptr);
     if (actual_method == nullptr) {
@@ -1323,6 +1278,13 @@ bool HInliner::TryInlineAndReplace(HInvoke* invoke_instruction,
         // always uses a method in the iftable which is never an original default
         // method.
         // On the other hand, inlining an original default method by CHA is fine.
+        DCHECK(cha_devirtualize);
+        return false;
+      }
+
+      if (method->IsDefault() && method->IsDefaultConflicting()) {
+        // Changing to invoke-virtual cannot be done on default conflict method
+        // since it's not in any vtable.
         DCHECK(cha_devirtualize);
         return false;
       }

@@ -43,6 +43,7 @@
 #include "gc/allocator/dlmalloc.h"
 #include "gc/scoped_gc_critical_section.h"
 #include "handle.h"
+#include "handle_scope-inl.h"
 #include "instrumentation.h"
 #include "intern_table.h"
 #include "jit/jit.h"
@@ -591,17 +592,20 @@ void JitCodeCache::DisallowInlineCacheAccess() {
   is_weak_access_enabled_.store(false, std::memory_order_seq_cst);
 }
 
-void JitCodeCache::CopyInlineCacheInto(const InlineCache& ic,
-                                       Handle<mirror::ObjectArray<mirror::Class>> array) {
+void JitCodeCache::CopyInlineCacheInto(
+    const InlineCache& ic,
+    /*out*/StackHandleScope<InlineCache::kIndividualCacheSize>* classes) {
+  static_assert(arraysize(ic.classes_) == InlineCache::kIndividualCacheSize);
+  DCHECK_EQ(classes->NumberOfReferences(), InlineCache::kIndividualCacheSize);
+  DCHECK_EQ(classes->RemainingSlots(), InlineCache::kIndividualCacheSize);
   WaitUntilInlineCacheAccessible(Thread::Current());
   // Note that we don't need to lock `lock_` here, the compiler calling
   // this method has already ensured the inline cache will not be deleted.
-  for (size_t in_cache = 0, in_array = 0;
-       in_cache < InlineCache::kIndividualCacheSize;
-       ++in_cache) {
-    mirror::Class* object = ic.classes_[in_cache].Read();
+  for (const GcRoot<mirror::Class>& root : ic.classes_) {
+    mirror::Class* object = root.Read();
     if (object != nullptr) {
-      array->Set(in_array++, object);
+      DCHECK_NE(classes->RemainingSlots(), 0u);
+      classes->NewHandle(object);
     }
   }
 }
