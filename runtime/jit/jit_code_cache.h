@@ -34,6 +34,7 @@
 #include "base/safe_map.h"
 #include "compilation_kind.h"
 #include "jit_memory_region.h"
+#include "profiling_info.h"
 
 namespace art {
 
@@ -305,7 +306,8 @@ class JitCodeCache {
       REQUIRES(!Locks::jit_lock_)
       REQUIRES_SHARED(Locks::mutator_lock_);
 
-  void CopyInlineCacheInto(const InlineCache& ic, Handle<mirror::ObjectArray<mirror::Class>> array)
+  void CopyInlineCacheInto(const InlineCache& ic,
+                           /*out*/StackHandleScope<InlineCache::kIndividualCacheSize>* classes)
       REQUIRES(!Locks::jit_lock_)
       REQUIRES_SHARED(Locks::mutator_lock_);
 

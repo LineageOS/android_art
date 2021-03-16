@@ -28,61 +28,61 @@ namespace art {
 TEST_F(OatDumpTest, TestNoDumpVmap) {
   TEST_DISABLED_FOR_ARM_AND_ARM64();
   std::string error_msg;
-  ASSERT_TRUE(Exec(kDynamic, kModeArt, {"--no-dump:vmap"}, kListAndCode));
+  ASSERT_TRUE(Exec(Flavor::kDynamic, kModeArt, {"--no-dump:vmap"}, kListAndCode));
 }
 TEST_F(OatDumpTest, TestNoDumpVmapStatic) {
   TEST_DISABLED_FOR_ARM_AND_ARM64();
   TEST_DISABLED_FOR_NON_STATIC_HOST_BUILDS();
   std::string error_msg;
-  ASSERT_TRUE(Exec(kStatic, kModeArt, {"--no-dump:vmap"}, kListAndCode));
+  ASSERT_TRUE(Exec(Flavor::kStatic, kModeArt, {"--no-dump:vmap"}, kListAndCode));
 }
 
 TEST_F(OatDumpTest, TestNoDisassemble) {
   TEST_DISABLED_FOR_ARM_AND_ARM64();
   std::string error_msg;
-  ASSERT_TRUE(Exec(kDynamic, kModeArt, {"--no-disassemble"}, kListAndCode));
+  ASSERT_TRUE(Exec(Flavor::kDynamic, kModeArt, {"--no-disassemble"}, kListAndCode));
 }
 TEST_F(OatDumpTest, TestNoDisassembleStatic) {
   TEST_DISABLED_FOR_ARM_AND_ARM64();
   TEST_DISABLED_FOR_NON_STATIC_HOST_BUILDS();
   std::string error_msg;
-  ASSERT_TRUE(Exec(kStatic, kModeArt, {"--no-disassemble"}, kListAndCode));
+  ASSERT_TRUE(Exec(Flavor::kStatic, kModeArt, {"--no-disassemble"}, kListAndCode));
 }
 
 TEST_F(OatDumpTest, TestListClasses) {
   TEST_DISABLED_FOR_ARM_AND_ARM64();
   std::string error_msg;
-  ASSERT_TRUE(Exec(kDynamic, kModeArt, {"--list-classes"}, kListOnly));
+  ASSERT_TRUE(Exec(Flavor::kDynamic, kModeArt, {"--list-classes"}, kListOnly));
 }
 TEST_F(OatDumpTest, TestListClassesStatic) {
   TEST_DISABLED_FOR_ARM_AND_ARM64();
   TEST_DISABLED_FOR_NON_STATIC_HOST_BUILDS();
   std::string error_msg;
-  ASSERT_TRUE(Exec(kStatic, kModeArt, {"--list-classes"}, kListOnly));
+  ASSERT_TRUE(Exec(Flavor::kStatic, kModeArt, {"--list-classes"}, kListOnly));
 }
 
 TEST_F(OatDumpTest, TestListMethods) {
   TEST_DISABLED_FOR_ARM_AND_ARM64();
   std::string error_msg;
-  ASSERT_TRUE(Exec(kDynamic, kModeArt, {"--list-methods"}, kListOnly));
+  ASSERT_TRUE(Exec(Flavor::kDynamic, kModeArt, {"--list-methods"}, kListOnly));
 }
 TEST_F(OatDumpTest, TestListMethodsStatic) {
   TEST_DISABLED_FOR_ARM_AND_ARM64();
   TEST_DISABLED_FOR_NON_STATIC_HOST_BUILDS();
   std::string error_msg;
-  ASSERT_TRUE(Exec(kStatic, kModeArt, {"--list-methods"}, kListOnly));
+  ASSERT_TRUE(Exec(Flavor::kStatic, kModeArt, {"--list-methods"}, kListOnly));
 }
 
 TEST_F(OatDumpTest, TestSymbolize) {
   TEST_DISABLED_FOR_TARGET();  // Can not write files inside the apex directory.
   std::string error_msg;
-  ASSERT_TRUE(Exec(kDynamic, kModeSymbolize, {}, kListOnly));
+  ASSERT_TRUE(Exec(Flavor::kDynamic, kModeSymbolize, {}, kListOnly));
 }
 TEST_F(OatDumpTest, TestSymbolizeStatic) {
   TEST_DISABLED_FOR_ARM_AND_ARM64();
   TEST_DISABLED_FOR_NON_STATIC_HOST_BUILDS();
   std::string error_msg;
-  ASSERT_TRUE(Exec(kStatic, kModeSymbolize, {}, kListOnly));
+  ASSERT_TRUE(Exec(Flavor::kStatic, kModeSymbolize, {}, kListOnly));
 }
 
 TEST_F(OatDumpTest, TestExportDex) {
@@ -90,8 +90,8 @@ TEST_F(OatDumpTest, TestExportDex) {
   // Test is failing on target, b/77469384.
   TEST_DISABLED_FOR_TARGET();
   std::string error_msg;
-  ASSERT_TRUE(GenerateAppOdexFile(kDynamic, {"--runtime-arg", "-Xmx64M"}));
-  ASSERT_TRUE(Exec(kDynamic, kModeOat, {"--export-dex-to=" + tmp_dir_}, kListOnly));
+  ASSERT_TRUE(GenerateAppOdexFile(Flavor::kDynamic, {"--runtime-arg", "-Xmx64M"}));
+  ASSERT_TRUE(Exec(Flavor::kDynamic, kModeOat, {"--export-dex-to=" + tmp_dir_}, kListOnly));
   const std::string dex_location =
       tmp_dir_+ "/" + android::base::Basename(GetTestDexFileName(GetAppBaseName().c_str())) +
       "_export.dex";
@@ -108,8 +108,8 @@ TEST_F(OatDumpTest, TestExportDexStatic) {
   TEST_DISABLED_FOR_ARM_AND_ARM64();
   TEST_DISABLED_FOR_NON_STATIC_HOST_BUILDS();
   std::string error_msg;
-  ASSERT_TRUE(GenerateAppOdexFile(kStatic, {"--runtime-arg", "-Xmx64M"}));
-  ASSERT_TRUE(Exec(kStatic, kModeOat, {"--export-dex-to=" + tmp_dir_}, kListOnly));
+  ASSERT_TRUE(GenerateAppOdexFile(Flavor::kStatic, {"--runtime-arg", "-Xmx64M"}));
+  ASSERT_TRUE(Exec(Flavor::kStatic, kModeOat, {"--export-dex-to=" + tmp_dir_}, kListOnly));
 }
 
 }  // namespace art
