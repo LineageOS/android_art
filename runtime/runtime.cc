@@ -3154,7 +3154,7 @@ void Runtime::MadviseFileForRange(size_t madvise_size_limit_bytes,
     const uint8_t* target_pos = map_begin + target_size_bytes;
 
     // Clamp endOfFile if its past map_end
-    if (target_pos < map_end) {
+    if (target_pos > map_end) {
         target_pos = map_end;
     }
 
