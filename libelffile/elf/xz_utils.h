@@ -20,10 +20,17 @@
 #include <vector>
 
 #include "base/array_ref.h"
+#include "base/bit_utils.h"
 
 namespace art {
 
-void XzCompress(ArrayRef<const uint8_t> src, std::vector<uint8_t>* dst, int level = 1 /* speed */);
+constexpr size_t kXzDefaultBlockSize = 16 * KB;
+
+void XzCompress(ArrayRef<const uint8_t> src,
+                std::vector<uint8_t>* dst,
+                int level = 1 /* speed */,
+                size_t block_size = kXzDefaultBlockSize);
+
 void XzDecompress(ArrayRef<const uint8_t> src, std::vector<uint8_t>* dst);
 
 }  // namespace art

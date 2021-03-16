@@ -310,7 +310,7 @@ class ElfBuilder final {
       last_offset_ = 0;
     }
 
-    Elf_Word Write(const std::string& name) {
+    Elf_Word Write(std::string_view name) {
       if (current_offset_ == 0) {
         DCHECK(name.empty());
       } else if (name == last_name_) {
@@ -318,7 +318,9 @@ class ElfBuilder final {
       }
       last_name_ = name;
       last_offset_ = current_offset_;
-      this->WriteFully(name.c_str(), name.length() + 1);
+      this->WriteFully(name.data(), name.length());
+      char null_terminator = '\0';
+      this->WriteFully(&null_terminator, sizeof(null_terminator));
       current_offset_ += name.length() + 1;
       return last_offset_;
     }
@@ -798,6 +800,21 @@ class ElfBuilder final {
      return stream_.Seek(RoundUp(stream_.Seek(0, kSeekCurrent), alignment), kSeekSet);
   }
 
+  static InstructionSet GetIsaFromHeader(const Elf_Ehdr& header) {
+    switch (header.e_machine) {
+      case EM_ARM:
+        return InstructionSet::kThumb2;
+      case EM_AARCH64:
+        return InstructionSet::kArm64;
+      case EM_386:
+        return InstructionSet::kX86;
+      case EM_X86_64:
+        return InstructionSet::kX86_64;
+    }
+    LOG(FATAL) << "Unknown architecture: " << header.e_machine;
+    UNREACHABLE();
+  }
+
  private:
   static Elf_Ehdr MakeElfHeader(InstructionSet isa) {
     Elf_Ehdr elf_header = Elf_Ehdr();
@@ -832,6 +849,7 @@ class ElfBuilder final {
         LOG(FATAL) << "Unknown instruction set " << isa;
       }
     }
+    DCHECK_EQ(GetIsaFromHeader(elf_header), isa);
 
     elf_header.e_ident[EI_MAG0]       = ELFMAG0;
     elf_header.e_ident[EI_MAG1]       = ELFMAG1;
