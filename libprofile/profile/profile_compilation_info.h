@@ -17,12 +17,14 @@
 #ifndef ART_LIBPROFILE_PROFILE_PROFILE_COMPILATION_INFO_H_
 #define ART_LIBPROFILE_PROFILE_PROFILE_COMPILATION_INFO_H_
 
+#include <array>
 #include <list>
 #include <set>
 #include <vector>
 
 #include "base/arena_containers.h"
 #include "base/arena_object.h"
+#include "base/array_ref.h"
 #include "base/atomic.h"
 #include "base/bit_memory_region.h"
 #include "base/hash_set.h"
@@ -91,35 +93,8 @@ class ProfileCompilationInfo {
   // This is exposed as public in order to make it available to dex2oat compilations
   // (see compiler/optimizing/inliner.cc).
 
-  // A profile reference to the dex file (profile key, dex checksum and number of methods).
-  //
-  // This contains references to internal std::string data of a profile key. The profile
-  // key must not be modified or destroyed for the entire lifetime of a `DexReference`.
-  struct DexReference {
-    DexReference() : dex_checksum(0), num_method_ids(0) {}
-
-    DexReference(std::string_view key, uint32_t checksum, uint32_t num_methods)
-        : profile_key(key), dex_checksum(checksum), num_method_ids(num_methods) {}
-
-    bool operator==(const DexReference& other) const {
-      return dex_checksum == other.dex_checksum &&
-          profile_key == other.profile_key &&
-          num_method_ids == other.num_method_ids;
-    }
-
-    bool MatchesDex(const DexFile* dex_file) const {
-      return dex_checksum == dex_file->GetLocationChecksum() &&
-             GetBaseKeyViewFromAugmentedKey(profile_key) ==
-                 GetProfileDexFileBaseKeyView(dex_file->GetLocation());
-    }
-
-    std::string_view profile_key;
-    uint32_t dex_checksum;
-    uint32_t num_method_ids;
-  };
-
   // The types used to manipulate the profile index of dex files.
-  // They set an upper limit to how many dex files a given profile can recored.
+  // They set an upper limit to how many dex files a given profile can record.
   //
   // Boot profiles have more needs than regular profiles as they contain data from
   // many apps merged together. As such they set the default type for data manipulation.
@@ -135,11 +110,10 @@ class ProfileCompilationInfo {
 
   // Encodes a class reference in the profile.
   // The owning dex file is encoded as the index (dex_profile_index) it has in the
-  // profile rather than as a full DexRefence(location,checksum).
+  // profile rather than as a full reference (location, checksum).
   // This avoids excessive string copying when managing the profile data.
-  // The dex_profile_index is an index in either of:
-  //  - OfflineProfileMethodInfo#dex_references vector (public use)
-  //  - DexFileData#profile_index (internal use).
+  // The dex_profile_index is an index in the `DexFileData::profile_index` (internal use)
+  // and a matching dex file can found with `FindDexFileForProfileIndex()`.
   // Note that the dex_profile_index is not necessary the multidex index.
   // We cannot rely on the actual multidex index because a single profile may store
   // data from multiple splits. This means that a profile may contain a classes2.dex from split-A
@@ -273,42 +247,19 @@ class ProfileCompilationInfo {
       return flags_ != 0;
     }
 
-   private:
-    const InlineCacheMap* inline_cache_map_ = nullptr;
-    uint32_t flags_ = 0;
-
     const InlineCacheMap* GetInlineCacheMap() const {
       return inline_cache_map_;
     }
+
+   private:
+    const InlineCacheMap* inline_cache_map_ = nullptr;
+    uint32_t flags_ = 0;
 
     void SetInlineCacheMap(const InlineCacheMap* info) {
       inline_cache_map_ = info;
     }
 
     friend class ProfileCompilationInfo;
-  };
-
-  // Encodes the full set of inline caches for a given method.
-  //
-  // The `dex_references` vector is indexed according to the ClassReference::dex_profile_index.
-  // i.e. the dex file of any ClassReference present in the inline caches can be found at
-  // dex_references[ClassReference::dex_profile_index].
-  //
-  // The `dex_references` contains references to internal std::string data of profile keys.
-  // Those profile keys must not be modified or destroyed for the entire lifetime of the
-  // `OfflineProfileMethodInfo`. To ensure that, the `ProfileCompilationInfo` should not
-  // be modified or destroyed while an `OfflineProfileMethodInfo` is in use.
-  struct OfflineProfileMethodInfo {
-    explicit OfflineProfileMethodInfo(const InlineCacheMap* inline_cache_map)
-        : inline_caches(inline_cache_map) {}
-
-    bool operator==(const OfflineProfileMethodInfo& other) const;
-    // Checks that this offline representation of inline caches matches the runtime view of the
-    // data.
-    bool operator==(const std::vector<ProfileMethodInfo::ProfileInlineCache>& other) const;
-
-    const InlineCacheMap* const inline_caches;
-    std::vector<DexReference> dex_references;
   };
 
   // Encapsulates metadata that can be associated with the methods and classes added to the profile.
@@ -337,6 +288,9 @@ class ProfileCompilationInfo {
     // The name of the package that generated the samples.
     const std::string origin_package_name_;
   };
+
+  // Helper class for printing referenced dex file information to a stream.
+  struct DexReferenceDumper;
 
   // Public methods to create, extend or query the profile.
   ProfileCompilationInfo();
@@ -427,7 +381,7 @@ class ProfileCompilationInfo {
   // - No class id exceeds NumTypeIds corresponding to the dex_file.
   // - For every inline_caches, class_ids does not exceed NumTypeIds corresponding to
   //   the dex_file they are in.
-  bool VerifyProfileData(const std::vector<const DexFile *> &dex_files);
+  bool VerifyProfileData(const std::vector<const DexFile*>& dex_files);
 
   // Load profile information from the given file
   // If the current profile is non-empty the load will fail.
@@ -448,6 +402,11 @@ class ProfileCompilationInfo {
 
   // Save the current profile into the given file. The file will be cleared before saving.
   bool Save(const std::string& filename, uint64_t* bytes_written);
+
+  // Return the number of dex files referenced in the profile.
+  size_t GetNumberOfDexFiles() const {
+    return info_.size();
+  }
 
   // Return the number of methods that were profiled.
   uint32_t GetNumberOfMethods() const;
@@ -476,15 +435,35 @@ class ProfileCompilationInfo {
       dex::TypeIndex type_idx,
       const ProfileSampleAnnotation& annotation = ProfileSampleAnnotation::kNone) const;
 
-  // Return the hot method info for the given location and index from the profiling info.
-  // If the method index is not found or the checksum doesn't match, null is returned.
-  // Note: the inline cache map is a pointer to the map stored in the profile and
-  // its allocation will go away if the profile goes out of scope.
-  //
-  // Note: see GetMethodHotness docs for the handling of annotations.
-  std::unique_ptr<OfflineProfileMethodInfo> GetHotMethodInfo(
-      const MethodReference& method_ref,
-      const ProfileSampleAnnotation& annotation = ProfileSampleAnnotation::kNone) const;
+  // Return the dex file for the given `profile_index`, or null if none of the provided
+  // dex files has a matching checksum and a location with the same base key.
+  template <typename Container>
+  const DexFile* FindDexFileForProfileIndex(ProfileIndexType profile_index,
+                                            const Container& dex_files) const {
+    static_assert(std::is_same_v<typename Container::value_type, const DexFile*> ||
+                  std::is_same_v<typename Container::value_type, std::unique_ptr<const DexFile>>);
+    DCHECK_LE(profile_index, info_.size());
+    const DexFileData* dex_file_data = info_[profile_index];
+    DCHECK(dex_file_data != nullptr);
+    uint32_t dex_checksum = dex_file_data->checksum;
+    std::string_view base_key = GetBaseKeyViewFromAugmentedKey(dex_file_data->profile_key);
+    for (const auto& dex_file : dex_files) {
+      if (dex_checksum == dex_file->GetLocationChecksum() &&
+          base_key == GetProfileDexFileBaseKeyView(dex_file->GetLocation())) {
+        return std::addressof(*dex_file);
+      }
+    }
+    return nullptr;
+  }
+
+  // Helper function for tests.
+  bool ProfileIndexMatchesDexFile(ProfileIndexType profile_index, const DexFile* dex_file) const {
+    DCHECK(dex_file != nullptr);
+    std::array<const DexFile*, 1u> dex_files{dex_file};
+    return dex_file == FindDexFileForProfileIndex(profile_index, dex_files);
+  }
+
+  DexReferenceDumper DumpDexReference(ProfileIndexType profile_index) const;
 
   // Dump all the loaded profile info into a string and returns it.
   // If dex_files is not empty then the method indices will be resolved to their
@@ -540,10 +519,6 @@ class ProfileCompilationInfo {
                                   uint16_t method_percentage,
                                   uint16_t class_percentage,
                                   uint32_t random_seed);
-
-  // Check that the given profile method info contain the same data.
-  static bool Equals(const ProfileCompilationInfo::OfflineProfileMethodInfo& pmi1,
-                     const ProfileCompilationInfo::OfflineProfileMethodInfo& pmi2);
 
   ArenaAllocator* GetAllocator() { return &allocator_; }
 
@@ -712,10 +687,6 @@ class ProfileCompilationInfo {
                                dex_file->GetLocationChecksum(),
                                dex_file->NumMethodIds());
   }
-
-  // Encode the known dex_files into a vector. The index of a dex_reference will
-  // be the same as the profile index of the dex file (used to encode the ClassReferences).
-  void DexFileToProfileIndex(/*out*/std::vector<DexReference>* dex_references) const;
 
   // Return the dex data associated with the given profile key or null if the profile
   // doesn't contain the key.
@@ -1071,8 +1042,28 @@ class FlattenProfileData {
   friend class ProfileCompilationInfo;
 };
 
-std::ostream& operator<<(std::ostream& stream,
-                         const ProfileCompilationInfo::DexReference& dex_ref);
+struct ProfileCompilationInfo::DexReferenceDumper {
+  const std::string& GetProfileKey() {
+    return dex_file_data->profile_key;
+  }
+
+  uint32_t GetDexChecksum() const {
+    return dex_file_data->checksum;
+  }
+
+  uint32_t GetNumMethodIds() const {
+    return dex_file_data->num_method_ids;
+  }
+
+  const DexFileData* dex_file_data;
+};
+
+inline ProfileCompilationInfo::DexReferenceDumper ProfileCompilationInfo::DumpDexReference(
+    ProfileIndexType profile_index) const {
+  return DexReferenceDumper{info_[profile_index]};
+}
+
+std::ostream& operator<<(std::ostream& stream, ProfileCompilationInfo::DexReferenceDumper dumper);
 
 }  // namespace art
 

@@ -35,6 +35,7 @@
 #include "dex/art_dex_file_loader.h"
 #include "dex/compact_dex_level.h"
 #include "dex/compact_dex_file.h"
+#include "profile/profile_compilation_info.h"
 
 namespace art {
 
@@ -309,6 +310,10 @@ class CommonArtTestImpl {
 
   std::unique_ptr<const DexFile> OpenTestDexFile(const char* name);
 
+  // Compare different representations of inline caches for equality.
+  static bool EqualInlineCaches(const std::vector<ProfileMethodInfo::ProfileInlineCache>& expected,
+                                const ProfileCompilationInfo::MethodHotness& actual_hotness,
+                                const ProfileCompilationInfo& info);
 
   std::string android_data_;
   std::string android_system_ext_;
