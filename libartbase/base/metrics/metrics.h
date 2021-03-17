@@ -204,11 +204,18 @@ class MetricsCounter final : public MetricsBase<T> {
 
   void Report(MetricsBackend* backend) const { backend->ReportCounter(counter_type, Value()); }
 
+ protected:
+  void Reset() {
+    value_ = 0;
+  }
+
  private:
   value_t Value() const { return value_.load(std::memory_order::memory_order_relaxed); }
 
   std::atomic<value_t> value_;
   static_assert(std::atomic<value_t>::is_always_lock_free);
+
+  friend class ArtMetrics;
 };
 
 template <DatumId histogram_type_,
@@ -239,6 +246,13 @@ class MetricsHistogram final : public MetricsBase<int64_t> {
     backend->ReportHistogram(histogram_type_, minimum_value_, maximum_value_, GetBuckets());
   }
 
+ protected:
+  void Reset() {
+    for (auto& bucket : buckets_) {
+      bucket = 0;
+    }
+  }
+
  private:
   inline constexpr size_t FindBucketId(int64_t value) const {
     // Values below the minimum are clamped into the first bucket.
@@ -263,6 +277,8 @@ class MetricsHistogram final : public MetricsBase<int64_t> {
 
   std::array<std::atomic<value_t>, num_buckets_> buckets_;
   static_assert(std::atomic<value_t>::is_always_lock_free);
+
+  friend class ArtMetrics;
 };
 
 // A backend that writes metrics in a human-readable format to a string.
@@ -397,6 +413,10 @@ class ArtMetrics {
 
   void ReportAllMetrics(MetricsBackend* backend) const;
   void DumpForSigQuit(std::ostream& os) const;
+
+  // Resets all metrics to their initial value. This is intended to be used after forking from the
+  // zygote so we don't attribute parent values to the child process.
+  void Reset();
 
 #define METRIC_ACCESSORS(name, Kind, ...)                                        \
   Kind<DatumId::k##name, ##__VA_ARGS__>* name() { return &name##_; } \
