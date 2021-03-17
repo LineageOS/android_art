@@ -335,65 +335,66 @@ const uint8_t* OatHeader::GetKeyValueStore() const {
   return key_value_store_;
 }
 
-// Advance start until it is either end or \0.
-static const char* ParseString(const char* start, const char* end) {
-  while (start < end && *start != 0) {
-    start++;
-  }
-  return start;
-}
-
 const char* OatHeader::GetStoreValueByKey(const char* key) const {
+  std::string_view key_view(key);
   const char* ptr = reinterpret_cast<const char*>(&key_value_store_);
   const char* end = ptr + key_value_store_size_;
 
   while (ptr < end) {
     // Scan for a closing zero.
-    const char* str_end = ParseString(ptr, end);
-    if (str_end < end) {
-      if (strcmp(key, ptr) == 0) {
-        // Same as key. Check if value is OK.
-        if (ParseString(str_end + 1, end) < end) {
-          return str_end + 1;
-        }
-      } else {
-        // Different from key. Advance over the value.
-        ptr = ParseString(str_end + 1, end) + 1;
-      }
-    } else {
-      break;
+    const char* str_end = reinterpret_cast<const char*>(memchr(ptr, 0, end - ptr));
+    if (UNLIKELY(str_end == nullptr)) {
+      LOG(WARNING) << "OatHeader: Unterminated key in key value store.";
+      return nullptr;
     }
+    const char* value_start = str_end + 1;
+    const char* value_end =
+        reinterpret_cast<const char*>(memchr(value_start, 0, end - value_start));
+    if (UNLIKELY(value_end == nullptr)) {
+      LOG(WARNING) << "OatHeader: Unterminated value in key value store.";
+      return nullptr;
+    }
+    if (key_view == std::string_view(ptr, str_end - ptr)) {
+      // Same as key.
+      return value_start;
+    }
+    // Different from key. Advance over the value.
+    ptr = value_end + 1;
   }
   // Not found.
   return nullptr;
 }
 
-bool OatHeader::GetStoreKeyValuePairByIndex(size_t index, const char** key,
+bool OatHeader::GetStoreKeyValuePairByIndex(size_t index,
+                                            const char** key,
                                             const char** value) const {
   const char* ptr = reinterpret_cast<const char*>(&key_value_store_);
   const char* end = ptr + key_value_store_size_;
-  ssize_t counter = static_cast<ssize_t>(index);
+  size_t counter = index;
 
-  while (ptr < end && counter >= 0) {
+  while (ptr < end) {
     // Scan for a closing zero.
-    const char* str_end = ParseString(ptr, end);
-    if (str_end < end) {
-      const char* maybe_key = ptr;
-      ptr = ParseString(str_end + 1, end) + 1;
-      if (ptr <= end) {
-        if (counter == 0) {
-          *key = maybe_key;
-          *value = str_end + 1;
-          return true;
-        } else {
-          counter--;
-        }
-      } else {
-        return false;
-      }
-    } else {
-      break;
+    const char* str_end = reinterpret_cast<const char*>(memchr(ptr, 0, end - ptr));
+    if (UNLIKELY(str_end == nullptr)) {
+      LOG(WARNING) << "OatHeader: Unterminated key in key value store.";
+      return false;
     }
+    const char* value_start = str_end + 1;
+    const char* value_end =
+        reinterpret_cast<const char*>(memchr(value_start, 0, end - value_start));
+    if (UNLIKELY(value_end == nullptr)) {
+      LOG(WARNING) << "OatHeader: Unterminated value in key value store.";
+      return false;
+    }
+    if (counter == 0) {
+      *key = ptr;
+      *value = value_start;
+      return true;
+    } else {
+      --counter;
+    }
+    // Advance over the value.
+    ptr = value_end + 1;
   }
   // Not found.
   return false;
