@@ -86,12 +86,6 @@ class ElfFile {
   // Returns true on success, false on failure.
   static bool Strip(File* file, std::string* error_msg);
 
-  // Fixup an ELF file so that that oat header will be loaded at oat_begin.
-  // Returns true on success, false on failure.
-  static bool Fixup(File* file, uint64_t oat_data_begin);
-
-  bool Fixup(uint64_t base_address);
-
   bool Is64Bit() const {
     return elf64_.get() != nullptr;
   }
