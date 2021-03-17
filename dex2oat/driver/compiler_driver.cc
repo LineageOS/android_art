@@ -846,7 +846,7 @@ static void EnsureVerifiedOrVerifyAtRuntime(jobject jclass_loader,
 void CompilerDriver::PrepareDexFilesForOatFile(TimingLogger* timings) {
   compiled_classes_.AddDexFiles(GetCompilerOptions().GetDexFilesForOatFile());
 
-  if (GetCompilerOptions().IsAnyCompilationEnabled()) {
+  if (GetCompilerOptions().IsQuickeningCompilationEnabled()) {
     TimingLogger::ScopedTiming t2("Dex2Dex SetDexFiles", timings);
     dex_to_dex_compiler_.SetDexFiles(GetCompilerOptions().GetDexFilesForOatFile());
   }
