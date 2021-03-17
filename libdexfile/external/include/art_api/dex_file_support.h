@@ -100,11 +100,27 @@ class DexFile {
                                              /*out*/ std::string* error_msg);
 
   // Given an offset relative to the start of the dex file header, if there is a
+  // method whose instruction range includes that offset then calls the provided
+  // callback with ExtDexFileMethodInfo* (which is live only during the callback).
+  template<typename T /* lambda taking (ExtDexFileMethodInfo*) */>
+  void GetMethodInfoForOffset(int64_t dex_offset, T& callback, uint32_t flags = 0) {
+    auto cb = [](void* ctx, ExtDexFileMethodInfo* info) { (*reinterpret_cast<T*>(ctx))(info); };
+    g_ExtDexFileGetMethodInfoForOffset(ext_dex_file_, dex_offset, flags, cb, &callback);
+  }
+
+  // Given an offset relative to the start of the dex file header, if there is a
   // method whose instruction range includes that offset then returns info about
   // it, otherwise returns a struct with offset == 0. MethodInfo.name receives
   // the full function signature if with_signature is set, otherwise it gets the
   // class and method name only.
   MethodInfo GetMethodInfoForOffset(int64_t dex_offset, bool with_signature);
+
+  // Call the provided callback for all dex methods.
+  template<typename T /* lambda taking (ExtDexFileMethodInfo*) */>
+  void GetAllMethodInfos(T& callback, uint32_t flags = 0) {
+    auto cb = [](void* ctx, ExtDexFileMethodInfo* info) { (*reinterpret_cast<T*>(ctx))(info); };
+    g_ExtDexFileGetAllMethodInfos(ext_dex_file_, flags, cb, &callback);
+  }
 
   // Returns info structs about all methods in the dex file. MethodInfo.name
   // receives the full function signature if with_signature is set, otherwise it
