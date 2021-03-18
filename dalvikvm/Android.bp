@@ -36,8 +36,8 @@ art_cc_binary {
     ],
     shared_libs: [
         "libnativehelper",
+        "libsigchain",
     ],
-    whole_static_libs: ["libsigchain"],
     target: {
         android: {
             shared_libs: [
