@@ -342,16 +342,6 @@ inline void ImageTest::DoCompile(ImageHeader::StorageMode storage_mode,
                                        image_filenames,
                                        image_filenames.size());
     ASSERT_TRUE(success_image);
-
-    for (size_t i = 0, size = oat_filenames.size(); i != size; ++i) {
-      const char* oat_filename = oat_filenames[i].c_str();
-      std::unique_ptr<File> oat_file(OS::OpenFileReadWrite(oat_filename));
-      ASSERT_TRUE(oat_file != nullptr);
-      bool success_fixup = ElfWriter::Fixup(oat_file.get(), writer->GetOatDataBegin(i));
-      ASSERT_TRUE(success_fixup);
-      ASSERT_EQ(oat_file->FlushCloseOrErase(), 0) << "Could not flush and close oat file "
-                                                  << oat_filename;
-    }
   }
 }
 
