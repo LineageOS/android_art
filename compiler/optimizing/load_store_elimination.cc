@@ -1251,6 +1251,7 @@ class LSEVisitor final : private HGraphDelegateVisitor {
   };
   // Small pre-allocated initial buffer avoids initializing a large one until it's really needed.
   static constexpr size_t kStoreRecordsInitialBufferSize = 16;
+  std::pair<HInstruction*, StoreRecord> store_records_buffer_[kStoreRecordsInitialBufferSize];
   ScopedArenaHashMap<HInstruction*, StoreRecord> store_records_;
 
   // Replacements for Phi placeholders.
@@ -1441,8 +1442,7 @@ LSEVisitor::LSEVisitor(HGraph* graph,
                                                   /*expandable=*/false,
                                                   kArenaAllocLSE),
       loads_requiring_loop_phi_(allocator_.Adapter(kArenaAllocLSE)),
-      store_records_(allocator_.AllocArray<std::pair<HInstruction*, StoreRecord>>(
-                         kStoreRecordsInitialBufferSize, kArenaAllocLSE),
+      store_records_(store_records_buffer_,
                      kStoreRecordsInitialBufferSize,
                      allocator_.Adapter(kArenaAllocLSE)),
       phi_placeholder_replacements_(num_phi_placeholders_,
@@ -3763,6 +3763,24 @@ void LSEVisitor::FinishFullLSE() {
   }
 }
 
+// The LSEVisitor is a ValueObject (indirectly through base classes) and therefore
+// cannot be directly allocated with an arena allocator, so we need to wrap it.
+class LSEVisitorWrapper : public DeletableArenaObject<kArenaAllocLSE> {
+ public:
+  LSEVisitorWrapper(HGraph* graph,
+                    const HeapLocationCollector& heap_location_collector,
+                    bool perform_partial_lse,
+                    OptimizingCompilerStats* stats)
+      : lse_visitor_(graph, heap_location_collector, perform_partial_lse, stats) {}
+
+  void Run() {
+    lse_visitor_.Run();
+  }
+
+ private:
+  LSEVisitor lse_visitor_;
+};
+
 bool LoadStoreElimination::Run(bool enable_partial_lse) {
   if (graph_->IsDebuggable() || graph_->HasTryCatch()) {
     // Debugger may set heap values or trigger deoptimization of callers.
@@ -3789,8 +3807,9 @@ bool LoadStoreElimination::Run(bool enable_partial_lse) {
     return false;
   }
 
-  LSEVisitor lse_visitor(graph_, heap_location_collector, enable_partial_lse, stats_);
-  lse_visitor.Run();
+  std::unique_ptr<LSEVisitorWrapper> lse_visitor(new (&allocator) LSEVisitorWrapper(
+      graph_, heap_location_collector, enable_partial_lse, stats_));
+  lse_visitor->Run();
   return true;
 }
 
