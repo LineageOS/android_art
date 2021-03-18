@@ -59,7 +59,6 @@ void CommonCompilerDriverTest::CompileAll(jobject class_loader,
 void CommonCompilerDriverTest::SetDexFilesForOatFile(const std::vector<const DexFile*>& dex_files) {
   compiler_options_->dex_files_for_oat_file_ = dex_files;
   compiler_driver_->compiled_classes_.AddDexFiles(dex_files);
-  compiler_driver_->dex_to_dex_compiler_.SetDexFiles(dex_files);
 }
 
 void CommonCompilerDriverTest::ReserveImageSpace() {
