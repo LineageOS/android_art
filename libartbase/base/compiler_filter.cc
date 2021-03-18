@@ -54,14 +54,8 @@ bool CompilerFilter::IsJniCompilationEnabled(Filter filter) {
   UNREACHABLE();
 }
 
-bool CompilerFilter::IsQuickeningCompilationEnabled(Filter filter ATTRIBUTE_UNUSED) {
-  return false;
-}
-
 bool CompilerFilter::IsAnyCompilationEnabled(Filter filter) {
-  return IsJniCompilationEnabled(filter) ||
-      IsQuickeningCompilationEnabled(filter) ||
-      IsAotCompilationEnabled(filter);
+  return IsJniCompilationEnabled(filter) || IsAotCompilationEnabled(filter);
 }
 
 bool CompilerFilter::IsVerificationEnabled(Filter filter) {

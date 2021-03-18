@@ -52,7 +52,6 @@
 #include "dex/dex_file-inl.h"
 #include "dex/dex_file_annotations.h"
 #include "dex/dex_instruction-inl.h"
-#include "dex/dex_to_dex_compiler.h"
 #include "dex/verification_results.h"
 #include "dex/verified_method.h"
 #include "driver/compiler_options.h"
@@ -265,8 +264,7 @@ CompilerDriver::CompilerDriver(
       parallel_thread_count_(thread_count),
       stats_(new AOTCompilationStats),
       compiled_method_storage_(swap_fd),
-      max_arena_alloc_(0),
-      dex_to_dex_compiler_(this) {
+      max_arena_alloc_(0) {
   DCHECK(compiler_options_ != nullptr);
 
   compiled_method_storage_.SetDedupeEnabled(compiler_options_->DeduplicateCode());
@@ -352,64 +350,6 @@ void CompilerDriver::CompileAll(jobject class_loader,
   }
 }
 
-static optimizer::DexToDexCompiler::CompilationLevel GetDexToDexCompilationLevel(
-    Thread* self, const CompilerDriver& driver, Handle<mirror::ClassLoader> class_loader,
-    const DexFile& dex_file, const dex::ClassDef& class_def)
-    REQUIRES_SHARED(Locks::mutator_lock_) {
-  // When the dex file is uncompressed in the APK, we do not generate a copy in the .vdex
-  // file. As a result, dex2oat will map the dex file read-only, and we only need to check
-  // that to know if we can do quickening.
-  if (dex_file.GetContainer() != nullptr && dex_file.GetContainer()->IsReadOnly()) {
-    return optimizer::DexToDexCompiler::CompilationLevel::kDontDexToDexCompile;
-  }
-  if (!driver.GetCompilerOptions().IsQuickeningCompilationEnabled()) {
-    // b/170086509 Quickening compilation is being deprecated.
-    return optimizer::DexToDexCompiler::CompilationLevel::kDontDexToDexCompile;
-  }
-  auto* const runtime = Runtime::Current();
-  const char* descriptor = dex_file.GetClassDescriptor(class_def);
-  ClassLinker* class_linker = runtime->GetClassLinker();
-  ObjPtr<mirror::Class> klass = class_linker->FindClass(self, descriptor, class_loader);
-  if (klass == nullptr) {
-    CHECK(self->IsExceptionPending());
-    self->ClearException();
-    return optimizer::DexToDexCompiler::CompilationLevel::kDontDexToDexCompile;
-  }
-  // DexToDex at the kOptimize level may introduce quickened opcodes, which replace symbolic
-  // references with actual offsets. We cannot re-verify such instructions.
-  //
-  // We store the verification information in the class status in the oat file, which the linker
-  // can validate (checksums) and use to skip load-time verification. It is thus safe to
-  // optimize when a class has been fully verified before.
-  optimizer::DexToDexCompiler::CompilationLevel max_level =
-      optimizer::DexToDexCompiler::CompilationLevel::kOptimize;
-  if (driver.GetCompilerOptions().GetDebuggable()) {
-    // We are debuggable so definitions of classes might be changed. We don't want to do any
-    // optimizations that could break that.
-    max_level = optimizer::DexToDexCompiler::CompilationLevel::kDontDexToDexCompile;
-  }
-  if (klass->IsVerified()) {
-    // Class is verified so we can enable DEX-to-DEX compilation for performance.
-    return max_level;
-  } else {
-    // Class verification has failed: do not run DEX-to-DEX optimizations.
-    return optimizer::DexToDexCompiler::CompilationLevel::kDontDexToDexCompile;
-  }
-}
-
-static optimizer::DexToDexCompiler::CompilationLevel GetDexToDexCompilationLevel(
-    Thread* self,
-    const CompilerDriver& driver,
-    jobject jclass_loader,
-    const DexFile& dex_file,
-    const dex::ClassDef& class_def) {
-  ScopedObjectAccess soa(self);
-  StackHandleScope<1> hs(soa.Self());
-  Handle<mirror::ClassLoader> class_loader(
-      hs.NewHandle(soa.Decode<mirror::ClassLoader>(jclass_loader)));
-  return GetDexToDexCompilationLevel(self, driver, class_loader, dex_file, class_def);
-}
-
 // Does the runtime for the InstructionSet provide an implementation returned by
 // GetQuickGenericJniStub allowing down calls that aren't compiled using a JNI compiler?
 static bool InstructionSetHasGenericJniStub(InstructionSet isa) {
@@ -434,7 +374,6 @@ static void CompileMethodHarness(
     uint32_t method_idx,
     Handle<mirror::ClassLoader> class_loader,
     const DexFile& dex_file,
-    optimizer::DexToDexCompiler::CompilationLevel dex_to_dex_compilation_level,
     Handle<mirror::DexCache> dex_cache,
     CompileFn compile_fn) {
   DCHECK(driver != nullptr);
@@ -451,7 +390,6 @@ static void CompileMethodHarness(
                                method_idx,
                                class_loader,
                                dex_file,
-                               dex_to_dex_compilation_level,
                                dex_cache);
 
   if (kTimeCompileMethod) {
@@ -473,68 +411,6 @@ static void CompileMethodHarness(
   }
 }
 
-static void CompileMethodDex2Dex(
-    Thread* self,
-    CompilerDriver* driver,
-    const dex::CodeItem* code_item,
-    uint32_t access_flags,
-    InvokeType invoke_type,
-    uint16_t class_def_idx,
-    uint32_t method_idx,
-    Handle<mirror::ClassLoader> class_loader,
-    const DexFile& dex_file,
-    optimizer::DexToDexCompiler::CompilationLevel dex_to_dex_compilation_level,
-    Handle<mirror::DexCache> dex_cache) {
-  auto dex_2_dex_fn = [](Thread* self ATTRIBUTE_UNUSED,
-      CompilerDriver* driver,
-      const dex::CodeItem* code_item,
-      uint32_t access_flags,
-      InvokeType invoke_type,
-      uint16_t class_def_idx,
-      uint32_t method_idx,
-      Handle<mirror::ClassLoader> class_loader,
-      const DexFile& dex_file,
-      optimizer::DexToDexCompiler::CompilationLevel dex_to_dex_compilation_level,
-      Handle<mirror::DexCache> dex_cache ATTRIBUTE_UNUSED) -> CompiledMethod* {
-    DCHECK(driver != nullptr);
-    MethodReference method_ref(&dex_file, method_idx);
-
-    optimizer::DexToDexCompiler* const compiler = &driver->GetDexToDexCompiler();
-
-    if (compiler->ShouldCompileMethod(method_ref)) {
-      const VerificationResults* results = driver->GetCompilerOptions().GetVerificationResults();
-      DCHECK(results != nullptr);
-      const VerifiedMethod* verified_method = results->GetVerifiedMethod(method_ref);
-      // Do not optimize if a VerifiedMethod is missing. SafeCast elision,
-      // for example, relies on it.
-      return compiler->CompileMethod(
-          code_item,
-          access_flags,
-          invoke_type,
-          class_def_idx,
-          method_idx,
-          class_loader,
-          dex_file,
-          (verified_method != nullptr)
-          ? dex_to_dex_compilation_level
-              : optimizer::DexToDexCompiler::CompilationLevel::kDontDexToDexCompile);
-    }
-    return nullptr;
-  };
-  CompileMethodHarness(self,
-                       driver,
-                       code_item,
-                       access_flags,
-                       invoke_type,
-                       class_def_idx,
-                       method_idx,
-                       class_loader,
-                       dex_file,
-                       dex_to_dex_compilation_level,
-                       dex_cache,
-                       dex_2_dex_fn);
-}
-
 static void CompileMethodQuick(
     Thread* self,
     CompilerDriver* driver,
@@ -545,10 +421,9 @@ static void CompileMethodQuick(
     uint32_t method_idx,
     Handle<mirror::ClassLoader> class_loader,
     const DexFile& dex_file,
-    optimizer::DexToDexCompiler::CompilationLevel dex_to_dex_compilation_level,
     Handle<mirror::DexCache> dex_cache) {
   auto quick_fn = [](
-      Thread* self,
+      Thread* self ATTRIBUTE_UNUSED,
       CompilerDriver* driver,
       const dex::CodeItem* code_item,
       uint32_t access_flags,
@@ -557,7 +432,6 @@ static void CompileMethodQuick(
       uint32_t method_idx,
       Handle<mirror::ClassLoader> class_loader,
       const DexFile& dex_file,
-      optimizer::DexToDexCompiler::CompilationLevel dex_to_dex_compilation_level,
       Handle<mirror::DexCache> dex_cache) {
     DCHECK(driver != nullptr);
     CompiledMethod* compiled_method = nullptr;
@@ -629,13 +503,6 @@ static void CompileMethodQuick(
           }
         }
       }
-      if (compiled_method == nullptr &&
-          dex_to_dex_compilation_level !=
-              optimizer::DexToDexCompiler::CompilationLevel::kDontDexToDexCompile) {
-        DCHECK(!Runtime::Current()->UseJitCompilation());
-        // TODO: add a command-line option to disable DEX-to-DEX compilation ?
-        driver->GetDexToDexCompiler().MarkForCompilation(self, method_ref);
-      }
     }
     return compiled_method;
   };
@@ -648,7 +515,6 @@ static void CompileMethodQuick(
                        method_idx,
                        class_loader,
                        dex_file,
-                       dex_to_dex_compilation_level,
                        dex_cache,
                        quick_fn);
 }
@@ -843,13 +709,8 @@ static void EnsureVerifiedOrVerifyAtRuntime(jobject jclass_loader,
   }
 }
 
-void CompilerDriver::PrepareDexFilesForOatFile(TimingLogger* timings) {
+void CompilerDriver::PrepareDexFilesForOatFile(TimingLogger* timings ATTRIBUTE_UNUSED) {
   compiled_classes_.AddDexFiles(GetCompilerOptions().GetDexFilesForOatFile());
-
-  if (GetCompilerOptions().IsQuickeningCompilationEnabled()) {
-    TimingLogger::ScopedTiming t2("Dex2Dex SetDexFiles", timings);
-    dex_to_dex_compiler_.SetDexFiles(GetCompilerOptions().GetDexFilesForOatFile());
-  }
 }
 
 class CreateConflictTablesVisitor : public ClassVisitor {
@@ -2738,10 +2599,6 @@ static void CompileDexFile(CompilerDriver* driver,
     // Go to native so that we don't block GC during compilation.
     ScopedThreadSuspension sts(soa.Self(), kNative);
 
-    // Can we run DEX-to-DEX compiler on this class ?
-    optimizer::DexToDexCompiler::CompilationLevel dex_to_dex_compilation_level =
-        GetDexToDexCompilationLevel(soa.Self(), *driver, jclass_loader, dex_file, class_def);
-
     // Compile direct and virtual methods.
     int64_t previous_method_idx = -1;
     for (const ClassAccessor::Method& method : accessor.GetMethods()) {
@@ -2761,7 +2618,6 @@ static void CompileDexFile(CompilerDriver* driver,
                  method_idx,
                  class_loader,
                  dex_file,
-                 dex_to_dex_compilation_level,
                  dex_cache);
     }
   };
@@ -2780,7 +2636,6 @@ void CompilerDriver::Compile(jobject class_loader,
             : profile_compilation_info->DumpInfo(dex_files));
   }
 
-  dex_to_dex_compiler_.ClearState();
   for (const DexFile* dex_file : dex_files) {
     CHECK(dex_file != nullptr);
     CompileDexFile(this,
@@ -2796,23 +2651,6 @@ void CompilerDriver::Compile(jobject class_loader,
     const size_t arena_alloc = arena_pool->GetBytesAllocated();
     max_arena_alloc_ = std::max(arena_alloc, max_arena_alloc_);
     Runtime::Current()->ReclaimArenaPoolMemory();
-  }
-
-  if (dex_to_dex_compiler_.NumCodeItemsToQuicken(Thread::Current()) > 0u) {
-    // TODO: Not visit all of the dex files, its probably rare that only one would have quickened
-    // methods though.
-    for (const DexFile* dex_file : dex_files) {
-      CompileDexFile(this,
-                     class_loader,
-                     *dex_file,
-                     dex_files,
-                     parallel_thread_pool_.get(),
-                     parallel_thread_count_,
-                     timings,
-                     "Compile Dex File Dex2Dex",
-                     CompileMethodDex2Dex);
-    }
-    dex_to_dex_compiler_.ClearState();
   }
 
   VLOG(compiler) << "Compile: " << GetMemoryUsageString(false);
