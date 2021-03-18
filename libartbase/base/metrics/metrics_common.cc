@@ -179,6 +179,44 @@ void FileBackend::EndReport() {
   }
 }
 
+// Make sure CompilationReasonName and CompilationReasonForName are inverses.
+static_assert(CompilationReasonFromName(CompilationReasonName(CompilationReason::kError)) ==
+              CompilationReason::kError);
+static_assert(CompilationReasonFromName(CompilationReasonName(CompilationReason::kUnknown)) ==
+              CompilationReason::kUnknown);
+static_assert(CompilationReasonFromName(CompilationReasonName(CompilationReason::kFirstBoot)) ==
+              CompilationReason::kFirstBoot);
+static_assert(CompilationReasonFromName(CompilationReasonName(CompilationReason::kBootAfterOTA)) ==
+              CompilationReason::kBootAfterOTA);
+static_assert(CompilationReasonFromName(CompilationReasonName(CompilationReason::kPostBoot)) ==
+              CompilationReason::kPostBoot);
+static_assert(CompilationReasonFromName(CompilationReasonName(CompilationReason::kInstall)) ==
+              CompilationReason::kInstall);
+static_assert(CompilationReasonFromName(CompilationReasonName(CompilationReason::kInstallFast)) ==
+              CompilationReason::kInstallFast);
+static_assert(CompilationReasonFromName(CompilationReasonName(CompilationReason::kInstallBulk)) ==
+              CompilationReason::kInstallBulk);
+static_assert(
+    CompilationReasonFromName(CompilationReasonName(CompilationReason::kInstallBulkSecondary)) ==
+    CompilationReason::kInstallBulkSecondary);
+static_assert(
+    CompilationReasonFromName(CompilationReasonName(CompilationReason::kInstallBulkDowngraded)) ==
+    CompilationReason::kInstallBulkDowngraded);
+static_assert(CompilationReasonFromName(
+                  CompilationReasonName(CompilationReason::kInstallBulkSecondaryDowngraded)) ==
+              CompilationReason::kInstallBulkSecondaryDowngraded);
+static_assert(CompilationReasonFromName(CompilationReasonName(CompilationReason::kBgDexopt)) ==
+              CompilationReason::kBgDexopt);
+static_assert(CompilationReasonFromName(CompilationReasonName(CompilationReason::kABOTA)) ==
+              CompilationReason::kABOTA);
+static_assert(CompilationReasonFromName(CompilationReasonName(CompilationReason::kInactive)) ==
+              CompilationReason::kInactive);
+static_assert(CompilationReasonFromName(CompilationReasonName(CompilationReason::kShared)) ==
+              CompilationReason::kShared);
+static_assert(
+    CompilationReasonFromName(CompilationReasonName(CompilationReason::kInstallWithDexMetadata)) ==
+    CompilationReason::kInstallWithDexMetadata);
+
 }  // namespace metrics
 }  // namespace art
 
