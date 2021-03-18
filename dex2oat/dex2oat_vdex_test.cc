@@ -81,7 +81,7 @@ class Dex2oatVdexTest : public Dex2oatEnvironmentTest {
     }
 
     // Verify the deps.
-    VdexFile::VerifierDepsHeader vdex_header = vdex->GetVerifierDepsHeader();
+    VdexFile::VdexFileHeader vdex_header = vdex->GetVdexFileHeader();
     if (!vdex_header.IsValid()) {
       ::testing::AssertionFailure() << "Invalid vdex header";
     }
