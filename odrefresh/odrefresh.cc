@@ -140,6 +140,12 @@ static std::string Concatenate(std::initializer_list<std::string_view> args) {
   return ss.str();
 }
 
+static std::string GetEnvironmentVariableOrDie(const char* name) {
+  const char* value = getenv(name);
+  LOG_ALWAYS_FATAL_IF(value == nullptr, "%s is not defined.", name);
+  return value;
+}
+
 static std::string QuotePath(std::string_view path) {
   return Concatenate({"'", path, "'"});
 }
@@ -1356,8 +1362,8 @@ class OnDeviceRefresh final {
   static int InitializeTargetConfig(int argc, const char** argv, OdrConfig* config) {
     config->SetApexInfoListFile("/apex/apex-info-list.xml");
     config->SetArtBinDir(GetArtBinDir());
-    config->SetDex2oatBootclasspath(getenv("DEX2OATBOOTCLASSPATH"));
-    config->SetSystemServerClasspath(getenv("SYSTEMSERVERCLASSPATH"));
+    config->SetDex2oatBootclasspath(GetEnvironmentVariableOrDie("DEX2OATBOOTCLASSPATH"));
+    config->SetSystemServerClasspath(GetEnvironmentVariableOrDie("SYSTEMSERVERCLASSPATH"));
     config->SetIsa(kRuntimeISA);
 
     const std::string zygote = android::base::GetProperty("ro.zygote", {});
