@@ -323,26 +323,15 @@ class InstructionHandler {
         Self(), shadow_frame_, inst_, inst_data_);
   }
 
-  template<Primitive::Type field_type>
-  HANDLER_ATTRIBUTES bool HandleGetQuick() {
-    return DoIGetQuick<field_type>(shadow_frame_, inst_, inst_data_);
-  }
-
   template<FindFieldType find_type, Primitive::Type field_type>
   HANDLER_ATTRIBUTES bool HandlePut() {
     return DoFieldPut<find_type, field_type, do_access_check, transaction_active>(
         Self(), shadow_frame_, inst_, inst_data_);
   }
 
-  template<Primitive::Type field_type>
-  HANDLER_ATTRIBUTES bool HandlePutQuick() {
-    return DoIPutQuick<field_type, transaction_active>(
-        shadow_frame_, inst_, inst_data_);
-  }
-
-  template<InvokeType type, bool is_range, bool is_quick = false>
+  template<InvokeType type, bool is_range>
   HANDLER_ATTRIBUTES bool HandleInvoke() {
-    bool success = DoInvoke<type, is_range, do_access_check, /*is_mterp=*/ false, is_quick>(
+    bool success = DoInvoke<type, is_range, do_access_check, /*is_mterp=*/ false>(
         Self(), shadow_frame_, inst_, inst_data_, ResultRegister());
     return PossiblyHandlePendingExceptionOnInvoke(!success);
   }
@@ -929,31 +918,31 @@ class InstructionHandler {
   }
 
   HANDLER_ATTRIBUTES bool IGET_QUICK() {
-    return HandleGetQuick<Primitive::kPrimInt>();
+    return HandleUnused();
   }
 
   HANDLER_ATTRIBUTES bool IGET_WIDE_QUICK() {
-    return HandleGetQuick<Primitive::kPrimLong>();
+    return HandleUnused();
   }
 
   HANDLER_ATTRIBUTES bool IGET_OBJECT_QUICK() {
-    return HandleGetQuick<Primitive::kPrimNot>();
+    return HandleUnused();
   }
 
   HANDLER_ATTRIBUTES bool IGET_BOOLEAN_QUICK() {
-    return HandleGetQuick<Primitive::kPrimBoolean>();
+    return HandleUnused();
   }
 
   HANDLER_ATTRIBUTES bool IGET_BYTE_QUICK() {
-    return HandleGetQuick<Primitive::kPrimByte>();
+    return HandleUnused();
   }
 
   HANDLER_ATTRIBUTES bool IGET_CHAR_QUICK() {
-    return HandleGetQuick<Primitive::kPrimChar>();
+    return HandleUnused();
   }
 
   HANDLER_ATTRIBUTES bool IGET_SHORT_QUICK() {
-    return HandleGetQuick<Primitive::kPrimShort>();
+    return HandleUnused();
   }
 
   HANDLER_ATTRIBUTES bool SGET_BOOLEAN() {
@@ -1013,31 +1002,31 @@ class InstructionHandler {
   }
 
   HANDLER_ATTRIBUTES bool IPUT_QUICK() {
-    return HandlePutQuick<Primitive::kPrimInt>();
+    return HandleUnused();
   }
 
   HANDLER_ATTRIBUTES bool IPUT_BOOLEAN_QUICK() {
-    return HandlePutQuick<Primitive::kPrimBoolean>();
+    return HandleUnused();
   }
 
   HANDLER_ATTRIBUTES bool IPUT_BYTE_QUICK() {
-    return HandlePutQuick<Primitive::kPrimByte>();
+    return HandleUnused();
   }
 
   HANDLER_ATTRIBUTES bool IPUT_CHAR_QUICK() {
-    return HandlePutQuick<Primitive::kPrimChar>();
+    return HandleUnused();
   }
 
   HANDLER_ATTRIBUTES bool IPUT_SHORT_QUICK() {
-    return HandlePutQuick<Primitive::kPrimShort>();
+    return HandleUnused();
   }
 
   HANDLER_ATTRIBUTES bool IPUT_WIDE_QUICK() {
-    return HandlePutQuick<Primitive::kPrimLong>();
+    return HandleUnused();
   }
 
   HANDLER_ATTRIBUTES bool IPUT_OBJECT_QUICK() {
-    return HandlePutQuick<Primitive::kPrimNot>();
+    return HandleUnused();
   }
 
   HANDLER_ATTRIBUTES bool SPUT_BOOLEAN() {
@@ -1109,11 +1098,11 @@ class InstructionHandler {
   }
 
   HANDLER_ATTRIBUTES bool INVOKE_VIRTUAL_QUICK() {
-    return HandleInvoke<kVirtual, /*is_range=*/ false, /*is_quick=*/ true>();
+    return HandleUnused();
   }
 
   HANDLER_ATTRIBUTES bool INVOKE_VIRTUAL_RANGE_QUICK() {
-    return HandleInvoke<kVirtual, /*is_range=*/ true, /*is_quick=*/ true>();
+    return HandleUnused();
   }
 
   HANDLER_ATTRIBUTES bool INVOKE_POLYMORPHIC() {

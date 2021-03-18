@@ -112,10 +112,10 @@
     /* op vAA, {vCCCC..v(CCCC+AA-1)}, meth@BBBB */
 
 %def op_invoke_virtual_quick():
-%  invoke(helper="MterpInvokeVirtualQuick")
+%  unused()
 
 %def op_invoke_virtual_range():
 %  invoke(helper="MterpInvokeVirtualRange")
 
 %def op_invoke_virtual_range_quick():
-%  invoke(helper="MterpInvokeVirtualQuickRange")
+%  unused()

@@ -243,28 +243,6 @@ extern "C" size_t MterpInvokePolymorphicRange(Thread* self,
       self, *shadow_frame, inst, inst_data, result_register) ? 1u : 0u;
 }
 
-extern "C" size_t MterpInvokeVirtualQuick(Thread* self,
-                                          ShadowFrame* shadow_frame,
-                                          uint16_t* dex_pc_ptr,
-                                          uint16_t inst_data)
-    REQUIRES_SHARED(Locks::mutator_lock_) {
-  JValue* result_register = shadow_frame->GetResultRegister();
-  const Instruction* inst = Instruction::At(dex_pc_ptr);
-  return DoInvoke<kVirtual, /*is_range=*/ false, /*do_access_check=*/ false, /*is_mterp=*/ true,
-      /*is_quick=*/ true>(self, *shadow_frame, inst, inst_data, result_register) ? 1u : 0u;
-}
-
-extern "C" size_t MterpInvokeVirtualQuickRange(Thread* self,
-                                               ShadowFrame* shadow_frame,
-                                               uint16_t* dex_pc_ptr,
-                                               uint16_t inst_data)
-    REQUIRES_SHARED(Locks::mutator_lock_) {
-  JValue* result_register = shadow_frame->GetResultRegister();
-  const Instruction* inst = Instruction::At(dex_pc_ptr);
-  return DoInvoke<kVirtual, /*is_range=*/ true, /*do_access_check=*/ false, /*is_mterp=*/ true,
-      /*is_quick=*/ true>(self, *shadow_frame, inst, inst_data, result_register) ? 1u : 0u;
-}
-
 extern "C" void MterpThreadFenceForConstructor() {
   QuasiAtomic::ThreadFenceForConstructor();
 }
@@ -398,14 +376,6 @@ extern "C" size_t MterpNewInstance(ShadowFrame* shadow_frame, Thread* self, uint
   obj->GetClass()->AssertInitializedOrInitializingInThread(self);
   shadow_frame->SetVRegReference(inst->VRegA_21c(inst_data), obj);
   return 1u;
-}
-
-extern "C" size_t MterpIputObjectQuick(ShadowFrame* shadow_frame,
-                                       uint16_t* dex_pc_ptr,
-                                       uint32_t inst_data)
-    REQUIRES_SHARED(Locks::mutator_lock_) {
-  const Instruction* inst = Instruction::At(dex_pc_ptr);
-  return DoIPutQuick<Primitive::kPrimNot, false>(*shadow_frame, inst, inst_data) ? 1u : 0u;
 }
 
 extern "C" size_t MterpAputObject(ShadowFrame* shadow_frame,
