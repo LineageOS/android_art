@@ -49,7 +49,7 @@ cc_library {
         },
 
         android: {
-            whole_static_libs: ["libasync_safe"],
+            static_libs: ["libasync_safe"],
         },
     },
 
@@ -74,7 +74,7 @@ cc_library_static {
     srcs: ["sigchain_fake.cc"],
     target: {
         android: {
-            whole_static_libs: ["libasync_safe"],
+            static_libs: ["libasync_safe"],
         },
     },
 
@@ -87,5 +87,5 @@ art_cc_test {
         "art_gtest_defaults",
     ],
     srcs: ["sigchain_test.cc"],
-    whole_static_libs: ["libsigchain"],
+    shared_libs: ["libsigchain"],
 }
