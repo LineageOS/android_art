@@ -118,6 +118,10 @@ class ThreadLifecycleCallbackRuntimeCallbacksTest : public RuntimeCallbacksTest 
 
   struct Callback : public ThreadLifecycleCallback {
     void ThreadStart(Thread* self) override {
+      {
+        ScopedObjectAccess soa(self);
+        LOG(DEBUG) << "ThreadStart callback for thread: " << self->GetThreadName();
+      }
       if (state == CallbackState::kBase) {
         state = CallbackState::kStarted;
         stored_self = self;
@@ -127,6 +131,10 @@ class ThreadLifecycleCallbackRuntimeCallbacksTest : public RuntimeCallbacksTest 
     }
 
     void ThreadDeath(Thread* self) override {
+      {
+        ScopedObjectAccess soa(self);
+        LOG(DEBUG) << "ThreadDeath callback for thread: " << self->GetThreadName();
+      }
       if (state == CallbackState::kStarted && self == stored_self) {
         state = CallbackState::kDied;
       } else {
@@ -149,6 +157,10 @@ TEST_F(ThreadLifecycleCallbackRuntimeCallbacksTest, ThreadLifecycleCallbackJava)
   ASSERT_TRUE(started);
   // Make sure the workers are done starting so we don't get callbacks for them.
   runtime_->WaitForThreadPoolWorkersToStart();
+
+  // The metrics reporting thread will sometimes be slow to start. Synchronously requesting a
+  // metrics report forces us to wait until the thread has started.
+  runtime_->RequestMetricsReport(/*synchronous=*/true);
 
   cb_.state = CallbackState::kBase;  // Ignore main thread attach.
 
@@ -187,7 +199,7 @@ TEST_F(ThreadLifecycleCallbackRuntimeCallbacksTest, ThreadLifecycleCallbackJava)
   env->CallVoidMethod(thread.get(), join_id);
   ASSERT_FALSE(env->ExceptionCheck());
 
-  EXPECT_TRUE(cb_.state == CallbackState::kDied) << static_cast<int>(cb_.state);
+  EXPECT_EQ(cb_.state, CallbackState::kDied);
 }
 
 TEST_F(ThreadLifecycleCallbackRuntimeCallbacksTest, ThreadLifecycleCallbackAttach) {
