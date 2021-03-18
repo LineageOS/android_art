@@ -102,10 +102,6 @@ class CompilerOptions final {
     return CompilerFilter::IsJniCompilationEnabled(compiler_filter_);
   }
 
-  bool IsQuickeningCompilationEnabled() const {
-    return CompilerFilter::IsQuickeningCompilationEnabled(compiler_filter_);
-  }
-
   bool IsVerificationEnabled() const {
     return CompilerFilter::IsVerificationEnabled(compiler_filter_);
   }
