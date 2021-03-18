@@ -56,10 +56,6 @@ class CompilerFilter final {
   // compiled executable code for JNI methods.
   static bool IsJniCompilationEnabled(Filter filter);
 
-  // Returns true if an oat file with this compiler filter contains
-  // quickened dex bytecode.
-  static bool IsQuickeningCompilationEnabled(Filter filter);
-
   // Returns true if this compiler filter requires running verification.
   static bool IsVerificationEnabled(Filter filter);
 
