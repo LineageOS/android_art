@@ -43,6 +43,8 @@
 #include "dex/dex_file-inl.h"
 #include "dex/dex_file_loader.h"
 #include "dex2oat_environment_test.h"
+#include "elf_file.h"
+#include "elf_file_impl.h"
 #include "gc_root-inl.h"
 #include "intern_table-inl.h"
 #include "oat.h"
@@ -2211,6 +2213,110 @@ TEST_F(LinkageTest, LinkageEnabled) {
         &error_msg,
         {"--check-linkage-conditions"});
   EXPECT_EQ(0, res_no_fail);
+}
+
+// Regression test for bug 179221298.
+TEST_F(Dex2oatTest, LoadOutOfDateOatFile) {
+  std::unique_ptr<const DexFile> dex(OpenTestDexFile("ManyMethods"));
+  std::string out_dir = GetScratchDir();
+  const std::string base_oat_name = out_dir + "/base.oat";
+  ASSERT_TRUE(GenerateOdexForTest(dex->GetLocation(),
+                                  base_oat_name,
+                                  CompilerFilter::Filter::kSpeed,
+                                  { "--deduplicate-code=false" },
+                                  /*expect_success=*/ true,
+                                  /*use_fd=*/ false,
+                                  /*use_zip_fd=*/ false));
+
+  // Check that we can open the oat file as executable.
+  {
+    std::string error_msg;
+    std::unique_ptr<OatFile> odex_file(OatFile::Open(/*zip_fd=*/ -1,
+                                                     base_oat_name.c_str(),
+                                                     base_oat_name.c_str(),
+                                                     /*executable=*/ true,
+                                                     /*low_4gb=*/ false,
+                                                     dex->GetLocation(),
+                                                     &error_msg));
+    ASSERT_TRUE(odex_file != nullptr) << error_msg;
+  }
+
+  // Rewrite the oat file with wrong version and bogus contents.
+  {
+    std::unique_ptr<File> file(OS::OpenFileReadWrite(base_oat_name.c_str()));
+    ASSERT_TRUE(file != nullptr);
+    // Retrieve the offset and size of the embedded oat file.
+    size_t oatdata_offset;
+    size_t oatdata_size;
+    {
+      std::string error_msg;
+      std::unique_ptr<ElfFile> elf_file(ElfFile::Open(file.get(),
+                                                      /*writable=*/ false,
+                                                      /*program_header_only=*/ true,
+                                                      /*low_4gb=*/ false,
+                                                      &error_msg));
+      ASSERT_TRUE(elf_file != nullptr) << error_msg;
+      ASSERT_TRUE(elf_file->Load(file.get(),
+                                 /*executable=*/ false,
+                                 /*low_4gb=*/ false,
+                                 /*reservation=*/ nullptr,
+                                 &error_msg)) << error_msg;
+      const uint8_t* base_address = elf_file->Is64Bit()
+          ? elf_file->GetImpl64()->GetBaseAddress()
+          : elf_file->GetImpl32()->GetBaseAddress();
+      const uint8_t* oatdata = elf_file->FindDynamicSymbolAddress("oatdata");
+      ASSERT_TRUE(oatdata != nullptr);
+      ASSERT_TRUE(oatdata > base_address);
+      // Note: We're assuming here that the virtual address offset is the same
+      // as file offset. This is currently true for all oat files we generate.
+      oatdata_offset = static_cast<size_t>(oatdata - base_address);
+      const uint8_t* oatlastword = elf_file->FindDynamicSymbolAddress("oatlastword");
+      ASSERT_TRUE(oatlastword != nullptr);
+      ASSERT_TRUE(oatlastword > oatdata);
+      oatdata_size = oatlastword - oatdata;
+    }
+
+    // Check that we have the right `oatdata_offset`.
+    int64_t length = file->GetLength();
+    ASSERT_GE(length, static_cast<ssize_t>(oatdata_offset + sizeof(OatHeader)));
+    alignas(OatHeader) uint8_t header_data[sizeof(OatHeader)];
+    ASSERT_TRUE(file->PreadFully(header_data, sizeof(header_data), oatdata_offset));
+    const OatHeader& header = reinterpret_cast<const OatHeader&>(header_data);
+    ASSERT_TRUE(header.IsValid()) << header.GetValidationErrorMessage();
+
+    // Overwrite all oat data from version onwards with bytes with value 4.
+    // (0x04040404 is not a valid version, we're using three decimal digits and '\0'.)
+    //
+    // We previously tried to find the value for key "debuggable" (bug 179221298)
+    // in the key-value store before checking the oat header. This test tries to
+    // ensure that such early processing of the key-value store shall crash.
+    // Reading 0x04040404 as the size of the key-value store yields a bit over
+    // 64MiB which should hopefully include some unmapped memory beyond the end
+    // of the loaded oat file. Overwriting the whole embedded oat file ensures
+    // that we do not match the key within the oat file but we could still
+    // accidentally match it in the additional sections of the elf file, so this
+    // approach could fail to catch similar issues. At the time of writing, this
+    // test crashed when run without the fix on 64-bit host (but not 32-bit).
+    static constexpr size_t kVersionOffset = sizeof(OatHeader::kOatMagic);
+    static_assert(kVersionOffset < sizeof(OatHeader));
+    std::vector<uint8_t> data(oatdata_size - kVersionOffset, 4u);
+    ASSERT_TRUE(file->PwriteFully(data.data(), data.size(), oatdata_offset + kVersionOffset));
+    UNUSED(oatdata_size);
+    CHECK_EQ(file->FlushClose(), 0) << "Could not flush and close oat file";
+  }
+
+  // Check that we reject the oat file without crashing.
+  {
+    std::string error_msg;
+    std::unique_ptr<OatFile> odex_file(OatFile::Open(/*zip_fd=*/ -1,
+                                                     base_oat_name.c_str(),
+                                                     base_oat_name.c_str(),
+                                                     /*executable=*/ true,
+                                                     /*low_4gb=*/ false,
+                                                     dex->GetLocation(),
+                                                     &error_msg));
+    ASSERT_FALSE(odex_file != nullptr);
+  }
 }
 
 }  // namespace art
