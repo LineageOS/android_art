@@ -50,8 +50,6 @@ class ElfWriter {
   // Returns runtime oat_data runtime address for an opened ElfFile.
   static uintptr_t GetOatDataAddress(ElfFile* elf_file);
 
-  static bool Fixup(File* file, uintptr_t oat_data_begin);
-
   virtual ~ElfWriter() {}
 
   virtual void Start() = 0;
