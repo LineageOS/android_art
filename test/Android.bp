@@ -81,9 +81,6 @@ art_cc_defaults {
         "libnativehelper",
         "libz",
     ],
-    whole_static_libs: [
-        "libsigchain",
-    ],
 
     target: {
         linux: {
