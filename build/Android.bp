@@ -230,6 +230,8 @@ art_global_defaults {
         // will still get the "real" errors.
         "-extra-arg=-Wno-unreachable-code",
     ],
+
+    min_sdk_version: "S",
 }
 
 cc_defaults {
@@ -284,6 +286,8 @@ art_debug_defaults {
             cflags: ["-Wno-frame-larger-than="],
         },
     },
+
+    min_sdk_version: "S",
 }
 
 soong_config_module_type_import {
