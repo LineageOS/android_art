@@ -59,6 +59,10 @@ class ElfFileImpl {
     return file_path_;
   }
 
+  uint8_t* GetBaseAddress() const {
+    return base_address_;
+  }
+
   uint8_t* Begin() const {
     return map_.Begin();
   }
