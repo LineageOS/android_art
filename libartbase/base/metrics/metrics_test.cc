@@ -220,6 +220,51 @@ TEST_F(MetricsTest, StreamBackendDumpAllMetrics) {
 #undef METRIC
 }
 
+TEST_F(MetricsTest, ResetMetrics) {
+  ArtMetrics metrics;
+
+  // Add something to each of the metrics.
+#define METRIC(name, type, ...) metrics.name()->Add(42);
+  ART_METRICS(METRIC)
+#undef METRIC
+
+  class NonZeroBackend : public TestBackendBase {
+   public:
+    void ReportCounter(DatumId, uint64_t value) override {
+      EXPECT_NE(value, 0u);
+    }
+
+    void ReportHistogram(DatumId, int64_t, int64_t, const std::vector<uint32_t>& buckets) override {
+      bool nonzero = false;
+      for (const auto value : buckets) {
+        nonzero |= (value != 0u);
+      }
+      EXPECT_TRUE(nonzero);
+    }
+  } non_zero_backend;
+
+  // Make sure the metrics all have a nonzero value.
+  metrics.ReportAllMetrics(&non_zero_backend);
+
+  // Reset the metrics and make sure they are all zero again
+  metrics.Reset();
+
+  class ZeroBackend : public TestBackendBase {
+   public:
+    void ReportCounter(DatumId, uint64_t value) override {
+      EXPECT_EQ(value, 0u);
+    }
+
+    void ReportHistogram(DatumId, int64_t, int64_t, const std::vector<uint32_t>& buckets) override {
+      for (const auto value : buckets) {
+        EXPECT_EQ(value, 0u);
+      }
+    }
+  } zero_backend;
+
+  metrics.ReportAllMetrics(&zero_backend);
+}
+
 }  // namespace metrics
 }  // namespace art
 
