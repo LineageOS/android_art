@@ -5121,9 +5121,9 @@ void ClassLinker::CreateProxyMethod(Handle<mirror::Class> klass, ArtMethod* prot
 
   // Set class to be the concrete proxy class.
   out->SetDeclaringClass(klass.Get());
-  // Clear the abstract, default and conflict flags to ensure that defaults aren't picked in
+  // Clear the abstract and default flags to ensure that defaults aren't picked in
   // preference to the invocation handler.
-  const uint32_t kRemoveFlags = kAccAbstract | kAccDefault | kAccDefaultConflict;
+  const uint32_t kRemoveFlags = kAccAbstract | kAccDefault;
   // Make the method final.
   // Mark kAccCompileDontBother so that we don't take JIT samples for the method. b/62349349
   const uint32_t kAddFlags = kAccFinal | kAccCompileDontBother;
@@ -7881,9 +7881,11 @@ void ClassLinker::LinkInterfaceMethodsHelper::ReallocMethods() {
     ArtMethod* mir_method = miranda_methods_[i];
     ArtMethod& new_method = *out;
     new_method.CopyFrom(mir_method, pointer_size);
-    new_method.SetAccessFlags(new_method.GetAccessFlags() | kAccMiranda | kAccCopied);
-    DCHECK_NE(new_method.GetAccessFlags() & kAccAbstract, 0u)
-        << "Miranda method should be abstract!";
+    uint32_t access_flags = new_method.GetAccessFlags();
+    DCHECK_EQ(access_flags & kAccIntrinsic, 0u) << "Miranda method should not be an intrinsic!";
+    DCHECK_EQ(access_flags & kAccDefault, 0u) << "Miranda method should not be a default method!";
+    DCHECK_NE(access_flags & kAccAbstract, 0u) << "Miranda method should be abstract!";
+    new_method.SetAccessFlags(access_flags | kAccCopied);
     move_table_.emplace(mir_method, &new_method);
     // Update the entry in the method array, as the array will be used for future lookups,
     // where thread suspension is allowed.
@@ -7928,17 +7930,20 @@ void ClassLinker::LinkInterfaceMethodsHelper::ReallocMethods() {
       ArtMethod& new_method = *out;
       new_method.CopyFrom(conf_method, pointer_size);
       // This is a type of default method (there are default method impls, just a conflict) so
-      // mark this as a default, non-abstract method, since thats what it is. Also clear the
-      // kAccSkipAccessChecks bit since this class hasn't been verified yet it shouldn't have
-      // methods that are skipping access checks.
-      // Also clear potential kAccSingleImplementation to avoid CHA trying to inline
-      // the default method.
-      DCHECK_EQ(new_method.GetAccessFlags() & kAccNative, 0u);
-      constexpr uint32_t kSetFlags = kAccDefault | kAccDefaultConflict | kAccCopied;
-      constexpr uint32_t kMaskFlags =
-          ~(kAccAbstract | kAccSkipAccessChecks | kAccSingleImplementation);
-      new_method.SetAccessFlags((new_method.GetAccessFlags() | kSetFlags) & kMaskFlags);
+      // mark this as a default. We use the `kAccAbstract` flag to distinguish it from invokable
+      // copied default method without using a separate access flag but the default conflicting
+      // method is technically not abstract and ArtMethod::IsAbstract() shall return false.
+      // Also clear the kAccSkipAccessChecks bit since this class hasn't been verified yet it
+      // shouldn't have methods that are skipping access checks. Also clear potential
+      // kAccSingleImplementation to avoid CHA trying to inline the default method.
+      uint32_t access_flags = new_method.GetAccessFlags();
+      DCHECK_EQ(access_flags & kAccNative, 0u);
+      DCHECK_EQ(access_flags & kAccIntrinsic, 0u);
+      constexpr uint32_t kSetFlags = kAccDefault | kAccAbstract | kAccCopied;
+      constexpr uint32_t kMaskFlags = ~(kAccSkipAccessChecks | kAccSingleImplementation);
+      new_method.SetAccessFlags((access_flags | kSetFlags) & kMaskFlags);
       DCHECK(new_method.IsDefaultConflicting());
+      DCHECK(!new_method.IsAbstract());
       // The actual method might or might not be marked abstract since we just copied it from a
       // (possibly default) interface method. We need to set it entry point to be the bridge so
       // that the compiler will not invoke the implementation of whatever method we copied from.
