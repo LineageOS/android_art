@@ -39,6 +39,7 @@
 #define ART_METRICS(METRIC)                                        \
   METRIC(ClassLoadingTotalTime, MetricsCounter)                    \
   METRIC(ClassVerificationTotalTime, MetricsCounter)               \
+  METRIC(ClassVerificationCount, MetricsCounter)                   \
   METRIC(MutatorPauseTimeDuringGC, MetricsCounter)                 \
   METRIC(YoungGcCount, MetricsCounter)                             \
   METRIC(FullGcCount, MetricsCounter)                              \
