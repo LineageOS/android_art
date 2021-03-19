@@ -111,9 +111,6 @@
     },
     {
       "name": "art-run-test-047-returns[com.google.android.art.apex]"
-    },
-    {
-      "name": "art-run-test-048-reflect-v8[com.google.android.art.apex]"
     }
   ],
   "presubmit": [
@@ -332,9 +329,6 @@
     },
     {
       "name": "art-run-test-095-switch-MAX_INT"
-    },
-    {
-      "name": "art-run-test-098-ddmc"
     },
     {
       "name": "art-run-test-099-vmdebug"
