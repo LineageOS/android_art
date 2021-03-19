@@ -31,7 +31,7 @@ static constexpr const char* kOdrefreshArtifactDirectory =
 // NB if odrefresh crashes, then the caller should not sign any artifacts and should remove any
 // unsigned artifacts under `kOdrefreshArtifactDirectory`.
 //
-enum ExitCode {
+enum ExitCode : int {
   // No compilation required, all artifacts look good or there is insufficient space to compile.
   // For ART APEX in the system image, there may be no artifacts present under
   // `kOdrefreshArtifactDirectory`.
@@ -39,17 +39,24 @@ enum ExitCode {
 
   // Compilation required. Re-run program with --compile on the command-line to generate
   // new artifacts under `kOdrefreshArtifactDirectory`.
-  kCompilationRequired = 1,
+  kCompilationRequired = EX__MAX + 1,
 
-  // Compilation failed. Artifacts under `kOdrefreshArtifactDirectory` will be valid. This may
-  // happen, for example, if compilation of boot extensions succeeds, but the compilation of the
-  // system_server jars fails due to lack of storage space.
-  kCompilationFailed = 2,
+  // Compilation failed. Any artifacts under `kOdrefreshArtifactDirectory` are valid and should not
+  // be removed. This may happen, for example, if compilation of boot extensions succeeds, but the
+  // compilation of the system_server jars fails due to lack of storage space.
+  kCompilationFailed = EX__MAX + 2,
+
+  // Removal of existing artifacts (or files under `kOdrefreshArtifactDirectory`) failed. Artifacts
+  // should be treated as invalid and should be removed if possible.
+  kCleanupFailed = EX__MAX + 3,
+
+  // Last exit code defined.
+  kLastExitCode = kCleanupFailed,
 };
 
 static_assert(EX_OK == 0);
 static_assert(ExitCode::kOkay < EX__BASE);
-static_assert(ExitCode::kCompilationFailed < EX__BASE);
+static_assert(ExitCode::kLastExitCode < 0xff);  // The `exit()` man page discusses the mask value.
 
 }  // namespace odrefresh
 }  // namespace art
