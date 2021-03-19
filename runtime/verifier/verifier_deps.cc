@@ -112,23 +112,16 @@ dex::StringIndex VerifierDeps::GetClassDescriptorStringId(const DexFile& dex_fil
   return GetIdFromString(dex_file, klass->GetDescriptor(&temp));
 }
 
-static inline VerifierDeps* GetMainVerifierDeps() {
+static inline VerifierDeps* GetMainVerifierDeps(VerifierDeps* local_deps) {
   // The main VerifierDeps is the one set in the compiler callbacks, which at the
   // end of verification will have all the per-thread VerifierDeps merged into it.
   CompilerCallbacks* callbacks = Runtime::Current()->GetCompilerCallbacks();
   if (callbacks == nullptr) {
-    return nullptr;
+    DCHECK(!Runtime::Current()->IsAotCompiler());
+    return local_deps;
   }
+  DCHECK(Runtime::Current()->IsAotCompiler());
   return callbacks->GetVerifierDeps();
-}
-
-static inline VerifierDeps* GetThreadLocalVerifierDeps() {
-  // During AOT, each thread has its own VerifierDeps, to avoid lock contention. At the end
-  // of full verification, these VerifierDeps will be merged into the main one.
-  if (!Runtime::Current()->IsAotCompiler()) {
-    return nullptr;
-  }
-  return Thread::Current()->GetVerifierDeps();
 }
 
 static bool FindExistingStringId(const std::vector<std::string>& strings,
@@ -156,7 +149,7 @@ dex::StringIndex VerifierDeps::GetIdFromString(const DexFile& dex_file, const st
 
   // We use the main `VerifierDeps` for adding new strings to simplify
   // synchronization/merging of these entries between threads.
-  VerifierDeps* singleton = GetMainVerifierDeps();
+  VerifierDeps* singleton = GetMainVerifierDeps(this);
   DexFileDeps* deps = singleton->GetDexFileDeps(dex_file);
   DCHECK(deps != nullptr);
 
@@ -285,16 +278,16 @@ void VerifierDeps::AddAssignability(const DexFile& dex_file,
   }
 }
 
-void VerifierDeps::MaybeRecordVerificationStatus(const DexFile& dex_file,
+void VerifierDeps::MaybeRecordVerificationStatus(VerifierDeps* verifier_deps,
+                                                 const DexFile& dex_file,
                                                  const dex::ClassDef& class_def,
                                                  FailureKind failure_kind) {
-  VerifierDeps* thread_deps = GetThreadLocalVerifierDeps();
-  if (thread_deps != nullptr) {
+  if (verifier_deps != nullptr) {
     switch (failure_kind) {
       case verifier::FailureKind::kHardFailure:
       case verifier::FailureKind::kSoftFailure: {
         // Class will be verified at runtime.
-        DexFileDeps* dex_deps = thread_deps->GetDexFileDeps(dex_file);
+        DexFileDeps* dex_deps = verifier_deps->GetDexFileDeps(dex_file);
         uint16_t index = dex_file.GetIndexForClassDef(class_def);
         dex_deps->assignable_types_[index].clear();
         break;
@@ -302,7 +295,7 @@ void VerifierDeps::MaybeRecordVerificationStatus(const DexFile& dex_file,
       case verifier::FailureKind::kAccessChecksFailure:
       case verifier::FailureKind::kTypeChecksFailure:
       case verifier::FailureKind::kNoFailure: {
-        thread_deps->RecordClassVerified(dex_file, class_def);
+        verifier_deps->RecordClassVerified(dex_file, class_def);
         break;
       }
     }
@@ -315,23 +308,23 @@ void VerifierDeps::RecordClassVerified(const DexFile& dex_file, const dex::Class
   dex_deps->verified_classes_[dex_file.GetIndexForClassDef(class_def)] = true;
 }
 
-void VerifierDeps::MaybeRecordAssignability(const DexFile& dex_file,
+void VerifierDeps::MaybeRecordAssignability(VerifierDeps* verifier_deps,
+                                            const DexFile& dex_file,
                                             const dex::ClassDef& class_def,
                                             ObjPtr<mirror::Class> destination,
                                             ObjPtr<mirror::Class> source) {
-  VerifierDeps* thread_deps = GetThreadLocalVerifierDeps();
-  if (thread_deps != nullptr) {
-    thread_deps->AddAssignability(dex_file, class_def, destination, source);
+  if (verifier_deps != nullptr) {
+    verifier_deps->AddAssignability(dex_file, class_def, destination, source);
   }
 }
 
-void VerifierDeps::MaybeRecordAssignability(const DexFile& dex_file,
+void VerifierDeps::MaybeRecordAssignability(VerifierDeps* verifier_deps,
+                                            const DexFile& dex_file,
                                             const dex::ClassDef& class_def,
                                             const RegType& destination,
                                             const RegType& source) {
-  VerifierDeps* thread_deps = GetThreadLocalVerifierDeps();
-  if (thread_deps != nullptr) {
-    thread_deps->AddAssignability(dex_file, class_def, destination, source);
+  if (verifier_deps != nullptr) {
+    verifier_deps->AddAssignability(dex_file, class_def, destination, source);
   }
 }
 

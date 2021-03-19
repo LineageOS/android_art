@@ -63,13 +63,13 @@ class TransactionTest : public CommonRuntimeTest {
     h_klass.Assign(class_linker_->FindClass(soa.Self(), "LTransaction$AbortHelperClass;",
                                             class_loader));
     ASSERT_TRUE(h_klass != nullptr);
-    class_linker_->VerifyClass(soa.Self(), h_klass);
+    class_linker_->VerifyClass(soa.Self(), /* verifier_deps= */ nullptr, h_klass);
     ASSERT_TRUE(h_klass->IsVerified());
 
     // Load and verify tested class.
     h_klass.Assign(class_linker_->FindClass(soa.Self(), tested_class_signature, class_loader));
     ASSERT_TRUE(h_klass != nullptr);
-    class_linker_->VerifyClass(soa.Self(), h_klass);
+    class_linker_->VerifyClass(soa.Self(), /* verifier_deps= */ nullptr, h_klass);
     ASSERT_TRUE(h_klass->IsVerified());
 
     ClassStatus old_status = h_klass->GetStatus();
@@ -543,7 +543,7 @@ TEST_F(TransactionTest, EmptyClass) {
       hs.NewHandle(class_linker_->FindClass(soa.Self(), "LTransaction$EmptyStatic;",
                                             class_loader)));
   ASSERT_TRUE(h_klass != nullptr);
-  class_linker_->VerifyClass(soa.Self(), h_klass);
+  class_linker_->VerifyClass(soa.Self(), /* verifier_deps= */ nullptr, h_klass);
   ASSERT_TRUE(h_klass->IsVerified());
 
   EnterTransactionMode();
@@ -566,7 +566,7 @@ TEST_F(TransactionTest, StaticFieldClass) {
       hs.NewHandle(class_linker_->FindClass(soa.Self(), "LTransaction$StaticFieldClass;",
                                             class_loader)));
   ASSERT_TRUE(h_klass != nullptr);
-  class_linker_->VerifyClass(soa.Self(), h_klass);
+  class_linker_->VerifyClass(soa.Self(), /* verifier_deps= */ nullptr, h_klass);
   ASSERT_TRUE(h_klass->IsVerified());
 
   EnterTransactionMode();
