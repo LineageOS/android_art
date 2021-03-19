@@ -70,7 +70,7 @@ void ArtMetrics::ReportAllMetrics(MetricsBackend* backend) const {
 
 #define ART_METRIC(name, Kind, ...) name()->Report(backend);
   ART_METRICS(ART_METRIC)
-#undef ART_METRICS
+#undef ART_METRIC
 
   backend->EndReport();
 }
@@ -79,6 +79,13 @@ void ArtMetrics::DumpForSigQuit(std::ostream& os) const {
   StringBackend backend;
   ReportAllMetrics(&backend);
   os << backend.GetAndResetBuffer();
+}
+
+void ArtMetrics::Reset() {
+  beginning_timestamp_ = MilliTime();
+#define ART_METRIC(name, kind, ...) name##_.Reset();
+  ART_METRICS(ART_METRIC);
+#undef ART_METRIC
 }
 
 StringBackend::StringBackend() {}
