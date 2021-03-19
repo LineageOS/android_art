@@ -149,8 +149,6 @@ uint16_t ArtMethod::FindObsoleteDexClassDefIndex() {
 
 void ArtMethod::ThrowInvocationTimeError() {
   DCHECK(!IsInvokable());
-  // NOTE: IsDefaultConflicting must be first since the actual method might or might not be abstract
-  //       due to the way we select it.
   if (IsDefaultConflicting()) {
     ThrowIncompatibleClassChangeErrorForMethodConflict(this);
   } else {
