@@ -246,6 +246,7 @@ apex_defaults {
     compile_multilib: "both",
     manifest: "manifest-art.json",
     boot_images: ["art-boot-image"],
+    compat_configs: ["libcore-platform-compat-config"],
     java_libs: libcore_java_libs + art_java_libs,
     native_shared_libs: art_runtime_base_native_shared_libs +
         art_runtime_base_native_device_only_shared_libs +
