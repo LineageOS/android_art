@@ -30,17 +30,11 @@ namespace metrics {
 
 std::string DatumName(DatumId datum) {
   switch (datum) {
-#define ART_COUNTER(name) \
+#define ART_METRIC(name, Kind, ...) \
   case DatumId::k##name:  \
     return #name;
-    ART_COUNTERS(ART_COUNTER)
-#undef ART_COUNTER
-
-#define ART_HISTOGRAM(name, num_buckets, low_value, high_value) \
-  case DatumId::k##name:                                        \
-    return #name;
-    ART_HISTOGRAMS(ART_HISTOGRAM)
-#undef ART_HISTOGRAM
+    ART_METRICS(ART_METRIC)
+#undef ART_METRIC
 
     default:
       LOG(FATAL) << "Unknown datum id: " << static_cast<unsigned>(datum);
@@ -64,29 +58,19 @@ SessionData SessionData::CreateDefault() {
 }
 
 ArtMetrics::ArtMetrics() : beginning_timestamp_ {MilliTime()}
-#define ART_COUNTER(name) \
+#define ART_METRIC(name, Kind, ...) \
   , name##_ {}
-ART_COUNTERS(ART_COUNTER)
-#undef ART_COUNTER
-#define ART_HISTOGRAM(name, num_buckets, low_value, high_value) \
-  , name##_ {}
-ART_HISTOGRAMS(ART_HISTOGRAM)
-#undef ART_HISTOGRAM
+ART_METRICS(ART_METRIC)
+#undef ART_METRIC
 {
 }
 
 void ArtMetrics::ReportAllMetrics(MetricsBackend* backend) const {
   backend->BeginReport(MilliTime() - beginning_timestamp_);
 
-// Dump counters
-#define ART_COUNTER(name) name()->Report(backend);
-  ART_COUNTERS(ART_COUNTER)
-#undef ART_COUNTERS
-
-// Dump histograms
-#define ART_HISTOGRAM(name, num_buckets, low_value, high_value) name()->Report(backend);
-  ART_HISTOGRAMS(ART_HISTOGRAM)
-#undef ART_HISTOGRAM
+#define ART_METRIC(name, Kind, ...) name()->Report(backend);
+  ART_METRICS(ART_METRIC)
+#undef ART_METRICS
 
   backend->EndReport();
 }
