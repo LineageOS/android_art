@@ -1068,9 +1068,10 @@ void Runtime::InitNonZygoteOrPostFork(
     thread_pool_->StartWorkers(Thread::Current());
   }
 
-  // Reset the gc performance data at zygote fork so that the GCs
+  // Reset the gc performance data and metrics at zygote fork so that the events from
   // before fork aren't attributed to an app.
   heap_->ResetGcPerformanceInfo();
+  GetMetrics()->Reset();
 
   if (metrics_reporter_ != nullptr) {
     if (IsSystemServer() && !metrics_reporter_->IsPeriodicReportingEnabled()) {
