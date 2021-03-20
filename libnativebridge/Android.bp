@@ -35,6 +35,7 @@ cc_library_headers {
         "com.android.art.debug",
         "com.android.media",
     ],
+    min_sdk_version: "S",
 }
 
 art_cc_library {

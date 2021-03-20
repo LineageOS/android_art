@@ -779,6 +779,7 @@ cc_library_headers {
         "com.android.art",
         "com.android.art.debug",
     ],
+    min_sdk_version: "S",
 }
 
 genrule {
@@ -893,6 +894,7 @@ cc_library_static {
         "com.android.art",
         "com.android.art.debug",
     ],
+    min_sdk_version: "S",
 }
 
 genrule {

@@ -35,6 +35,7 @@ cc_library {
         "com.android.art",
         "com.android.art.debug",
     ],
+    min_sdk_version: "S",
     shared_libs: [
         "libbase",
     ],
@@ -55,8 +56,8 @@ java_library {
         "com.android.art",
         "com.android.art.debug",
     ],
-
     sdk_version: "core_platform",
+    min_sdk_version: "31",
 
     srcs: [
         "service/java/com/android/server/art/ArtService.java",
