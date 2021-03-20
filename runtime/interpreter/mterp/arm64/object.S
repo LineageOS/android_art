@@ -84,76 +84,40 @@
 %  op_iget(load="ldrb", helper="MterpIGetU8")
 
 %def op_iget_boolean_quick():
-%  op_iget_quick(load="ldrb")
+%  unused()
 
 %def op_iget_byte():
 %  op_iget(load="ldrsb", helper="MterpIGetI8")
 
 %def op_iget_byte_quick():
-%  op_iget_quick(load="ldrsb")
+%  unused()
 
 %def op_iget_char():
 %  op_iget(load="ldrh", helper="MterpIGetU16")
 
 %def op_iget_char_quick():
-%  op_iget_quick(load="ldrh")
+%  unused()
 
 %def op_iget_object():
 %  op_iget(is_object=True, helper="MterpIGetObj")
 
 %def op_iget_object_quick():
-    /* For: iget-object-quick */
-    /* op vA, vB, offset//CCCC */
-    lsr     w2, wINST, #12              // w2<- B
-    FETCH w1, 1                         // w1<- field byte offset
-    EXPORT_PC
-    GET_VREG w0, w2                     // w0<- object we're operating on
-    bl      artIGetObjectFromMterp      // (obj, offset)
-    ldr     x3, [xSELF, #THREAD_EXCEPTION_OFFSET]
-    ubfx    w2, wINST, #8, #4           // w2<- A
-    PREFETCH_INST 2
-    cbnz    w3, MterpPossibleException      // bail out
-    SET_VREG_OBJECT w0, w2              // fp[A]<- w0
-    ADVANCE 2                           // advance rPC
-    GET_INST_OPCODE ip                  // extract opcode from wINST
-    GOTO_OPCODE ip                      // jump to next instruction
+%  unused()
 
 %def op_iget_quick(load="ldr", extend=""):
-    /* For: iget-quick, iget-boolean-quick, iget-byte-quick, iget-char-quick, iget-short-quick */
-    /* op vA, vB, offset//CCCC */
-    lsr     w2, wINST, #12              // w2<- B
-    FETCH w1, 1                         // w1<- field byte offset
-    GET_VREG w3, w2                     // w3<- object we're operating on
-    ubfx    w2, wINST, #8, #4           // w2<- A
-    cbz     w3, common_errNullObject    // object was null
-    $load   w0, [x3, x1]                // w0<- obj.field
-    FETCH_ADVANCE_INST 2                // advance rPC, load rINST
-    $extend
-    SET_VREG w0, w2                     // fp[A]<- w0
-    GET_INST_OPCODE ip                  // extract opcode from rINST
-    GOTO_OPCODE ip                      // jump to next instruction
+%  unused()
 
 %def op_iget_short():
 %  op_iget(load="ldrsh", helper="MterpIGetI16")
 
 %def op_iget_short_quick():
-%  op_iget_quick(load="ldrsh")
+%  unused()
 
 %def op_iget_wide():
 %  op_iget(is_wide=True, helper="MterpIGetU64")
 
 %def op_iget_wide_quick():
-    /* iget-wide-quick vA, vB, offset//CCCC */
-    lsr     w2, wINST, #12              // w2<- B
-    FETCH w4, 1                         // w4<- field byte offset
-    GET_VREG w3, w2                     // w3<- object we're operating on
-    ubfx    w2, wINST, #8, #4           // w2<- A
-    cbz     w3, common_errNullObject    // object was null
-    ldr     x0, [x3, x4]                // x0<- obj.field
-    FETCH_ADVANCE_INST 2                // advance rPC, load wINST
-    SET_VREG_WIDE x0, w2
-    GET_INST_OPCODE ip                  // extract opcode from wINST
-    GOTO_OPCODE ip                      // jump to next instruction
+%  unused()
 
 %def op_instance_of():
     /*
@@ -186,69 +150,40 @@
 %  op_iput(helper="MterpIPutU8")
 
 %def op_iput_boolean_quick():
-%  op_iput_quick(store="strb")
+%  unused()
 
 %def op_iput_byte():
 %  op_iput(helper="MterpIPutI8")
 
 %def op_iput_byte_quick():
-%  op_iput_quick(store="strb")
+%  unused()
 
 %def op_iput_char():
 %  op_iput(helper="MterpIPutU16")
 
 %def op_iput_char_quick():
-%  op_iput_quick(store="strh")
+%  unused()
 
 %def op_iput_object():
 %  op_iput(helper="MterpIPutObj")
 
 %def op_iput_object_quick():
-    EXPORT_PC
-    add     x0, xFP, #OFF_FP_SHADOWFRAME
-    mov     x1, xPC
-    mov     w2, wINST
-    bl      MterpIputObjectQuick
-    cbz     w0, MterpException
-    FETCH_ADVANCE_INST 2                // advance rPC, load rINST
-    GET_INST_OPCODE ip                  // extract opcode from rINST
-    GOTO_OPCODE ip                      // jump to next instruction
+%  unused()
 
 %def op_iput_quick(store="str"):
-    /* For: iput-quick, iput-object-quick */
-    /* op vA, vB, offset//CCCC */
-    lsr     w2, wINST, #12              // w2<- B
-    FETCH w1, 1                         // w1<- field byte offset
-    GET_VREG w3, w2                     // w3<- fp[B], the object pointer
-    ubfx    w2, wINST, #8, #4           // w2<- A
-    cbz     w3, common_errNullObject    // object was null
-    GET_VREG w0, w2                     // w0<- fp[A]
-    FETCH_ADVANCE_INST 2                // advance rPC, load rINST
-    $store     w0, [x3, x1]             // obj.field<- w0
-    GET_INST_OPCODE ip                  // extract opcode from rINST
-    GOTO_OPCODE ip                      // jump to next instruction
+%  unused()
 
 %def op_iput_short():
 %  op_iput(helper="MterpIPutI16")
 
 %def op_iput_short_quick():
-%  op_iput_quick(store="strh")
+%  unused()
 
 %def op_iput_wide():
 %  op_iput(helper="MterpIPutU64")
 
 %def op_iput_wide_quick():
-    /* iput-wide-quick vA, vB, offset//CCCC */
-    lsr     w2, wINST, #12              // w2<- B
-    FETCH w3, 1                         // w3<- field byte offset
-    GET_VREG w2, w2                     // w2<- fp[B], the object pointer
-    ubfx    w0, wINST, #8, #4           // w0<- A
-    cbz     w2, common_errNullObject    // object was null
-    GET_VREG_WIDE x0, w0                // x0<- fp[A]
-    FETCH_ADVANCE_INST 2                // advance rPC, load wINST
-    str     x0, [x2, x3]                // obj.field<- x0
-    GET_INST_OPCODE ip                  // extract opcode from wINST
-    GOTO_OPCODE ip                      // jump to next instruction
+%  unused()
 
 %def op_new_instance():
     /*
