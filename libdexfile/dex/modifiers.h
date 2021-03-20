@@ -58,35 +58,34 @@ static constexpr uint32_t kAccSkipHiddenapiChecks =   0x00100000;  // class (run
 // Used by a class to denote that this class and any objects with this as a
 // declaring-class/super-class are to be considered obsolete, meaning they should not be used by.
 static constexpr uint32_t kAccObsoleteObject =        0x00200000;  // class (runtime)
-// This is set by the class linker during LinkInterfaceMethods. It is used by a method to represent
-// that it was copied from its declaring class into another class. All methods marked kAccMiranda
-// and kAccDefaultConflict will have this bit set. Any kAccDefault method contained in the methods_
-// array of a concrete class will also have this bit set.
-// We need copies of the original method because the method may end up in
-// different places in classes vtables, and the vtable index is set in ArtMethod.method_index.
-static constexpr uint32_t kAccCopied =                0x00100000;  // method (runtime)
-static constexpr uint32_t kAccMiranda =               0x00200000;  // method (runtime, not native)
+// This is set by the class linker during LinkInterfaceMethods. It is used by a method
+// to represent that it was copied from its declaring class into another class.
+// We need copies of the original method because the method may end up in different
+// places in classes vtables, and the vtable index is set in ArtMethod.method_index.
+//
+// Default methods copied to a sub-interface or a concrete class shall have this bit set.
+// Default conflict methods shall be marked as copied, abstract and default.
+// Miranda methods shall be marked as copied and abstract but not default.
+//
+// We do not have intrinsics for any default methods and therefore intrinsics are never
+// copied. We can therefore use a flag from the intrinsic flags range.
+static constexpr uint32_t kAccCopied =                0x01000000;  // method (runtime)
 static constexpr uint32_t kAccDefault =               0x00400000;  // method (runtime)
 // Native method flags are set when linking the methods based on the presence of the
 // @dalvik.annotation.optimization.{Fast,Critical}Native annotations with build visibility.
 // Reuse the values of kAccSkipAccessChecks and kAccMiranda which are not used for native methods.
 static constexpr uint32_t kAccFastNative =            0x00080000;  // method (runtime; native only)
-static constexpr uint32_t kAccCriticalNative =        0x00200000;  // method (runtime; native only)
+static constexpr uint32_t kAccCriticalNative =        0x00100000;  // method (runtime; native only)
 
 // Set by the JIT when clearing profiling infos to denote that a method was previously warm.
 static constexpr uint32_t kAccPreviouslyWarm =        0x00800000;  // method (runtime)
-
-// This is set by the class linker during LinkInterfaceMethods. Prior to that point we do not know
-// if any particular method needs to be a default conflict. Used to figure out at runtime if
-// invoking this method will throw an exception.
-static constexpr uint32_t kAccDefaultConflict =       0x01000000;  // method (runtime)
 
 // Set by the verifier for a method we do not want the compiler to compile.
 static constexpr uint32_t kAccCompileDontBother =     0x02000000;  // method (runtime)
 
 // Used in conjunction with kAccCompileDontBother to mark the method as pre
 // compiled by the JIT compiler.
-static constexpr uint32_t kAccPreCompiled =           0x00200000;  // method (runtime)
+static constexpr uint32_t kAccPreCompiled =           0x00100000;  // method (runtime)
 
 // Set by the verifier for a method that could not be verified to follow structured locking.
 static constexpr uint32_t kAccMustCountLocks =        0x04000000;  // method (runtime)
@@ -118,7 +117,7 @@ static constexpr uint32_t kAccHiddenapiBits = kAccPublicApi | kAccCorePlatformAp
 // Continuous sequence of bits used to hold the ordinal of an intrinsic method. Flags
 // which overlap are not valid when kAccIntrinsic is set.
 static constexpr uint32_t kAccIntrinsicBits = kAccHiddenapiBits |
-    kAccSingleImplementation | kAccMustCountLocks | kAccCompileDontBother | kAccDefaultConflict |
+    kAccSingleImplementation | kAccMustCountLocks | kAccCompileDontBother | kAccCopied |
     kAccPreviouslyWarm | kAccFastInterpreterToInterpreterInvoke;
 
 // Valid (meaningful) bits for a field.
