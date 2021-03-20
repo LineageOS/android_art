@@ -280,6 +280,7 @@ apex_defaults {
             enabled: false,
         },
     },
+    min_sdk_version: "S",
 }
 
 // Default values shared by (device) Debug and Testing ART APEXes.
@@ -312,7 +313,6 @@ art_apex {
     name: "com.android.art",
     defaults: ["com.android.art-device-defaults"],
     certificate: ":com.android.art.certificate",
-    updatable: false,
 }
 
 // "Debug" version of the ART APEX module (containing both release and
@@ -322,7 +322,6 @@ art_apex {
     name: "com.android.art.debug",
     defaults: ["com.android.art-devel-defaults"],
     certificate: ":com.android.art.certificate",
-    updatable: false,
 }
 
 // ART gtests with dependencies on internal ART APEX libraries.

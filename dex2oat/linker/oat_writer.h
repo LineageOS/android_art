@@ -278,8 +278,6 @@ class OatWriter {
   class InitImageMethodVisitor;
   class WriteCodeMethodVisitor;
   class WriteMapMethodVisitor;
-  class WriteQuickeningInfoMethodVisitor;
-  class WriteQuickeningInfoOffsetsMethodVisitor;
 
   // Visit all the methods in all the compiled dex files in their definition order
   // with a given DexMethodVisitor.
