@@ -130,59 +130,25 @@
 %  op_iget(load="ldr", volatile_load="ldar", maybe_extend="", wide="0", is_object="1")
 
 %def op_iget_boolean_quick():
-%  op_iget_quick(load="ldrb")
+%  unused()
 
 %def op_iget_byte_quick():
-%  op_iget_quick(load="ldrsb")
+%  unused()
 
 %def op_iget_char_quick():
-%  op_iget_quick(load="ldrh")
+%  unused()
 
 %def op_iget_object_quick():
-   /* For: iget-object-quick */
-   /* op vA, vB, offset//CCCC */
-   lsr     w2, wINST, #12              // w2<- B
-   FETCH w1, 1                         // w1<- field byte offset
-   GET_VREG w0, w2                     // w0<- object we're operating on
-   cbz     x0, common_errNullObject    // bail if null object.
-   ldr     w0, [x0, x1]
-   cbnz    wMR, 2f
-1:
-   ubfx    w2, wINST, #8, #4           // w2<- A
-   PREFETCH_INST 2
-   SET_VREG_OBJECT w0, w2              // fp[A]<- w0
-   ADVANCE 2                           // advance rPC
-   GET_INST_OPCODE ip                  // extract opcode from wINST
-   GOTO_OPCODE ip                      // jump to next instruction
-2:
-   bl      art_quick_read_barrier_mark_reg00
-   b       1b
+%  unused()
 
 %def op_iget_quick(load="ldr", wide="0"):
-   /* For: iget-quick, iget-boolean-quick, iget-byte-quick, iget-char-quick, iget-short-quick, iget-wide-quick */
-   /* op vA, vB, offset@CCCC */
-   lsr     w2, wINST, #12              // w2<- B
-   FETCH w1, 1                         // w1<- field byte offset
-   GET_VREG w0, w2                     // w0<- object we're operating on
-   cbz     x0, common_errNullObject    // bail if null object.
-   ubfx    w2, wINST, #8, #4           // w2<- A
-   PREFETCH_INST 2
-   .if $wide
-   ${load} x0, [x0, x1]
-   SET_VREG_WIDE x0, w2                // fp[A]<- x0
-   .else
-   ${load} w0, [x0, x1]
-   SET_VREG w0, w2                     // fp[A]<- w0
-   .endif
-   ADVANCE 2                           // advance rPC
-   GET_INST_OPCODE ip                  // extract opcode from wINST
-   GOTO_OPCODE ip                      // jump to next instruction
+%  unused()
 
 %def op_iget_short_quick():
-%  op_iget_quick(load="ldrsh")
+%  unused()
 
 %def op_iget_wide_quick():
-%  op_iget_quick(load="ldr", wide="1")
+%  unused()
 
 %def op_iput_boolean():
 %  op_iput(store="strb", volatile_store="stlrb", wide="0", is_object="0")
@@ -262,42 +228,25 @@
 %  op_iput(store="str", volatile_store="stlr", wide="0", is_object="1")
 
 %def op_iput_boolean_quick():
-%  op_iput_quick(store="strb")
+%  unused()
 
 %def op_iput_byte_quick():
-%  op_iput_quick(store="strb")
+%  unused()
 
 %def op_iput_char_quick():
-%  op_iput_quick(store="strh")
+%  unused()
 
 %def op_iput_quick(store="str", wide="0", is_object="0"):
-   /* op vA, vB, offset@CCCC */
-   lsr     w2, wINST, #12              // w2<- B
-   FETCH w1, 1                         // w1<- field byte offset
-   GET_VREG w3, w2                     // w3<- fp[B], the object pointer
-   ubfx    w2, wINST, #8, #4           // w2<- A
-   cbz     w3, common_errNullObject    // object was null
-   .if $wide
-   GET_VREG_WIDE x0, w2                // x0<- fp[A]
-   FETCH_ADVANCE_INST 2                // advance rPC, load rINST
-   $store  x0, [x3, x1]                // obj.field<- x0
-   .else
-   GET_VREG w0, w2                     // w0<- fp[A]
-   FETCH_ADVANCE_INST 2                // advance rPC, load rINST
-   $store  w0, [x3, x1]                // obj.field<- w0
-   WRITE_BARRIER_IF_OBJECT $is_object, w0, w3, .L${opcode}_skip_write_barrier
-   .endif
-   GET_INST_OPCODE ip                  // extract opcode from rINST
-   GOTO_OPCODE ip                      // jump to next instruction
+%  unused()
 
 %def op_iput_object_quick():
-%  op_iput_quick(store="str", wide="0", is_object="1")
+%  unused()
 
 %def op_iput_short_quick():
-%  op_iput_quick(store="strh")
+%  unused()
 
 %def op_iput_wide_quick():
-%  op_iput_quick(store="str", wide="1", is_object="0")
+%  unused()
 
 %def op_sget_boolean():
 %  op_sget(load="ldrb", volatile_load="ldarb", maybe_extend="", wide="0", is_object="0")

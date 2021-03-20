@@ -172,23 +172,8 @@
 %def op_invoke_virtual_range():
 %  invoke_virtual(helper="NterpCommonInvokeInstanceRange", range="1")
 
-%def invoke_virtual_quick(helper="", range=""):
-   EXPORT_PC
-   FETCH w2, 1  // offset
-   // First argument is the 'this' pointer.
-   FETCH w1, 2 // arguments
-   .if !$range
-   and w1, w1, #0xf
-   .endif
-   GET_VREG w1, w1
-   // Note: if w1 is null, this will be handled by our SIGSEGV handler.
-   ldr w0, [x1, #MIRROR_OBJECT_CLASS_OFFSET]
-   add w0, w0, #MIRROR_CLASS_VTABLE_OFFSET_64
-   ldr x0, [x0, w2, uxtw #3]
-   b $helper
-
 %def op_invoke_virtual_quick():
-%  invoke_virtual_quick(helper="NterpCommonInvokeInstance", range="0")
+%  unused()
 
 %def op_invoke_virtual_range_quick():
-%  invoke_virtual_quick(helper="NterpCommonInvokeInstanceRange", range="1")
+%  unused()
