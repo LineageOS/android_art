@@ -308,6 +308,8 @@ FailureKind ClassVerifier::VerifyClass(Thread* self,
   VLOG(verifier) << "VerifyClass took " << PrettyDuration(UsToNs(elapsed_time_microseconds))
                  << ", class: " << PrettyDescriptor(dex_file->GetClassDescriptor(class_def));
 
+  GetMetrics()->ClassVerificationCount()->AddOne();
+
   if (failure_data.kind == FailureKind::kNoFailure) {
     return FailureKind::kNoFailure;
   } else {

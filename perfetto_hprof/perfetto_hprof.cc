@@ -585,6 +585,10 @@ void DumpPerfetto(art::Thread* self) {
   // We need to do this before the fork, because otherwise it can deadlock
   // waiting for the GC, as all other threads get terminated by the clone, but
   // their locks are not released.
+  // This does not perfectly solve all fork-related issues, as there could still be threads that
+  // are unaffected by ScopedSuspendAll and in a non-fork-friendly situation
+  // (e.g. inside a malloc holding a lock). This situation is quite rare, and in that case we will
+  // hit the watchdog in the grand-child process if it gets stuck.
   std::optional<art::gc::ScopedGCCriticalSection> gcs(std::in_place, self, art::gc::kGcCauseHprof,
                                                       art::gc::kCollectorTypeHprof);
 
@@ -602,10 +606,30 @@ void DumpPerfetto(art::Thread* self) {
     // continue while we waitpid here.
     ssa.reset();
     gcs.reset();
-    int stat_loc;
-    for (;;) {
-      if (waitpid(pid, &stat_loc, 0) != -1 || errno != EINTR) {
+    for (size_t i = 0;; ++i) {
+      if (i == 1000) {
+        // The child hasn't exited for 1 second (and all it was supposed to do was fork itself).
+        // Give up and SIGKILL it. The next waitpid should succeed.
+        LOG(ERROR) << "perfetto_hprof child timed out. Sending SIGKILL.";
+        kill(pid, SIGKILL);
+      }
+      // Busy waiting here will introduce some extra latency, but that is okay because we have
+      // already unsuspended all other threads. This runs on the perfetto_hprof_listener, which
+      // is not needed for progress of the app itself.
+      int stat_loc;
+      pid_t wait_result = waitpid(pid, &stat_loc, WNOHANG);
+      if (wait_result == -1 && errno != EINTR) {
+        if (errno != ECHILD) {
+          // This hopefully never happens (should only be EINVAL).
+          PLOG(FATAL_WITHOUT_ABORT) << "waitpid";
+        }
+        // If we get ECHILD, the parent process was handling SIGCHLD, or did a wildcard wait.
+        // The child is no longer here either way, so that's good enough for us.
         break;
+      } else if (wait_result > 0) {
+        break;
+      } else {  // wait_result == 0 || errno == EINTR.
+        usleep(1000);
       }
     }
     return;
