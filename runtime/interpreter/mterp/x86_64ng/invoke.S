@@ -172,27 +172,10 @@
 %  invoke_virtual(helper="NterpCommonInvokeInstance", range="0")
 
 %def op_invoke_virtual_quick():
-   EXPORT_PC
-   movzwl 2(rPC), %eax // offset
-   // First argument is the 'this' pointer.
-   movzwl 4(rPC), %r11d // arguments
-   andq $$0xf, %r11
-   movl (rFP, %r11, 4), %esi
-   // Note: if esi is null, this will be handled by our SIGSEGV handler.
-   movl MIRROR_OBJECT_CLASS_OFFSET(%esi), %edx
-   movq MIRROR_CLASS_VTABLE_OFFSET_64(%edx, %eax, 8), %rdi
-   jmp NterpCommonInvokeInstance
+%  unused()
 
 %def op_invoke_virtual_range():
 %  invoke_virtual(helper="NterpCommonInvokeInstanceRange", range="1")
 
 %def op_invoke_virtual_range_quick():
-   EXPORT_PC
-   movzwl 2(rPC), %eax // offset
-   // First argument is the 'this' pointer.
-   movzwl 4(rPC), %r11d // arguments
-   movl (rFP, %r11, 4), %esi
-   // Note: if esi is null, this will be handled by our SIGSEGV handler.
-   movl MIRROR_OBJECT_CLASS_OFFSET(%esi), %edx
-   movq MIRROR_CLASS_VTABLE_OFFSET_64(%edx, %eax, 8), %rdi
-   jmp NterpCommonInvokeInstanceRange
+%  unused()
