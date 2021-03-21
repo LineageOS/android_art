@@ -43,77 +43,40 @@
 %  op_iget(helper="MterpIGetU8")
 
 %def op_iget_boolean_quick():
-%  op_iget_quick(load="movsbl")
+%  unused()
 
 %def op_iget_byte():
 %  op_iget(helper="MterpIGetI8")
 
 %def op_iget_byte_quick():
-%  op_iget_quick(load="movsbl")
+%  unused()
 
 %def op_iget_char():
 %  op_iget(helper="MterpIGetU16")
 
 %def op_iget_char_quick():
-%  op_iget_quick(load="movzwl")
+%  unused()
 
 %def op_iget_object():
 %  op_iget(is_object="1", helper="MterpIGetObj")
 
 %def op_iget_object_quick():
-    /* For: iget-object-quick */
-    /* op vA, vB, offset@CCCC */
-    movzbl  rINSTbl, %ecx                   # ecx <- BA
-    sarl    $$4, %ecx                       # ecx <- B
-    GET_VREG %ecx, %ecx                     # vB (object we're operating on)
-    movzwl  2(rPC), %eax                    # eax <- field byte offset
-    movl    %ecx, OUT_ARG0(%esp)
-    movl    %eax, OUT_ARG1(%esp)
-    EXPORT_PC
-    call    SYMBOL(artIGetObjectFromMterp)  # (obj, offset)
-    movl    rSELF, %ecx
-    RESTORE_IBASE_FROM_SELF %ecx
-    cmpl    $$0, THREAD_EXCEPTION_OFFSET(%ecx)
-    jnz     MterpException                  # bail out
-    andb    $$0xf,rINSTbl                   # rINST <- A
-    SET_VREG_OBJECT %eax, rINST             # fp[A] <- value
-    ADVANCE_PC_FETCH_AND_GOTO_NEXT 2
+%  unused()
 
 %def op_iget_quick(load="movl"):
-    /* For: iget-quick, iget-boolean-quick, iget-byte-quick, iget-char-quick, iget-short-quick */
-    /* op vA, vB, offset@CCCC */
-    movzbl  rINSTbl, %ecx                   # ecx <- BA
-    sarl    $$4, %ecx                       # ecx <- B
-    GET_VREG %ecx, %ecx                     # vB (object we're operating on)
-    movzwl  2(rPC), %eax                    # eax <- field byte offset
-    testl   %ecx, %ecx                      # is object null?
-    je      common_errNullObject
-    ${load} (%ecx,%eax,1), %eax
-    andb    $$0xf,rINSTbl                   # rINST <- A
-    SET_VREG %eax, rINST                    # fp[A] <- value
-    ADVANCE_PC_FETCH_AND_GOTO_NEXT 2
+%  unused()
 
 %def op_iget_short():
 %  op_iget(helper="MterpIGetI16")
 
 %def op_iget_short_quick():
-%  op_iget_quick(load="movswl")
+%  unused()
 
 %def op_iget_wide():
 %  op_iget(helper="MterpIGetU64")
 
 %def op_iget_wide_quick():
-    /* iget-wide-quick vA, vB, offset@CCCC */
-    movzbl  rINSTbl, %ecx                   # ecx <- BA
-    sarl    $$4, %ecx                       # ecx <- B
-    GET_VREG %ecx, %ecx                     # vB (object we're operating on)
-    movzwl  2(rPC), %eax                    # eax <- field byte offset
-    testl   %ecx, %ecx                      # is object null?
-    je      common_errNullObject
-    movq    (%ecx,%eax,1), %xmm0
-    andb    $$0xf, rINSTbl                  # rINST <- A
-    SET_WIDE_FP_VREG %xmm0, rINST
-    ADVANCE_PC_FETCH_AND_GOTO_NEXT 2
+%  unused()
 
 %def op_instance_of():
 /*
@@ -150,72 +113,40 @@
 %  op_iput(helper="MterpIPutU8")
 
 %def op_iput_boolean_quick():
-%  op_iput_quick(reg="rINSTbl", store="movb")
+%  unused()
 
 %def op_iput_byte():
 %  op_iput(helper="MterpIPutI8")
 
 %def op_iput_byte_quick():
-%  op_iput_quick(reg="rINSTbl", store="movb")
+%  unused()
 
 %def op_iput_char():
 %  op_iput(helper="MterpIPutU16")
 
 %def op_iput_char_quick():
-%  op_iput_quick(reg="rINSTw", store="movw")
+%  unused()
 
 %def op_iput_object():
 %  op_iput(is_object="1", helper="MterpIPutObj")
 
 %def op_iput_object_quick():
-    EXPORT_PC
-    leal    OFF_FP_SHADOWFRAME(rFP), %eax
-    movl    %eax, OUT_ARG0(%esp)
-    movl    rPC, OUT_ARG1(%esp)
-    REFRESH_INST ${opnum}
-    movl    rINST, OUT_ARG2(%esp)
-    call    SYMBOL(MterpIputObjectQuick)
-    testb   %al, %al
-    jz      MterpException
-    RESTORE_IBASE
-    ADVANCE_PC_FETCH_AND_GOTO_NEXT 2
+%  unused()
 
 %def op_iput_quick(reg="rINST", store="movl"):
-    /* For: iput-quick, iput-object-quick */
-    /* op vA, vB, offset@CCCC */
-    movzbl  rINSTbl, %ecx                   # ecx <- BA
-    sarl    $$4, %ecx                       # ecx <- B
-    GET_VREG %ecx, %ecx                     # vB (object we're operating on)
-    testl   %ecx, %ecx                      # is object null?
-    je      common_errNullObject
-    andb    $$0xf, rINSTbl                  # rINST <- A
-    GET_VREG rINST, rINST                   # rINST <- v[A]
-    movzwl  2(rPC), %eax                    # eax <- field byte offset
-    ${store}    ${reg}, (%ecx,%eax,1)
-    ADVANCE_PC_FETCH_AND_GOTO_NEXT 2
+%  unused()
 
 %def op_iput_short():
 %  op_iput(helper="MterpIPutI16")
 
 %def op_iput_short_quick():
-%  op_iput_quick(reg="rINSTw", store="movw")
+%  unused()
 
 %def op_iput_wide():
 %  op_iput(helper="MterpIPutU64")
 
 %def op_iput_wide_quick():
-    /* iput-wide-quick vA, vB, offset@CCCC */
-    movzbl    rINSTbl, %ecx                 # ecx<- BA
-    sarl      $$4, %ecx                     # ecx<- B
-    GET_VREG  %ecx, %ecx                    # vB (object we're operating on)
-    testl     %ecx, %ecx                    # is object null?
-    je        common_errNullObject
-    movzwl    2(rPC), %eax                  # eax<- field byte offset
-    leal      (%ecx,%eax,1), %ecx           # ecx<- Address of 64-bit target
-    andb      $$0xf, rINSTbl                # rINST<- A
-    GET_WIDE_FP_VREG %xmm0, rINST           # xmm0<- fp[A]/fp[A+1]
-    movq      %xmm0, (%ecx)                 # obj.field<- r0/r1
-    ADVANCE_PC_FETCH_AND_GOTO_NEXT 2
+%  unused()
 
 %def op_new_instance():
 /*
