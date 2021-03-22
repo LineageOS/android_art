@@ -39,7 +39,6 @@ static constexpr size_t kBlockSize = 32 * KB;
 template<typename ElfTypes>
 static void WriteMinidebugInfo(const std::vector<uint8_t>& input, std::vector<uint8_t>* output) {
   using Elf_Addr = typename ElfTypes::Addr;
-  using Elf_Ehdr = typename ElfTypes::Ehdr;
   using Elf_Shdr = typename ElfTypes::Shdr;
   using Elf_Sym = typename ElfTypes::Sym;
   using Elf_Word = typename ElfTypes::Word;
@@ -54,12 +53,9 @@ static void WriteMinidebugInfo(const std::vector<uint8_t>& input, std::vector<ui
   std::unique_ptr<ElfBuilder<ElfTypes>> builder(new ElfBuilder<ElfTypes>(isa, &output_stream));
   builder->Start(/*write_program_headers=*/ false);
 
-  auto* rodata = builder->GetRoData();
   auto* text = builder->GetText();
   const Elf_Shdr* original_text = reader.GetSection(".text");
   CHECK(original_text != nullptr);
-  CHECK_EQ(reader.GetLoadAddress(), 0u);
-  rodata->AllocateVirtualMemory(original_text->sh_addr - sizeof(Elf_Ehdr));
   text->AllocateVirtualMemory(original_text->sh_addr, original_text->sh_size);
 
   auto* strtab = builder->GetStrTab();
