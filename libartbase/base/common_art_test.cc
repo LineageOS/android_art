@@ -322,10 +322,12 @@ void CommonArtTestImpl::SetUp() {
   mkdir_result = mkdir(dalvik_cache_.c_str(), 0700);
   ASSERT_EQ(mkdir_result, 0);
 
-  static bool gSlowDebugTestFlag = false;
-  RegisterRuntimeDebugFlag(&gSlowDebugTestFlag);
-  SetRuntimeDebugFlagsEnabled(true);
-  CHECK(gSlowDebugTestFlag);
+  if (kIsDebugBuild) {
+    static bool gSlowDebugTestFlag = false;
+    RegisterRuntimeDebugFlag(&gSlowDebugTestFlag);
+    SetRuntimeDebugFlagsEnabled(true);
+    CHECK(gSlowDebugTestFlag);
+  }
 }
 
 void CommonArtTestImpl::TearDownAndroidDataDir(const std::string& android_data,

@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Copyright (C) 2021 The Android Open Source Project
+
+     Licensed under the Apache License, Version 2.0 (the "License");
+     you may not use this file except in compliance with the License.
+     You may obtain a copy of the License at
+
+          http://www.apache.org/licenses/LICENSE-2.0
+
+     Unless required by applicable law or agreed to in writing, software
+     distributed under the License is distributed on an "AS IS" BASIS,
+     WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+     See the License for the specific language governing permissions and
+     limitations under the License.
+-->
+<configuration description="Runs art_standalone_runtime_tests.">
+    <target_preparer class="com.android.compatibility.common.tradefed.targetprep.FilePusher">
+        <option name="cleanup" value="true" />
+        <option name="push" value="art_standalone_runtime_tests->/data/local/tmp/nativetest/art_standalone_runtime_tests" />
+        <option name="append-bitness" value="true" />
+    </target_preparer>
+
+    <target_preparer class="com.android.compatibility.common.tradefed.targetprep.FilePusher">
+        <option name="cleanup" value="true" />
+        <option name="push" value="art-gtest-jars-AllFields.jar->/data/local/tmp/nativetest/art-gtest-jars-AllFields.jar" />
+        <option name="push" value="art-gtest-jars-ErroneousA.jar->/data/local/tmp/nativetest/art-gtest-jars-ErroneousA.jar" />
+        <option name="push" value="art-gtest-jars-ErroneousB.jar->/data/local/tmp/nativetest/art-gtest-jars-ErroneousB.jar" />
+        <option name="push" value="art-gtest-jars-ErroneousInit.jar->/data/local/tmp/nativetest/art-gtest-jars-ErroneousInit.jar" />
+        <option name="push" value="art-gtest-jars-Extension1.jar->/data/local/tmp/nativetest/art-gtest-jars-Extension1.jar" />
+        <option name="push" value="art-gtest-jars-Extension2.jar->/data/local/tmp/nativetest/art-gtest-jars-Extension2.jar" />
+        <option name="push" value="art-gtest-jars-ForClassLoaderA.jar->/data/local/tmp/nativetest/art-gtest-jars-ForClassLoaderA.jar" />
+        <option name="push" value="art-gtest-jars-ForClassLoaderB.jar->/data/local/tmp/nativetest/art-gtest-jars-ForClassLoaderB.jar" />
+        <option name="push" value="art-gtest-jars-ForClassLoaderC.jar->/data/local/tmp/nativetest/art-gtest-jars-ForClassLoaderC.jar" />
+        <option name="push" value="art-gtest-jars-ForClassLoaderD.jar->/data/local/tmp/nativetest/art-gtest-jars-ForClassLoaderD.jar" />
+        <option name="push" value="art-gtest-jars-HiddenApiSignatures.jar->/data/local/tmp/nativetest/art-gtest-jars-HiddenApiSignatures.jar" />
+        <option name="push" value="art-gtest-jars-IMTA.jar->/data/local/tmp/nativetest/art-gtest-jars-IMTA.jar" />
+        <option name="push" value="art-gtest-jars-IMTB.jar->/data/local/tmp/nativetest/art-gtest-jars-IMTB.jar" />
+        <option name="push" value="art-gtest-jars-Instrumentation.jar->/data/local/tmp/nativetest/art-gtest-jars-Instrumentation.jar" />
+        <option name="push" value="art-gtest-jars-Interfaces.jar->/data/local/tmp/nativetest/art-gtest-jars-Interfaces.jar" />
+        <option name="push" value="art-gtest-jars-LinkageTest.dex->/data/local/tmp/nativetest/art-gtest-jars-LinkageTest.dex" />
+        <option name="push" value="art-gtest-jars-Main.jar->/data/local/tmp/nativetest/art-gtest-jars-Main.jar" />
+        <option name="push" value="art-gtest-jars-MainStripped.jar->/data/local/tmp/nativetest/art-gtest-jars-MainStripped.jar" />
+        <option name="push" value="art-gtest-jars-MainUncompressedAligned.jar->/data/local/tmp/nativetest/art-gtest-jars-MainUncompressedAligned.jar" />
+        <option name="push" value="art-gtest-jars-MethodTypes.jar->/data/local/tmp/nativetest/art-gtest-jars-MethodTypes.jar" />
+        <option name="push" value="art-gtest-jars-MultiDex.jar->/data/local/tmp/nativetest/art-gtest-jars-MultiDex.jar" />
+        <option name="push" value="art-gtest-jars-MultiDexModifiedSecondary.jar->/data/local/tmp/nativetest/art-gtest-jars-MultiDexModifiedSecondary.jar" />
+        <option name="push" value="art-gtest-jars-MultiDexUncompressedAligned.jar->/data/local/tmp/nativetest/art-gtest-jars-MultiDexUncompressedAligned.jar" />
+        <option name="push" value="art-gtest-jars-MyClass.jar->/data/local/tmp/nativetest/art-gtest-jars-MyClass.jar" />
+        <option name="push" value="art-gtest-jars-MyClassNatives.jar->/data/local/tmp/nativetest/art-gtest-jars-MyClassNatives.jar" />
+        <option name="push" value="art-gtest-jars-Nested.jar->/data/local/tmp/nativetest/art-gtest-jars-Nested.jar" />
+        <option name="push" value="art-gtest-jars-Packages.jar->/data/local/tmp/nativetest/art-gtest-jars-Packages.jar" />
+        <option name="push" value="art-gtest-jars-ProfileTestMultiDex.jar->/data/local/tmp/nativetest/art-gtest-jars-ProfileTestMultiDex.jar" />
+        <option name="push" value="art-gtest-jars-ProtoCompare.jar->/data/local/tmp/nativetest/art-gtest-jars-ProtoCompare.jar" />
+        <option name="push" value="art-gtest-jars-ProtoCompare2.jar->/data/local/tmp/nativetest/art-gtest-jars-ProtoCompare2.jar" />
+        <option name="push" value="art-gtest-jars-StaticLeafMethods.jar->/data/local/tmp/nativetest/art-gtest-jars-StaticLeafMethods.jar" />
+        <option name="push" value="art-gtest-jars-Statics.jar->/data/local/tmp/nativetest/art-gtest-jars-Statics.jar" />
+        <option name="push" value="art-gtest-jars-StaticsFromCode.jar->/data/local/tmp/nativetest/art-gtest-jars-StaticsFromCode.jar" />
+        <option name="push" value="art-gtest-jars-Transaction.jar->/data/local/tmp/nativetest/art-gtest-jars-Transaction.jar" />
+        <option name="push" value="art-gtest-jars-VerifierDeps.dex->/data/local/tmp/nativetest/art-gtest-jars-VerifierDeps.dex" />
+        <option name="push" value="art-gtest-jars-VerifierDepsMulti.dex->/data/local/tmp/nativetest/art-gtest-jars-VerifierDepsMulti.dex" />
+        <option name="push" value="art-gtest-jars-XandY.jar->/data/local/tmp/nativetest/art-gtest-jars-XandY.jar" />
+    </target_preparer>
+
+    <test class="com.android.tradefed.testtype.GTest" >
+        <option name="native-test-device-path" value="/data/local/tmp/nativetest" />
+        <option name="module-name" value="art_standalone_runtime_tests" />
+        <option name="ld-library-path-32" value="/apex/com.android.art/lib" />
+        <option name="ld-library-path-64" value="/apex/com.android.art/lib64" />
+
+        <!-- The following tests from `art_standalone_runtime_tests` are currently failing
+             (observed on `aosp_cf_x86_64_phone-userdebug`).
+
+              TODO(b/162834439): Investigate these failures and re-enable these tests. -->
+        <option name="exclude-filter" value="HiddenApiTest.DexDomain_SystemDir" />
+        <option name="exclude-filter" value="HiddenApiTest.DexDomain_SystemDir_MultiDex" />
+        <option name="exclude-filter" value="HiddenApiTest.DexDomain_SystemFrameworkDir" />
+        <option name="exclude-filter" value="HiddenApiTest.DexDomain_SystemFrameworkDir_MultiDex" />
+        <option name="exclude-filter" value="HiddenApiTest.DexDomain_SystemSystemExtDir" />
+        <option name="exclude-filter" value="HiddenApiTest.DexDomain_SystemSystemExtDir_MultiDex" />
+        <option name="exclude-filter" value="HiddenApiTest.DexDomain_SystemSystemExtFrameworkDir" />
+        <option name="exclude-filter" value="HiddenApiTest.DexDomain_SystemSystemExtFrameworkDir_MultiDex" />
+        <option name="exclude-filter" value="JniInternalTest.CallVarArgMethodBadPrimitive" />
+        <option name="exclude-filter" value="OatFileAssistantTest.SystemFrameworkDir" />
+        <option name="exclude-filter" value="StubTest.Fields16" />
+        <option name="exclude-filter" value="StubTest.Fields32" />
+        <option name="exclude-filter" value="StubTest.Fields64" />
+        <option name="exclude-filter" value="StubTest.Fields8" />
+        <option name="exclude-filter" value="StubTest.FieldsObj" />
+        <option name="exclude-filter" value="SubtypeCheckInfoTest.IllegalValues" />
+
+        <!-- The following tests from `art_standalone_runtime_tests` are currently failing when
+             run as 32-bit on a 64-bit device, because they try to execute other system (64-bit)
+             processes but `LD_LIBRARY_PATH` is set to a directory of 32-bit libraries which make
+             them fail to dynamically link to the expected (64-bit) libraries.
+
+             TODO(b/162834439): Investigate these failures and re-enable these tests. -->
+        <option name="exclude-filter" value="ExecUtilsTest.EnvSnapshotDeletionsAreNotVisible" />
+        <option name="exclude-filter" value="ExecUtilsTest.ExecNoTimeout" />
+        <option name="exclude-filter" value="ExecUtilsTest.ExecSuccess" />
+        <option name="exclude-filter" value="ExecUtilsTest.ExecTimeout" />
+    </test>
+</configuration>

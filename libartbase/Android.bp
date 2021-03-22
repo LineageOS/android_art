@@ -221,15 +221,12 @@ art_cc_library {
     },
 }
 
-art_cc_library {
-    name: "libartbased-art-gtest",
-    defaults: ["libartd-gtest-defaults"],
+art_cc_defaults {
+    name: "libartbase-art-gtest-defaults",
     srcs: [
         "base/common_art_test.cc",
     ],
     shared_libs: [
-        "libartbased",
-        "libdexfiled",
         "libbase",
         "libbacktrace",
     ],
@@ -244,11 +241,32 @@ art_cc_library {
     },
 }
 
-art_cc_test {
-    name: "art_libartbase_tests",
+art_cc_library {
+    name: "libartbase-art-gtest",
     defaults: [
-        "art_gtest_defaults",
+        "libart-gtest-defaults",
+        "libartbase-art-gtest-defaults",
     ],
+    shared_libs: [
+        "libartbase",
+        "libdexfile",
+    ],
+}
+
+art_cc_library {
+    name: "libartbased-art-gtest",
+    defaults: [
+        "libartd-gtest-defaults",
+        "libartbase-art-gtest-defaults",
+    ],
+    shared_libs: [
+        "libartbased",
+        "libdexfiled",
+    ],
+}
+
+art_cc_defaults {
+    name: "art_libartbase_tests_defaults",
     srcs: [
         "arch/instruction_set_test.cc",
         "base/arena_allocator_test.cc",
@@ -287,6 +305,28 @@ art_cc_test {
     ],
     shared_libs: [
         "libbase",
+    ],
+    static_libs: [
+        "libgmock",
+    ],
+}
+
+// Version of ART gtest `art_libartbase_tests` bundled with the ART APEX on target.
+// TODO(b/192274705): Remove this module when the migration to standalone ART gtests is complete.
+art_cc_test {
+    name: "art_libartbase_tests",
+    defaults: [
+        "art_gtest_defaults",
+        "art_libartbase_tests_defaults",
+    ],
+}
+
+// Standalone version of ART gtest `art_libartbase_tests`, not bundled with the ART APEX on target.
+art_cc_test {
+    name: "art_standalone_libartbase_tests",
+    defaults: [
+        "art_standalone_gtest_defaults",
+        "art_libartbase_tests_defaults",
     ],
 }
 
