@@ -37,18 +37,21 @@ enum ExitCode : int {
   // `kOdrefreshArtifactDirectory`.
   kOkay = EX_OK,
 
-  // Compilation required. Re-run program with --compile on the command-line to generate
-  // new artifacts under `kOdrefreshArtifactDirectory`.
+  // Compilation required (only returned for --check). Re-run program with --compile on the
+  // command-line to generate + new artifacts under `kOdrefreshArtifactDirectory`.
   kCompilationRequired = EX__MAX + 1,
+
+  // New artifacts successfully generated under `kOdrefreshArtifactDirectory`.
+  kCompilationSuccess = EX__MAX + 2,
 
   // Compilation failed. Any artifacts under `kOdrefreshArtifactDirectory` are valid and should not
   // be removed. This may happen, for example, if compilation of boot extensions succeeds, but the
   // compilation of the system_server jars fails due to lack of storage space.
-  kCompilationFailed = EX__MAX + 2,
+  kCompilationFailed = EX__MAX + 3,
 
   // Removal of existing artifacts (or files under `kOdrefreshArtifactDirectory`) failed. Artifacts
   // should be treated as invalid and should be removed if possible.
-  kCleanupFailed = EX__MAX + 3,
+  kCleanupFailed = EX__MAX + 4,
 
   // Last exit code defined.
   kLastExitCode = kCleanupFailed,
