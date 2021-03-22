@@ -232,12 +232,13 @@ class ArtMethod final {
   }
 
   bool IsPreCompiled() const {
-    if (IsIntrinsic()) {
-      // kAccCompileDontBother overlaps with kAccIntrinsicBits.
-      return false;
-    }
-    uint32_t expected = (kAccPreCompiled | kAccCompileDontBother);
-    return (GetAccessFlags() & expected) == expected;
+    // kAccCompileDontBother and kAccPreCompiled overlap with kAccIntrinsicBits.
+    // Intrinsics should be compiled in primary boot image, not pre-compiled by JIT.
+    static_assert((kAccCompileDontBother & kAccIntrinsicBits) != 0);
+    static_assert((kAccPreCompiled & kAccIntrinsicBits) != 0);
+    static constexpr uint32_t kMask = kAccIntrinsic | kAccCompileDontBother | kAccPreCompiled;
+    static constexpr uint32_t kValue = kAccCompileDontBother | kAccPreCompiled;
+    return (GetAccessFlags() & kMask) == kValue;
   }
 
   void SetPreCompiled() REQUIRES_SHARED(Locks::mutator_lock_) {
