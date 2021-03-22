@@ -375,6 +375,13 @@ known_failing_tests.extend([
   #   ISA_FEATURES = {'ssse3': True, 'sse4': False}
   #
   "530-checker-lse",
+  # Fails (on cf_x86_phone-userdebug_coverage) with:
+  #
+  #   error: NOT statement matched line 117078
+  #   Main.java:108: NewInstance
+  #   ISA_FEATURES = {'ssse3': True, 'sse4': False}
+  #
+  "530-checker-lse2",
   # Fails (on aosp_cf_x86_phone-userdebug) with:
   #
   #   Error while running Checker: java.lang.RuntimeException: Error running Checker command:
@@ -400,6 +407,13 @@ known_failing_tests.extend([
   #
   #
   "562-checker-no-intermediate",
+  # Fails (on cf_x86_phone-userdebug_coverage) with:
+  #
+  #   error: Statement could not be matched starting from line 5260
+  #   Main.java:24: InstanceFieldSet
+  #   ISA_FEATURES = {'ssse3': True, 'sse4': False}
+  #
+  "583-checker-zero",
   # Fails (on aosp_cf_x86_phone-userdebug) with:
   #
   #   Error while running Checker: java.lang.RuntimeException: Error running Checker command:
