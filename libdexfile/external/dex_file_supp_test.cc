@@ -49,69 +49,12 @@ static constexpr uint32_t kDexData[] = {
     0x00000002, 0x00000173, 0x00002000, 0x00000001, 0x0000017e, 0x00001000, 0x00000001, 0x0000018c,
 };
 
-TEST(DexStringTest, alloc_string) {
-  auto s = DexString("123");
-  EXPECT_EQ(std::string_view(s), "123");
-}
-
-TEST(DexStringTest, alloc_empty_string) {
-  auto s = DexString("");
-  EXPECT_TRUE(std::string_view(s).empty());
-}
-
-TEST(DexStringTest, move_construct) {
-  auto s1 = DexString("foo");
-  auto s2 = DexString(std::move(s1));
-  EXPECT_TRUE(std::string_view(s1).empty()); // NOLINT bugprone-use-after-move
-  EXPECT_EQ(std::string_view(s2), "foo");
-}
-
-TEST(DexStringTest, move_assign) {
-  auto s1 = DexString("foo");
-  DexString s2;
-  EXPECT_TRUE(std::string_view(s2).empty());
-  s2 = std::move(s1);
-  EXPECT_TRUE(std::string_view(s1).empty()); // NOLINT bugprone-use-after-move
-  EXPECT_EQ(std::string_view(s2), "foo");
-}
-
-TEST(DexStringTest, reassign) {
-  auto s = DexString("foo");
-  s = DexString("bar");
-  EXPECT_EQ(std::string_view(s), "bar");
-}
-
-TEST(DexStringTest, data_access) {
-  auto s = DexString("foo");
-  EXPECT_STREQ(s.data(), "foo");
-  EXPECT_STREQ(s.c_str(), "foo");
-}
-
-TEST(DexStringTest, size_access) {
-  auto s = DexString("foo");
-  EXPECT_EQ(s.size(), size_t{3});
-  EXPECT_EQ(s.length(), size_t{3});
-}
-
-TEST(DexStringTest, equality) {
-  auto s = DexString("foo");
-  EXPECT_EQ(s, DexString("foo"));
-  EXPECT_FALSE(s == DexString("bar"));
-}
-
-TEST(DexStringTest, equality_with_nul) {
-  auto s = DexString(std::string("foo\0bar", 7));
-  EXPECT_EQ(s.size(), size_t{7});
-  EXPECT_EQ(s, DexString(std::string("foo\0bar", 7)));
-  EXPECT_FALSE(s == DexString(std::string("foo\0baz", 7)));
-}
-
 TEST(DexFileTest, from_memory_header_too_small) {
   size_t size = sizeof(art::DexFile::Header) - 1;
   std::string error_msg;
   EXPECT_EQ(DexFile::OpenFromMemory(kDexData, &size, "", &error_msg), nullptr);
   EXPECT_EQ(size, sizeof(art::DexFile::Header));
-  EXPECT_TRUE(error_msg.empty());
+  EXPECT_FALSE(error_msg.empty());
 }
 
 TEST(DexFileTest, from_memory_file_too_small) {
@@ -119,7 +62,7 @@ TEST(DexFileTest, from_memory_file_too_small) {
   std::string error_msg;
   EXPECT_EQ(DexFile::OpenFromMemory(kDexData, &size, "", &error_msg), nullptr);
   EXPECT_EQ(size, sizeof(kDexData));
-  EXPECT_TRUE(error_msg.empty());
+  EXPECT_FALSE(error_msg.empty());
 }
 
 static std::unique_ptr<DexFile> GetTestDexData() {
@@ -259,8 +202,8 @@ TEST(DexFileTest, get_all_method_infos_without_signature) {
   ASSERT_NE(dex_file, nullptr);
 
   std::vector<MethodInfo> infos;
-  infos.emplace_back(MethodInfo{0x100, 8, DexString("Main.<init>")});
-  infos.emplace_back(MethodInfo{0x118, 2, DexString("Main.main")});
+  infos.emplace_back(MethodInfo{0x100, 8, std::string("Main.<init>")});
+  infos.emplace_back(MethodInfo{0x118, 2, std::string("Main.main")});
   ASSERT_EQ(dex_file->GetAllMethodInfos(false), infos);
 }
 
@@ -269,8 +212,8 @@ TEST(DexFileTest, get_all_method_infos_with_signature) {
   ASSERT_NE(dex_file, nullptr);
 
   std::vector<MethodInfo> infos;
-  infos.emplace_back(MethodInfo{0x100, 8, DexString("void Main.<init>()")});
-  infos.emplace_back(MethodInfo{0x118, 2, DexString("void Main.main(java.lang.String[])")});
+  infos.emplace_back(MethodInfo{0x100, 8, std::string("void Main.<init>()")});
+  infos.emplace_back(MethodInfo{0x118, 2, std::string("void Main.main(java.lang.String[])")});
   ASSERT_EQ(dex_file->GetAllMethodInfos(true), infos);
 }
 
