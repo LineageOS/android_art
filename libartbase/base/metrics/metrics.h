@@ -177,6 +177,8 @@ class MetricsBackend {
   friend class MetricsCounter;
   template <DatumId histogram_type, size_t num_buckets, int64_t low_value, int64_t high_value>
   friend class MetricsHistogram;
+  template <DatumId datum_id, typename T, const T& AccumulatorFunction(const T&, const T&)>
+  friend class MetricsAccumulator;
   friend class ArtMetrics;
 };
 
@@ -277,6 +279,48 @@ class MetricsHistogram final : public MetricsBase<int64_t> {
 
   std::array<std::atomic<value_t>, num_buckets_> buckets_;
   static_assert(std::atomic<value_t>::is_always_lock_free);
+
+  friend class ArtMetrics;
+};
+
+template <DatumId datum_id, typename T, const T& AccumulatorFunction(const T&, const T&)>
+class MetricsAccumulator final : MetricsBase<T> {
+ public:
+  explicit constexpr MetricsAccumulator(T value = 0) : value_{value} {
+    // Ensure we do not have any unnecessary data in this class.
+    // Adding intptr_t to accommodate vtable, and rounding up to incorporate
+    // padding.
+    static_assert(RoundUp(sizeof(*this), sizeof(uint64_t)) ==
+                  RoundUp(sizeof(intptr_t) + sizeof(T), sizeof(uint64_t)));
+  }
+
+  void Add(T value) {
+    T current = value_.load(std::memory_order::memory_order_relaxed);
+    T new_value;
+    do {
+      new_value = AccumulatorFunction(current, value);
+      // If the value didn't change, don't bother storing it.
+      if (current == new_value) {
+        break;
+      }
+    } while (!value_.compare_exchange_weak(
+        current, new_value, std::memory_order::memory_order_relaxed));
+  }
+
+  // Report the metric as a counter, since this has only a single value.
+  void Report(MetricsBackend* backend) const {
+    backend->ReportCounter(datum_id, static_cast<uint64_t>(Value()));
+  }
+
+ protected:
+  void Reset() {
+    value_ = 0;
+  }
+
+ private:
+  T Value() const { return value_.load(std::memory_order::memory_order_relaxed); }
+
+  std::atomic<T> value_;
 
   friend class ArtMetrics;
 };
