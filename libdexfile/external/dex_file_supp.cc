@@ -179,21 +179,17 @@ std::unique_ptr<DexFile> DexFile::OpenFromFd(int fd,
 
 MethodInfo DexFile::GetMethodInfoForOffset(int64_t dex_offset, bool with_signature) {
   MethodInfo res{};
-  auto set_method = [](void* ctx, ExtDexFileMethodInfo* info) {
-    *reinterpret_cast<MethodInfo*>(ctx) = AbsorbMethodInfo(info);
-  };
+  auto set_method = [&res](ExtDexFileMethodInfo* info) { res = AbsorbMethodInfo(info); };
   uint32_t flags = with_signature ? kExtDexFileWithSignature : 0;
-  g_ExtDexFileGetMethodInfoForOffset(ext_dex_file_, dex_offset, flags, set_method, &res);
+  GetMethodInfoForOffset(dex_offset, set_method, flags);
   return res;
 }
 
 std::vector<MethodInfo> DexFile::GetAllMethodInfos(bool with_signature) {
   std::vector<MethodInfo> res;
-  auto add_method = [](void* ctx, ExtDexFileMethodInfo* info) {
-    reinterpret_cast<std::vector<MethodInfo>*>(ctx)->push_back(AbsorbMethodInfo(info));
-  };
+  auto add_method = [&res](ExtDexFileMethodInfo* info) { res.push_back(AbsorbMethodInfo(info)); };
   uint32_t flags = with_signature ? kExtDexFileWithSignature : 0;
-  g_ExtDexFileGetAllMethodInfos(ext_dex_file_, flags, add_method, &res);
+  GetAllMethodInfos(add_method, flags);
   return res;
 }
 
