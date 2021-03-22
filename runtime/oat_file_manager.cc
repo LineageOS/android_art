@@ -735,7 +735,7 @@ class BackgroundVerificationTask final : public Task {
         }
 
         CHECK(h_class->IsResolved()) << h_class->PrettyDescriptor();
-        class_linker->VerifyClass(self, h_class);
+        class_linker->VerifyClass(self, &verifier_deps, h_class);
         if (h_class->IsErroneous()) {
           // ClassLinker::VerifyClass throws, which isn't useful here.
           CHECK(soa.Self()->IsExceptionPending());

@@ -4464,6 +4464,7 @@ void ClassLinker::LookupClasses(const char* descriptor,
 }
 
 bool ClassLinker::AttemptSupertypeVerification(Thread* self,
+                                               verifier::VerifierDeps* verifier_deps,
                                                Handle<mirror::Class> klass,
                                                Handle<mirror::Class> supertype) {
   DCHECK(self != nullptr);
@@ -4471,7 +4472,7 @@ bool ClassLinker::AttemptSupertypeVerification(Thread* self,
   DCHECK(supertype != nullptr);
 
   if (!supertype->IsVerified() && !supertype->IsErroneous()) {
-    VerifyClass(self, supertype);
+    VerifyClass(self, verifier_deps, supertype);
   }
 
   if (supertype->IsVerified()
@@ -4508,8 +4509,10 @@ bool ClassLinker::AttemptSupertypeVerification(Thread* self,
   return false;
 }
 
-verifier::FailureKind ClassLinker::VerifyClass(
-    Thread* self, Handle<mirror::Class> klass, verifier::HardFailLogMode log_level) {
+verifier::FailureKind ClassLinker::VerifyClass(Thread* self,
+                                               verifier::VerifierDeps* verifier_deps,
+                                               Handle<mirror::Class> klass,
+                                               verifier::HardFailLogMode log_level) {
   {
     // TODO: assert that the monitor on the Class is held
     ObjectLock<mirror::Class> lock(self, klass);
@@ -4577,7 +4580,8 @@ verifier::FailureKind ClassLinker::VerifyClass(
   StackHandleScope<2> hs(self);
   MutableHandle<mirror::Class> supertype(hs.NewHandle(klass->GetSuperClass()));
   // If we have a superclass and we get a hard verification failure we can return immediately.
-  if (supertype != nullptr && !AttemptSupertypeVerification(self, klass, supertype)) {
+  if (supertype != nullptr &&
+      !AttemptSupertypeVerification(self, verifier_deps, klass, supertype)) {
     CHECK(self->IsExceptionPending()) << "Verification error should be pending.";
     return verifier::FailureKind::kHardFailure;
   }
@@ -4603,7 +4607,7 @@ verifier::FailureKind ClassLinker::VerifyClass(
       // We only care if we have default interfaces and can skip if we are already verified...
       if (LIKELY(!iface->HasDefaultMethods() || iface->IsVerified())) {
         continue;
-      } else if (UNLIKELY(!AttemptSupertypeVerification(self, klass, iface))) {
+      } else if (UNLIKELY(!AttemptSupertypeVerification(self, verifier_deps, klass, iface))) {
         // We had a hard failure while verifying this interface. Just return immediately.
         CHECK(self->IsExceptionPending()) << "Verification error should be pending.";
         return verifier::FailureKind::kHardFailure;
@@ -4643,7 +4647,7 @@ verifier::FailureKind ClassLinker::VerifyClass(
   std::string error_msg;
   verifier::FailureKind verifier_failure = verifier::FailureKind::kNoFailure;
   if (!preverified) {
-    verifier_failure = PerformClassVerification(self, klass, log_level, &error_msg);
+    verifier_failure = PerformClassVerification(self, verifier_deps, klass, log_level, &error_msg);
   }
 
   // Verification is done, grab the lock again.
@@ -4728,11 +4732,13 @@ verifier::FailureKind ClassLinker::VerifyClass(
 }
 
 verifier::FailureKind ClassLinker::PerformClassVerification(Thread* self,
+                                                            verifier::VerifierDeps* verifier_deps,
                                                             Handle<mirror::Class> klass,
                                                             verifier::HardFailLogMode log_level,
                                                             std::string* error_msg) {
   Runtime* const runtime = Runtime::Current();
   return verifier::ClassVerifier::VerifyClass(self,
+                                              verifier_deps,
                                               klass.Get(),
                                               runtime->GetCompilerCallbacks(),
                                               runtime->IsAotCompiler(),
@@ -5233,7 +5239,7 @@ bool ClassLinker::InitializeClass(Thread* self,
         << klass->PrettyClass() << ": state=" << klass->GetStatus();
 
     if (!klass->IsVerified()) {
-      VerifyClass(self, klass);
+      VerifyClass(self, /*verifier_deps= */ nullptr, klass);
       if (!klass->IsVerified()) {
         // We failed to verify, expect either the klass to be erroneous or verification failed at
         // compile time.

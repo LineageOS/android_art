@@ -1613,6 +1613,7 @@ bool Redefiner::ClassRedefinition::CheckVerification(const RedefinitionDataIter&
   // TODO Make verification log level lower
   art::verifier::FailureKind failure =
       art::verifier::ClassVerifier::VerifyClass(driver_->self_,
+                                                /*verifier_deps=*/nullptr,
                                                 dex_file_.get(),
                                                 hs.NewHandle(iter.GetNewDexCache()),
                                                 hs.NewHandle(GetClassLoader()),
