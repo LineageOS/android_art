@@ -98,6 +98,10 @@ using MethodDexCachePair = NativeDexCachePair<ArtMethod>;
 using MethodDexCacheType = std::atomic<MethodDexCachePair>;
 }  // namespace mirror
 
+namespace verifier {
+class VerifierDeps;
+}
+
 class ClassVisitor {
  public:
   virtual ~ClassVisitor() {}
@@ -553,6 +557,7 @@ class ClassLinker {
 
   verifier::FailureKind VerifyClass(
       Thread* self,
+      verifier::VerifierDeps* verifier_deps,
       Handle<mirror::Class> klass,
       verifier::HardFailLogMode log_level = verifier::HardFailLogMode::kLogNone)
       REQUIRES_SHARED(Locks::mutator_lock_)
@@ -851,6 +856,7 @@ class ClassLinker {
       REQUIRES(!Locks::dex_lock_);
 
   virtual verifier::FailureKind PerformClassVerification(Thread* self,
+                                                         verifier::VerifierDeps* verifier_deps,
                                                          Handle<mirror::Class> klass,
                                                          verifier::HardFailLogMode log_level,
                                                          std::string* error_msg)
@@ -882,6 +888,7 @@ class ClassLinker {
   // appropriate exceptions if verification failed hard. Returns true for successful verification or
   // soft-failures.
   bool AttemptSupertypeVerification(Thread* self,
+                                    verifier::VerifierDeps* verifier_deps,
                                     Handle<mirror::Class> klass,
                                     Handle<mirror::Class> supertype)
       REQUIRES(!Locks::dex_lock_)
