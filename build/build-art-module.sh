@@ -8,24 +8,29 @@ if [ ! -e build/make/core/Makefile ]; then
   exit 1
 fi
 
+skip_apex=
 skip_module_sdk=
 build_args=()
 for arg; do
   case "$arg" in
+    --skip-apex) skip_apex=true ;;
     --skip-module-sdk) skip_module_sdk=true ;;
     *) build_args+=("$arg") ;;
   esac
   shift
 done
 
-# Take the list of modules from MAINLINE_MODULES.
-if [ -n "${MAINLINE_MODULES}" ]; then
-  read -r -a MAINLINE_MODULES <<< "${MAINLINE_MODULES}"
-else
-  MAINLINE_MODULES=(
-    com.android.art
-    com.android.art.debug
-  )
+MAINLINE_MODULES=()
+if [ -z "$skip_apex" ]; then
+  # Take the list of modules from MAINLINE_MODULES.
+  if [ -n "${MAINLINE_MODULES}" ]; then
+    read -r -a MAINLINE_MODULES <<< "${MAINLINE_MODULES}"
+  else
+    MAINLINE_MODULES=(
+      com.android.art
+      com.android.art.debug
+    )
+  fi
 fi
 
 # Take the list of products to build the modules for from
@@ -60,14 +65,9 @@ echo_and_run() {
 export OUT_DIR=${OUT_DIR:-out}
 export DIST_DIR=${DIST_DIR:-${OUT_DIR}/dist}
 
-# We require .apex files here, so ensure we get them regardless of product
-# settings.
-export OVERRIDE_TARGET_FLATTEN_APEX=false
-
 # Use same build settings as build_unbundled_mainline_module.sh, for build
 # consistency.
 # TODO(mast): Call out to a common script for building APEXes.
-export TARGET_BUILD_APPS="${MAINLINE_MODULES[*]}"
 export UNBUNDLED_BUILD_SDKS_FROM_SOURCE=true
 export TARGET_BUILD_VARIANT=${TARGET_BUILD_VARIANT:-"user"}
 export TARGET_BUILD_DENSITY=alldpi
@@ -78,28 +78,42 @@ if [ ! -d frameworks/base ]; then
   export SOONG_ALLOW_MISSING_DEPENDENCIES=true
 fi
 
-for product in ${MAINLINE_MODULE_PRODUCTS[*]}; do
-  echo_and_run build/soong/soong_ui.bash --make-mode \
-    TARGET_PRODUCT=${product} "${build_args[@]}" ${MAINLINE_MODULES[*]}
+if [ ${#MAINLINE_MODULES[*]} -gt 0 ]; then
+  (
+    export TARGET_BUILD_APPS="${MAINLINE_MODULES[*]}"
 
-  vars="$(TARGET_PRODUCT=${product} build/soong/soong_ui.bash --dumpvars-mode \
-          --vars="PRODUCT_OUT TARGET_ARCH")"
-  # Assign to a variable and eval that, since bash ignores any error status from
-  # the command substitution if it's directly on the eval line.
-  eval $vars
+    # We require .apex files here, so ensure we get them regardless of product
+    # settings.
+    export OVERRIDE_TARGET_FLATTEN_APEX=false
 
-  mkdir -p ${DIST_DIR}/${TARGET_ARCH}
-  for module in ${MAINLINE_MODULES[*]}; do
-    echo_and_run cp ${PRODUCT_OUT}/system/apex/${module}.apex \
-      ${DIST_DIR}/${TARGET_ARCH}/
-  done
-done
+    for product in ${MAINLINE_MODULE_PRODUCTS[*]}; do
+      echo_and_run build/soong/soong_ui.bash --make-mode \
+        TARGET_PRODUCT=${product} "${build_args[@]}" ${MAINLINE_MODULES[*]}
+
+      vars="$(TARGET_PRODUCT=${product} build/soong/soong_ui.bash \
+              --dumpvars-mode --vars="PRODUCT_OUT TARGET_ARCH")"
+      # Assign to a variable and eval that, since bash ignores any error status
+      # from the command substitution if it's directly on the eval line.
+      eval $vars
+
+      mkdir -p ${DIST_DIR}/${TARGET_ARCH}
+      for module in ${MAINLINE_MODULES[*]}; do
+        echo_and_run cp ${PRODUCT_OUT}/system/apex/${module}.apex \
+          ${DIST_DIR}/${TARGET_ARCH}/
+      done
+    done
+  )
+fi
 
 if [ ${#MODULE_SDKS_AND_EXPORTS[*]} -gt 0 ]; then
   # Create multi-arch SDKs in a different out directory. The multi-arch script
   # uses Soong in --skip-make mode which cannot use the same directory as normal
   # mode with make.
   export OUT_DIR=${OUT_DIR}/aml
+
+  # Put the build system in apps building mode so we don't trip on platform
+  # dependencies, but there are no actual apps to build here.
+  export TARGET_BUILD_APPS=none
 
   # Make build-aml-prebuilts.sh set the source_build Soong config variable true.
   export ENABLE_ART_SOURCE_BUILD=true
