@@ -35,7 +35,6 @@
 #include "mirror/dex_cache.h"
 #include "oat_file.h"
 #include "optimizing_compiler_stats.h"
-#include "quicken_info.h"
 #include "reflective_handle_scope-inl.h"
 #include "scoped_thread_state_change-inl.h"
 #include "sharpening.h"
@@ -91,7 +90,6 @@ HInstructionBuilder::HInstructionBuilder(HGraph* graph,
                                          const DexCompilationUnit* dex_compilation_unit,
                                          const DexCompilationUnit* outer_compilation_unit,
                                          CodeGenerator* code_generator,
-                                         ArrayRef<const uint8_t> interpreter_metadata,
                                          OptimizingCompilerStats* compiler_stats,
                                          ScopedArenaAllocator* local_allocator)
     : allocator_(graph->GetAllocator()),
@@ -104,7 +102,6 @@ HInstructionBuilder::HInstructionBuilder(HGraph* graph,
       code_generator_(code_generator),
       dex_compilation_unit_(dex_compilation_unit),
       outer_compilation_unit_(outer_compilation_unit),
-      quicken_info_(interpreter_metadata),
       compilation_stats_(compiler_stats),
       local_allocator_(local_allocator),
       locals_for_(local_allocator->Adapter(kArenaAllocGraphBuilder)),
@@ -396,11 +393,6 @@ bool HInstructionBuilder::Build() {
 
     DCHECK(!IsBlockPopulated(current_block_));
 
-    uint32_t quicken_index = 0;
-    if (CanDecodeQuickenedInfo()) {
-      quicken_index = block_builder_->GetQuickenIndex(block_dex_pc);
-    }
-
     for (const DexInstructionPcPair& pair : code_item_accessor_.InstructionsFrom(block_dex_pc)) {
       if (current_block_ == nullptr) {
         // The previous instruction ended this block.
@@ -425,16 +417,12 @@ bool HInstructionBuilder::Build() {
       DCHECK(Thread::Current() == nullptr || !Thread::Current()->IsExceptionPending())
           << dex_file_->PrettyMethod(dex_compilation_unit_->GetDexMethodIndex())
           << " " << pair.Inst().Name() << "@" << dex_pc;
-      if (!ProcessDexInstruction(pair.Inst(), dex_pc, quicken_index)) {
+      if (!ProcessDexInstruction(pair.Inst(), dex_pc)) {
         return false;
       }
       DCHECK(Thread::Current() == nullptr || !Thread::Current()->IsExceptionPending())
           << dex_file_->PrettyMethod(dex_compilation_unit_->GetDexMethodIndex())
           << " " << pair.Inst().Name() << "@" << dex_pc;
-
-      if (QuickenInfoTable::NeedsIndexForInstruction(&pair.Inst())) {
-        ++quicken_index;
-      }
     }
 
     if (current_block_ != nullptr) {
@@ -852,9 +840,7 @@ static InvokeType GetInvokeTypeFromOpCode(Instruction::Code opcode) {
     case Instruction::INVOKE_DIRECT_RANGE:
       return kDirect;
     case Instruction::INVOKE_VIRTUAL:
-    case Instruction::INVOKE_VIRTUAL_QUICK:
     case Instruction::INVOKE_VIRTUAL_RANGE:
-    case Instruction::INVOKE_VIRTUAL_RANGE_QUICK:
       return kVirtual;
     case Instruction::INVOKE_INTERFACE:
     case Instruction::INVOKE_INTERFACE_RANGE:
@@ -1947,21 +1933,10 @@ static DataType::Type GetFieldAccessType(const DexFile& dex_file, uint16_t field
 
 bool HInstructionBuilder::BuildInstanceFieldAccess(const Instruction& instruction,
                                                    uint32_t dex_pc,
-                                                   bool is_put,
-                                                   size_t quicken_index) {
+                                                   bool is_put) {
   uint32_t source_or_dest_reg = instruction.VRegA_22c();
   uint32_t obj_reg = instruction.VRegB_22c();
-  uint16_t field_index;
-  if (instruction.IsQuickened()) {
-    if (!CanDecodeQuickenedInfo()) {
-      VLOG(compiler) << "Not compiled: Could not decode quickened instruction "
-                     << instruction.Opcode();
-      return false;
-    }
-    field_index = LookupQuickenedInfo(quicken_index);
-  } else {
-    field_index = instruction.VRegC_22c();
-  }
+  uint16_t field_index = instruction.VRegC_22c();
 
   ScopedObjectAccess soa(Thread::Current());
   ArtField* resolved_field = ResolveField(field_index, /* is_static= */ false, is_put);
@@ -2615,18 +2590,7 @@ void HInstructionBuilder::BuildTypeCheck(const Instruction& instruction,
   }
 }
 
-bool HInstructionBuilder::CanDecodeQuickenedInfo() const {
-  return !quicken_info_.IsNull();
-}
-
-uint16_t HInstructionBuilder::LookupQuickenedInfo(uint32_t quicken_index) {
-  DCHECK(CanDecodeQuickenedInfo());
-  return quicken_info_.GetData(quicken_index);
-}
-
-bool HInstructionBuilder::ProcessDexInstruction(const Instruction& instruction,
-                                                uint32_t dex_pc,
-                                                size_t quicken_index) {
+bool HInstructionBuilder::ProcessDexInstruction(const Instruction& instruction, uint32_t dex_pc) {
   switch (instruction.Opcode()) {
     case Instruction::CONST_4: {
       int32_t register_index = instruction.VRegA();
@@ -2777,19 +2741,8 @@ bool HInstructionBuilder::ProcessDexInstruction(const Instruction& instruction,
     case Instruction::INVOKE_INTERFACE:
     case Instruction::INVOKE_STATIC:
     case Instruction::INVOKE_SUPER:
-    case Instruction::INVOKE_VIRTUAL:
-    case Instruction::INVOKE_VIRTUAL_QUICK: {
-      uint16_t method_idx;
-      if (instruction.Opcode() == Instruction::INVOKE_VIRTUAL_QUICK) {
-        if (!CanDecodeQuickenedInfo()) {
-          VLOG(compiler) << "Not compiled: Could not decode quickened instruction "
-                         << instruction.Opcode();
-          return false;
-        }
-        method_idx = LookupQuickenedInfo(quicken_index);
-      } else {
-        method_idx = instruction.VRegB_35c();
-      }
+    case Instruction::INVOKE_VIRTUAL: {
+      uint16_t method_idx = instruction.VRegB_35c();
       uint32_t args[5];
       uint32_t number_of_vreg_arguments = instruction.GetVarArgs(args);
       VarArgsInstructionOperands operands(args, number_of_vreg_arguments);
@@ -2803,19 +2756,8 @@ bool HInstructionBuilder::ProcessDexInstruction(const Instruction& instruction,
     case Instruction::INVOKE_INTERFACE_RANGE:
     case Instruction::INVOKE_STATIC_RANGE:
     case Instruction::INVOKE_SUPER_RANGE:
-    case Instruction::INVOKE_VIRTUAL_RANGE:
-    case Instruction::INVOKE_VIRTUAL_RANGE_QUICK: {
-      uint16_t method_idx;
-      if (instruction.Opcode() == Instruction::INVOKE_VIRTUAL_RANGE_QUICK) {
-        if (!CanDecodeQuickenedInfo()) {
-          VLOG(compiler) << "Not compiled: Could not decode quickened instruction "
-                         << instruction.Opcode();
-          return false;
-        }
-        method_idx = LookupQuickenedInfo(quicken_index);
-      } else {
-        method_idx = instruction.VRegB_3rc();
-      }
+    case Instruction::INVOKE_VIRTUAL_RANGE: {
+      uint16_t method_idx = instruction.VRegB_3rc();
       RangeInstructionOperands operands(instruction.VRegC(), instruction.VRegA_3rc());
       if (!BuildInvoke(instruction, dex_pc, method_idx, operands)) {
         return false;
@@ -3456,40 +3398,26 @@ bool HInstructionBuilder::ProcessDexInstruction(const Instruction& instruction,
       break;
 
     case Instruction::IGET:
-    case Instruction::IGET_QUICK:
     case Instruction::IGET_WIDE:
-    case Instruction::IGET_WIDE_QUICK:
     case Instruction::IGET_OBJECT:
-    case Instruction::IGET_OBJECT_QUICK:
     case Instruction::IGET_BOOLEAN:
-    case Instruction::IGET_BOOLEAN_QUICK:
     case Instruction::IGET_BYTE:
-    case Instruction::IGET_BYTE_QUICK:
     case Instruction::IGET_CHAR:
-    case Instruction::IGET_CHAR_QUICK:
-    case Instruction::IGET_SHORT:
-    case Instruction::IGET_SHORT_QUICK: {
-      if (!BuildInstanceFieldAccess(instruction, dex_pc, /* is_put= */ false, quicken_index)) {
+    case Instruction::IGET_SHORT: {
+      if (!BuildInstanceFieldAccess(instruction, dex_pc, /* is_put= */ false)) {
         return false;
       }
       break;
     }
 
     case Instruction::IPUT:
-    case Instruction::IPUT_QUICK:
     case Instruction::IPUT_WIDE:
-    case Instruction::IPUT_WIDE_QUICK:
     case Instruction::IPUT_OBJECT:
-    case Instruction::IPUT_OBJECT_QUICK:
     case Instruction::IPUT_BOOLEAN:
-    case Instruction::IPUT_BOOLEAN_QUICK:
     case Instruction::IPUT_BYTE:
-    case Instruction::IPUT_BYTE_QUICK:
     case Instruction::IPUT_CHAR:
-    case Instruction::IPUT_CHAR_QUICK:
-    case Instruction::IPUT_SHORT:
-    case Instruction::IPUT_SHORT_QUICK: {
-      if (!BuildInstanceFieldAccess(instruction, dex_pc, /* is_put= */ true, quicken_index)) {
+    case Instruction::IPUT_SHORT: {
+      if (!BuildInstanceFieldAccess(instruction, dex_pc, /* is_put= */ true)) {
         return false;
       }
       break;
@@ -3632,6 +3560,22 @@ bool HInstructionBuilder::ProcessDexInstruction(const Instruction& instruction,
       break;
     }
 
+    case Instruction::IGET_QUICK:
+    case Instruction::IGET_BOOLEAN_QUICK:
+    case Instruction::IGET_BYTE_QUICK:
+    case Instruction::IGET_SHORT_QUICK:
+    case Instruction::IGET_CHAR_QUICK:
+    case Instruction::IGET_WIDE_QUICK:
+    case Instruction::IGET_OBJECT_QUICK:
+    case Instruction::IPUT_QUICK:
+    case Instruction::IPUT_BOOLEAN_QUICK:
+    case Instruction::IPUT_BYTE_QUICK:
+    case Instruction::IPUT_SHORT_QUICK:
+    case Instruction::IPUT_CHAR_QUICK:
+    case Instruction::IPUT_WIDE_QUICK:
+    case Instruction::IPUT_OBJECT_QUICK:
+    case Instruction::INVOKE_VIRTUAL_QUICK:
+    case Instruction::INVOKE_VIRTUAL_RANGE_QUICK:
     case Instruction::UNUSED_3E:
     case Instruction::UNUSED_3F:
     case Instruction::UNUSED_40:
