@@ -1899,6 +1899,7 @@ class VerifyClassVisitor : public CompilationVisitor {
       std::string error_msg;
       failure_kind =
           verifier::ClassVerifier::VerifyClass(soa.Self(),
+                                               soa.Self()->GetVerifierDeps(),
                                                &dex_file,
                                                dex_cache,
                                                class_loader,
@@ -1938,7 +1939,10 @@ class VerifyClassVisitor : public CompilationVisitor {
       return;  // Do not update state.
     } else if (!SkipClass(jclass_loader, dex_file, klass.Get())) {
       CHECK(klass->IsResolved()) << klass->PrettyClass();
-      failure_kind = class_linker->VerifyClass(soa.Self(), klass, log_level_);
+      failure_kind = class_linker->VerifyClass(soa.Self(),
+                                               soa.Self()->GetVerifierDeps(),
+                                               klass,
+                                               log_level_);
 
       if (klass->IsErroneous()) {
         // ClassLinker::VerifyClass throws, which isn't useful in the compiler.
@@ -1994,7 +1998,10 @@ class VerifyClassVisitor : public CompilationVisitor {
       // Make the skip a soft failure, essentially being considered as verify at runtime.
       failure_kind = verifier::FailureKind::kSoftFailure;
     }
-    verifier::VerifierDeps::MaybeRecordVerificationStatus(dex_file, class_def, failure_kind);
+    verifier::VerifierDeps::MaybeRecordVerificationStatus(soa.Self()->GetVerifierDeps(),
+                                                          dex_file,
+                                                          class_def,
+                                                          failure_kind);
     soa.Self()->AssertNoPendingException();
   }
 

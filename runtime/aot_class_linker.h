@@ -52,6 +52,7 @@ static bool CanReferenceInBootImageExtension(ObjPtr<mirror::Class> klass, gc::He
   // Overridden version of PerformClassVerification allows skipping verification if the class was
   // previously verified but unloaded.
   verifier::FailureKind PerformClassVerification(Thread* self,
+                                                 verifier::VerifierDeps* verifier_deps,
                                                  Handle<mirror::Class> klass,
                                                  verifier::HardFailLogMode log_level,
                                                  std::string* error_msg)

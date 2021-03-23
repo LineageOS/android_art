@@ -49,6 +49,8 @@ class ClassLoader;
 
 namespace verifier {
 
+class VerifierDeps;
+
 // Verifier that ensures the complete class is OK.
 class ClassVerifier {
  public:
@@ -64,6 +66,7 @@ class ClassVerifier {
       REQUIRES_SHARED(Locks::mutator_lock_);
   // Verify a class. Returns "kNoFailure" on success.
   static FailureKind VerifyClass(Thread* self,
+                                 VerifierDeps* verifier_deps,
                                  ObjPtr<mirror::Class> klass,
                                  CompilerCallbacks* callbacks,
                                  bool allow_soft_failures,
@@ -72,6 +75,7 @@ class ClassVerifier {
                                  std::string* error)
       REQUIRES_SHARED(Locks::mutator_lock_);
   static FailureKind VerifyClass(Thread* self,
+                                 VerifierDeps* verifier_deps,
                                  const DexFile* dex_file,
                                  Handle<mirror::DexCache> dex_cache,
                                  Handle<mirror::ClassLoader> class_loader,
@@ -91,6 +95,7 @@ class ClassVerifier {
 
  private:
   static FailureKind CommonVerifyClass(Thread* self,
+                                       VerifierDeps* verifier_deps,
                                        ObjPtr<mirror::Class> klass,
                                        CompilerCallbacks* callbacks,
                                        VerifierCallback* verifier_callback,
@@ -101,6 +106,7 @@ class ClassVerifier {
       REQUIRES_SHARED(Locks::mutator_lock_);
 
   static FailureKind VerifyClass(Thread* self,
+                                 VerifierDeps* verifier_deps,
                                  const DexFile* dex_file,
                                  Handle<mirror::DexCache> dex_cache,
                                  Handle<mirror::ClassLoader> class_loader,

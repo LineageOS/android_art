@@ -909,7 +909,8 @@ class ZygoteVerificationTask final : public Task {
           continue;
         }
         ++number_of_classes;
-        if (linker->VerifyClass(self, klass) == verifier::FailureKind::kHardFailure) {
+        if (linker->VerifyClass(self, /* verifier_deps= */ nullptr, klass) ==
+                verifier::FailureKind::kHardFailure) {
           DCHECK(self->IsExceptionPending());
           LOG(FATAL) << "Methods in the boot classpath failed to verify: "
                      << self->GetException()->Dump();

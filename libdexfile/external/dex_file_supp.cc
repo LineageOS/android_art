@@ -17,7 +17,12 @@
 #include "art_api/dex_file_support.h"
 
 #include <dlfcn.h>
+#include <inttypes.h>
 #include <mutex>
+#include <sys/stat.h>
+
+#include <android-base/mapped_file.h>
+#include <android-base/stringprintf.h>
 
 #ifndef STATIC_LIB
 // Not used in the static lib, so avoid a dependency on this header in
@@ -29,14 +34,10 @@ namespace art_api {
 namespace dex {
 
 #define FOR_ALL_DLFUNCS(MACRO) \
-  MACRO(DexString, ExtDexFileMakeString) \
-  MACRO(DexString, ExtDexFileGetString) \
-  MACRO(DexString, ExtDexFileFreeString) \
   MACRO(DexFile, ExtDexFileOpenFromMemory) \
-  MACRO(DexFile, ExtDexFileOpenFromFd) \
   MACRO(DexFile, ExtDexFileGetMethodInfoForOffset) \
   MACRO(DexFile, ExtDexFileGetAllMethodInfos) \
-  MACRO(DexFile, ExtDexFileFree)
+  MACRO(DexFile, ExtDexFileClose)
 
 #ifdef STATIC_LIB
 #define DEFINE_DLFUNC_PTR(CLASS, DLFUNC) decltype(DLFUNC)* CLASS::g_##DLFUNC = DLFUNC;
@@ -103,15 +104,93 @@ void LoadLibdexfileExternal() {
 #endif
 }
 
-DexFile::~DexFile() { g_ExtDexFileFree(ext_dex_file_); }
+DexFile::~DexFile() { g_ExtDexFileClose(ext_dex_file_); }
 
-MethodInfo DexFile::AbsorbMethodInfo(const ExtDexFileMethodInfo& ext_method_info) {
-  return {ext_method_info.offset, ext_method_info.len, DexString(ext_method_info.name)};
+std::unique_ptr<DexFile> DexFile::OpenFromMemory(const void* addr,
+                                                 size_t* size,
+                                                 const std::string& location,
+                                                 /*out*/ std::string* error_msg) {
+  if (UNLIKELY(g_ExtDexFileOpenFromMemory == nullptr)) {
+    // Load libdexfile_external.so in this factory function, so instance
+    // methods don't need to check this.
+    LoadLibdexfileExternal();
+  }
+  ExtDexFile* ext_dex_file;
+  int res = g_ExtDexFileOpenFromMemory(addr, size, location.c_str(), &ext_dex_file);
+  switch (static_cast<ExtDexFileError>(res)) {
+    case kExtDexFileOk:
+      return std::unique_ptr<DexFile>(new DexFile(ext_dex_file));
+    case kExtDexFileInvalidHeader:
+      *error_msg = std::string("Invalid DexFile header ") + location;
+      return nullptr;
+    case kExtDexFileNotEnoughData:
+      *error_msg = std::string("Not enough data");
+      return nullptr;
+    case kExtDexFileError:
+      break;
+  }
+  *error_msg = std::string("Failed to open DexFile ") + location;
+  return nullptr;
 }
 
-void DexFile::AddMethodInfoCallback(const ExtDexFileMethodInfo* ext_method_info, void* ctx) {
-  auto vect = static_cast<MethodInfoVector*>(ctx);
-  vect->emplace_back(AbsorbMethodInfo(*ext_method_info));
+std::unique_ptr<DexFile> DexFile::OpenFromFd(int fd,
+                                             off_t offset,
+                                             const std::string& location,
+                                             /*out*/ std::string* error_msg) {
+  using android::base::StringPrintf;
+  size_t length;
+  {
+    struct stat sbuf;
+    std::memset(&sbuf, 0, sizeof(sbuf));
+    if (fstat(fd, &sbuf) == -1) {
+      *error_msg = StringPrintf("fstat '%s' failed: %s", location.c_str(), std::strerror(errno));
+      return nullptr;
+    }
+    if (S_ISDIR(sbuf.st_mode)) {
+      *error_msg = StringPrintf("Attempt to mmap directory '%s'", location.c_str());
+      return nullptr;
+    }
+    length = sbuf.st_size;
+  }
+
+  if (static_cast<off_t>(length) < offset) {
+    *error_msg = StringPrintf(
+        "Offset %" PRId64 " too large for '%s' of size %zu",
+        int64_t{offset},
+        location.c_str(),
+        length);
+    return nullptr;
+  }
+  length -= offset;
+
+  std::unique_ptr<android::base::MappedFile> map;
+  map = android::base::MappedFile::FromFd(fd, offset, length, PROT_READ);
+  if (map == nullptr) {
+    *error_msg = StringPrintf("mmap '%s' failed: %s", location.c_str(), std::strerror(errno));
+    return nullptr;
+  }
+
+  std::unique_ptr<DexFile> dex = OpenFromMemory(map->data(), &length, location, error_msg);
+  if (dex != nullptr) {
+    dex->map_ = std::move(map);  // Ensure the map gets freed with the dex file.
+  }
+  return dex;
+}
+
+MethodInfo DexFile::GetMethodInfoForOffset(int64_t dex_offset, bool with_signature) {
+  MethodInfo res{};
+  auto set_method = [&res](ExtDexFileMethodInfo* info) { res = AbsorbMethodInfo(info); };
+  uint32_t flags = with_signature ? kExtDexFileWithSignature : 0;
+  GetMethodInfoForOffset(dex_offset, set_method, flags);
+  return res;
+}
+
+std::vector<MethodInfo> DexFile::GetAllMethodInfos(bool with_signature) {
+  std::vector<MethodInfo> res;
+  auto add_method = [&res](ExtDexFileMethodInfo* info) { res.push_back(AbsorbMethodInfo(info)); };
+  uint32_t flags = with_signature ? kExtDexFileWithSignature : 0;
+  GetAllMethodInfos(add_method, flags);
+  return res;
 }
 
 }  // namespace dex

@@ -20,6 +20,7 @@
 // Dex file external API
 
 #include <sys/types.h>
+#include <stdint.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -28,59 +29,53 @@ extern "C" {
 // This is the stable C ABI that backs art_api::dex below. Structs and functions
 // may only be added here. C++ users should use dex_file_support.h instead.
 
-// Opaque wrapper for an std::string allocated in libdexfile which must be freed
-// using ExtDexFileFreeString.
-struct ExtDexFileString;
-
-// Returns an ExtDexFileString initialized to the given string.
-const struct ExtDexFileString* ExtDexFileMakeString(const char* str, size_t size);
-
-// Returns a pointer to the underlying null-terminated character array and its
-// size for the given ExtDexFileString.
-const char* ExtDexFileGetString(const struct ExtDexFileString* ext_string, /*out*/ size_t* size);
-
-// Frees an ExtDexFileString.
-void ExtDexFileFreeString(const struct ExtDexFileString* ext_string);
-
 struct ExtDexFileMethodInfo {
-  int32_t offset;
-  int32_t len;
-  const struct ExtDexFileString* name;
+  size_t sizeof_struct;  // Size of this structure (to allow future extensions).
+  uint32_t addr;  // Start of dex byte-code relative to the start of the dex file.
+  uint32_t size;  // Size of the dex byte-code in bytes.
+  const char* name;
+  size_t name_size;
+};
+
+enum ExtDexFileError {
+  kExtDexFileOk = 0,
+  kExtDexFileError = 1,  // Unspecified error.
+  kExtDexFileNotEnoughData = 2,
+  kExtDexFileInvalidHeader = 3,
+};
+
+enum ExtDexFileMethodFlags {
+  kExtDexFileWithSignature = 1,
 };
 
 struct ExtDexFile;
 
-// See art_api::dex::DexFile::OpenFromMemory. Returns true on success.
+// Try to open a dex file in the given memory range.
+// If the memory range is too small, larger suggest size is written to the argument.
 int ExtDexFileOpenFromMemory(const void* addr,
                              /*inout*/ size_t* size,
                              const char* location,
-                             /*out*/ const struct ExtDexFileString** error_msg,
                              /*out*/ struct ExtDexFile** ext_dex_file);
 
-// See art_api::dex::DexFile::OpenFromFd. Returns true on success.
-int ExtDexFileOpenFromFd(int fd,
-                         off_t offset,
-                         const char* location,
-                         /*out*/ const struct ExtDexFileString** error_msg,
-                         /*out*/ struct ExtDexFile** ext_dex_file);
+// Callback used to return information about a dex method.
+typedef void ExtDexFileMethodInfoCallback(void* user_data,
+                                          struct ExtDexFileMethodInfo* method_info);
 
-// See art_api::dex::DexFile::GetMethodInfoForOffset. Returns true on success.
+// Find a single dex method based on the given dex offset.
 int ExtDexFileGetMethodInfoForOffset(struct ExtDexFile* ext_dex_file,
-                                     int64_t dex_offset,
-                                     int with_signature,
-                                     /*out*/ struct ExtDexFileMethodInfo* method_info);
+                                     uint32_t dex_offset,
+                                     uint32_t flags,
+                                     ExtDexFileMethodInfoCallback* method_info_cb,
+                                     void* user_data);
 
-typedef void ExtDexFileMethodInfoCallback(const struct ExtDexFileMethodInfo* ext_method_info,
-                                          void* user_data);
-
-// See art_api::dex::DexFile::GetAllMethodInfos.
+// Return all dex methods in the dex file.
 void ExtDexFileGetAllMethodInfos(struct ExtDexFile* ext_dex_file,
-                                 int with_signature,
+                                 uint32_t flags,
                                  ExtDexFileMethodInfoCallback* method_info_cb,
                                  void* user_data);
 
-// Frees an ExtDexFile.
-void ExtDexFileFree(struct ExtDexFile* ext_dex_file);
+// Release all associated memory.
+void ExtDexFileClose(struct ExtDexFile* ext_dex_file);
 
 #ifdef __cplusplus
 }  // extern "C"
