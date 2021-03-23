@@ -123,7 +123,7 @@ NO_RETURN static void UsageHelp(const char* argv0) {
   UsageError(
       "--check          Check compilation artifacts are up-to-date based on metadata (fast).");
   UsageError("--compile        Compile boot class path extensions and system_server jars");
-  UsageError("                 when necessary).");
+  UsageError("                 when necessary.");
   UsageError("--force-compile  Unconditionally compile the boot class path extensions and");
   UsageError("                 system_server jars.");
   UsageError("--verify         Verify artifacts are up-to-date with dexoptanalyzer (slow).");
@@ -1289,7 +1289,7 @@ class OnDeviceRefresh final {
       }
     }
 
-    return ExitCode::kOkay;
+    return ExitCode::kCompilationSuccess;
   }
 
   static bool ArgumentMatches(std::string_view argument,
@@ -1416,7 +1416,8 @@ class OnDeviceRefresh final {
         // Fast determination of whether artifacts are up to date.
         return odr.CheckArtifactsAreUpToDate();
       } else if (action == "--compile") {
-        return odr.Compile(/*force_compile=*/false);
+        const ExitCode e = odr.CheckArtifactsAreUpToDate();
+        return (e == ExitCode::kCompilationRequired) ? odr.Compile(/*force_compile=*/false) : e;
       } else if (action == "--force-compile") {
         return odr.Compile(/*force_compile=*/true);
       } else if (action == "--verify") {
