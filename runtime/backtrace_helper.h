@@ -20,6 +20,10 @@
 #include <stddef.h>
 #include <stdint.h>
 
+namespace unwindstack {
+class Unwinder;
+}
+
 namespace art {
 
 // Using libbacktrace
@@ -38,7 +42,7 @@ class BacktraceCollector {
  private:
   // Try to collect backtrace. Returns false on failure.
   // It is used to retry backtrace on temporary failure.
-  bool CollectImpl();
+  bool CollectImpl(unwindstack::Unwinder* unwinder);
 
   uintptr_t* const out_frames_ = nullptr;
   size_t num_frames_ = 0u;
