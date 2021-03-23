@@ -1349,50 +1349,24 @@ bool MethodContainsRSensitiveAccess(const DexFile& dex_file,
   if (!accessor.HasCodeItem()) {
     return false;
   }
-  ArrayRef<const uint8_t> quicken_data;
-  const OatDexFile* oat_dex_file = dex_file.GetOatDexFile();
-  if (oat_dex_file != nullptr) {
-    quicken_data = oat_dex_file->GetQuickenedInfoOf(dex_file, method_index);
-  }
-  const QuickenInfoTable quicken_info(quicken_data);
-  uint32_t quicken_index = 0;
   for (DexInstructionIterator iter = accessor.begin(); iter != accessor.end(); ++iter) {
     switch (iter->Opcode()) {
       case Instruction::IGET:
-      case Instruction::IGET_QUICK:
       case Instruction::IGET_WIDE:
-      case Instruction::IGET_WIDE_QUICK:
       case Instruction::IGET_OBJECT:
-      case Instruction::IGET_OBJECT_QUICK:
       case Instruction::IGET_BOOLEAN:
-      case Instruction::IGET_BOOLEAN_QUICK:
       case Instruction::IGET_BYTE:
-      case Instruction::IGET_BYTE_QUICK:
       case Instruction::IGET_CHAR:
-      case Instruction::IGET_CHAR_QUICK:
       case Instruction::IGET_SHORT:
-      case Instruction::IGET_SHORT_QUICK:
       case Instruction::IPUT:
-      case Instruction::IPUT_QUICK:
       case Instruction::IPUT_WIDE:
-      case Instruction::IPUT_WIDE_QUICK:
       case Instruction::IPUT_OBJECT:
-      case Instruction::IPUT_OBJECT_QUICK:
       case Instruction::IPUT_BOOLEAN:
-      case Instruction::IPUT_BOOLEAN_QUICK:
       case Instruction::IPUT_BYTE:
-      case Instruction::IPUT_BYTE_QUICK:
       case Instruction::IPUT_CHAR:
-      case Instruction::IPUT_CHAR_QUICK:
       case Instruction::IPUT_SHORT:
-      case Instruction::IPUT_SHORT_QUICK:
         {
-          uint32_t field_index;
-          if (iter->IsQuickened()) {
-            field_index = quicken_info.GetData(quicken_index);
-          } else {
-            field_index = iter->VRegC_22c();
-          }
+          uint32_t field_index = iter->VRegC_22c();
           DCHECK(field_index < dex_file.NumFieldIds());
           // We only guarantee to pay attention to the annotation if it's in the same class,
           // or a containing class, but it's OK to do so in other cases.
@@ -1434,15 +1408,6 @@ bool MethodContainsRSensitiveAccess(const DexFile& dex_file,
           }
         }
         break;
-      case Instruction::INVOKE_VIRTUAL_QUICK:
-      case Instruction::INVOKE_VIRTUAL_RANGE_QUICK:
-        {
-          uint32_t called_method_index = quicken_info.GetData(quicken_index);
-          if (MethodIsReachabilitySensitive(dex_file, called_method_index)) {
-            return true;
-          }
-        }
-        break;
         // We explicitly do not handle indirect ReachabilitySensitive accesses through VarHandles,
         // etc. Thus we ignore INVOKE_CUSTOM / INVOKE_CUSTOM_RANGE / INVOKE_POLYMORPHIC /
         // INVOKE_POLYMORPHIC_RANGE.
@@ -1453,9 +1418,6 @@ bool MethodContainsRSensitiveAccess(const DexFile& dex_file,
         // on the call stack. We allow ReachabilitySensitive annotations on static methods and
         // fields, but they can be safely ignored.
         break;
-    }
-    if (QuickenInfoTable::NeedsIndexForInstruction(&iter.Inst())) {
-      ++quicken_index;
     }
   }
   return false;

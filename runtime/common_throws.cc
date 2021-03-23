@@ -476,9 +476,7 @@ static bool IsValidImplicitCheck(uintptr_t addr, const Instruction& instr)
     case Instruction::INVOKE_POLYMORPHIC:
     case Instruction::INVOKE_POLYMORPHIC_RANGE:
     case Instruction::INVOKE_SUPER:
-    case Instruction::INVOKE_SUPER_RANGE:
-    case Instruction::INVOKE_VIRTUAL_QUICK:
-    case Instruction::INVOKE_VIRTUAL_RANGE_QUICK: {
+    case Instruction::INVOKE_SUPER_RANGE: {
       // Without inlining, we could just check that the offset is the class offset.
       // However, when inlining, the compiler can (validly) merge the null check with a field access
       // on the same object. Note that the stack map at the NPE will reflect the invoke's location,
@@ -504,30 +502,6 @@ static bool IsValidImplicitCheck(uintptr_t addr, const Instruction& instr)
     case Instruction::IPUT_BYTE:
     case Instruction::IPUT_CHAR:
     case Instruction::IPUT_SHORT: {
-      // We might be doing an implicit null check with an offset that doesn't correspond
-      // to the instruction, for example with two field accesses and the first one being
-      // eliminated or re-ordered.
-      return true;
-    }
-
-    case Instruction::IGET_OBJECT_QUICK:
-      if (kEmitCompilerReadBarrier && IsValidReadBarrierImplicitCheck(addr)) {
-        return true;
-      }
-      FALLTHROUGH_INTENDED;
-    case Instruction::IGET_QUICK:
-    case Instruction::IGET_BOOLEAN_QUICK:
-    case Instruction::IGET_BYTE_QUICK:
-    case Instruction::IGET_CHAR_QUICK:
-    case Instruction::IGET_SHORT_QUICK:
-    case Instruction::IGET_WIDE_QUICK:
-    case Instruction::IPUT_QUICK:
-    case Instruction::IPUT_BOOLEAN_QUICK:
-    case Instruction::IPUT_BYTE_QUICK:
-    case Instruction::IPUT_CHAR_QUICK:
-    case Instruction::IPUT_SHORT_QUICK:
-    case Instruction::IPUT_WIDE_QUICK:
-    case Instruction::IPUT_OBJECT_QUICK: {
       // We might be doing an implicit null check with an offset that doesn't correspond
       // to the instruction, for example with two field accesses and the first one being
       // eliminated or re-ordered.
@@ -616,18 +590,6 @@ void ThrowNullPointerExceptionFromDexPC(bool check_address, uintptr_t addr) {
     case Instruction::INVOKE_POLYMORPHIC_RANGE:
       ThrowNullPointerExceptionForMethodAccess(instr.VRegB_4rcc(), kVirtual);
       break;
-    case Instruction::INVOKE_VIRTUAL_QUICK:
-    case Instruction::INVOKE_VIRTUAL_RANGE_QUICK: {
-      uint16_t method_idx = method->GetIndexFromQuickening(throw_dex_pc);
-      if (method_idx != DexFile::kDexNoIndex16) {
-        // NPE with precise message.
-        ThrowNullPointerExceptionForMethodAccess(method_idx, kVirtual);
-      } else {
-        // NPE with imprecise message.
-        ThrowNullPointerException("Attempt to invoke a virtual method on a null object reference");
-      }
-      break;
-    }
     case Instruction::IGET:
     case Instruction::IGET_WIDE:
     case Instruction::IGET_OBJECT:
@@ -641,22 +603,6 @@ void ThrowNullPointerExceptionFromDexPC(bool check_address, uintptr_t addr) {
       ThrowNullPointerExceptionForFieldAccess(field, /* is_read= */ true);
       break;
     }
-    case Instruction::IGET_QUICK:
-    case Instruction::IGET_BOOLEAN_QUICK:
-    case Instruction::IGET_BYTE_QUICK:
-    case Instruction::IGET_CHAR_QUICK:
-    case Instruction::IGET_SHORT_QUICK:
-    case Instruction::IGET_WIDE_QUICK:
-    case Instruction::IGET_OBJECT_QUICK: {
-      uint16_t field_idx = method->GetIndexFromQuickening(throw_dex_pc);
-      ArtField* field = nullptr;
-      CHECK_NE(field_idx, DexFile::kDexNoIndex16);
-      field = Runtime::Current()->GetClassLinker()->ResolveField(
-          field_idx, method, /* is_static= */ false);
-      Thread::Current()->ClearException();  // Resolution may fail, ignore.
-      ThrowNullPointerExceptionForFieldAccess(field, /* is_read= */ true);
-      break;
-    }
     case Instruction::IPUT:
     case Instruction::IPUT_WIDE:
     case Instruction::IPUT_OBJECT:
@@ -666,22 +612,6 @@ void ThrowNullPointerExceptionFromDexPC(bool check_address, uintptr_t addr) {
     case Instruction::IPUT_SHORT: {
       ArtField* field = Runtime::Current()->GetClassLinker()->ResolveField(
           instr.VRegC_22c(), method, /* is_static= */ false);
-      Thread::Current()->ClearException();  // Resolution may fail, ignore.
-      ThrowNullPointerExceptionForFieldAccess(field, /* is_read= */ false);
-      break;
-    }
-    case Instruction::IPUT_QUICK:
-    case Instruction::IPUT_BOOLEAN_QUICK:
-    case Instruction::IPUT_BYTE_QUICK:
-    case Instruction::IPUT_CHAR_QUICK:
-    case Instruction::IPUT_SHORT_QUICK:
-    case Instruction::IPUT_WIDE_QUICK:
-    case Instruction::IPUT_OBJECT_QUICK: {
-      uint16_t field_idx = method->GetIndexFromQuickening(throw_dex_pc);
-      ArtField* field = nullptr;
-      CHECK_NE(field_idx, DexFile::kDexNoIndex16);
-      field = Runtime::Current()->GetClassLinker()->ResolveField(
-          field_idx, method, /* is_static= */ false);
       Thread::Current()->ClearException();  // Resolution may fail, ignore.
       ThrowNullPointerExceptionForFieldAccess(field, /* is_read= */ false);
       break;

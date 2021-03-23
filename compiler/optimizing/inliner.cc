@@ -1983,8 +1983,7 @@ bool HInliner::TryBuildAndInlineHelper(HInvoke* invoke_instruction,
                         &dex_compilation_unit,
                         &outer_compilation_unit_,
                         codegen_,
-                        inline_stats_,
-                        resolved_method->GetQuickenedInfo());
+                        inline_stats_);
 
   if (builder.BuildGraph() != kAnalysisSuccess) {
     LOG_FAIL(stats_, MethodCompilationStat::kNotInlinedCannotBuild)
