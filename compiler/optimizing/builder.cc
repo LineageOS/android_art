@@ -41,8 +41,7 @@ HGraphBuilder::HGraphBuilder(HGraph* graph,
                              const DexCompilationUnit* dex_compilation_unit,
                              const DexCompilationUnit* outer_compilation_unit,
                              CodeGenerator* code_generator,
-                             OptimizingCompilerStats* compiler_stats,
-                             ArrayRef<const uint8_t> interpreter_metadata)
+                             OptimizingCompilerStats* compiler_stats)
     : graph_(graph),
       dex_file_(&graph->GetDexFile()),
       code_item_accessor_(accessor),
@@ -50,7 +49,6 @@ HGraphBuilder::HGraphBuilder(HGraph* graph,
       outer_compilation_unit_(outer_compilation_unit),
       code_generator_(code_generator),
       compilation_stats_(compiler_stats),
-      interpreter_metadata_(interpreter_metadata),
       return_type_(DataType::FromShorty(dex_compilation_unit_->GetShorty()[0])) {}
 
 HGraphBuilder::HGraphBuilder(HGraph* graph,
@@ -124,7 +122,6 @@ GraphAnalysisResult HGraphBuilder::BuildGraph() {
                                           dex_compilation_unit_,
                                           outer_compilation_unit_,
                                           code_generator_,
-                                          interpreter_metadata_,
                                           compilation_stats_,
                                           &local_allocator);
 
@@ -193,7 +190,6 @@ void HGraphBuilder::BuildIntrinsicGraph(ArtMethod* method) {
                                           dex_compilation_unit_,
                                           outer_compilation_unit_,
                                           code_generator_,
-                                          interpreter_metadata_,
                                           compilation_stats_,
                                           &local_allocator);
 

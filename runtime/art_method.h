@@ -708,9 +708,6 @@ class ArtMethod final {
     return MemberOffset(OFFSETOF_MEMBER(ArtMethod, hotness_count_));
   }
 
-  ArrayRef<const uint8_t> GetQuickenedInfo() REQUIRES_SHARED(Locks::mutator_lock_);
-  uint16_t GetIndexFromQuickening(uint32_t dex_pc) REQUIRES_SHARED(Locks::mutator_lock_);
-
   // Returns the method header for the compiled code containing 'pc'. Note that runtime
   // methods will return null for this method, as they are not oat based.
   const OatQuickMethodHeader* GetOatQuickMethodHeader(uintptr_t pc)
