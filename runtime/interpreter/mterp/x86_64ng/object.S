@@ -4,41 +4,20 @@
 %def op_iget_boolean():
    jmp NterpGetBooleanInstanceField
 
-%def op_iget_boolean_quick():
-%  unused()
-
 %def op_iget_byte():
    jmp NterpGetByteInstanceField
-
-%def op_iget_byte_quick():
-%  unused()
 
 %def op_iget_char():
    jmp NterpGetCharInstanceField
 
-%def op_iget_char_quick():
-%  unused()
-
 %def op_iget_object():
     jmp NterpGetObjectInstanceField
-
-%def op_iget_object_quick():
-%  unused()
-
-%def op_iget_quick(load="movl", wide="0"):
-%  unused()
 
 %def op_iget_short():
    jmp NterpGetShortInstanceField
 
-%def op_iget_short_quick():
-%  unused()
-
 %def op_iget_wide():
    jmp NterpGetWideInstanceField
-
-%def op_iget_wide_quick():
-%  unused()
 
 %def op_instance_of():
    jmp NterpInstanceOf
@@ -52,41 +31,20 @@
 %def op_iput_boolean():
    jmp NterpPutBooleanInstanceField
 
-%def op_iput_boolean_quick():
-%  unused()
-
 %def op_iput_byte():
    jmp NterpPutByteInstanceField
-
-%def op_iput_byte_quick():
-%  unused()
 
 %def op_iput_char():
    jmp NterpPutCharInstanceField
 
-%def op_iput_char_quick():
-%  unused()
-
 %def op_iput_object():
     jmp NterpPutObjectInstanceField
-
-%def op_iput_object_quick():
-%  unused()
-
-%def op_iput_quick(reg="rINST", store="movl"):
-%  unused()
 
 %def op_iput_short():
    jmp NterpPutShortInstanceField
 
-%def op_iput_short_quick():
-%  unused()
-
 %def op_iput_wide():
    jmp NterpPutWideInstanceField
-
-%def op_iput_wide_quick():
-%  unused()
 
 %def op_sget(load="movl", wide="0"):
    jmp NterpGetIntStaticField
