@@ -29,8 +29,7 @@ Caught java.lang.reflect.InvocationTargetException
 Calling Test7User.test():
 Test7Interface.foo()
 Calling Test7User2.test():
-Caught java.lang.reflect.InvocationTargetException
-  caused by java.lang.IllegalAccessError
+Test7Interface.foo()
 Calling Test8User.test():
 Test8Derived.foo()
 Calling Test8User2.test():
