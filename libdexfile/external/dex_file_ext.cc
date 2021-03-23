@@ -42,74 +42,29 @@
 #include <dex/dex_file-inl.h>
 #include <dex/dex_file_loader.h>
 
-namespace art {
-namespace {
-
-struct MethodCacheEntry {
-  int32_t offset;  // Offset relative to the start of the dex file header.
-  int32_t len;
-  int32_t index;  // Method index.
-};
-
-class MappedFileContainer : public DexFileContainer {
- public:
-  explicit MappedFileContainer(std::unique_ptr<android::base::MappedFile>&& map)
-      : map_(std::move(map)) {}
-  ~MappedFileContainer() override {}
-  int GetPermissions() override { return 0; }
-  bool IsReadOnly() override { return true; }
-  bool EnableWrite() override { return false; }
-  bool DisableWrite() override { return false; }
-
- private:
-  std::unique_ptr<android::base::MappedFile> map_;
-  DISALLOW_COPY_AND_ASSIGN(MappedFileContainer);
-};
-
-}  // namespace
-}  // namespace art
-
 extern "C" {
-
-struct ExtDexFileString {
-  const std::string str_;
-};
-
-static const ExtDexFileString empty_string{""};
-
-const ExtDexFileString* ExtDexFileMakeString(const char* str, size_t size) {
-  if (size == 0) {
-    return &empty_string;
-  }
-  return new ExtDexFileString{std::string(str, size)};
-}
-
-const char* ExtDexFileGetString(const ExtDexFileString* ext_string, /*out*/ size_t* size) {
-  DCHECK(ext_string != nullptr);
-  *size = ext_string->str_.size();
-  return ext_string->str_.data();
-}
-
-void ExtDexFileFreeString(const ExtDexFileString* ext_string) {
-  DCHECK(ext_string != nullptr);
-  if (ext_string != &empty_string) {
-    delete (ext_string);
-  }
-}
-
 // Wraps DexFile to add the caching needed by the external interface. This is
 // what gets passed over as ExtDexFile*.
 struct ExtDexFile {
+  struct MethodCacheEntry {
+    uint32_t offset;  // Offset relative to the start of the dex file header.
+    uint32_t len;
+    uint32_t index;  // Method index.
+  };
+
  public:
   std::unique_ptr<const art::DexFile> dex_file_;
   explicit ExtDexFile(std::unique_ptr<const art::DexFile>&& dex_file)
       : dex_file_(std::move(dex_file)) {}
 
-  art::MethodCacheEntry* GetMethodCacheEntryForOffset(int64_t dex_offset) {
+  bool GetMethodDefIndex(uint32_t dex_offset, uint32_t* index, uint32_t* addr, uint32_t* size) {
     // First look in the method cache.
     auto it = method_cache_.upper_bound(dex_offset);
     if (it != method_cache_.end() && dex_offset >= it->second.offset) {
-      return &it->second;
+      *index = it->second.index;
+      *addr = it->second.offset;
+      *size = it->second.len;
+      return true;
     }
 
     uint32_t class_def_index;
@@ -122,17 +77,18 @@ struct ExtDexFile {
           continue;
         }
 
-        int32_t offset = reinterpret_cast<const uint8_t*>(code.Insns()) - dex_file_->Begin();
-        int32_t len = code.InsnsSizeInBytes();
+        uint32_t offset = reinterpret_cast<const uint8_t*>(code.Insns()) - dex_file_->Begin();
+        uint32_t len = code.InsnsSizeInBytes();
         if (offset <= dex_offset && dex_offset < offset + len) {
-          int32_t index = method.GetIndex();
-          auto res = method_cache_.emplace(offset + len, art::MethodCacheEntry{offset, len, index});
-          return &res.first->second;
+          *index = method.GetIndex();
+          *addr = offset;
+          *size = len;
+          method_cache_.emplace(offset + len, MethodCacheEntry{offset, len, *index});
+          return true;
         }
       }
     }
-
-    return nullptr;
+    return false;
   }
 
  private:
@@ -183,18 +139,16 @@ struct ExtDexFile {
 
   // Binary search table with (end_dex_offset, class_def_index) entries.
   std::vector<std::pair<uint32_t, uint32_t>> class_cache_;
-  std::map<uint32_t, art::MethodCacheEntry> method_cache_;  // end_dex_offset -> method.
+  std::map<uint32_t, MethodCacheEntry> method_cache_;  // end_dex_offset -> method.
 };
 
 int ExtDexFileOpenFromMemory(const void* addr,
                              /*inout*/ size_t* size,
                              const char* location,
-                             /*out*/ const ExtDexFileString** ext_error_msg,
                              /*out*/ ExtDexFile** ext_dex_file) {
   if (*size < sizeof(art::DexFile::Header)) {
     *size = sizeof(art::DexFile::Header);
-    *ext_error_msg = nullptr;
-    return false;
+    return kExtDexFileNotEnoughData;
   }
 
   const art::DexFile::Header* header = reinterpret_cast<const art::DexFile::Header*>(addr);
@@ -206,23 +160,18 @@ int ExtDexFileOpenFromMemory(const void* addr,
     //       In practice, this should be fine, as such sharing only happens on disk.
     uint32_t computed_file_size;
     if (__builtin_add_overflow(header->data_off_, header->data_size_, &computed_file_size)) {
-      *ext_error_msg = new ExtDexFileString{
-          android::base::StringPrintf("Corrupt CompactDexFile header in '%s'", location)};
-      return false;
+      return kExtDexFileInvalidHeader;
     }
     if (computed_file_size > file_size) {
       file_size = computed_file_size;
     }
   } else if (!art::StandardDexFile::IsMagicValid(header->magic_)) {
-    *ext_error_msg = new ExtDexFileString{
-        android::base::StringPrintf("Unrecognized dex file header in '%s'", location)};
-    return false;
+    return kExtDexFileInvalidHeader;
   }
 
   if (*size < file_size) {
     *size = file_size;
-    *ext_error_msg = nullptr;
-    return false;
+    return kExtDexFileNotEnoughData;
   }
 
   std::string loc_str(location);
@@ -237,99 +186,19 @@ int ExtDexFileOpenFromMemory(const void* addr,
                                                              /*verify_checksum=*/false,
                                                              &error_msg);
   if (dex_file == nullptr) {
-    *ext_error_msg = new ExtDexFileString{std::move(error_msg)};
-    return false;
+    LOG(ERROR) << "Can not opend dex file " << loc_str << ": " << error_msg;
+    return kExtDexFileError;
   }
 
   *ext_dex_file = new ExtDexFile(std::move(dex_file));
-  return true;
-}
-
-int ExtDexFileOpenFromFd(int fd,
-                         off_t offset,
-                         const char* location,
-                         /*out*/ const ExtDexFileString** ext_error_msg,
-                         /*out*/ ExtDexFile** ext_dex_file) {
-  size_t length;
-  {
-    struct stat sbuf;
-    std::memset(&sbuf, 0, sizeof(sbuf));
-    if (fstat(fd, &sbuf) == -1) {
-      *ext_error_msg = new ExtDexFileString{
-          android::base::StringPrintf("fstat '%s' failed: %s", location, std::strerror(errno))};
-      return false;
-    }
-    if (S_ISDIR(sbuf.st_mode)) {
-      *ext_error_msg = new ExtDexFileString{
-          android::base::StringPrintf("Attempt to mmap directory '%s'", location)};
-      return false;
-    }
-    length = sbuf.st_size;
-  }
-
-  if (length < offset + sizeof(art::DexFile::Header)) {
-    *ext_error_msg = new ExtDexFileString{android::base::StringPrintf(
-        "Offset %" PRId64 " too large for '%s' of size %zu",
-        int64_t{offset},
-        location,
-        length)};
-    return false;
-  }
-
-  // Cannot use MemMap in libartbase here, because it pulls in dlopen which we
-  // can't have when being compiled statically.
-  std::unique_ptr<android::base::MappedFile> map =
-      android::base::MappedFile::FromFd(fd, offset, length, PROT_READ);
-  if (map == nullptr) {
-    *ext_error_msg = new ExtDexFileString{
-        android::base::StringPrintf("mmap '%s' failed: %s", location, std::strerror(errno))};
-    return false;
-  }
-
-  const art::DexFile::Header* header = reinterpret_cast<const art::DexFile::Header*>(map->data());
-  uint32_t file_size;
-  if (__builtin_add_overflow(offset, header->file_size_, &file_size)) {
-    *ext_error_msg =
-        new ExtDexFileString{android::base::StringPrintf("Corrupt header in '%s'", location)};
-    return false;
-  }
-  if (length < file_size) {
-    *ext_error_msg = new ExtDexFileString{
-        android::base::StringPrintf("Dex file '%s' too short: expected %" PRIu32 ", got %" PRIu64,
-                                    location,
-                                    file_size,
-                                    uint64_t{length})};
-    return false;
-  }
-
-  void* addr = map->data();
-  size_t size = map->size();
-  auto container = std::make_unique<art::MappedFileContainer>(std::move(map));
-
-  std::string loc_str(location);
-  std::string error_msg;
-  art::DexFileLoader loader;
-  std::unique_ptr<const art::DexFile> dex_file = loader.Open(reinterpret_cast<const uint8_t*>(addr),
-                                                             size,
-                                                             loc_str,
-                                                             header->checksum_,
-                                                             /*oat_dex_file=*/nullptr,
-                                                             /*verify=*/false,
-                                                             /*verify_checksum=*/false,
-                                                             &error_msg,
-                                                             std::move(container));
-  if (dex_file == nullptr) {
-    *ext_error_msg = new ExtDexFileString{std::move(error_msg)};
-    return false;
-  }
-  *ext_dex_file = new ExtDexFile(std::move(dex_file));
-  return true;
+  return kExtDexFileOk;
 }
 
 int ExtDexFileGetMethodInfoForOffset(ExtDexFile* ext_dex_file,
-                                     int64_t dex_offset,
-                                     int with_signature,
-                                     /*out*/ ExtDexFileMethodInfo* method_info) {
+                                     uint32_t dex_offset,
+                                     uint32_t flags,
+                                     ExtDexFileMethodInfoCallback* method_info_cb,
+                                     void* user_data) {
   if (!ext_dex_file->dex_file_->IsInDataSection(ext_dex_file->dex_file_->Begin() + dex_offset)) {
     return false;  // The DEX offset is not within the bytecode of this dex file.
   }
@@ -346,40 +215,49 @@ int ExtDexFileGetMethodInfoForOffset(ExtDexFile* ext_dex_file,
     }
   }
 
-  art::MethodCacheEntry* entry = ext_dex_file->GetMethodCacheEntryForOffset(dex_offset);
-  if (entry != nullptr) {
-    method_info->offset = entry->offset;
-    method_info->len = entry->len;
-    method_info->name =
-        new ExtDexFileString{ext_dex_file->dex_file_->PrettyMethod(entry->index, with_signature)};
-    return true;
+  uint32_t method_index, addr, size;
+  if (!ext_dex_file->GetMethodDefIndex(dex_offset, &method_index, &addr, &size)) {
+    return false;
   }
 
-  return false;
+  bool with_signature = flags & kExtDexFileWithSignature;
+  std::string name = ext_dex_file->dex_file_->PrettyMethod(method_index, with_signature);
+  ExtDexFileMethodInfo info {
+    .sizeof_struct = sizeof(ExtDexFileMethodInfo),
+    .addr = addr,
+    .size = size,
+    .name = name.c_str(),
+    .name_size = name.size()
+  };
+  method_info_cb(user_data, &info);
+  return true;
 }
 
 void ExtDexFileGetAllMethodInfos(ExtDexFile* ext_dex_file,
-                                 int with_signature,
+                                 uint32_t flags,
                                  ExtDexFileMethodInfoCallback* method_info_cb,
                                  void* user_data) {
+  const art::DexFile* dex_file = ext_dex_file->dex_file_.get();
   for (art::ClassAccessor accessor : ext_dex_file->dex_file_->GetClasses()) {
     for (const art::ClassAccessor::Method& method : accessor.GetMethods()) {
       art::CodeItemInstructionAccessor code = method.GetInstructions();
-      if (!code.HasCodeItem()) {
-        continue;
+      if (code.HasCodeItem()) {
+        const uint8_t* insns = reinterpret_cast<const uint8_t*>(code.Insns());
+        bool with_signature = flags & kExtDexFileWithSignature;
+        std::string name = dex_file->PrettyMethod(method.GetIndex(), with_signature);
+        ExtDexFileMethodInfo info {
+          .sizeof_struct = sizeof(ExtDexFileMethodInfo),
+          .addr = static_cast<uint32_t>(insns - dex_file->Begin()),
+          .size = code.InsnsSizeInBytes(),
+          .name = name.c_str(),
+          .name_size = name.size()
+        };
+        method_info_cb(user_data, &info);
       }
-
-      ExtDexFileMethodInfo method_info;
-      method_info.offset = static_cast<int32_t>(reinterpret_cast<const uint8_t*>(code.Insns()) -
-                                                ext_dex_file->dex_file_->Begin());
-      method_info.len = code.InsnsSizeInBytes();
-      method_info.name = new ExtDexFileString{
-          ext_dex_file->dex_file_->PrettyMethod(method.GetIndex(), with_signature)};
-      method_info_cb(&method_info, user_data);
     }
   }
 }
 
-void ExtDexFileFree(ExtDexFile* ext_dex_file) { delete (ext_dex_file); }
+void ExtDexFileClose(ExtDexFile* ext_dex_file) { delete (ext_dex_file); }
 
 }  // extern "C"

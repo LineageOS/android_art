@@ -80,7 +80,8 @@ class VerifierDeps {
       REQUIRES(!Locks::verifier_deps_lock_);
 
   // Record the verification status of the class defined in `class_def`.
-  static void MaybeRecordVerificationStatus(const DexFile& dex_file,
+  static void MaybeRecordVerificationStatus(VerifierDeps* verifier_deps,
+                                            const DexFile& dex_file,
                                             const dex::ClassDef& class_def,
                                             FailureKind failure_kind)
       REQUIRES(!Locks::verifier_deps_lock_);
@@ -88,7 +89,8 @@ class VerifierDeps {
   // Record the outcome `is_assignable` of type assignability test from `source`
   // to `destination` as defined by RegType::AssignableFrom. `dex_file` is the
   // owner of the method for which MethodVerifier performed the assignability test.
-  static void MaybeRecordAssignability(const DexFile& dex_file,
+  static void MaybeRecordAssignability(VerifierDeps* verifier_deps,
+                                       const DexFile& dex_file,
                                        const dex::ClassDef& class_def,
                                        ObjPtr<mirror::Class> destination,
                                        ObjPtr<mirror::Class> source)
@@ -97,7 +99,8 @@ class VerifierDeps {
 
   // Record that `source` is assignable to `destination`. `dex_file` is the
   // owner of the method for which MethodVerifier performed the assignability test.
-  static void MaybeRecordAssignability(const DexFile& dex_file,
+  static void MaybeRecordAssignability(VerifierDeps* verifier_deps,
+                                       const DexFile& dex_file,
                                        const dex::ClassDef& class_def,
                                        const RegType& destination,
                                        const RegType& source)
