@@ -278,8 +278,8 @@ static JniCompiledMethod ArtJniCompileMethodInternal(const CompilerOptions& comp
   //    can occur. The result is the saved JNI local state that is restored by the exit call. We
   //    abuse the JNI calling convention here, that is guaranteed to support passing 2 pointer
   //    arguments.
-  FrameOffset saved_cookie_offset(
-      FrameOffset(0xDEADBEEFu));  // @CriticalNative - use obviously bad value for debugging
+  constexpr size_t cookie_size = JniCallingConvention::SavedLocalReferenceCookieSize();
+  ManagedRegister saved_cookie_register = ManagedRegister::NoRegister();
   if (LIKELY(!is_critical_native)) {
     // Skip this for @CriticalNative methods. They do not call JniMethodStart.
     ThreadOffset<kPointerSize> jni_start(
@@ -324,8 +324,8 @@ static JniCompiledMethod ArtJniCompileMethodInternal(const CompilerOptions& comp
     }
 
     // Store into stack_frame[saved_cookie_offset] the return value of JniMethodStart.
-    saved_cookie_offset = main_jni_conv->SavedLocalReferenceCookieOffset();
-    __ Store(saved_cookie_offset, main_jni_conv->IntReturnRegister(), 4 /* sizeof cookie */);
+    saved_cookie_register = main_jni_conv->SavedLocalReferenceCookieRegister();
+    __ Move(saved_cookie_register, main_jni_conv->IntReturnRegister(), cookie_size);
   }
 
   // 6. Fill arguments.
@@ -500,7 +500,6 @@ static JniCompiledMethod ArtJniCompileMethodInternal(const CompilerOptions& comp
       current_out_arg_size = end_out_arg_size;
       __ IncreaseFrameSize(out_arg_size_diff);
       current_frame_size += out_arg_size_diff;
-      saved_cookie_offset = FrameOffset(saved_cookie_offset.SizeValue() + out_arg_size_diff);
       return_save_location = FrameOffset(return_save_location.SizeValue() + out_arg_size_diff);
     }
     end_jni_conv->ResetIterator(FrameOffset(end_out_arg_size));
@@ -519,10 +518,10 @@ static JniCompiledMethod ArtJniCompileMethodInternal(const CompilerOptions& comp
     // Pass saved local reference state.
     if (end_jni_conv->IsCurrentParamOnStack()) {
       FrameOffset out_off = end_jni_conv->CurrentParamStackOffset();
-      __ Copy(out_off, saved_cookie_offset, 4);
+      __ Store(out_off, saved_cookie_register, cookie_size);
     } else {
       ManagedRegister out_reg = end_jni_conv->CurrentParamRegister();
-      __ Load(out_reg, saved_cookie_offset, 4);
+      __ Move(out_reg, saved_cookie_register, cookie_size);
     }
     end_jni_conv->Next();
     if (is_synchronized) {
