@@ -38,8 +38,7 @@ class HGraphBuilder : public ValueObject {
                 const DexCompilationUnit* dex_compilation_unit,
                 const DexCompilationUnit* outer_compilation_unit,
                 CodeGenerator* code_generator,
-                OptimizingCompilerStats* compiler_stats,
-                ArrayRef<const uint8_t> interpreter_metadata);
+                OptimizingCompilerStats* compiler_stats);
 
   // Only for unit testing.
   HGraphBuilder(HGraph* graph,
@@ -69,7 +68,6 @@ class HGraphBuilder : public ValueObject {
   CodeGenerator* const code_generator_;
 
   OptimizingCompilerStats* const compilation_stats_;
-  const ArrayRef<const uint8_t> interpreter_metadata_;
   const DataType::Type return_type_;
 
   DISALLOW_COPY_AND_ASSIGN(HGraphBuilder);

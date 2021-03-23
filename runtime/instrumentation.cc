@@ -1434,24 +1434,7 @@ static char GetRuntimeMethodShorty(Thread* thread) REQUIRES_SHARED(Locks::mutato
         } else {
           const Instruction& instr = m->DexInstructions().InstructionAt(stack_visitor->GetDexPc());
           if (instr.IsInvoke()) {
-            auto get_method_index_fn = [](ArtMethod* caller,
-                                          const Instruction& inst,
-                                          uint32_t dex_pc)
-                REQUIRES_SHARED(Locks::mutator_lock_) {
-              switch (inst.Opcode()) {
-                case Instruction::INVOKE_VIRTUAL_RANGE_QUICK:
-                case Instruction::INVOKE_VIRTUAL_QUICK: {
-                  uint16_t method_idx = caller->GetIndexFromQuickening(dex_pc);
-                  CHECK_NE(method_idx, DexFile::kDexNoIndex16);
-                  return method_idx;
-                }
-                default: {
-                  return static_cast<uint16_t>(inst.VRegB());
-                }
-              }
-            };
-
-            uint16_t method_index = get_method_index_fn(m, instr, stack_visitor->GetDexPc());
+            uint16_t method_index = static_cast<uint16_t>(instr.VRegB());
             const DexFile* dex_file = m->GetDexFile();
             if (interpreter::IsStringInit(dex_file, method_index)) {
               // Invoking string init constructor is turned into invoking
