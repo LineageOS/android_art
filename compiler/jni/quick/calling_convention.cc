@@ -173,18 +173,10 @@ size_t JniCallingConvention::ReferenceCount() const {
   return NumReferenceArgs() + (IsStatic() ? 1 : 0);
 }
 
-FrameOffset JniCallingConvention::SavedLocalReferenceCookieOffset() const {
-  // The cookie goes after the method pointer.
-  DCHECK_EQ(SavedLocalReferenceCookieSize(), sizeof(IRTSegmentState));
-  DCHECK(HasLocalReferenceSegmentState());
-  return FrameOffset(displacement_.SizeValue() + static_cast<size_t>(frame_pointer_size_));
-}
-
 FrameOffset JniCallingConvention::ReturnValueSaveLocation() const {
-  // The saved return value goes at a properly aligned slot after the cookie.
+  // The saved return value goes at a properly aligned slot after the method pointer.
   DCHECK(SpillsReturnValue());
-  size_t cookie_offset = SavedLocalReferenceCookieOffset().SizeValue() - displacement_.SizeValue();
-  size_t return_value_offset = cookie_offset + SavedLocalReferenceCookieSize();
+  size_t return_value_offset = static_cast<size_t>(frame_pointer_size_);
   const size_t return_value_size = SizeOfReturnValue();
   DCHECK(return_value_size == 4u || return_value_size == 8u) << return_value_size;
   DCHECK_ALIGNED(return_value_offset, 4u);
