@@ -212,6 +212,11 @@ art_module_exports {
                 "dex2oat",
                 "dex2oatd",
             ],
+            native_libs: [
+                "libdexfile", // libdexfile_external dependency
+                "libartpalette", // libdexfile dependency
+                "libartbase", // libdexfile dependency
+            ],
         },
 
         linux_bionic: {
