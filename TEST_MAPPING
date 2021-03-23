@@ -856,9 +856,6 @@
       "name": "art-run-test-530-checker-lse-simd"
     },
     {
-      "name": "art-run-test-530-checker-lse2"
-    },
-    {
       "name": "art-run-test-530-instanceof-checkcast"
     },
     {
@@ -1004,9 +1001,6 @@
     },
     {
       "name": "art-run-test-582-checker-bce-length"
-    },
-    {
-      "name": "art-run-test-583-checker-zero"
     },
     {
       "name": "art-run-test-584-checker-div-bool"

@@ -410,7 +410,10 @@ static void DeleteJITCodeEntryInternal(const JITCodeEntry* entry) {
 void AddNativeDebugInfoForDex(Thread* self, const DexFile* dexfile) {
   MutexLock mu(self, g_dex_debug_lock);
   DCHECK(dexfile != nullptr);
-  const ArrayRef<const uint8_t> symfile(dexfile->Begin(), dexfile->Size());
+  // Compact dex files may store data past the size defined in the header.
+  const DexFile::Header& header = dexfile->GetHeader();
+  uint32_t size = std::max(header.file_size_, header.data_off_ + header.data_size_);
+  const ArrayRef<const uint8_t> symfile(dexfile->Begin(), size);
   CreateJITCodeEntryInternal<DexNativeInfo>(symfile);
 }
 

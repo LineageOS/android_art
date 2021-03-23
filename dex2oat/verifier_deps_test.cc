@@ -163,9 +163,9 @@ class VerifierDepsTest : public CommonCompilerDriverTest {
               method.GetInvokeType(class_def->access_flags_));
       CHECK(resolved_method != nullptr);
       if (method_name == resolved_method->GetName()) {
-        soa.Self()->SetVerifierDeps(callbacks_->GetVerifierDeps());
         std::unique_ptr<MethodVerifier> verifier(
             MethodVerifier::CreateVerifier(soa.Self(),
+                                           callbacks_->GetVerifierDeps(),
                                            primary_dex_file_,
                                            dex_cache_handle,
                                            class_loader_handle,
@@ -547,25 +547,23 @@ TEST_F(VerifierDepsTest, UnverifiedOrder) {
   ASSERT_GT(dex_files.size(), 0u);
   const DexFile* dex_file = dex_files[0];
   VerifierDeps deps1(dex_files);
-  Thread* const self = Thread::Current();
-  ASSERT_TRUE(self->GetVerifierDeps() == nullptr);
-  self->SetVerifierDeps(&deps1);
-  deps1.MaybeRecordVerificationStatus(*dex_file,
+  deps1.MaybeRecordVerificationStatus(&deps1,
+                                      *dex_file,
                                       dex_file->GetClassDef(0u),
                                       verifier::FailureKind::kHardFailure);
-  deps1.MaybeRecordVerificationStatus(*dex_file,
+  deps1.MaybeRecordVerificationStatus(&deps1,
+                                      *dex_file,
                                       dex_file->GetClassDef(1u),
                                       verifier::FailureKind::kHardFailure);
   VerifierDeps deps2(dex_files);
-  self->SetVerifierDeps(nullptr);
-  self->SetVerifierDeps(&deps2);
-  deps2.MaybeRecordVerificationStatus(*dex_file,
+  deps2.MaybeRecordVerificationStatus(&deps2,
+                                      *dex_file,
                                       dex_file->GetClassDef(1u),
                                       verifier::FailureKind::kHardFailure);
-  deps2.MaybeRecordVerificationStatus(*dex_file,
+  deps2.MaybeRecordVerificationStatus(&deps2,
+                                      *dex_file,
                                       dex_file->GetClassDef(0u),
                                       verifier::FailureKind::kHardFailure);
-  self->SetVerifierDeps(nullptr);
   std::vector<uint8_t> buffer1;
   deps1.Encode(dex_files, &buffer1);
   std::vector<uint8_t> buffer2;
