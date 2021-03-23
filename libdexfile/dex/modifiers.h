@@ -97,6 +97,9 @@ static constexpr uint32_t kAccMustCountLocks =        0x04000000;  // method (ru
 // virtual call.
 static constexpr uint32_t kAccSingleImplementation =  0x08000000;  // method (runtime)
 
+// Whether nterp can take a fast path when entering this method (runtime; non-native)
+static constexpr uint32_t kAccNterpEntryPointFastPathFlag = 0x00100000;
+
 static constexpr uint32_t kAccPublicApi =             0x10000000;  // field, method
 static constexpr uint32_t kAccCorePlatformApi =       0x20000000;  // field, method
 
