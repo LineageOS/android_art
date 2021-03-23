@@ -87,6 +87,10 @@ art_module_sdk {
                 "art-boot-image",
             ],
 
+            compat_configs: [
+                "libcore-platform-compat-config",
+            ],
+
             // Create placeholder java_import prebuilts for the java boot libraries so that Soong
             // can retrieve their dex implementation jars from the associated prebuilt_apex. All
             // libraries listed in the exported_java_libs property of the ART apex (see
