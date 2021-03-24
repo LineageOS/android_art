@@ -225,16 +225,23 @@ const ClassDef* DexFile::FindClassDef(dex::TypeIndex type_idx) const {
   return nullptr;
 }
 
-uint32_t DexFile::FindCodeItemOffset(const ClassDef& class_def, uint32_t method_idx) const {
+std::optional<uint32_t> DexFile::GetCodeItemOffset(const ClassDef &class_def,
+                                                   uint32_t method_idx) const {
   ClassAccessor accessor(*this, class_def);
   CHECK(accessor.HasClassData());
-  for (const ClassAccessor::Method& method : accessor.GetMethods()) {
+  for (const ClassAccessor::Method &method : accessor.GetMethods()) {
     if (method.GetIndex() == method_idx) {
       return method.GetCodeItemOffset();
     }
   }
-  LOG(FATAL) << "Unable to find method " << method_idx;
-  UNREACHABLE();
+  return std::nullopt;
+}
+
+uint32_t DexFile::FindCodeItemOffset(const dex::ClassDef &class_def,
+                                     uint32_t dex_method_idx) const {
+  std::optional<uint32_t> val = GetCodeItemOffset(class_def, dex_method_idx);
+  CHECK(val.has_value()) << "Unable to find method " << dex_method_idx;
+  return *val;
 }
 
 const FieldId* DexFile::FindFieldId(const TypeId& declaring_klass,
