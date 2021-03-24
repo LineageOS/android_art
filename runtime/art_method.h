@@ -404,6 +404,10 @@ class ArtMethod final {
     AddAccessFlags(kAccNterpEntryPointFastPathFlag);
   }
 
+  void SetNterpInvokeFastPathFlag() REQUIRES_SHARED(Locks::mutator_lock_) {
+    AddAccessFlags(kAccNterpInvokeFastPathFlag);
+  }
+
   // Returns true if this method could be overridden by a default method.
   bool IsOverridableByDefaultMethod() REQUIRES_SHARED(Locks::mutator_lock_);
 
