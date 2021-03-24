@@ -231,8 +231,8 @@ TEST_F(SigchainTest, EnsureFrontOfChain) {
 
   // ...and after.
   art::EnsureFrontOfChain(SIGSEGV);
+  RaiseHandled();
   ASSERT_EQ(0, called);
-  called = 0;
 
   RaiseUnhandled();
   ASSERT_EQ(1, called);

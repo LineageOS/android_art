@@ -123,7 +123,7 @@ NO_RETURN static void UsageHelp(const char* argv0) {
   UsageError(
       "--check          Check compilation artifacts are up-to-date based on metadata (fast).");
   UsageError("--compile        Compile boot class path extensions and system_server jars");
-  UsageError("                 when necessary).");
+  UsageError("                 when necessary.");
   UsageError("--force-compile  Unconditionally compile the boot class path extensions and");
   UsageError("                 system_server jars.");
   UsageError("--verify         Verify artifacts are up-to-date with dexoptanalyzer (slow).");
@@ -332,6 +332,12 @@ class OnDeviceRefresh final {
       }
     }
 
+    const std::string dir_name = android::base::Dirname(cache_info_filename_);
+    if (!EnsureDirectoryExists(dir_name)) {
+      LOG(ERROR) << "Could not create directory: " << QuotePath(dir_name);
+      return;
+    }
+
     std::optional<art_apex::ArtModuleInfo> art_module_info = GenerateArtModuleInfo();
     if (!art_module_info.has_value()) {
       LOG(ERROR) << "Unable to generate cache provenance";
@@ -345,21 +351,21 @@ class OnDeviceRefresh final {
     std::optional<std::vector<art_apex::Component>> bcp_components =
         GenerateBootExtensionComponents();
     if (!bcp_components.has_value()) {
+      LOG(ERROR) << "No boot classpath extension components.";
       return;
     }
 
     std::optional<std::vector<art_apex::Component>> system_server_components =
         GenerateSystemServerComponents();
     if (!system_server_components.has_value()) {
+      LOG(ERROR) << "No system_server extension components.";
       return;
     }
 
     std::ofstream out(cache_info_filename_.c_str());
-    art_apex::CacheInfo info{
-      art_module_infos,
-      {{ art_apex::Dex2oatBootClasspath {bcp_components.value()}}},
-      {{ art_apex::SystemServerClasspath {system_server_components.value()}}}
-    };
+    art_apex::CacheInfo info{art_module_infos,
+                             {{art_apex::Dex2oatBootClasspath{bcp_components.value()}}},
+                             {{art_apex::SystemServerClasspath{system_server_components.value()}}}};
 
     art_apex::write(out, info);
   }
@@ -509,10 +515,13 @@ class OnDeviceRefresh final {
 
     if (apex_info->getIsFactory()) {
       // Remove any artifacts on /data as they are not necessary and no compilation is necessary.
+      LOG(INFO) << "Factory APEX mounted.";
       return cleanup_return(ExitCode::kOkay);
     }
 
     if (!OS::FileExists(cache_info_filename_.c_str())) {
+      // If the cache info file does not exist, assume compilation is required because the
+      // file is missing and because the current ART APEX is not factory installed.
       PLOG(ERROR) << "No prior cache-info file: " << QuotePath(cache_info_filename_);
       return cleanup_return(ExitCode::kCompilationRequired);
     }
@@ -1289,7 +1298,7 @@ class OnDeviceRefresh final {
       }
     }
 
-    return ExitCode::kOkay;
+    return ExitCode::kCompilationSuccess;
   }
 
   static bool ArgumentMatches(std::string_view argument,
@@ -1416,7 +1425,8 @@ class OnDeviceRefresh final {
         // Fast determination of whether artifacts are up to date.
         return odr.CheckArtifactsAreUpToDate();
       } else if (action == "--compile") {
-        return odr.Compile(/*force_compile=*/false);
+        const ExitCode e = odr.CheckArtifactsAreUpToDate();
+        return (e == ExitCode::kCompilationRequired) ? odr.Compile(/*force_compile=*/false) : e;
       } else if (action == "--force-compile") {
         return odr.Compile(/*force_compile=*/true);
       } else if (action == "--verify") {

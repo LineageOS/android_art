@@ -1472,6 +1472,24 @@ END \name
     b 1b
 .endm
 
+.macro SETUP_REFERENCE_PARAMETER_IN_GPR gpr32, regs, refs, ins, arg_offset, finished
+    str \gpr32, [\regs, \arg_offset]
+    subs \ins, \ins, #1
+    str \gpr32, [\refs, \arg_offset]
+    add \arg_offset, \arg_offset, #4
+    beq \finished
+.endm
+
+.macro SETUP_REFERENCE_PARAMETERS_IN_STACK regs, refs, ins, stack_ptr, arg_offset
+1:
+    ldr ip, [\stack_ptr, \arg_offset]
+    subs \ins, \ins, #1
+    str ip, [\regs, \arg_offset]
+    str ip, [\refs, \arg_offset]
+    add \arg_offset, \arg_offset, #4
+    bne 1b
+.endm
+
 %def entry():
 /*
  * ArtMethod entry point.
@@ -1502,6 +1520,20 @@ OAT_ENTRY ExecuteNterpImpl, EndExecuteNterpImpl
     lsl rINST, rINST, #2 // rINST is now the offset for inputs into the registers array.
     mov rIBASE, ip // rIBASE contains the old stack pointer
 
+    tst r8, #ART_METHOD_NTERP_ENTRY_POINT_FAST_PATH_FLAG
+    beq .Lsetup_slow_path
+    // Setup pointer to inputs in FP and pointer to inputs in REFS
+    add lr, rFP, rINST
+    add r8, rREFS, rINST
+    mov r0, #0
+    SETUP_REFERENCE_PARAMETER_IN_GPR r1, lr, r8, r4, r0, .Lxmm_setup_finished
+    SETUP_REFERENCE_PARAMETER_IN_GPR r2, lr, r8, r4, r0, .Lxmm_setup_finished
+    SETUP_REFERENCE_PARAMETER_IN_GPR r3, lr, r8, r4, r0, .Lxmm_setup_finished
+    add rIBASE, rIBASE, #OFFSET_TO_FIRST_ARGUMENT_IN_STACK
+    SETUP_REFERENCE_PARAMETERS_IN_STACK lr, r8, r4, rIBASE, r0
+    b .Lxmm_setup_finished
+
+.Lsetup_slow_path:
     // If the method is not static and there is one argument ('this'), we don't need to fetch the
     // shorty.
     tst r8, #ART_METHOD_IS_STATIC_FLAG

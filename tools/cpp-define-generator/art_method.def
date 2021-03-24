@@ -23,10 +23,14 @@ ASM_DEFINE(ART_METHOD_ACCESS_FLAGS_OFFSET,
            art::ArtMethod::AccessFlagsOffset().Int32Value())
 ASM_DEFINE(ART_METHOD_IS_STATIC_FLAG,
            art::kAccStatic)
+ASM_DEFINE(ART_METHOD_NTERP_ENTRY_POINT_FAST_PATH_FLAG,
+           art::kAccNterpEntryPointFastPathFlag)
 ASM_DEFINE(ART_METHOD_IMT_MASK,
            art::ImTable::kSizeTruncToPowerOfTwo - 1)
 ASM_DEFINE(ART_METHOD_IS_STATIC_FLAG_BIT,
            art::MostSignificantBit(art::kAccStatic))
+ASM_DEFINE(ART_METHOD_NTERP_ENTRY_POINT_FAST_PATH_FLAG_BIT,
+           art::MostSignificantBit(art::kAccNterpEntryPointFastPathFlag))
 ASM_DEFINE(ART_METHOD_DECLARING_CLASS_OFFSET,
            art::ArtMethod::DeclaringClassOffset().Int32Value())
 ASM_DEFINE(ART_METHOD_JNI_OFFSET_32,
