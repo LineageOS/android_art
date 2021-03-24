@@ -1553,6 +1553,25 @@ END_FUNCTION \name
    jmp 1b
 .endm
 
+.macro SETUP_REFERENCE_PARAMETER_IN_GPR gpr32, regs, refs, ins, arg_offset, finished
+    movl REG_VAR(gpr32), (REG_VAR(regs), REG_VAR(arg_offset))
+    movl REG_VAR(gpr32), (REG_VAR(refs), REG_VAR(arg_offset))
+    addq MACRO_LITERAL(4), REG_VAR(arg_offset)
+    subl MACRO_LITERAL(1), REG_VAR(ins)
+    je \finished
+.endm
+
+// Uses eax as temporary
+.macro SETUP_REFERENCE_PARAMETERS_IN_STACK regs, refs, ins, stack_ptr, arg_offset
+1:
+    movl OFFSET_TO_FIRST_ARGUMENT_IN_STACK(REG_VAR(stack_ptr), REG_VAR(arg_offset)), %eax
+    movl %eax, (REG_VAR(regs), REG_VAR(arg_offset))
+    movl %eax, (REG_VAR(refs), REG_VAR(arg_offset))
+    addq MACRO_LITERAL(4), REG_VAR(arg_offset)
+    subl MACRO_LITERAL(1), REG_VAR(ins)
+    jne 1b
+.endm
+
 %def entry():
 /*
  * ArtMethod entry point.
@@ -1581,6 +1600,21 @@ OAT_ENTRY ExecuteNterpImpl, EndExecuteNterpImpl
     subq %r14, %rbx
     salq $$2, %rbx // rbx is now the offset for inputs into the registers array.
 
+    testl $$ART_METHOD_NTERP_ENTRY_POINT_FAST_PATH_FLAG, ART_METHOD_ACCESS_FLAGS_OFFSET(%rdi)
+    je .Lsetup_slow_path
+    leaq (rFP, %rbx, 1), %rdi
+    leaq (rREFS, %rbx, 1), %rbx
+    movq $$0, %r10
+
+    SETUP_REFERENCE_PARAMETER_IN_GPR esi, rdi, rbx, r14d, r10, .Lxmm_setup_finished
+    SETUP_REFERENCE_PARAMETER_IN_GPR edx, rdi, rbx, r14d, r10, .Lxmm_setup_finished
+    SETUP_REFERENCE_PARAMETER_IN_GPR ecx, rdi, rbx, r14d, r10, .Lxmm_setup_finished
+    SETUP_REFERENCE_PARAMETER_IN_GPR r8d, rdi, rbx, r14d, r10, .Lxmm_setup_finished
+    SETUP_REFERENCE_PARAMETER_IN_GPR r9d, rdi, rbx, r14d, r10, .Lxmm_setup_finished
+    SETUP_REFERENCE_PARAMETERS_IN_STACK rdi, rbx, r14d, r11, r10
+    jmp .Lxmm_setup_finished
+
+.Lsetup_slow_path:
     // If the method is not static and there is one argument ('this'), we don't need to fetch the
     // shorty.
     testl $$ART_METHOD_IS_STATIC_FLAG, ART_METHOD_ACCESS_FLAGS_OFFSET(%rdi)

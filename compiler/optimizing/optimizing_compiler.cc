@@ -784,7 +784,6 @@ CodeGenerator* OptimizingCompiler::TryCompile(ArenaAllocator* allocator,
   CodeItemDebugInfoAccessor code_item_accessor(dex_file, code_item, method_idx);
 
   bool dead_reference_safe;
-  ArrayRef<const uint8_t> interpreter_metadata;
   // For AOT compilation, we may not get a method, for example if its class is erroneous,
   // possibly due to an unavailable superclass.  JIT should always have a method.
   DCHECK(Runtime::Current()->IsAotCompiler() || method != nullptr);
@@ -793,7 +792,6 @@ CodeGenerator* OptimizingCompiler::TryCompile(ArenaAllocator* allocator,
     {
       ScopedObjectAccess soa(Thread::Current());
       containing_class = &method->GetClassDef();
-      interpreter_metadata = method->GetQuickenedInfo();
     }
     // MethodContainsRSensitiveAccess is currently slow, but HasDeadReferenceSafeAnnotation()
     // is currently rarely true.
@@ -845,8 +843,7 @@ CodeGenerator* OptimizingCompiler::TryCompile(ArenaAllocator* allocator,
                           &dex_compilation_unit,
                           &dex_compilation_unit,
                           codegen.get(),
-                          compilation_stats_.get(),
-                          interpreter_metadata);
+                          compilation_stats_.get());
     GraphAnalysisResult result = builder.BuildGraph();
     if (result != kAnalysisSuccess) {
       switch (result) {
@@ -970,8 +967,7 @@ CodeGenerator* OptimizingCompiler::TryCompileIntrinsic(
                           &dex_compilation_unit,
                           &dex_compilation_unit,
                           codegen.get(),
-                          compilation_stats_.get(),
-                          /* interpreter_metadata= */ ArrayRef<const uint8_t>());
+                          compilation_stats_.get());
     builder.BuildIntrinsicGraph(method);
   }
 

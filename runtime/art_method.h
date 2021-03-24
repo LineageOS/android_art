@@ -394,6 +394,16 @@ class ArtMethod final {
     ClearAccessFlags(kAccSkipAccessChecks);
   }
 
+  bool HasNterpEntryPointFastPathFlag() const {
+    constexpr uint32_t mask = kAccNative | kAccNterpEntryPointFastPathFlag;
+    return (GetAccessFlags() & mask) == kAccNterpEntryPointFastPathFlag;
+  }
+
+  void SetNterpEntryPointFastPathFlag() REQUIRES_SHARED(Locks::mutator_lock_) {
+    DCHECK(!IsNative());
+    AddAccessFlags(kAccNterpEntryPointFastPathFlag);
+  }
+
   // Returns true if this method could be overridden by a default method.
   bool IsOverridableByDefaultMethod() REQUIRES_SHARED(Locks::mutator_lock_);
 
@@ -707,9 +717,6 @@ class ArtMethod final {
   static constexpr MemberOffset HotnessCountOffset() {
     return MemberOffset(OFFSETOF_MEMBER(ArtMethod, hotness_count_));
   }
-
-  ArrayRef<const uint8_t> GetQuickenedInfo() REQUIRES_SHARED(Locks::mutator_lock_);
-  uint16_t GetIndexFromQuickening(uint32_t dex_pc) REQUIRES_SHARED(Locks::mutator_lock_);
 
   // Returns the method header for the compiled code containing 'pc'. Note that runtime
   // methods will return null for this method, as they are not oat based.

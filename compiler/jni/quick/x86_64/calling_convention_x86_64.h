@@ -58,6 +58,7 @@ class X86_64JniCallingConvention final : public JniCallingConvention {
   size_t FrameSize() const override;
   size_t OutFrameSize() const override;
   ArrayRef<const ManagedRegister> CalleeSaveRegisters() const override;
+  ManagedRegister SavedLocalReferenceCookieRegister() const override;
   ManagedRegister ReturnScratchRegister() const override;
   uint32_t CoreSpillMask() const override;
   uint32_t FpSpillMask() const override;

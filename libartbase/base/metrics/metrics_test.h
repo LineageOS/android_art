@@ -48,8 +48,8 @@ class TestBackendBase : public MetricsBackend {
   void EndReport() override {}
 };
 
-template <DatumId counter_type>
-uint64_t CounterValue(const MetricsCounter<counter_type>& counter) {
+template <typename MetricType>
+uint64_t CounterValue(const MetricType& counter) {
   uint64_t counter_value{0};
   struct CounterBackend : public TestBackendBase {
     explicit CounterBackend(uint64_t* counter_value) : counter_value_{counter_value} {}

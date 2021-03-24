@@ -46,6 +46,14 @@ cc_library_headers {
 art_cc_library {
     name: "libartpalette",
     defaults: ["libartpalette_defaults"],
+    visibility: [
+        // TODO(b/183483755): Please visibility checks when the prebuilt
+        // libartpalette is present but not preferred, and the prebuilt
+        // libdexfile hence depends on the source instead.
+        // TODO(b/172480617): Alternatively, clean up when we no longer need to
+        // support both prebuilts and sources present simultaneously.
+        "//prebuilts/module_sdk/art/current/host-exports",
+    ],
     header_libs: ["libbase_headers"],
     target: {
         // Targets supporting dlopen build the client library which loads

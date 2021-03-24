@@ -385,6 +385,13 @@ uint32_t ArmJniCallingConvention::FpSpillMask() const {
   return is_critical_native_ ? 0u : kFpCalleeSpillMask;
 }
 
+ManagedRegister ArmJniCallingConvention::SavedLocalReferenceCookieRegister() const {
+  // The r5 is callee-save register in both managed and native ABIs.
+  // It is saved in the stack frame and it has no special purpose like `tr`.
+  static_assert((kCoreCalleeSpillMask & (1u << R5)) != 0u);  // Managed callee save register.
+  return ArmManagedRegister::FromCoreRegister(R5);
+}
+
 ManagedRegister ArmJniCallingConvention::ReturnScratchRegister() const {
   return ArmManagedRegister::FromCoreRegister(R2);
 }
@@ -404,14 +411,18 @@ size_t ArmJniCallingConvention::FrameSize() const {
   size_t total_size = method_ptr_size + callee_save_area_size;
 
   DCHECK(HasLocalReferenceSegmentState());
-  const size_t cookie_size = SavedLocalReferenceCookieSize();
-  total_size += cookie_size;
+  // Cookie is saved in one of the spilled registers.
 
   // Plus return value spill area size
   if (SpillsReturnValue()) {
-    // No padding between cookie and return value on arm.
-    DCHECK_EQ(ReturnValueSaveLocation().SizeValue(),
-              SavedLocalReferenceCookieOffset().SizeValue() + cookie_size);
+    // For 64-bit return values there shall be a 4B alignment gap between
+    // the method pointer and the saved return value.
+    size_t padding = ReturnValueSaveLocation().SizeValue() - method_ptr_size;
+    DCHECK_EQ(padding,
+              (GetReturnType() == Primitive::kPrimLong || GetReturnType() == Primitive::kPrimDouble)
+                  ? 4u
+                  : 0u);
+    total_size += padding;
     total_size += SizeOfReturnValue();
   }
 

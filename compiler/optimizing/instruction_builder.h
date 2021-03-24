@@ -26,7 +26,6 @@
 #include "dex/dex_file_types.h"
 #include "handle.h"
 #include "nodes.h"
-#include "quicken_info.h"
 
 namespace art {
 
@@ -58,7 +57,6 @@ class HInstructionBuilder : public ValueObject {
                       const DexCompilationUnit* dex_compilation_unit,
                       const DexCompilationUnit* outer_compilation_unit,
                       CodeGenerator* code_generator,
-                      ArrayRef<const uint8_t> interpreter_metadata,
                       OptimizingCompilerStats* compiler_stats,
                       ScopedArenaAllocator* local_allocator);
 
@@ -70,11 +68,8 @@ class HInstructionBuilder : public ValueObject {
   void PropagateLocalsToCatchBlocks();
   void SetLoopHeaderPhiInputs();
 
-  bool ProcessDexInstruction(const Instruction& instruction, uint32_t dex_pc, size_t quicken_index);
+  bool ProcessDexInstruction(const Instruction& instruction, uint32_t dex_pc);
   ArenaBitVector* FindNativeDebugInfoLocations();
-
-  bool CanDecodeQuickenedInfo() const;
-  uint16_t LookupQuickenedInfo(uint32_t quicken_index);
 
   HBasicBlock* FindBlockStartingAt(uint32_t dex_pc) const;
 
@@ -141,8 +136,7 @@ class HInstructionBuilder : public ValueObject {
   // Builds an instance field access node and returns whether the instruction is supported.
   bool BuildInstanceFieldAccess(const Instruction& instruction,
                                 uint32_t dex_pc,
-                                bool is_put,
-                                size_t quicken_index);
+                                bool is_put);
 
   void BuildUnresolvedStaticFieldAccess(const Instruction& instruction,
                                         uint32_t dex_pc,
@@ -324,9 +318,6 @@ class HInstructionBuilder : public ValueObject {
   // method being compiled (and not inlined), and potentially inlining other
   // methods.
   const DexCompilationUnit* const outer_compilation_unit_;
-
-  // Original values kept after instruction quickening.
-  QuickenInfoTable quicken_info_;
 
   OptimizingCompilerStats* const compilation_stats_;
 
