@@ -37,6 +37,7 @@ public class Main {
             test8();
             test9();
             test10();
+            test11();
 
             // TODO: How to test that interface method resolution returns the unique
             // maximally-specific non-abstract superinterface method if there is one?
@@ -403,6 +404,38 @@ public class Main {
                                "  caused by java.lang.IncompatibleClassChangeError");
         } else {
             invokeUserTest("Test10User");
+        }
+    }
+
+    /*
+     * Test11
+     * ------
+     * Tested function:
+     *     public class Test11Base {
+     *         Test11Base(String) { ... }
+     *     }
+     *     public class Test11Derived extends Test11Base {
+     *         Test11Derived() { Test11Base("Test"); }
+     *     }
+     * Tested invokes:
+     *     invoke-direct Test11Derived.<init>(Ljava/lang/String;)V from Test11User in first dex
+     *         TODO b/183485797 This should throw a NSME (constructors are never inherited, JLS 8.8)
+     *                          but actually calls the superclass constructor.
+     *         expected: Throws NoSuchMethodError
+     *         actual: Successful construction of a Test11Derived instance.
+     *
+     * Files:
+     *   src/Test11Base.java          - defines Test11Base with <init>(Ljava/lang/String;)V
+     *   src/Test11Derived.java       - defines Test11Derived with <init>()V
+     *   jasmin/Test11User.j          - invokespecial Test11Derived.<init>(Ljava/lang/String;)V
+     */
+    private static void test11() throws Exception {
+        if (usingRI) {
+            // For RI, just print the expected output to hide the divergence for now.
+            System.out.println("Calling Test11User.test():\n" +
+                               "Test11Base.<init>(\"Test\")");
+        } else {
+            invokeUserTest("Test11User");
         }
     }
 
