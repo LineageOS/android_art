@@ -734,32 +734,13 @@ class MethodVerifier final : public ::art::verifier::MethodVerifier {
   // Returns the method index of an invoke instruction.
   uint16_t GetMethodIdxOfInvoke(const Instruction* inst)
       REQUIRES_SHARED(Locks::mutator_lock_) {
-    switch (inst->Opcode()) {
-      case Instruction::INVOKE_VIRTUAL_RANGE_QUICK:
-      case Instruction::INVOKE_VIRTUAL_QUICK: {
-        DCHECK(Runtime::Current()->IsStarted() || verify_to_dump_)
-            << dex_file_->PrettyMethod(dex_method_idx_, true) << "@" << work_insn_idx_;
-        DCHECK(method_being_verified_ != nullptr);
-        uint16_t method_idx = method_being_verified_->GetIndexFromQuickening(work_insn_idx_);
-        CHECK_NE(method_idx, DexFile::kDexNoIndex16);
-        return method_idx;
-      }
-      default: {
-        return inst->VRegB();
-      }
-    }
+    return inst->VRegB();
   }
   // Returns the field index of a field access instruction.
   uint16_t GetFieldIdxOfFieldAccess(const Instruction* inst, bool is_static)
       REQUIRES_SHARED(Locks::mutator_lock_) {
     if (is_static) {
       return inst->VRegB_21c();
-    } else if (inst->IsQuickened()) {
-      DCHECK(Runtime::Current()->IsStarted() || verify_to_dump_);
-      DCHECK(method_being_verified_ != nullptr);
-      uint16_t field_idx = method_being_verified_->GetIndexFromQuickening(work_insn_idx_);
-      CHECK_NE(field_idx, DexFile::kDexNoIndex16);
-      return field_idx;
     } else {
       return inst->VRegC_22c();
     }

@@ -58,15 +58,6 @@ struct ExtDexFile {
       : dex_file_(std::move(dex_file)) {}
 
   bool GetMethodDefIndex(uint32_t dex_offset, uint32_t* index, uint32_t* addr, uint32_t* size) {
-    // First look in the method cache.
-    auto it = method_cache_.upper_bound(dex_offset);
-    if (it != method_cache_.end() && dex_offset >= it->second.offset) {
-      *index = it->second.index;
-      *addr = it->second.offset;
-      *size = it->second.len;
-      return true;
-    }
-
     uint32_t class_def_index;
     if (GetClassDefIndex(dex_offset, &class_def_index)) {
       art::ClassAccessor accessor(*dex_file_, class_def_index);
@@ -83,7 +74,6 @@ struct ExtDexFile {
           *index = method.GetIndex();
           *addr = offset;
           *size = len;
-          method_cache_.emplace(offset + len, MethodCacheEntry{offset, len, *index});
           return true;
         }
       }
@@ -139,7 +129,6 @@ struct ExtDexFile {
 
   // Binary search table with (end_dex_offset, class_def_index) entries.
   std::vector<std::pair<uint32_t, uint32_t>> class_cache_;
-  std::map<uint32_t, MethodCacheEntry> method_cache_;  // end_dex_offset -> method.
 };
 
 int ExtDexFileOpenFromMemory(const void* addr,

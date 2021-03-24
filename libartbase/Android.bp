@@ -168,6 +168,12 @@ art_cc_library {
         "art_pgo_defaults",
     ],
     visibility: [
+        // TODO(b/183483755): Please visibility checks when the prebuilt
+        // libartbase is present but not preferred, and the prebuilt libdexfile
+        // hence depends on the source instead.
+        // TODO(b/172480617): Alternatively, clean up when we no longer need to
+        // support both prebuilts and sources present simultaneously.
+        "//prebuilts/module_sdk/art/current/host-exports",
         // TODO(b/133140750): Clean this up.
         "//packages/modules/NetworkStack/tests:__subpackages__",
     ],
