@@ -30,6 +30,7 @@ cc_library {
     // Service to make use of this functionality.
 
     name: "libarttools",
+    defaults: ["art_defaults"],
     host_supported: true,
     srcs: [
         "tools/tools.cc",
@@ -39,7 +40,6 @@ cc_library {
         "com.android.art",
         "com.android.art.debug",
     ],
-    min_sdk_version: "S",
     shared_libs: [
         "libbase",
     ],
