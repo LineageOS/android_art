@@ -606,8 +606,9 @@ bool OatWriter::AddVdexDexFilesSource(const VdexFile& vdex_file,
   DCHECK(write_state_ == WriteState::kAddingDexFileSources);
   DCHECK(vdex_file.HasDexSection());
   const uint8_t* current_dex_data = nullptr;
-  for (size_t i = 0; i < vdex_file.GetVerifierDepsHeader().GetNumberOfDexFiles(); ++i) {
-    current_dex_data = vdex_file.GetNextDexFileData(current_dex_data);
+  size_t i = 0;
+  for (; i < vdex_file.GetNumberOfDexFiles(); ++i) {
+    current_dex_data = vdex_file.GetNextDexFileData(current_dex_data, i);
     if (current_dex_data == nullptr) {
       LOG(ERROR) << "Unexpected number of dex files in vdex " << location;
       return false;
@@ -629,7 +630,7 @@ bool OatWriter::AddVdexDexFilesSource(const VdexFile& vdex_file,
         header->file_size_);
   }
 
-  if (vdex_file.GetNextDexFileData(current_dex_data) != nullptr) {
+  if (vdex_file.GetNextDexFileData(current_dex_data, i) != nullptr) {
     LOG(ERROR) << "Unexpected number of dex files in vdex " << location;
     return false;
   }
@@ -693,9 +694,10 @@ bool OatWriter::WriteAndOpenDexFiles(
     /*out*/ std::vector<std::unique_ptr<const DexFile>>* opened_dex_files) {
   CHECK(write_state_ == WriteState::kAddingDexFileSources);
 
-  // Reserve space for Vdex header and checksums.
-  vdex_size_ = sizeof(VdexFile::VerifierDepsHeader) +
-      oat_dex_files_.size() * sizeof(VdexFile::VdexChecksum);
+  size_vdex_header_ = sizeof(VdexFile::VdexFileHeader) +
+      VdexSection::kNumberOfSections * sizeof(VdexFile::VdexSectionHeader);
+  // Reserve space for Vdex header, sections, and checksums.
+  vdex_size_ = size_vdex_header_ + oat_dex_files_.size() * sizeof(VdexFile::VdexChecksum);
 
   // Write DEX files into VDEX, mmap and open them.
   std::vector<MemMap> dex_files_map;
@@ -3133,8 +3135,6 @@ bool OatWriter::WriteDexFiles(File* file,
   }
 
   if (extract_dex_files_into_vdex_) {
-    // Add the dex section header.
-    vdex_size_ += sizeof(VdexFile::DexSectionHeader);
     vdex_dex_files_offset_ = vdex_size_;
 
     // Perform dexlayout if requested.
@@ -3155,8 +3155,6 @@ bool OatWriter::WriteDexFiles(File* file,
     for (OatDexFile& oat_dex_file : oat_dex_files_) {
       // Dex files are required to be 4 byte aligned.
       vdex_size_with_dex_files = RoundUp(vdex_size_with_dex_files, 4u);
-      // Leave extra room for the quicken table offset.
-      vdex_size_with_dex_files += sizeof(VdexFile::QuickeningTableOffsetType);
       // Record offset for the dex file.
       oat_dex_file.dex_file_offset_ = vdex_size_with_dex_files;
       // Add the size of the dex file.
@@ -3236,18 +3234,9 @@ bool OatWriter::WriteDexFiles(File* file,
     // Write dex files.
     for (OatDexFile& oat_dex_file : oat_dex_files_) {
       // Dex files are required to be 4 byte aligned.
-      size_t quickening_table_offset_offset = RoundUp(vdex_size_, 4u);
-      if (!update_input_vdex) {
-        // Clear the padding.
-        memset(vdex_begin_ + vdex_size_, 0, quickening_table_offset_offset - vdex_size_);
-        // Initialize the quickening table offset to 0.
-        auto* quickening_table_offset = reinterpret_cast<VdexFile::QuickeningTableOffsetType*>(
-            vdex_begin_ + quickening_table_offset_offset);
-        *quickening_table_offset = 0u;
-      }
-      size_dex_file_alignment_ += quickening_table_offset_offset - vdex_size_;
-      size_quickening_table_offset_ += sizeof(VdexFile::QuickeningTableOffsetType);
-      vdex_size_ = quickening_table_offset_offset + sizeof(VdexFile::QuickeningTableOffsetType);
+      size_t old_vdex_size = vdex_size_;
+      vdex_size_ = RoundUp(vdex_size_, 4u);
+      size_dex_file_alignment_ += vdex_size_ - old_vdex_size;
       // Write the actual dex file.
       if (!WriteDexFile(file, &oat_dex_file, update_input_vdex)) {
         return false;
@@ -3729,8 +3718,6 @@ bool OatWriter::FinishVdexFile(File* vdex_file, verifier::VerifierDeps* verifier
   buffer.reserve(64 * KB);
   WriteVerifierDeps(verifier_deps, &buffer);
   DCHECK_EQ(vdex_size_, old_vdex_size + buffer.size());
-  WriteQuickeningInfo(&buffer);
-  DCHECK_EQ(vdex_size_, old_vdex_size + buffer.size());
 
   // Resize the vdex file.
   if (vdex_file->SetLength(vdex_size_) != 0) {
@@ -3788,7 +3775,7 @@ bool OatWriter::FinishVdexFile(File* vdex_file, verifier::VerifierDeps* verifier
   }
 
   // Write checksums
-  off_t checksums_offset = sizeof(VdexFile::VerifierDepsHeader);
+  off_t checksums_offset = VdexFile::GetChecksumsOffset();
   VdexFile::VdexChecksum* checksums_data =
       reinterpret_cast<VdexFile::VdexChecksum*>(vdex_begin + checksums_offset);
   for (size_t i = 0, size = oat_dex_files_.size(); i != size; ++i) {
@@ -3797,24 +3784,29 @@ bool OatWriter::FinishVdexFile(File* vdex_file, verifier::VerifierDeps* verifier
     size_vdex_checksums_ += sizeof(VdexFile::VdexChecksum);
   }
 
-  // Maybe write dex section header.
-  DCHECK_NE(vdex_verifier_deps_offset_, 0u);
-  DCHECK_NE(vdex_quickening_info_offset_, 0u);
+  // Write sections.
+  uint8_t* ptr = vdex_begin + sizeof(VdexFile::VdexFileHeader);
 
-  bool has_dex_section = extract_dex_files_into_vdex_;
-  if (has_dex_section) {
-    DCHECK_NE(vdex_dex_files_offset_, 0u);
-    size_t dex_section_size = vdex_dex_shared_data_offset_ - vdex_dex_files_offset_;
-    size_t dex_shared_data_size = vdex_verifier_deps_offset_ - vdex_dex_shared_data_offset_;
-    size_t quickening_info_section_size = vdex_size_ - vdex_quickening_info_offset_;
+  // Checksums section.
+  new (ptr) VdexFile::VdexSectionHeader(VdexSection::kChecksumSection,
+                                        checksums_offset,
+                                        size_vdex_checksums_);
+  ptr += sizeof(VdexFile::VdexFileHeader);
 
-    void* dex_section_header_storage = checksums_data + oat_dex_files_.size();
-    new (dex_section_header_storage) VdexFile::DexSectionHeader(dex_section_size,
-                                                                dex_shared_data_size,
-                                                                quickening_info_section_size);
-    size_vdex_header_ += sizeof(VdexFile::DexSectionHeader);
-  }
+  // Dex section.
+  new (ptr) VdexFile::VdexSectionHeader(
+      VdexSection::kDexFileSection,
+      extract_dex_files_into_vdex_ ? vdex_dex_files_offset_ : 0u,
+      extract_dex_files_into_vdex_ ? vdex_verifier_deps_offset_ - vdex_dex_files_offset_ : 0u);
+  ptr += sizeof(VdexFile::VdexFileHeader);
 
+  // VerifierDeps section.
+  new (ptr) VdexFile::VdexSectionHeader(VdexSection::kVerifierDepsSection,
+                                        vdex_verifier_deps_offset_,
+                                        vdex_size_ - vdex_verifier_deps_offset_);
+
+  // All the contents (except the header) of the vdex file has been emitted in memory. Flush it
+  // to disk.
   {
     TimingLogger::ScopedTiming split("VDEX flush contents", timings_);
     // Sync the data to the disk while the header is invalid. We do not want to end up with
@@ -3833,14 +3825,10 @@ bool OatWriter::FinishVdexFile(File* vdex_file, verifier::VerifierDeps* verifier
     }
   }
 
-  // Write header.
-  // TODO: Use `size_quickening_info_` instead of `verifier_deps_section_size` which
-  // includes `size_quickening_info_alignment_`, adjust code in VdexFile.
-  size_t verifier_deps_section_size = vdex_quickening_info_offset_ - vdex_verifier_deps_offset_;
-
-  new (vdex_begin) VdexFile::VerifierDepsHeader(
-      oat_dex_files_.size(), verifier_deps_section_size, has_dex_section);
-  size_vdex_header_ += sizeof(VdexFile::VerifierDepsHeader);
+  // Now that we know all contents have been flushed to disk, we can write
+  // the header which will mke the vdex usable.
+  bool has_dex_section = extract_dex_files_into_vdex_;
+  new (vdex_begin) VdexFile::VdexFileHeader(has_dex_section);
 
   // Note: If `extract_dex_files_into_vdex_`, we passed the ownership of the vdex dex file
   // MemMap to the caller, so we need to use msync() for the range explicitly.
