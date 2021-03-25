@@ -761,7 +761,11 @@ static ArtMethod* ResolveMethodFromInlineCache(Handle<mirror::Class> klass,
     DCHECK(invoke_instruction->IsInvokeVirtual());
     resolved_method = klass->FindVirtualMethodForVirtual(resolved_method, pointer_size);
   }
-  DCHECK(resolved_method != nullptr);
+  // Even if the class exists we can still not have the function the
+  // inline-cache targets if the profile is from far enough in the past/future.
+  // We need to allow this since we don't update boot-profiles very often. This
+  // can occur in boot-profiles with inline-caches.
+  DCHECK(Runtime::Current()->IsAotCompiler() || resolved_method != nullptr);
   return resolved_method;
 }
 

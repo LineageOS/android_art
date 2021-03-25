@@ -1109,12 +1109,17 @@ class ProfMan final {
   template <typename Visitor>
   void VisitAllInstructions(const TypeReference& class_ref, uint16_t method_idx, Visitor visitor) {
     const DexFile* dex_file = class_ref.dex_file;
-    uint32_t offset =
-        dex_file->FindCodeItemOffset(*dex_file->FindClassDef(class_ref.TypeIndex()), method_idx);
-    for (const DexInstructionPcPair& inst :
-         CodeItemInstructionAccessor(*dex_file, dex_file->GetCodeItem(offset))) {
-      if (!visitor(inst)) {
-        break;
+    const dex::ClassDef* def = dex_file->FindClassDef(class_ref.TypeIndex());
+    if (def == nullptr) {
+      return;
+    }
+    std::optional<uint32_t> offset = dex_file->GetCodeItemOffset(*def, method_idx);
+    if (offset.has_value()) {
+      for (const DexInstructionPcPair& inst :
+          CodeItemInstructionAccessor(*dex_file, dex_file->GetCodeItem(*offset))) {
+        if (!visitor(inst)) {
+          break;
+        }
       }
     }
   }
