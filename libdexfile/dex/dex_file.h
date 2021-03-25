@@ -18,6 +18,7 @@
 #define ART_LIBDEXFILE_DEX_DEX_FILE_H_
 
 #include <memory>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -333,6 +334,13 @@ class DexFile {
                                   const dex::StringId& name,
                                   const dex::TypeId& type) const;
 
+  // Return the code-item offset associated with the class and method or nullopt
+  // if the method does not exist or has no code.
+  std::optional<uint32_t> GetCodeItemOffset(const dex::ClassDef& class_def,
+                                            uint32_t dex_method_idx) const;
+
+  // Return the code-item offset associated with the class and method or
+  // LOG(FATAL) if the method does not exist or has no code.
   uint32_t FindCodeItemOffset(const dex::ClassDef& class_def,
                               uint32_t dex_method_idx) const;
 

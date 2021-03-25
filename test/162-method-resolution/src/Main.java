@@ -37,6 +37,7 @@ public class Main {
             test8();
             test9();
             test10();
+            test11();
 
             // TODO: How to test that interface method resolution returns the unique
             // maximally-specific non-abstract superinterface method if there is one?
@@ -291,14 +292,16 @@ public class Main {
      * and superinterfaces are included in the search. ART follows the JLS behavior.
      *
      * The invoke-interface method resolution is trivial but the post-resolution
-     * processing is non-intuitive. According to the JLS 15.12.4.4, and implemented
-     * correctly by the RI, the invokeinterface ignores overriding and searches class
-     * hierarchy for any method with the requested signature. Thus it finds the private
-     * Test7Base.foo()V and throws IllegalAccessError. Unfortunately, ART does not comply
-     * and simply calls Test7Interface.foo()V. Bug: 63624936.
+     * processing is non-intuitive. According to older versions of JLS 15.12.4.4, and
+     * implemented by older RI, the invokeinterface ignores overriding and searches
+     * class hierarchy for any method with the requested signature, finds the private
+     * Test7Base.foo()V and throws IllegalAccessError. However, newer versions of JLS
+     * limit the search to overriding methods, thus excluding private methods, and
+     * therefore find and call Test7Interface.foo()V just like ART. Bug: 63624936.
      *
      * Files:
      *   src/Test7User.java          - calls invoke-virtual Test7Derived.foo()V.
+     *   src/Test7User2.java         - calls invoke-interface Test7Interface.foo()V.
      *   src/Test7Base.java          - defines private foo()V.
      *   src/Test7Interface.java     - defines default foo()V.
      *   src/Test7Derived.java       - extends Test7Base, implements Test7Interface.
@@ -308,15 +311,10 @@ public class Main {
             // For RI, just print the expected output to hide the deliberate divergence.
             System.out.println("Calling Test7User.test():\n" +
                                "Test7Interface.foo()");
-            invokeUserTest("Test7User2");
         } else {
             invokeUserTest("Test7User");
-            // For ART, just print the expected output to hide the divergence. Bug: 63624936.
-            // The expected-stdout.txt lists the desired behavior, not the current behavior.
-            System.out.println("Calling Test7User2.test():\n" +
-                               "Caught java.lang.reflect.InvocationTargetException\n" +
-                               "  caused by java.lang.IllegalAccessError");
         }
+        invokeUserTest("Test7User2");
     }
 
     /*
@@ -379,12 +377,12 @@ public class Main {
 
     /*
      * Test10
-     * -----
+     * ------
      * Tested function:
      *     public class Test10Base implements Test10Interface { }
      *     public interface Test10Interface { }
      * Tested invokes:
-     *     invoke-interface Test10Interface.clone()Ljava/lang/Object; from Test10Caller in first dex
+     *     invoke-interface Test10Interface.clone()Ljava/lang/Object; from Test10User in first dex
      *         TODO b/64274113 This should throw a NSME (JLS 13.4.12) but actually throws an ICCE.
      *         expected: Throws NoSuchMethodError (JLS 13.4.12)
      *         actual: Throws IncompatibleClassChangeError
@@ -394,12 +392,51 @@ public class Main {
      * 13.4.12 is expected to be binary incompatible and throw a NoSuchMethodError.
      *
      * Files:
+     *   src/Test10Interface.java     - defines empty interface
      *   jasmin/Test10Base.j          - implements Test10Interface
-     *   jasmin/Test10Interface.java  - defines empty interface
      *   jasmin/Test10User.j          - invokeinterface Test10Interface.clone()Ljava/lang/Object;
      */
     private static void test10() throws Exception {
-        invokeUserTest("Test10User");
+        if (usingRI) {
+            // For RI, just print the expected output to hide the divergence.
+            System.out.println("Calling Test10User.test():\n" +
+                               "Caught java.lang.reflect.InvocationTargetException\n" +
+                               "  caused by java.lang.IncompatibleClassChangeError");
+        } else {
+            invokeUserTest("Test10User");
+        }
+    }
+
+    /*
+     * Test11
+     * ------
+     * Tested function:
+     *     public class Test11Base {
+     *         Test11Base(String) { ... }
+     *     }
+     *     public class Test11Derived extends Test11Base {
+     *         Test11Derived() { Test11Base("Test"); }
+     *     }
+     * Tested invokes:
+     *     invoke-direct Test11Derived.<init>(Ljava/lang/String;)V from Test11User in first dex
+     *         TODO b/183485797 This should throw a NSME (constructors are never inherited, JLS 8.8)
+     *                          but actually calls the superclass constructor.
+     *         expected: Throws NoSuchMethodError
+     *         actual: Successful construction of a Test11Derived instance.
+     *
+     * Files:
+     *   src/Test11Base.java          - defines Test11Base with <init>(Ljava/lang/String;)V
+     *   src/Test11Derived.java       - defines Test11Derived with <init>()V
+     *   jasmin/Test11User.j          - invokespecial Test11Derived.<init>(Ljava/lang/String;)V
+     */
+    private static void test11() throws Exception {
+        if (usingRI) {
+            // For RI, just print the expected output to hide the divergence for now.
+            System.out.println("Calling Test11User.test():\n" +
+                               "Test11Base.<init>(\"Test\")");
+        } else {
+            invokeUserTest("Test11User");
+        }
     }
 
     private static void invokeUserTest(String userName) throws Exception {
