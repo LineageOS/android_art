@@ -594,15 +594,6 @@ std::vector<std::unique_ptr<const DexFile>> OatFileManager::OpenDexFilesFromOat_
   DCHECK(context->OpenDexFiles())
       << "Context created from already opened dex files should not attempt to open again";
 
-  // Check that we can use the vdex against this boot class path and in this class loader context.
-  // Note 1: We do not need a class loader collision check because there is no compiled code.
-  // Note 2: If these checks fail, we cannot fast-verify because the vdex does not contain
-  //         full VerifierDeps.
-  if (!vdex_file->MatchesBootClassPathChecksums() ||
-      !vdex_file->MatchesClassLoaderContext(*context.get())) {
-    return dex_files;
-  }
-
   // Initialize an OatFile instance backed by the loaded vdex.
   std::unique_ptr<OatFile> oat_file(OatFile::OpenFromVdex(MakeNonOwningPointerVector(dex_files),
                                                           std::move(vdex_file),
@@ -761,7 +752,6 @@ class BackgroundVerificationTask final : public Task {
     if (!VdexFile::WriteToDisk(vdex_path_,
                                dex_files_,
                                verifier_deps,
-                               class_loader_context_,
                                &error_msg)) {
       LOG(ERROR) << "Could not write anonymous vdex " << vdex_path_ << ": " << error_msg;
       return;

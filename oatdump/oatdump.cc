@@ -569,7 +569,7 @@ class OatDumper {
 
     if (!options_.dump_header_only_) {
       VariableIndentationOutputStream vios(&os);
-      VdexFile::VerifierDepsHeader vdex_header = oat_file_.GetVdexFile()->GetVerifierDepsHeader();
+      VdexFile::VdexFileHeader vdex_header = oat_file_.GetVdexFile()->GetVdexFileHeader();
       if (vdex_header.IsValid()) {
         std::string error_msg;
         std::vector<const DexFile*> dex_files;
@@ -590,10 +590,8 @@ class OatDumper {
       } else {
         os << "UNRECOGNIZED vdex file, magic "
            << vdex_header.GetMagic()
-           << ", verifier deps version "
-           << vdex_header.GetVerifierDepsVersion()
-           << ", dex section version "
-           << vdex_header.GetDexSectionVersion()
+           << ", version "
+           << vdex_header.GetVdexVersion()
            << "\n";
       }
       for (size_t i = 0; i < oat_dex_files_.size(); i++) {
@@ -614,9 +612,9 @@ class OatDumper {
       }
 
       DexFileUniqV vdex_dex_files;
-      std::unique_ptr<const VdexFile> vdex_file = OpenVdexUnquicken(vdex_filename,
-                                                                    &vdex_dex_files,
-                                                                    &error_msg);
+      std::unique_ptr<const VdexFile> vdex_file = OpenVdex(vdex_filename,
+                                                           &vdex_dex_files,
+                                                           &error_msg);
       if (vdex_file.get() == nullptr) {
         os << "Failed to open vdex file: " << error_msg << "\n";
         return false;
@@ -764,10 +762,10 @@ class OatDumper {
   }
 
   // Returns nullptr and updates error_msg if the Vdex file cannot be opened, otherwise all Dex
-  // files are fully unquickened and stored in dex_files
-  std::unique_ptr<const VdexFile> OpenVdexUnquicken(const std::string& vdex_filename,
-                                                    /* out */ DexFileUniqV* dex_files,
-                                                    /* out */ std::string* error_msg) {
+  // files are stored in dex_files.
+  std::unique_ptr<const VdexFile> OpenVdex(const std::string& vdex_filename,
+                                           /* out */ DexFileUniqV* dex_files,
+                                           /* out */ std::string* error_msg) {
     std::unique_ptr<const File> file(OS::OpenFileForReading(vdex_filename.c_str()));
     if (file == nullptr) {
       *error_msg = "Could not open file " + vdex_filename + " for reading.";
@@ -805,9 +803,6 @@ class OatDumper {
       *error_msg = "Failed to open Dex files from Vdex: " + *error_msg;
       return nullptr;
     }
-
-    vdex_file->Unquicken(MakeNonOwningPointerVector(tmp_dex_files),
-                         /* decompile_return_instruction= */ true);
 
     *dex_files = std::move(tmp_dex_files);
     return vdex_file;
