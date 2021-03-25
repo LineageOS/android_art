@@ -127,7 +127,9 @@ class StatsdBackend : public MetricsBackend {
                               // constant is not present in all branches)
           datum_id.value(),
           static_cast<int64_t>(value),
-          /*dex_metadata_type=*/0);  // Update the value once the enum is changed
+          statsd::ART_DATUM_REPORTED__DEX_METADATA_TYPE__ART_DEX_METADATA_TYPE_UNKNOWN,
+          statsd::ART_DATUM_REPORTED__APK_TYPE__ART_APK_TYPE_UNKNOWN,
+          statsd::ART_DATUM_REPORTED__ISA__ART_ISA_UNKNOWN);
     }
   }
 
