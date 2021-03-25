@@ -45,56 +45,24 @@
 
 namespace art {
 
-constexpr uint8_t VdexFile::VerifierDepsHeader::kVdexInvalidMagic[4];
-constexpr uint8_t VdexFile::VerifierDepsHeader::kVdexMagic[4];
-constexpr uint8_t VdexFile::VerifierDepsHeader::kVerifierDepsVersion[4];
-constexpr uint8_t VdexFile::VerifierDepsHeader::kDexSectionVersion[4];
-constexpr uint8_t VdexFile::VerifierDepsHeader::kDexSectionVersionEmpty[4];
+constexpr uint8_t VdexFile::VdexFileHeader::kVdexInvalidMagic[4];
+constexpr uint8_t VdexFile::VdexFileHeader::kVdexMagic[4];
+constexpr uint8_t VdexFile::VdexFileHeader::kVdexVersion[4];
 
-bool VdexFile::VerifierDepsHeader::IsMagicValid() const {
+bool VdexFile::VdexFileHeader::IsMagicValid() const {
   return (memcmp(magic_, kVdexMagic, sizeof(kVdexMagic)) == 0);
 }
 
-bool VdexFile::VerifierDepsHeader::IsVerifierDepsVersionValid() const {
-  return (memcmp(verifier_deps_version_, kVerifierDepsVersion, sizeof(kVerifierDepsVersion)) == 0);
+bool VdexFile::VdexFileHeader::IsVdexVersionValid() const {
+  return (memcmp(vdex_version_, kVdexVersion, sizeof(kVdexVersion)) == 0);
 }
 
-bool VdexFile::VerifierDepsHeader::IsDexSectionVersionValid() const {
-  return (memcmp(dex_section_version_, kDexSectionVersion, sizeof(kDexSectionVersion)) == 0) ||
-      (memcmp(dex_section_version_, kDexSectionVersionEmpty, sizeof(kDexSectionVersionEmpty)) == 0);
-}
-
-bool VdexFile::VerifierDepsHeader::HasDexSection() const {
-  return (memcmp(dex_section_version_, kDexSectionVersion, sizeof(kDexSectionVersion)) == 0);
-}
-
-VdexFile::VerifierDepsHeader::VerifierDepsHeader(uint32_t number_of_dex_files,
-                                                 uint32_t verifier_deps_size,
-                                                 bool has_dex_section,
-                                                 uint32_t bootclasspath_checksums_size,
-                                                 uint32_t class_loader_context_size)
-    : number_of_dex_files_(number_of_dex_files),
-      verifier_deps_size_(verifier_deps_size),
-      bootclasspath_checksums_size_(bootclasspath_checksums_size),
-      class_loader_context_size_(class_loader_context_size) {
+VdexFile::VdexFileHeader::VdexFileHeader(bool has_dex_section ATTRIBUTE_UNUSED)
+    : number_of_sections_(static_cast<uint32_t>(VdexSection::kNumberOfSections)) {
   memcpy(magic_, kVdexMagic, sizeof(kVdexMagic));
-  memcpy(verifier_deps_version_, kVerifierDepsVersion, sizeof(kVerifierDepsVersion));
-  if (has_dex_section) {
-    memcpy(dex_section_version_, kDexSectionVersion, sizeof(kDexSectionVersion));
-  } else {
-    memcpy(dex_section_version_, kDexSectionVersionEmpty, sizeof(kDexSectionVersionEmpty));
-  }
+  memcpy(vdex_version_, kVdexVersion, sizeof(kVdexVersion));
   DCHECK(IsMagicValid());
-  DCHECK(IsVerifierDepsVersionValid());
-  DCHECK(IsDexSectionVersionValid());
-}
-
-VdexFile::DexSectionHeader::DexSectionHeader(uint32_t dex_size,
-                                             uint32_t dex_shared_data_size,
-                                             uint32_t quickening_info_size)
-    : dex_size_(dex_size),
-      dex_shared_data_size_(dex_shared_data_size),
-      quickening_info_size_(quickening_info_size) {
+  DCHECK(IsVdexVersionValid());
 }
 
 std::unique_ptr<VdexFile> VdexFile::OpenAtAddress(uint8_t* mmap_addr,
@@ -182,66 +150,32 @@ std::unique_ptr<VdexFile> VdexFile::OpenAtAddress(uint8_t* mmap_addr,
     return nullptr;
   }
 
-  if (unquicken && vdex->HasDexSection()) {
-    std::vector<std::unique_ptr<const DexFile>> unique_ptr_dex_files;
-    if (!vdex->OpenAllDexFiles(&unique_ptr_dex_files, error_msg)) {
-      return nullptr;
-    }
-    // TODO: It would be nice to avoid doing the return-instruction stuff but then we end up not
-    // being able to tell if we need dequickening later. Instead just get rid of that too.
-    vdex->Unquicken(MakeNonOwningPointerVector(unique_ptr_dex_files),
-                    /* decompile_return_instruction= */ true);
-    // Update the quickening info size to pretend there isn't any.
-    size_t offset = vdex->GetDexSectionHeaderOffset();
-    reinterpret_cast<DexSectionHeader*>(vdex->mmap_.Begin() + offset)->quickening_info_size_ = 0;
-  }
-
-  if (!writable) {
-    vdex->AllowWriting(false);
-    Runtime* runtime = Runtime::Current();
-    // The runtime might not be available at this point if we're running
-    // dex2oat or oatdump.
-    if (runtime != nullptr) {
-      size_t madvise_size_limit = runtime->GetMadviseWillNeedSizeVdex();
-      Runtime::MadviseFileForRange(madvise_size_limit,
-                                   vdex->Size(),
-                                   vdex->Begin(),
-                                   vdex->End(),
-                                   vdex_filename);
-    }
-  }
-
-
   return vdex;
 }
 
-const uint8_t* VdexFile::GetNextDexFileData(const uint8_t* cursor) const {
+const uint8_t* VdexFile::GetNextDexFileData(const uint8_t* cursor, uint32_t dex_file_index) const {
   DCHECK(cursor == nullptr || (cursor > Begin() && cursor <= End()));
   if (cursor == nullptr) {
     // Beginning of the iteration, return the first dex file if there is one.
-    return HasDexSection() ? DexBegin() + sizeof(QuickeningTableOffsetType) : nullptr;
+    return HasDexSection() ? DexBegin() : nullptr;
+  } else if (dex_file_index >= GetNumberOfDexFiles()) {
+    return nullptr;
   } else {
     // Fetch the next dex file. Return null if there is none.
     const uint8_t* data = cursor + reinterpret_cast<const DexFile::Header*>(cursor)->file_size_;
     // Dex files are required to be 4 byte aligned. the OatWriter makes sure they are, see
     // OatWriter::SeekToDexFiles.
-    data = AlignUp(data, 4);
-
-    return (data == DexEnd()) ? nullptr : data + sizeof(QuickeningTableOffsetType);
+    return AlignUp(data, 4);
   }
-}
-
-void VdexFile::AllowWriting(bool val) const {
-  CHECK(mmap_.Protect(val ? (PROT_READ | PROT_WRITE) : PROT_READ));
 }
 
 bool VdexFile::OpenAllDexFiles(std::vector<std::unique_ptr<const DexFile>>* dex_files,
                                std::string* error_msg) const {
   const ArtDexFileLoader dex_file_loader;
   size_t i = 0;
-  for (const uint8_t* dex_file_start = GetNextDexFileData(nullptr);
+  for (const uint8_t* dex_file_start = GetNextDexFileData(nullptr, i);
        dex_file_start != nullptr;
-       dex_file_start = GetNextDexFileData(dex_file_start), ++i) {
+       dex_file_start = GetNextDexFileData(dex_file_start, ++i)) {
     size_t size = reinterpret_cast<const DexFile::Header*>(dex_file_start)->file_size_;
     // TODO: Supply the location information for a vdex file.
     static constexpr char kVdexLocation[] = "";
@@ -265,128 +199,6 @@ bool VdexFile::OpenAllDexFiles(std::vector<std::unique_ptr<const DexFile>>* dex_
   return true;
 }
 
-void VdexFile::UnquickenInPlace(bool decompile_return_instruction) const {
-  CHECK_NE(mmap_.GetProtect() & PROT_WRITE, 0)
-      << "File not mapped writable. Cannot unquicken! " << mmap_;
-  if (HasDexSection()) {
-    std::vector<std::unique_ptr<const DexFile>> unique_ptr_dex_files;
-    std::string error_msg;
-    if (!OpenAllDexFiles(&unique_ptr_dex_files, &error_msg)) {
-      return;
-    }
-    Unquicken(MakeNonOwningPointerVector(unique_ptr_dex_files),
-              decompile_return_instruction);
-    // Update the quickening info size to pretend there isn't any.
-    size_t offset = GetDexSectionHeaderOffset();
-    reinterpret_cast<DexSectionHeader*>(mmap_.Begin() + offset)->quickening_info_size_ = 0;
-  }
-}
-
-void VdexFile::Unquicken(const std::vector<const DexFile*>& target_dex_files,
-                         bool decompile_return_instruction) const {
-  const uint8_t* source_dex = GetNextDexFileData(nullptr);
-  for (const DexFile* target_dex : target_dex_files) {
-    UnquickenDexFile(*target_dex, source_dex, decompile_return_instruction);
-    source_dex = GetNextDexFileData(source_dex);
-  }
-  DCHECK(source_dex == nullptr);
-}
-
-uint32_t VdexFile::GetQuickeningInfoTableOffset(const uint8_t* source_dex_begin) const {
-  DCHECK_GE(source_dex_begin, DexBegin());
-  DCHECK_LT(source_dex_begin, DexEnd());
-  return reinterpret_cast<const QuickeningTableOffsetType*>(source_dex_begin)[-1];
-}
-
-CompactOffsetTable::Accessor VdexFile::GetQuickenInfoOffsetTable(
-    const uint8_t* source_dex_begin,
-    const ArrayRef<const uint8_t>& quickening_info) const {
-  // The offset a is in preheader right before the dex file.
-  const uint32_t offset = GetQuickeningInfoTableOffset(source_dex_begin);
-  return CompactOffsetTable::Accessor(quickening_info.SubArray(offset).data());
-}
-
-CompactOffsetTable::Accessor VdexFile::GetQuickenInfoOffsetTable(
-    const DexFile& dex_file,
-    const ArrayRef<const uint8_t>& quickening_info) const {
-  return GetQuickenInfoOffsetTable(dex_file.Begin(), quickening_info);
-}
-
-static ArrayRef<const uint8_t> GetQuickeningInfoAt(const ArrayRef<const uint8_t>& quickening_info,
-                                                   uint32_t quickening_offset) {
-  // Subtract offset of one since 0 represents unused and cannot be in the table.
-  ArrayRef<const uint8_t> remaining = quickening_info.SubArray(quickening_offset - 1);
-  return remaining.SubArray(0u, QuickenInfoTable::SizeInBytes(remaining));
-}
-
-void VdexFile::UnquickenDexFile(const DexFile& target_dex_file,
-                                const DexFile& source_dex_file,
-                                bool decompile_return_instruction) const {
-  UnquickenDexFile(
-      target_dex_file, source_dex_file.Begin(), decompile_return_instruction);
-}
-
-void VdexFile::UnquickenDexFile(const DexFile& target_dex_file,
-                                const uint8_t* source_dex_begin,
-                                bool decompile_return_instruction) const {
-  ArrayRef<const uint8_t> quickening_info = GetQuickeningInfo();
-  if (quickening_info.empty()) {
-    // Bail early if there is no quickening info and no need to decompile. This means there is also
-    // no RETURN_VOID to decompile since the empty table takes a non zero amount of space.
-    return;
-  }
-  // Make sure to not unquicken the same code item multiple times.
-  std::unordered_set<const dex::CodeItem*> unquickened_code_item;
-  CompactOffsetTable::Accessor accessor(GetQuickenInfoOffsetTable(source_dex_begin,
-                                                                  quickening_info));
-  for (ClassAccessor class_accessor : target_dex_file.GetClasses()) {
-    for (const ClassAccessor::Method& method : class_accessor.GetMethods()) {
-      const dex::CodeItem* code_item = method.GetCodeItem();
-      if (code_item != nullptr && unquickened_code_item.emplace(code_item).second) {
-        const uint32_t offset = accessor.GetOffset(method.GetIndex());
-        // Offset being 0 means not quickened.
-        if (offset != 0u) {
-          ArrayRef<const uint8_t> quicken_data = GetQuickeningInfoAt(quickening_info, offset);
-          optimizer::ArtDecompileDEX(
-              target_dex_file,
-              *code_item,
-              quicken_data,
-              decompile_return_instruction);
-        }
-      }
-    }
-  }
-}
-
-ArrayRef<const uint8_t> VdexFile::GetQuickenedInfoOf(const DexFile& dex_file,
-                                                     uint32_t dex_method_idx) const {
-  ArrayRef<const uint8_t> quickening_info = GetQuickeningInfo();
-  if (quickening_info.empty()) {
-    return ArrayRef<const uint8_t>();
-  }
-  CHECK_LT(dex_method_idx, dex_file.NumMethodIds());
-  const uint32_t quickening_offset =
-      GetQuickenInfoOffsetTable(dex_file, quickening_info).GetOffset(dex_method_idx);
-  if (quickening_offset == 0u) {
-    return ArrayRef<const uint8_t>();
-  }
-  return GetQuickeningInfoAt(quickening_info, quickening_offset);
-}
-
-static std::string ComputeBootClassPathChecksumString() {
-  Runtime* const runtime = Runtime::Current();
-  // Do not include boot image extension checksums, use their dex file checksums instead. Unlike
-  // oat files, vdex files do not reference anything in image spaces, so there is no reason why
-  // loading or not loading a boot image extension would affect the validity of the vdex file.
-  // Note: Update of a boot class path module such as conscrypt invalidates the vdex file anyway.
-  ArrayRef<gc::space::ImageSpace* const> image_spaces(runtime->GetHeap()->GetBootImageSpaces());
-  size_t boot_image_components =
-      image_spaces.empty() ? 0u : image_spaces[0]->GetImageHeader().GetComponentCount();
-  return gc::space::ImageSpace::GetBootClassPathChecksums(
-          image_spaces.SubArray(/*pos=*/ 0u, boot_image_components),
-          ArrayRef<const DexFile* const>(runtime->GetClassLinker()->GetBootClassPath()));
-}
-
 static bool CreateDirectories(const std::string& child_path, /* out */ std::string* error_msg) {
   size_t last_slash_pos = child_path.find_last_of('/');
   CHECK_NE(last_slash_pos, std::string::npos) << "Invalid path: " << child_path;
@@ -407,19 +219,29 @@ static bool CreateDirectories(const std::string& child_path, /* out */ std::stri
 bool VdexFile::WriteToDisk(const std::string& path,
                            const std::vector<const DexFile*>& dex_files,
                            const verifier::VerifierDeps& verifier_deps,
-                           const std::string& class_loader_context,
                            std::string* error_msg) {
   std::vector<uint8_t> verifier_deps_data;
   verifier_deps.Encode(dex_files, &verifier_deps_data);
 
-  std::string boot_checksum = ComputeBootClassPathChecksumString();
-  DCHECK_NE(boot_checksum, "");
+  VdexFile::VdexFileHeader vdex_header(/* has_dex_section= */ false);
+  VdexFile::VdexSectionHeader sections[static_cast<uint32_t>(VdexSection::kNumberOfSections)];
 
-  VdexFile::VerifierDepsHeader deps_header(dex_files.size(),
-                                           verifier_deps_data.size(),
-                                           /* has_dex_section= */ false,
-                                           boot_checksum.size(),
-                                           class_loader_context.size());
+  // Set checksum section.
+  sections[VdexSection::kChecksumSection].section_kind = VdexSection::kChecksumSection;
+  sections[VdexSection::kChecksumSection].section_offset = GetChecksumsOffset();
+  sections[VdexSection::kChecksumSection].section_size =
+      sizeof(VdexFile::VdexChecksum) * dex_files.size();
+
+  // Set dex section.
+  sections[VdexSection::kDexFileSection].section_kind = VdexSection::kDexFileSection;
+  sections[VdexSection::kDexFileSection].section_offset = 0u;
+  sections[VdexSection::kDexFileSection].section_size = 0u;
+
+  // Set VerifierDeps section.
+  sections[VdexSection::kVerifierDepsSection].section_kind = VdexSection::kVerifierDepsSection;
+  sections[VdexSection::kVerifierDepsSection].section_offset =
+      GetChecksumsOffset() + sections[kChecksumSection].section_size;
+  sections[VdexSection::kVerifierDepsSection].section_size = verifier_deps_data.size();
 
   if (!CreateDirectories(path, error_msg)) {
     return false;
@@ -431,12 +253,21 @@ bool VdexFile::WriteToDisk(const std::string& path,
     return false;
   }
 
-  if (!out->WriteFully(reinterpret_cast<const char*>(&deps_header), sizeof(deps_header))) {
+  // Write header.
+  if (!out->WriteFully(reinterpret_cast<const char*>(&vdex_header), sizeof(vdex_header))) {
     *error_msg = "Could not write vdex header to " + path;
     out->Unlink();
     return false;
   }
 
+  // Write section infos.
+  if (!out->WriteFully(reinterpret_cast<const char*>(&sections), sizeof(sections))) {
+    *error_msg = "Could not write vdex sections to " + path;
+    out->Unlink();
+    return false;
+  }
+
+  // Write checksum section.
   for (const DexFile* dex_file : dex_files) {
     const uint32_t* checksum_ptr = &dex_file->GetHeader().checksum_;
     static_assert(sizeof(*checksum_ptr) == sizeof(VdexFile::VdexChecksum));
@@ -444,25 +275,13 @@ bool VdexFile::WriteToDisk(const std::string& path,
                          sizeof(VdexFile::VdexChecksum))) {
       *error_msg = "Could not write dex checksums to " + path;
       out->Unlink();
-    return false;
+      return false;
     }
   }
 
   if (!out->WriteFully(reinterpret_cast<const char*>(verifier_deps_data.data()),
                        verifier_deps_data.size())) {
     *error_msg = "Could not write verifier deps to " + path;
-    out->Unlink();
-    return false;
-  }
-
-  if (!out->WriteFully(boot_checksum.c_str(), boot_checksum.size())) {
-    *error_msg = "Could not write boot classpath checksum to " + path;
-    out->Unlink();
-    return false;
-  }
-
-  if (!out->WriteFully(class_loader_context.c_str(), class_loader_context.size())) {
-    *error_msg = "Could not write class loader context to " + path;
     out->Unlink();
     return false;
   }
@@ -478,13 +297,12 @@ bool VdexFile::WriteToDisk(const std::string& path,
 
 bool VdexFile::MatchesDexFileChecksums(const std::vector<const DexFile::Header*>& dex_headers)
     const {
-  const VerifierDepsHeader& header = GetVerifierDepsHeader();
-  if (dex_headers.size() != header.GetNumberOfDexFiles()) {
+  if (dex_headers.size() != GetNumberOfDexFiles()) {
     LOG(WARNING) << "Mismatch of number of dex files in vdex (expected="
-        << header.GetNumberOfDexFiles() << ", actual=" << dex_headers.size() << ")";
+        << GetNumberOfDexFiles() << ", actual=" << dex_headers.size() << ")";
     return false;
   }
-  const VdexChecksum* checksums = header.GetDexChecksumsArray();
+  const VdexChecksum* checksums = GetDexChecksumsArray();
   for (size_t i = 0; i < dex_headers.size(); ++i) {
     if (checksums[i] != dex_headers[i]->checksum_) {
       LOG(WARNING) << "Mismatch of dex file checksum in vdex (index=" << i << ")";
@@ -492,32 +310,6 @@ bool VdexFile::MatchesDexFileChecksums(const std::vector<const DexFile::Header*>
     }
   }
   return true;
-}
-
-bool VdexFile::MatchesBootClassPathChecksums() const {
-  ArrayRef<const uint8_t> data = GetBootClassPathChecksumData();
-  std::string vdex(reinterpret_cast<const char*>(data.data()), data.size());
-  std::string runtime = ComputeBootClassPathChecksumString();
-  if (vdex == runtime) {
-    return true;
-  } else {
-    LOG(WARNING) << "Mismatch of boot class path checksum in vdex (expected="
-        << vdex << ", actual=" << runtime << ")";
-    return false;
-  }
-}
-
-bool VdexFile::MatchesClassLoaderContext(const ClassLoaderContext& context) const {
-  ArrayRef<const uint8_t> data = GetClassLoaderContextData();
-  std::string spec(reinterpret_cast<const char*>(data.data()), data.size());
-  ClassLoaderContext::VerificationResult result = context.VerifyClassLoaderContextMatch(spec);
-  if (result != ClassLoaderContext::VerificationResult::kMismatch) {
-    return true;
-  } else {
-    LOG(WARNING) << "Mismatch of class loader context in vdex (expected="
-        << spec << ", actual=" << context.EncodeContextForOatFile("") << ")";
-    return false;
-  }
 }
 
 static ObjPtr<mirror::Class> FindClassAndClearException(ClassLinker* class_linker,
@@ -577,14 +369,15 @@ ClassStatus VdexFile::ComputeClassStatus(Thread* self, Handle<mirror::Class> cls
 
   // Find which dex file index from within the vdex file.
   uint32_t index = 0;
-  for (; index < GetVerifierDepsHeader().GetNumberOfDexFiles(); ++index) {
+  for (; index < GetNumberOfDexFiles(); ++index) {
     if (dex_file.GetLocationChecksum() == GetLocationChecksum(index)) {
       break;
     }
   }
-  DCHECK_NE(index, GetVerifierDepsHeader().GetNumberOfDexFiles());
 
-  const uint8_t* verifier_deps = GetVerifierDepsStart();
+  DCHECK_NE(index, GetNumberOfDexFiles());
+
+  const uint8_t* verifier_deps = GetVerifierDepsData().data();
   const uint32_t* dex_file_class_defs = GetDexFileClassDefs(verifier_deps, index);
 
   // Fetch type checks offsets.
