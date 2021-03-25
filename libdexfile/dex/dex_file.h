@@ -758,12 +758,18 @@ class DexFile {
   // when computing the adler32 checksum of the entire file.
   static constexpr uint32_t kNumNonChecksumBytes = OFFSETOF_MEMBER(DexFile::Header, signature_);
 
-  // Returns a human-readable form of the method at an index.
-  std::string PrettyMethod(uint32_t method_idx, bool with_signature = true) const;
+  // Appends a human-readable form of the method at an index.
+  void AppendPrettyMethod(uint32_t method_idx, bool with_signature, std::string* result) const;
   // Returns a human-readable form of the field at an index.
   std::string PrettyField(uint32_t field_idx, bool with_type = true) const;
   // Returns a human-readable form of the type at an index.
   std::string PrettyType(dex::TypeIndex type_idx) const;
+
+  ALWAYS_INLINE std::string PrettyMethod(uint32_t method_idx, bool with_signature = true) const {
+    std::string result;
+    AppendPrettyMethod(method_idx, with_signature, &result);
+    return result;
+  }
 
   // Not virtual for performance reasons.
   ALWAYS_INLINE bool IsCompactDexFile() const {

@@ -526,34 +526,35 @@ uint64_t DexFile::ReadUnsignedLong(const uint8_t* ptr, int zwidth, bool fill_on_
   return val;
 }
 
-std::string DexFile::PrettyMethod(uint32_t method_idx, bool with_signature) const {
+void DexFile::AppendPrettyMethod(uint32_t method_idx,
+                                 bool with_signature,
+                                 std::string* const result) const {
   if (method_idx >= NumMethodIds()) {
-    return StringPrintf("<<invalid-method-idx-%d>>", method_idx);
+    android::base::StringAppendF(result, "<<invalid-method-idx-%d>>", method_idx);
+    return;
   }
   const MethodId& method_id = GetMethodId(method_idx);
-  std::string result;
   const ProtoId* proto_id = with_signature ? &GetProtoId(method_id.proto_idx_) : nullptr;
   if (with_signature) {
-    AppendPrettyDescriptor(StringByTypeIdx(proto_id->return_type_idx_), &result);
-    result += ' ';
+    AppendPrettyDescriptor(StringByTypeIdx(proto_id->return_type_idx_), result);
+    result->push_back(' ');
   }
-  AppendPrettyDescriptor(GetMethodDeclaringClassDescriptor(method_id), &result);
-  result += '.';
-  result += GetMethodName(method_id);
+  AppendPrettyDescriptor(GetMethodDeclaringClassDescriptor(method_id), result);
+  result->push_back('.');
+  result->append(GetMethodName(method_id));
   if (with_signature) {
-    result += '(';
+    result->push_back('(');
     const TypeList* params = GetProtoParameters(*proto_id);
     if (params != nullptr) {
       const char* separator = "";
       for (uint32_t i = 0u, size = params->Size(); i != size; ++i) {
-        result += separator;
+        result->append(separator);
         separator = ", ";
-        AppendPrettyDescriptor(StringByTypeIdx(params->GetTypeItem(i).type_idx_), &result);
+        AppendPrettyDescriptor(StringByTypeIdx(params->GetTypeItem(i).type_idx_), result);
       }
     }
-    result += ')';
+    result->push_back(')');
   }
-  return result;
 }
 
 std::string DexFile::PrettyField(uint32_t field_idx, bool with_type) const {
