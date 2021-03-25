@@ -45,8 +45,7 @@ template<class MirrorType> class ObjPtr;
 
 class Transaction final {
  public:
-  static constexpr const char* kAbortExceptionDescriptor = "dalvik.system.TransactionAbortError";
-  static constexpr const char* kAbortExceptionSignature = "Ldalvik/system/TransactionAbortError;";
+  static constexpr const char* kAbortExceptionDescriptor = "Ldalvik/system/TransactionAbortError;";
 
   Transaction(bool strict, mirror::Class* root);
   ~Transaction();

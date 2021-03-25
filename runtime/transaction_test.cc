@@ -54,7 +54,7 @@ class TransactionTest : public CommonRuntimeTest {
     ASSERT_TRUE(h_klass->IsInitialized());
 
     h_klass.Assign(class_linker_->FindSystemClass(soa.Self(),
-                                                  Transaction::kAbortExceptionSignature));
+                                                  Transaction::kAbortExceptionDescriptor));
     ASSERT_TRUE(h_klass != nullptr);
     class_linker_->EnsureInitialized(soa.Self(), h_klass, true, true);
     ASSERT_TRUE(h_klass->IsInitialized());
@@ -597,6 +597,18 @@ TEST_F(TransactionTest, CatchNativeCallAbortClass) {
 // Tests failing class initialization with multiple transaction aborts.
 TEST_F(TransactionTest, MultipleNativeCallAbortClass) {
   testTransactionAbort("LTransaction$MultipleNativeCallAbortClass;");
+}
+
+// Tests failing class initialization due to Class.forName() not finding the class,
+// even if an "all" catch handler catches the exception thrown when aborting the transaction.
+TEST_F(TransactionTest, CatchClassForNameAbortClass) {
+  testTransactionAbort("LTransaction$CatchClassForNameAbortClass;");
+}
+
+// Same as CatchClassForNameAbortClass but the class initializer tries to do the work twice.
+// This would trigger a DCHECK() if we continued executing bytecode with an aborted transaction.
+TEST_F(TransactionTest, CatchClassForNameAbortClassTwice) {
+  testTransactionAbort("LTransaction$CatchClassForNameAbortClassTwice;");
 }
 
 // Tests failing class initialization due to allocating instance of finalizable class.
