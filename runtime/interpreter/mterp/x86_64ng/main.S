@@ -1118,13 +1118,62 @@ END_FUNCTION \name
    .elseif \is_string_init
    // No fast path for string.init.
    .else
+     testl $$ART_METHOD_NTERP_INVOKE_FAST_PATH_FLAG, ART_METHOD_ACCESS_FLAGS_OFFSET(%rdi)
+     je .Lfast_path_with_few_args_\suffix
+     movzbl 1(rPC), %r9d
+     movl %r9d, %ebp
+     shrl MACRO_LITERAL(4), %ebp # Number of arguments
+     .if \is_static
+     jz .Linvoke_fast_path_\suffix  # shl sets the Z flag
+     .else
+     cmpl MACRO_LITERAL(1), %ebp
+     je .Linvoke_fast_path_\suffix
+     .endif
+     movzwl 4(rPC), %r11d
+     cmpl MACRO_LITERAL(2), %ebp
+     .if \is_static
+     jl .Lone_arg_fast_path_\suffix
+     .endif
+     je .Ltwo_args_fast_path_\suffix
+     cmpl MACRO_LITERAL(4), %ebp
+     jl .Lthree_args_fast_path_\suffix
+     je .Lfour_args_fast_path_\suffix
+
+     andl        MACRO_LITERAL(0xf), %r9d
+     GET_VREG    %r9d, %r9
+.Lfour_args_fast_path_\suffix:
+     movl        %r11d, %r8d
+     shrl        MACRO_LITERAL(12), %r8d
+     GET_VREG    %r8d, %r8
+.Lthree_args_fast_path_\suffix:
+     movl        %r11d, %ecx
+     shrl        MACRO_LITERAL(8), %ecx
+     andl        MACRO_LITERAL(0xf), %ecx
+     GET_VREG    %ecx, %rcx
+.Ltwo_args_fast_path_\suffix:
+     movl        %r11d, %edx
+     shrl        MACRO_LITERAL(4), %edx
+     andl        MACRO_LITERAL(0xf), %edx
+     GET_VREG    %edx, %rdx
+.Lone_arg_fast_path_\suffix:
+     .if \is_static
+     andl        MACRO_LITERAL(0xf), %r11d
+     GET_VREG    %esi, %r11
+     .else
+     // First argument already in %esi.
+     .endif
+.Linvoke_fast_path_\suffix:
+     call *ART_METHOD_QUICK_CODE_OFFSET_64(%rdi) // Call the method.
+     ADVANCE_PC_FETCH_AND_GOTO_NEXT 3
+
+.Lfast_path_with_few_args_\suffix:
      // Fast path when we have zero or one argument (modulo 'this'). If there
      // is one argument, we can put it in both floating point and core register.
      movzbl 1(rPC), %r9d
      shrl MACRO_LITERAL(4), %r9d # Number of arguments
      .if \is_static
      cmpl MACRO_LITERAL(1), %r9d
-     jl .Lfast_path_\suffix
+     jl .Linvoke_with_few_args_\suffix
      jne .Lget_shorty_\suffix
      movzwl 4(rPC), %r9d
      andl MACRO_LITERAL(0xf), %r9d  // dex register of first argument
@@ -1132,7 +1181,7 @@ END_FUNCTION \name
      movd %esi, %xmm0
      .else
      cmpl MACRO_LITERAL(2), %r9d
-     jl .Lfast_path_\suffix
+     jl .Linvoke_with_few_args_\suffix
      jne .Lget_shorty_\suffix
      movzwl 4(rPC), %r9d
      shrl MACRO_LITERAL(4), %r9d
@@ -1140,7 +1189,7 @@ END_FUNCTION \name
      GET_VREG %edx, %r9
      movd %edx, %xmm0
      .endif
-.Lfast_path_\suffix:
+.Linvoke_with_few_args_\suffix:
      // Check if the next instruction is move-result or move-result-wide.
      // If it is, we fetch the shorty and jump to the regular invocation.
      movzwq  6(rPC), %r9
@@ -1263,26 +1312,75 @@ END_FUNCTION \name
    .elseif \is_string_init
    // No fast path for string.init.
    .else
+     testl $$ART_METHOD_NTERP_INVOKE_FAST_PATH_FLAG, ART_METHOD_ACCESS_FLAGS_OFFSET(%rdi)
+     je .Lfast_path_with_few_args_range_\suffix
+     movzbl 1(rPC), %r9d  // number of arguments
+     .if \is_static
+     testl %r9d, %r9d
+     je .Linvoke_fast_path_range_\suffix
+     .else
+     cmpl MACRO_LITERAL(1), %r9d
+     je .Linvoke_fast_path_range_\suffix
+     .endif
+     movzwl 4(rPC), %r11d  // dex register of first argument
+     leaq (rFP, %r11, 4), %r11  // location of first dex register value
+     cmpl MACRO_LITERAL(2), %r9d
+     .if \is_static
+     jl .Lone_arg_fast_path_range_\suffix
+     .endif
+     je .Ltwo_args_fast_path_range_\suffix
+     cmp MACRO_LITERAL(4), %r9d
+     jl .Lthree_args_fast_path_range_\suffix
+     je .Lfour_args_fast_path_range_\suffix
+     cmp MACRO_LITERAL(5), %r9d
+     je .Lfive_args_fast_path_range_\suffix
+
+.Lloop_over_fast_path_range_\suffix:
+     subl MACRO_LITERAL(1), %r9d
+     movl (%r11, %r9, 4), %r8d
+     movl %r8d, 8(%rsp, %r9, 4)  // Add 8 for the ArtMethod
+     cmpl MACRO_LITERAL(5), %r9d
+     jne .Lloop_over_fast_path_range_\suffix
+
+.Lfive_args_fast_path_range_\suffix:
+     movl 16(%r11), %r9d
+.Lfour_args_fast_path_range_\suffix:
+     movl 12(%r11), %r8d
+.Lthree_args_fast_path_range_\suffix:
+     movl 8(%r11), %ecx
+.Ltwo_args_fast_path_range_\suffix:
+     movl 4(%r11), %edx
+.Lone_arg_fast_path_range_\suffix:
+     .if \is_static
+     movl 0(%r11), %esi
+     .else
+     // First argument already in %esi.
+     .endif
+.Linvoke_fast_path_range_\suffix:
+     call *ART_METHOD_QUICK_CODE_OFFSET_64(%rdi) // Call the method.
+     ADVANCE_PC_FETCH_AND_GOTO_NEXT 3
+
+.Lfast_path_with_few_args_range_\suffix:
      // Fast path when we have zero or one argument (modulo 'this'). If there
      // is one argument, we can put it in both floating point and core register.
      movzbl 1(rPC), %r9d # Number of arguments
      .if \is_static
      cmpl MACRO_LITERAL(1), %r9d
-     jl .Lfast_path_range_\suffix
+     jl .Linvoke_with_few_args_range_\suffix
      jne .Lget_shorty_range_\suffix
      movzwl 4(rPC), %r9d  // Dex register of first argument
      GET_VREG %esi, %r9
      movd %esi, %xmm0
      .else
      cmpl MACRO_LITERAL(2), %r9d
-     jl .Lfast_path_range_\suffix
+     jl .Linvoke_with_few_args_range_\suffix
      jne .Lget_shorty_range_\suffix
      movzwl 4(rPC), %r9d
      addl MACRO_LITERAL(1), %r9d  // dex register of second argument
      GET_VREG %edx, %r9
      movd %edx, %xmm0
      .endif
-.Lfast_path_range_\suffix:
+.Linvoke_with_few_args_range_\suffix:
      // Check if the next instruction is move-result or move-result-wide.
      // If it is, we fetch the shorty and jump to the regular invocation.
      movzwq  6(rPC), %r9

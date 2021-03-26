@@ -1865,7 +1865,8 @@ void UnstartedRuntime::UnstartedJNIThrowableNativeFillInStackTrace(
     Thread* self, ArtMethod* method ATTRIBUTE_UNUSED, mirror::Object* receiver ATTRIBUTE_UNUSED,
     uint32_t* args ATTRIBUTE_UNUSED, JValue* result) {
   ScopedObjectAccessUnchecked soa(self);
-  result->SetL(soa.Decode<mirror::Object>(self->CreateInternalStackTrace(soa)));
+  ScopedLocalRef<jobject> stack_trace(self->GetJniEnv(), self->CreateInternalStackTrace(soa));
+  result->SetL(soa.Decode<mirror::Object>(stack_trace.get()));
 }
 
 void UnstartedRuntime::UnstartedJNIUnsafeCompareAndSwapInt(
