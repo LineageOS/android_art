@@ -1137,6 +1137,7 @@
                   "811-checker-invoke-super-secondary",
                   "817-hiddenapi",
                   "820-vdex-multidex",
+                  "821-many-args",
                   "999-redefine-hiddenapi",
                   "1000-non-moving-space-stress",
                   "1001-app-image-regions",

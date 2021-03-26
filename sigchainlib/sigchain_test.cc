@@ -214,16 +214,20 @@ TEST_F(SigchainTest, EnsureFrontOfChain) {
   void* libc = dlopen(kLibcSoName, RTLD_LAZY | RTLD_NOLOAD);
   ASSERT_TRUE(libc);
 
+  auto libc_sigaction = reinterpret_cast<decltype(&sigaction)>(dlsym(libc, "sigaction"));
+  ASSERT_TRUE(libc_sigaction);
+
   static sig_atomic_t called = 0;
   struct sigaction action = {};
   action.sa_flags = SA_SIGINFO;
   action.sa_sigaction = [](int, siginfo_t*, void*) { called = 1; };
 
-  ASSERT_EQ(0, sigaction(SIGSEGV, &action, nullptr));
+  ASSERT_EQ(0, libc_sigaction(SIGSEGV, &action, nullptr));
 
   // Try before EnsureFrontOfChain.
   RaiseHandled();
-  ASSERT_EQ(0, called);
+  ASSERT_EQ(1, called);
+  called = 0;
 
   RaiseUnhandled();
   ASSERT_EQ(1, called);

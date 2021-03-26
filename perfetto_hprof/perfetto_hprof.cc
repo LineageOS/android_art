@@ -719,9 +719,11 @@ void DumpPerfetto(art::Thread* self) {
             std::unique_ptr<protozero::PackedVarInt> reference_object_ids(
                 new protozero::PackedVarInt);
 
+            uint64_t prev_object_id = 0;
+
             art::Runtime::Current()->GetHeap()->VisitObjectsPaused(
                 [&writer, &interned_fields, &interned_locations, &reference_field_ids,
-                 &reference_object_ids, &interned_classes, &ignored_types](
+                 &reference_object_ids, &interned_classes, &ignored_types, &prev_object_id](
                     art::mirror::Object* obj) REQUIRES_SHARED(art::Locks::mutator_lock_) {
                   if (obj->IsClass()) {
                     art::mirror::Class* klass = obj->AsClass().Ptr();
@@ -777,9 +779,15 @@ void DumpPerfetto(art::Thread* self) {
 
                   auto class_id = FindOrAppend(&interned_classes, class_ptr);
 
+                  uint64_t object_id = GetObjectId(obj);
                   perfetto::protos::pbzero::HeapGraphObject* object_proto =
                     writer.GetHeapGraph()->add_objects();
-                  object_proto->set_id(GetObjectId(obj));
+                  if (prev_object_id && prev_object_id < object_id) {
+                    object_proto->set_id_delta(object_id - prev_object_id);
+                  } else {
+                    object_proto->set_id(object_id);
+                  }
+                  prev_object_id = object_id;
                   object_proto->set_type_id(class_id);
 
                   // Arrays / strings are magic and have an instance dependent size.

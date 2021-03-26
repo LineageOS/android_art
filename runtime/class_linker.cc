@@ -3838,20 +3838,33 @@ void ClassLinker::LoadMethod(const DexFile& dex_file,
     } else {
       dst->SetCodeItem(dst->GetDexFile()->GetCodeItem(method.GetCodeItemOffset()));
     }
-    bool has_all_references = true;
-    const char* shorty = dst->GetShorty();
-    for (size_t i = 1, e = strlen(shorty); i < e; ++i) {
-      if (shorty[i] != 'L') {
-        has_all_references = false;
-        break;
-      }
-    }
-    if (has_all_references) {
-      dst->SetNterpEntryPointFastPathFlag();
-    }
   } else {
     dst->SetDataPtrSize(nullptr, image_pointer_size_);
     DCHECK_EQ(method.GetCodeItemOffset(), 0u);
+  }
+
+  // Set optimization flags related to the shorty.
+  const char* shorty = dst->GetShorty();
+  bool all_parameters_are_reference = true;
+  bool all_parameters_are_reference_or_int = true;
+  bool return_type_is_fp = (shorty[0] == 'F' || shorty[0] == 'D');
+
+  for (size_t i = 1, e = strlen(shorty); i < e; ++i) {
+    if (shorty[i] != 'L') {
+      all_parameters_are_reference = false;
+      if (shorty[i] == 'F' || shorty[i] == 'D' || shorty[i] == 'J') {
+        all_parameters_are_reference_or_int = false;
+        break;
+      }
+    }
+  }
+
+  if (!dst->IsNative() && all_parameters_are_reference) {
+    dst->SetNterpEntryPointFastPathFlag();
+  }
+
+  if (!return_type_is_fp && all_parameters_are_reference_or_int) {
+    dst->SetNterpInvokeFastPathFlag();
   }
 }
 
