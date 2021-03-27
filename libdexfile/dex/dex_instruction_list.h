@@ -246,22 +246,22 @@
   V(0xE0, SHL_INT_LIT8, "shl-int/lit8", k22b, kIndexNone, kContinue, kShl | kRegCFieldOrConstant, kVerifyRegA | kVerifyRegB) \
   V(0xE1, SHR_INT_LIT8, "shr-int/lit8", k22b, kIndexNone, kContinue, kShr | kRegCFieldOrConstant, kVerifyRegA | kVerifyRegB) \
   V(0xE2, USHR_INT_LIT8, "ushr-int/lit8", k22b, kIndexNone, kContinue, kUshr | kRegCFieldOrConstant, kVerifyRegA | kVerifyRegB) \
-  V(0xE3, IGET_QUICK, "iget-quick", k22c, kIndexFieldOffset, kContinue | kThrow, kLoad | kRegCFieldOrConstant, kVerifyRegA | kVerifyRegB | kVerifyRuntimeOnly) \
-  V(0xE4, IGET_WIDE_QUICK, "iget-wide-quick", k22c, kIndexFieldOffset, kContinue | kThrow, kLoad | kRegCFieldOrConstant, kVerifyRegAWide | kVerifyRegB | kVerifyRuntimeOnly) \
-  V(0xE5, IGET_OBJECT_QUICK, "iget-object-quick", k22c, kIndexFieldOffset, kContinue | kThrow, kLoad | kRegCFieldOrConstant, kVerifyRegA | kVerifyRegB | kVerifyRuntimeOnly) \
-  V(0xE6, IPUT_QUICK, "iput-quick", k22c, kIndexFieldOffset, kContinue | kThrow, kStore | kRegCFieldOrConstant, kVerifyRegA | kVerifyRegB | kVerifyRuntimeOnly) \
-  V(0xE7, IPUT_WIDE_QUICK, "iput-wide-quick", k22c, kIndexFieldOffset, kContinue | kThrow, kStore | kRegCFieldOrConstant, kVerifyRegAWide | kVerifyRegB | kVerifyRuntimeOnly) \
-  V(0xE8, IPUT_OBJECT_QUICK, "iput-object-quick", k22c, kIndexFieldOffset, kContinue | kThrow, kStore | kRegCFieldOrConstant, kVerifyRegA | kVerifyRegB | kVerifyRuntimeOnly) \
-  V(0xE9, INVOKE_VIRTUAL_QUICK, "invoke-virtual-quick", k35c, kIndexVtableOffset, kContinue | kThrow | kInvoke, 0, kVerifyVarArgNonZero | kVerifyRuntimeOnly) \
-  V(0xEA, INVOKE_VIRTUAL_RANGE_QUICK, "invoke-virtual/range-quick", k3rc, kIndexVtableOffset, kContinue | kThrow | kInvoke, 0, kVerifyVarArgRangeNonZero | kVerifyRuntimeOnly) \
-  V(0xEB, IPUT_BOOLEAN_QUICK, "iput-boolean-quick", k22c, kIndexFieldOffset, kContinue | kThrow, kStore | kRegCFieldOrConstant, kVerifyRegA | kVerifyRegB | kVerifyRuntimeOnly) \
-  V(0xEC, IPUT_BYTE_QUICK, "iput-byte-quick", k22c, kIndexFieldOffset, kContinue | kThrow, kStore | kRegCFieldOrConstant, kVerifyRegA | kVerifyRegB | kVerifyRuntimeOnly) \
-  V(0xED, IPUT_CHAR_QUICK, "iput-char-quick", k22c, kIndexFieldOffset, kContinue | kThrow, kStore | kRegCFieldOrConstant, kVerifyRegA | kVerifyRegB | kVerifyRuntimeOnly) \
-  V(0xEE, IPUT_SHORT_QUICK, "iput-short-quick", k22c, kIndexFieldOffset, kContinue | kThrow, kStore | kRegCFieldOrConstant, kVerifyRegA | kVerifyRegB | kVerifyRuntimeOnly) \
-  V(0xEF, IGET_BOOLEAN_QUICK, "iget-boolean-quick", k22c, kIndexFieldOffset, kContinue | kThrow, kLoad | kRegCFieldOrConstant, kVerifyRegA | kVerifyRegB | kVerifyRuntimeOnly) \
-  V(0xF0, IGET_BYTE_QUICK, "iget-byte-quick", k22c, kIndexFieldOffset, kContinue | kThrow, kLoad | kRegCFieldOrConstant, kVerifyRegA | kVerifyRegB | kVerifyRuntimeOnly) \
-  V(0xF1, IGET_CHAR_QUICK, "iget-char-quick", k22c, kIndexFieldOffset, kContinue | kThrow, kLoad | kRegCFieldOrConstant, kVerifyRegA | kVerifyRegB | kVerifyRuntimeOnly) \
-  V(0xF2, IGET_SHORT_QUICK, "iget-short-quick", k22c, kIndexFieldOffset, kContinue | kThrow, kLoad | kRegCFieldOrConstant, kVerifyRegA | kVerifyRegB | kVerifyRuntimeOnly) \
+  V(0xE3, UNUSED_E3, "unused-e3", k10x, kIndexUnknown, 0, 0, kVerifyError) \
+  V(0xE4, UNUSED_E4, "unused-e4", k10x, kIndexUnknown, 0, 0, kVerifyError) \
+  V(0xE5, UNUSED_E5, "unused-e5", k10x, kIndexUnknown, 0, 0, kVerifyError) \
+  V(0xE6, UNUSED_E6, "unused-e6", k10x, kIndexUnknown, 0, 0, kVerifyError) \
+  V(0xE7, UNUSED_E7, "unused-e7", k10x, kIndexUnknown, 0, 0, kVerifyError) \
+  V(0xE8, UNUSED_E8, "unused-e8", k10x, kIndexUnknown, 0, 0, kVerifyError) \
+  V(0xE9, UNUSED_E9, "unused-e9", k10x, kIndexUnknown, 0, 0, kVerifyError) \
+  V(0xEA, UNUSED_EA, "unused-ea", k10x, kIndexUnknown, 0, 0, kVerifyError) \
+  V(0xEB, UNUSED_EB, "unused-eb", k10x, kIndexUnknown, 0, 0, kVerifyError) \
+  V(0xEC, UNUSED_EC, "unused-ec", k10x, kIndexUnknown, 0, 0, kVerifyError) \
+  V(0xED, UNUSED_ED, "unused-ed", k10x, kIndexUnknown, 0, 0, kVerifyError) \
+  V(0xEE, UNUSED_EE, "unused-ee", k10x, kIndexUnknown, 0, 0, kVerifyError) \
+  V(0xEF, UNUSED_EF, "unused-ef", k10x, kIndexUnknown, 0, 0, kVerifyError) \
+  V(0xF0, UNUSED_F0, "unused-f0", k10x, kIndexUnknown, 0, 0, kVerifyError) \
+  V(0xF1, UNUSED_F1, "unused-f1", k10x, kIndexUnknown, 0, 0, kVerifyError) \
+  V(0xF2, UNUSED_F2, "unused-f2", k10x, kIndexUnknown, 0, 0, kVerifyError) \
   V(0xF3, UNUSED_F3, "unused-f3", k10x, kIndexUnknown, 0, 0, kVerifyError) \
   V(0xF4, UNUSED_F4, "unused-f4", k10x, kIndexUnknown, 0, 0, kVerifyError) \
   V(0xF5, UNUSED_F5, "unused-f5", k10x, kIndexUnknown, 0, 0, kVerifyError) \

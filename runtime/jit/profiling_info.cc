@@ -46,8 +46,6 @@ ProfilingInfo* ProfilingInfo::Create(Thread* self, ArtMethod* method) {
     switch (inst->Opcode()) {
       case Instruction::INVOKE_VIRTUAL:
       case Instruction::INVOKE_VIRTUAL_RANGE:
-      case Instruction::INVOKE_VIRTUAL_QUICK:
-      case Instruction::INVOKE_VIRTUAL_RANGE_QUICK:
       case Instruction::INVOKE_INTERFACE:
       case Instruction::INVOKE_INTERFACE_RANGE:
         entries.push_back(inst.DexPc());
