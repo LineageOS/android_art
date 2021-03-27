@@ -291,9 +291,6 @@ class OatTest : public CommonCompilerDriverTest {
                           dex_file_data->GetHeader().file_size_));
       ASSERT_EQ(dex_file_data->GetLocation(), opened_dex_file->GetLocation());
     }
-    const VdexFile::DexSectionHeader &vdex_header =
-        opened_oat_file->GetVdexFile()->GetDexSectionHeader();
-    ASSERT_EQ(vdex_header.GetQuickeningInfoSize(), 0u);
 
     int64_t actual_vdex_size = vdex_file.GetFile()->GetLength();
     ASSERT_GE(actual_vdex_size, 0);
