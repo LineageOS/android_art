@@ -1549,9 +1549,9 @@ class OatFileBackedByVdex final : public OatFileBase {
     std::unique_ptr<OatFileBackedByVdex> oat_file(new OatFileBackedByVdex(vdex_file->GetName()));
     if (vdex_file->HasDexSection()) {
       uint32_t i = 0;
-      for (const uint8_t* dex_file_start = vdex_file->GetNextDexFileData(nullptr);
+      for (const uint8_t* dex_file_start = vdex_file->GetNextDexFileData(nullptr, i);
            dex_file_start != nullptr;
-           dex_file_start = vdex_file->GetNextDexFileData(dex_file_start), ++i) {
+           dex_file_start = vdex_file->GetNextDexFileData(dex_file_start, ++i)) {
         // Create the OatDexFile and add it to the owning container.
         std::string location = DexFileLoader::GetMultiDexLocation(i, dex_location.c_str());
         std::string canonical_location = DexFileLoader::GetDexCanonicalLocation(location.c_str());

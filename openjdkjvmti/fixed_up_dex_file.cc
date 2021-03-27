@@ -51,28 +51,6 @@ static void RecomputeDexChecksum(art::DexFile* dex_file) {
       dex_file->CalculateChecksum();
 }
 
-static const art::VdexFile* GetVdex(const art::DexFile& original_dex_file) {
-  const art::OatDexFile* oat_dex = original_dex_file.GetOatDexFile();
-  if (oat_dex == nullptr) {
-    return nullptr;
-  }
-  const art::OatFile* oat_file = oat_dex->GetOatFile();
-  if (oat_file == nullptr) {
-    return nullptr;
-  }
-  return oat_file->GetVdexFile();
-}
-
-static void DoDexUnquicken(const art::DexFile& new_dex_file,
-                           const art::DexFile& original_dex_file) {
-  const art::VdexFile* vdex = GetVdex(original_dex_file);
-  if (vdex != nullptr) {
-    vdex->UnquickenDexFile(new_dex_file,
-                           original_dex_file,
-                           /* decompile_return_instruction= */ true);
-  }
-}
-
 static void DCheckVerifyDexFile(const art::DexFile& dex) {
   if (art::kIsDebugBuild) {
     std::string error;
@@ -149,8 +127,6 @@ std::unique_ptr<FixedUpDexFile> FixedUpDexFile::Create(const art::DexFile& origi
   }
 
   new_dex_file->SetHiddenapiDomain(original.GetHiddenapiDomain());
-
-  DoDexUnquicken(*new_dex_file, original);
 
   RecomputeDexChecksum(const_cast<art::DexFile*>(new_dex_file.get()));
   DCheckVerifyDexFile(*new_dex_file);

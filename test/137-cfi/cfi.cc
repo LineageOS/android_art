@@ -110,19 +110,36 @@ static bool CheckStack(Backtrace* bt, const std::vector<std::string>& seq) {
   size_t cur_search_index = 0;  // The currently active index in seq.
   CHECK_GT(seq.size(), 0U);
 
-  for (Backtrace::const_iterator it = bt->begin(); it != bt->end(); ++it) {
-    if (BacktraceMap::IsValid(it->map)) {
-      LOG(INFO) << "Got " << it->func_name << ", looking for " << seq[cur_search_index];
-      if (it->func_name.find(seq[cur_search_index]) != std::string::npos) {
-        cur_search_index++;
-        if (cur_search_index == seq.size()) {
-          return true;
+  bool any_empty_name = false;
+  for (size_t i = 0; i < bt->NumFrames(); i++) {
+    const backtrace_frame_data_t* frame = bt->GetFrame(i);
+    if (BacktraceMap::IsValid(frame->map)) {
+      if (cur_search_index < seq.size()) {
+        LOG(INFO) << "Got " << frame->func_name << ", looking for " << seq[cur_search_index];
+        if (frame->func_name.find(seq[cur_search_index]) != std::string::npos) {
+          cur_search_index++;
         }
       }
     }
+    any_empty_name |= frame->func_name.empty();
+    if (frame->func_name == "main") {
+      break;
+    }
   }
 
-  printf("Cannot find %s in backtrace:\n", seq[cur_search_index].c_str());
+  if (cur_search_index < seq.size()) {
+    printf("Cannot find %s in backtrace:\n", seq[cur_search_index].c_str());
+  } else if (any_empty_name) {
+#if defined(__BIONIC__ ) && !defined(__ANDROID__)
+    // TODO(b/182810709): Unwinding is broken on host-bionic so we expect some empty frames.
+    return true;
+#else
+    printf("Missing frames in backtrace:\n");
+#endif
+  } else {
+    return true;
+  }
+
   for (Backtrace::const_iterator it = bt->begin(); it != bt->end(); ++it) {
     if (BacktraceMap::IsValid(it->map)) {
       printf("  %s\n", Backtrace::FormatFrameData(&*it).c_str());
