@@ -2958,27 +2958,6 @@ void Runtime::DeoptimizeBootImage() {
       jit->GetCodeCache()->TransitionToDebuggable();
     }
   }
-  // Also de-quicken all -quick opcodes. We do this for both BCP and non-bcp so if we are swapping
-  // debuggable during startup by a plugin (eg JVMTI) even non-BCP code has its vdex files deopted.
-  std::unordered_set<const VdexFile*> vdexs;
-  GetClassLinker()->VisitKnownDexFiles(Thread::Current(), [&](const art::DexFile* df) {
-    const OatDexFile* odf = df->GetOatDexFile();
-    if (odf == nullptr) {
-      return;
-    }
-    const OatFile* of = odf->GetOatFile();
-    if (of == nullptr || of->IsDebuggable()) {
-      // no Oat or already debuggable so no -quick.
-      return;
-    }
-    vdexs.insert(of->GetVdexFile());
-  });
-  LOG(INFO) << "Unquickening " << vdexs.size() << " vdex files!";
-  for (const VdexFile* vf : vdexs) {
-    vf->AllowWriting(true);
-    vf->UnquickenInPlace(/*decompile_return_instruction=*/true);
-    vf->AllowWriting(false);
-  }
 }
 
 Runtime::ScopedThreadPoolUsage::ScopedThreadPoolUsage()

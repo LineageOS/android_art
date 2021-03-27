@@ -1287,8 +1287,8 @@ class Dex2Oat final {
     // the information to remain valid.
     if (update_input_vdex_) {
       File* vdex_file = vdex_files_.back().get();
-      if (!vdex_file->PwriteFully(&VdexFile::VerifierDepsHeader::kVdexInvalidMagic,
-                                  arraysize(VdexFile::VerifierDepsHeader::kVdexInvalidMagic),
+      if (!vdex_file->PwriteFully(&VdexFile::VdexFileHeader::kVdexInvalidMagic,
+                                  arraysize(VdexFile::VdexFileHeader::kVdexInvalidMagic),
                                   /*offset=*/ 0u)) {
         PLOG(ERROR) << "Failed to invalidate vdex header. File: " << vdex_file->GetPath();
         return false;
@@ -1850,18 +1850,6 @@ class Dex2Oat final {
 
     // Setup vdex for compilation.
     const std::vector<const DexFile*>& dex_files = compiler_options_->dex_files_for_oat_file_;
-    if (!DoEagerUnquickeningOfVdex() && input_vdex_file_ != nullptr) {
-      // TODO: we unquicken unconditionally, as we don't know
-      // if the boot image has changed. How exactly we'll know is under
-      // experimentation.
-      TimingLogger::ScopedTiming time_unquicken("Unquicken", timings_);
-
-      // We do not decompile a RETURN_VOID_NO_BARRIER into a RETURN_VOID, as the quickening
-      // optimization does not depend on the boot image (the optimization relies on not
-      // having final fields in a class, which does not change for an app).
-      input_vdex_file_->Unquicken(dex_files, /* decompile_return_instruction */ false);
-    }
-
     // To allow initialization of classes that construct ThreadLocal objects in class initializer,
     // re-initialize the ThreadLocal.nextHashCode to a new object that's not in the boot image.
     ThreadLocalHashOverride thread_local_hash_override(
