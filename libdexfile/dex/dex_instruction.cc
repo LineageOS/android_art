@@ -281,15 +281,6 @@ std::string Instruction::DumpString(const DexFile* file) const {
             break;
           }
           FALLTHROUGH_INTENDED;
-        case IGET_QUICK:
-        case IGET_OBJECT_QUICK:
-          if (file != nullptr) {
-            uint32_t field_idx = VRegC_22c();
-            os << opcode << " v" << static_cast<int>(VRegA_22c()) << ", v" << static_cast<int>(VRegB_22c()) << ", "
-               << "// offset@" << field_idx;
-            break;
-          }
-          FALLTHROUGH_INTENDED;
         case IPUT:
         case IPUT_WIDE:
         case IPUT_OBJECT:
@@ -301,15 +292,6 @@ std::string Instruction::DumpString(const DexFile* file) const {
             uint32_t field_idx = VRegC_22c();
             os << opcode << " v" << static_cast<int>(VRegA_22c()) << ", v" << static_cast<int>(VRegB_22c()) << ", "
                << file->PrettyField(field_idx, true) << " // field@" << field_idx;
-            break;
-          }
-          FALLTHROUGH_INTENDED;
-        case IPUT_QUICK:
-        case IPUT_OBJECT_QUICK:
-          if (file != nullptr) {
-            uint32_t field_idx = VRegC_22c();
-            os << opcode << " v" << static_cast<int>(VRegA_22c()) << ", v" << static_cast<int>(VRegB_22c()) << ", "
-               << "// offset@" << field_idx;
             break;
           }
           FALLTHROUGH_INTENDED;
@@ -399,15 +381,6 @@ std::string Instruction::DumpString(const DexFile* file) const {
             break;
           }
           FALLTHROUGH_INTENDED;
-        case INVOKE_VIRTUAL_QUICK:
-          if (file != nullptr) {
-            os << opcode << " {";
-            uint32_t vtable_offset = VRegB_35c();
-            DumpArgs(VRegA_35c());
-            os << "},  // vtable@" << vtable_offset;
-            break;
-          }
-          FALLTHROUGH_INTENDED;
         case INVOKE_CUSTOM:
           if (file != nullptr) {
             os << opcode << " {";
@@ -438,14 +411,6 @@ std::string Instruction::DumpString(const DexFile* file) const {
             uint32_t method_idx = VRegB_3rc();
             os << StringPrintf("%s, {v%d .. v%d}, ", opcode, first_reg, last_reg)
                << file->PrettyMethod(method_idx) << " // method@" << method_idx;
-            break;
-          }
-          FALLTHROUGH_INTENDED;
-        case INVOKE_VIRTUAL_RANGE_QUICK:
-          if (file != nullptr) {
-            uint32_t method_idx = VRegB_3rc();
-            os << StringPrintf("%s, {v%d .. v%d}, ", opcode, first_reg, last_reg)
-               << "// vtable@" << method_idx;
             break;
           }
           FALLTHROUGH_INTENDED;
