@@ -171,9 +171,3 @@
 
 %def op_invoke_virtual_range():
 %  invoke_virtual(helper="NterpCommonInvokeInstanceRange", range="1")
-
-%def op_invoke_virtual_quick():
-%  unused()
-
-%def op_invoke_virtual_range_quick():
-%  unused()

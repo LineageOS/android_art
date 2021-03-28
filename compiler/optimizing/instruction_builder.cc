@@ -3560,37 +3560,10 @@ bool HInstructionBuilder::ProcessDexInstruction(const Instruction& instruction, 
       break;
     }
 
-    case Instruction::IGET_QUICK:
-    case Instruction::IGET_BOOLEAN_QUICK:
-    case Instruction::IGET_BYTE_QUICK:
-    case Instruction::IGET_SHORT_QUICK:
-    case Instruction::IGET_CHAR_QUICK:
-    case Instruction::IGET_WIDE_QUICK:
-    case Instruction::IGET_OBJECT_QUICK:
-    case Instruction::IPUT_QUICK:
-    case Instruction::IPUT_BOOLEAN_QUICK:
-    case Instruction::IPUT_BYTE_QUICK:
-    case Instruction::IPUT_SHORT_QUICK:
-    case Instruction::IPUT_CHAR_QUICK:
-    case Instruction::IPUT_WIDE_QUICK:
-    case Instruction::IPUT_OBJECT_QUICK:
-    case Instruction::INVOKE_VIRTUAL_QUICK:
-    case Instruction::INVOKE_VIRTUAL_RANGE_QUICK:
-    case Instruction::UNUSED_3E:
-    case Instruction::UNUSED_3F:
-    case Instruction::UNUSED_40:
-    case Instruction::UNUSED_41:
-    case Instruction::UNUSED_42:
-    case Instruction::UNUSED_43:
+    case Instruction::UNUSED_3E ... Instruction::UNUSED_43:
     case Instruction::UNUSED_79:
     case Instruction::UNUSED_7A:
-    case Instruction::UNUSED_F3:
-    case Instruction::UNUSED_F4:
-    case Instruction::UNUSED_F5:
-    case Instruction::UNUSED_F6:
-    case Instruction::UNUSED_F7:
-    case Instruction::UNUSED_F8:
-    case Instruction::UNUSED_F9: {
+    case Instruction::UNUSED_E3 ... Instruction::UNUSED_F9: {
       VLOG(compiler) << "Did not compile "
                      << dex_file_->PrettyMethod(dex_compilation_unit_->GetDexMethodIndex())
                      << " because of unhandled instruction "

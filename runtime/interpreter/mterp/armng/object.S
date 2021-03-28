@@ -145,27 +145,6 @@
 %def op_iget_object():
 %  op_iget(load="ldr", wide="0", is_object="1")
 
-%def op_iget_boolean_quick():
-%  unused()
-
-%def op_iget_byte_quick():
-%  unused()
-
-%def op_iget_char_quick():
-%  unused()
-
-%def op_iget_object_quick():
-%  unused()
-
-%def op_iget_quick(load="ldr", wide="0"):
-%  unused()
-
-%def op_iget_short_quick():
-%  unused()
-
-%def op_iget_wide_quick():
-%  unused()
-
 %def op_iput_boolean():
 %  op_iput(store="strb", wide="0", is_object="0")
 
@@ -258,27 +237,6 @@
 
 %def op_iput_object():
 %  op_iput(store="str", wide="0", is_object="1")
-
-%def op_iput_boolean_quick():
-%  unused()
-
-%def op_iput_byte_quick():
-%  unused()
-
-%def op_iput_char_quick():
-%  unused()
-
-%def op_iput_object_quick():
-%  unused()
-
-%def op_iput_quick(store="str", wide="0", is_object="0"):
-%  unused()
-
-%def op_iput_short_quick():
-%  unused()
-
-%def op_iput_wide_quick():
-%  unused()
 
 %def op_sget_boolean():
 %  op_sget(load="ldrb", wide="0", is_object="0")

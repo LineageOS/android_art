@@ -169,8 +169,6 @@ TEST(Instruction, DumpString) {
             "filled-new-array {v3, v2}, type@1234");
   EXPECT_EQ(DumpInst35c(Instruction::INVOKE_VIRTUAL, 1234, {3, 2, 1, 5, 6}),
             "invoke-virtual {v3, v2, v1, v5, v6}, thing@1234");
-  EXPECT_EQ(DumpInst35c(Instruction::INVOKE_VIRTUAL_QUICK, 1234, {3, 2, 1, 5}),
-            "invoke-virtual-quick {v3, v2, v1, v5}, thing@1234");
   EXPECT_EQ(DumpInst35c(Instruction::INVOKE_CUSTOM, 1234, {3, 2, 1}),
             "invoke-custom {v3, v2, v1}, thing@1234");
 }

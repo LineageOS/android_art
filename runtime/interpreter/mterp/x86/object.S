@@ -42,41 +42,20 @@
 %def op_iget_boolean():
 %  op_iget(helper="MterpIGetU8")
 
-%def op_iget_boolean_quick():
-%  unused()
-
 %def op_iget_byte():
 %  op_iget(helper="MterpIGetI8")
-
-%def op_iget_byte_quick():
-%  unused()
 
 %def op_iget_char():
 %  op_iget(helper="MterpIGetU16")
 
-%def op_iget_char_quick():
-%  unused()
-
 %def op_iget_object():
 %  op_iget(is_object="1", helper="MterpIGetObj")
-
-%def op_iget_object_quick():
-%  unused()
-
-%def op_iget_quick(load="movl"):
-%  unused()
 
 %def op_iget_short():
 %  op_iget(helper="MterpIGetI16")
 
-%def op_iget_short_quick():
-%  unused()
-
 %def op_iget_wide():
 %  op_iget(helper="MterpIGetU64")
-
-%def op_iget_wide_quick():
-%  unused()
 
 %def op_instance_of():
 /*
@@ -112,41 +91,20 @@
 %def op_iput_boolean():
 %  op_iput(helper="MterpIPutU8")
 
-%def op_iput_boolean_quick():
-%  unused()
-
 %def op_iput_byte():
 %  op_iput(helper="MterpIPutI8")
-
-%def op_iput_byte_quick():
-%  unused()
 
 %def op_iput_char():
 %  op_iput(helper="MterpIPutU16")
 
-%def op_iput_char_quick():
-%  unused()
-
 %def op_iput_object():
 %  op_iput(is_object="1", helper="MterpIPutObj")
-
-%def op_iput_object_quick():
-%  unused()
-
-%def op_iput_quick(reg="rINST", store="movl"):
-%  unused()
 
 %def op_iput_short():
 %  op_iput(helper="MterpIPutI16")
 
-%def op_iput_short_quick():
-%  unused()
-
 %def op_iput_wide():
 %  op_iput(helper="MterpIPutU64")
-
-%def op_iput_wide_quick():
-%  unused()
 
 %def op_new_instance():
 /*

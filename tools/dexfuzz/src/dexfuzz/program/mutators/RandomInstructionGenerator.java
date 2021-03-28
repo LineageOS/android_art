@@ -133,14 +133,10 @@ public class RandomInstructionGenerator extends CodeMutator {
       if (Opcode.isBetween(newOpcode, Opcode.FILLED_NEW_ARRAY, Opcode.FILL_ARRAY_DATA)
           || Opcode.isBetween(newOpcode, Opcode.PACKED_SWITCH, Opcode.SPARSE_SWITCH)
           || Opcode.isBetween(newOpcode, Opcode.INVOKE_VIRTUAL, Opcode.INVOKE_INTERFACE)
-          || Opcode.isBetween(newOpcode,
-              Opcode.INVOKE_VIRTUAL_RANGE, Opcode.INVOKE_INTERFACE_RANGE)
-              // Can never accept these instructions at compile time.
-              || Opcode.isBetween(newOpcode, Opcode.IGET_QUICK, Opcode.IPUT_SHORT_QUICK)
-              // Unused opcodes...
-              || Opcode.isBetween(newOpcode, Opcode.UNUSED_3E, Opcode.UNUSED_43)
-              || Opcode.isBetween(newOpcode, Opcode.UNUSED_79, Opcode.UNUSED_7A)
-              || Opcode.isBetween(newOpcode, Opcode.UNUSED_EF, Opcode.UNUSED_FF)) {
+          || Opcode.isBetween(newOpcode, Opcode.INVOKE_VIRTUAL_RANGE, Opcode.INVOKE_INTERFACE_RANGE)
+          || Opcode.isBetween(newOpcode, Opcode.UNUSED_3E, Opcode.UNUSED_43)
+          || Opcode.isBetween(newOpcode, Opcode.UNUSED_79, Opcode.UNUSED_7A)
+          || Opcode.isBetween(newOpcode, Opcode.UNUSED_E3, Opcode.UNUSED_FF)) {
         foundOpcode = false;
       }
     }
