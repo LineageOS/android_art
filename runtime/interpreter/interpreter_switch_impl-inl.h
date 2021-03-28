@@ -917,34 +917,6 @@ class InstructionHandler {
     return HandleGet<InstanceObjectRead, Primitive::kPrimNot>();
   }
 
-  HANDLER_ATTRIBUTES bool IGET_QUICK() {
-    return HandleUnused();
-  }
-
-  HANDLER_ATTRIBUTES bool IGET_WIDE_QUICK() {
-    return HandleUnused();
-  }
-
-  HANDLER_ATTRIBUTES bool IGET_OBJECT_QUICK() {
-    return HandleUnused();
-  }
-
-  HANDLER_ATTRIBUTES bool IGET_BOOLEAN_QUICK() {
-    return HandleUnused();
-  }
-
-  HANDLER_ATTRIBUTES bool IGET_BYTE_QUICK() {
-    return HandleUnused();
-  }
-
-  HANDLER_ATTRIBUTES bool IGET_CHAR_QUICK() {
-    return HandleUnused();
-  }
-
-  HANDLER_ATTRIBUTES bool IGET_SHORT_QUICK() {
-    return HandleUnused();
-  }
-
   HANDLER_ATTRIBUTES bool SGET_BOOLEAN() {
     return HandleGet<StaticPrimitiveRead, Primitive::kPrimBoolean>();
   }
@@ -999,34 +971,6 @@ class InstructionHandler {
 
   HANDLER_ATTRIBUTES bool IPUT_OBJECT() {
     return HandlePut<InstanceObjectWrite, Primitive::kPrimNot>();
-  }
-
-  HANDLER_ATTRIBUTES bool IPUT_QUICK() {
-    return HandleUnused();
-  }
-
-  HANDLER_ATTRIBUTES bool IPUT_BOOLEAN_QUICK() {
-    return HandleUnused();
-  }
-
-  HANDLER_ATTRIBUTES bool IPUT_BYTE_QUICK() {
-    return HandleUnused();
-  }
-
-  HANDLER_ATTRIBUTES bool IPUT_CHAR_QUICK() {
-    return HandleUnused();
-  }
-
-  HANDLER_ATTRIBUTES bool IPUT_SHORT_QUICK() {
-    return HandleUnused();
-  }
-
-  HANDLER_ATTRIBUTES bool IPUT_WIDE_QUICK() {
-    return HandleUnused();
-  }
-
-  HANDLER_ATTRIBUTES bool IPUT_OBJECT_QUICK() {
-    return HandleUnused();
   }
 
   HANDLER_ATTRIBUTES bool SPUT_BOOLEAN() {
@@ -1095,14 +1039,6 @@ class InstructionHandler {
 
   HANDLER_ATTRIBUTES bool INVOKE_STATIC_RANGE() {
     return HandleInvoke<kStatic, /*is_range=*/ true>();
-  }
-
-  HANDLER_ATTRIBUTES bool INVOKE_VIRTUAL_QUICK() {
-    return HandleUnused();
-  }
-
-  HANDLER_ATTRIBUTES bool INVOKE_VIRTUAL_RANGE_QUICK() {
-    return HandleUnused();
   }
 
   HANDLER_ATTRIBUTES bool INVOKE_POLYMORPHIC() {
@@ -1670,6 +1606,70 @@ class InstructionHandler {
   }
 
   HANDLER_ATTRIBUTES bool UNUSED_7A() {
+    return HandleUnused();
+  }
+
+  HANDLER_ATTRIBUTES bool UNUSED_E3() {
+    return HandleUnused();
+  }
+
+  HANDLER_ATTRIBUTES bool UNUSED_E4() {
+    return HandleUnused();
+  }
+
+  HANDLER_ATTRIBUTES bool UNUSED_E5() {
+    return HandleUnused();
+  }
+
+  HANDLER_ATTRIBUTES bool UNUSED_E6() {
+    return HandleUnused();
+  }
+
+  HANDLER_ATTRIBUTES bool UNUSED_E7() {
+    return HandleUnused();
+  }
+
+  HANDLER_ATTRIBUTES bool UNUSED_E8() {
+    return HandleUnused();
+  }
+
+  HANDLER_ATTRIBUTES bool UNUSED_E9() {
+    return HandleUnused();
+  }
+
+  HANDLER_ATTRIBUTES bool UNUSED_EA() {
+    return HandleUnused();
+  }
+
+  HANDLER_ATTRIBUTES bool UNUSED_EB() {
+    return HandleUnused();
+  }
+
+  HANDLER_ATTRIBUTES bool UNUSED_EC() {
+    return HandleUnused();
+  }
+
+  HANDLER_ATTRIBUTES bool UNUSED_ED() {
+    return HandleUnused();
+  }
+
+  HANDLER_ATTRIBUTES bool UNUSED_EE() {
+    return HandleUnused();
+  }
+
+  HANDLER_ATTRIBUTES bool UNUSED_EF() {
+    return HandleUnused();
+  }
+
+  HANDLER_ATTRIBUTES bool UNUSED_F0() {
+    return HandleUnused();
+  }
+
+  HANDLER_ATTRIBUTES bool UNUSED_F1() {
+    return HandleUnused();
+  }
+
+  HANDLER_ATTRIBUTES bool UNUSED_F2() {
     return HandleUnused();
   }
 
