@@ -62,13 +62,11 @@ static constexpr char kDexFileChecksumSeparator = '*';
 static constexpr char kInMemoryDexClassLoaderDexLocationMagic[] = "<unknown>";
 
 ClassLoaderContext::ClassLoaderContext()
-    : special_shared_library_(false),
-      dex_files_state_(ContextDexFilesState::kDexFilesNotOpened),
+    : dex_files_state_(ContextDexFilesState::kDexFilesNotOpened),
       owns_the_dex_files_(true) {}
 
 ClassLoaderContext::ClassLoaderContext(bool owns_the_dex_files)
-    : special_shared_library_(false),
-      dex_files_state_(ContextDexFilesState::kDexFilesOpened),
+    : dex_files_state_(ContextDexFilesState::kDexFilesOpened),
       owns_the_dex_files_(owns_the_dex_files) {}
 
 // Utility method to add parent and shared libraries of `info` into
@@ -317,15 +315,6 @@ bool ClassLoaderContext::Parse(const std::string& spec, bool parse_checksums) {
     return true;
   }
 
-  // Stop early if we detect the special shared library, which may be passed as the classpath
-  // for dex2oat when we want to skip the shared libraries check.
-  if (spec == OatFile::kSpecialSharedLibrary) {
-    // TODO(calin): move this out from parsing to the oat manager to prevent log spam.
-    VLOG(oat) << "The ClassLoaderContext is a special shared library.";
-    special_shared_library_ = true;
-    return true;
-  }
-
   CHECK(class_loader_chain_ == nullptr);
   class_loader_chain_.reset(ParseInternal(spec, parse_checksums));
   return class_loader_chain_ != nullptr;
@@ -334,7 +323,6 @@ bool ClassLoaderContext::Parse(const std::string& spec, bool parse_checksums) {
 ClassLoaderContext::ClassLoaderInfo* ClassLoaderContext::ParseInternal(
     const std::string& spec, bool parse_checksums) {
   CHECK(!spec.empty());
-  CHECK_NE(spec, OatFile::kSpecialSharedLibrary);
   std::string remaining = spec;
   std::unique_ptr<ClassLoaderInfo> first(nullptr);
   ClassLoaderInfo* previous_iteration = nullptr;
@@ -417,11 +405,6 @@ bool ClassLoaderContext::OpenDexFiles(const std::string& classpath_dir,
 
   // Assume we can open the files. If not, we will adjust as we go.
   dex_files_state_ = only_read_checksums ? kDexFilesChecksumsRead : kDexFilesOpened;
-
-  if (special_shared_library_) {
-    // Nothing to open if the context is a special shared library.
-    return true;
-  }
 
   // Note that we try to open all dex files even if some fail.
   // We may get resource-only apks which we cannot load.
@@ -617,9 +600,6 @@ std::string ClassLoaderContext::EncodeContext(const std::string& base_dir,
                                               bool for_dex2oat,
                                               ClassLoaderContext* stored_context) const {
   CheckDexFilesOpened("EncodeContextForOatFile");
-  if (special_shared_library_) {
-    return OatFile::kSpecialSharedLibrary;
-  }
 
   if (stored_context != nullptr) {
     DCHECK_EQ(GetParentChainSize(), stored_context->GetParentChainSize());
@@ -860,12 +840,7 @@ jobject ClassLoaderContext::CreateClassLoader(
   Thread* self = Thread::Current();
   ScopedObjectAccess soa(self);
 
-  ClassLinker* const class_linker = Runtime::Current()->GetClassLinker();
-
-  if (class_loader_chain_ == nullptr) {
-    CHECK(special_shared_library_);
-    return class_linker->CreatePathClassLoader(self, compilation_sources);
-  }
+  CHECK(class_loader_chain_ != nullptr);
 
   // Create a map of canonicalized shared libraries. As we're holding objects,
   // we're creating a variable size handle scope to put handles in the map.
@@ -1243,22 +1218,6 @@ ClassLoaderContext::VerificationResult ClassLoaderContext::VerifyClassLoaderCont
     return VerificationResult::kMismatch;
   }
 
-  // Special shared library contexts always match. They essentially instruct the runtime
-  // to ignore the class path check because the oat file is known to be loaded in different
-  // contexts. OatFileManager will further verify if the oat file can be loaded based on the
-  // collision check.
-  if (expected_context.special_shared_library_) {
-    // Special case where we are the only entry in the class path.
-    if (class_loader_chain_ != nullptr &&
-        class_loader_chain_->parent == nullptr &&
-        class_loader_chain_->classpath.size() == 0) {
-      return VerificationResult::kVerifies;
-    }
-    return VerificationResult::kForcedToSkipChecks;
-  } else if (special_shared_library_) {
-    return VerificationResult::kForcedToSkipChecks;
-  }
-
   ClassLoaderInfo* info = class_loader_chain_.get();
   ClassLoaderInfo* expected = expected_context.class_loader_chain_.get();
   CHECK(info != nullptr);
@@ -1410,11 +1369,10 @@ std::set<const DexFile*> ClassLoaderContext::CheckForDuplicateDexFiles(
 
   std::set<const DexFile*> result;
 
-  // If we are the special shared library or the chain is null there's nothing
-  // we can check, return an empty list;
+  // If the chain is null there's nothing we can check, return an empty list.
   // The class loader chain can be null if there were issues when creating the
   // class loader context (e.g. tests).
-  if (special_shared_library_ || class_loader_chain_ == nullptr) {
+  if (class_loader_chain_ == nullptr) {
     return result;
   }
 
