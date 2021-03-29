@@ -21,6 +21,7 @@
 #include <vector>
 #include <sys/stat.h>
 
+#include "android-base/file.h"
 #include "android-base/stringprintf.h"
 #include "android-base/strings.h"
 
@@ -469,16 +470,6 @@ static std::vector<const DexFile::Header*> GetDexFileHeaders(const std::vector<M
   return headers;
 }
 
-static std::vector<const DexFile::Header*> GetDexFileHeaders(
-    const std::vector<const DexFile*>& dex_files) {
-  std::vector<const DexFile::Header*> headers;
-  headers.reserve(dex_files.size());
-  for (const DexFile* dex_file : dex_files) {
-    headers.push_back(&dex_file->GetHeader());
-  }
-  return headers;
-}
-
 std::vector<std::unique_ptr<const DexFile>> OatFileManager::OpenDexFilesFromOat(
     std::vector<MemMap>&& dex_mem_maps,
     jobject class_loader,
@@ -602,6 +593,12 @@ std::vector<std::unique_ptr<const DexFile>> OatFileManager::OpenDexFilesFromOat_
 // recently used one(s) (according to stat-reported atime).
 static bool UnlinkLeastRecentlyUsedVdexIfNeeded(const std::string& vdex_path_to_add,
                                                 std::string* error_msg) {
+  std::string basename = android::base::Basename(vdex_path_to_add);
+  if (!OatFileAssistant::IsAnonymousVdexBasename(basename)) {
+    // File is not for in memory dex files.
+    return true;
+  }
+
   if (OS::FileExists(vdex_path_to_add.c_str())) {
     // File already exists and will be overwritten.
     // This will not change the number of entries in the cache.
@@ -628,7 +625,7 @@ static bool UnlinkLeastRecentlyUsedVdexIfNeeded(const std::string& vdex_path_to_
     if (de->d_type != DT_REG) {
       continue;
     }
-    std::string basename = de->d_name;
+    basename = de->d_name;
     if (!OatFileAssistant::IsAnonymousVdexBasename(basename)) {
       continue;
     }
@@ -666,10 +663,8 @@ class BackgroundVerificationTask final : public Task {
  public:
   BackgroundVerificationTask(const std::vector<const DexFile*>& dex_files,
                              jobject class_loader,
-                             const char* class_loader_context,
                              const std::string& vdex_path)
       : dex_files_(dex_files),
-        class_loader_context_(class_loader_context),
         vdex_path_(vdex_path) {
     Thread* const self = Thread::Current();
     ScopedObjectAccess soa(self);
@@ -757,15 +752,13 @@ class BackgroundVerificationTask final : public Task {
  private:
   const std::vector<const DexFile*> dex_files_;
   jobject class_loader_;
-  const std::string class_loader_context_;
   const std::string vdex_path_;
 
   DISALLOW_COPY_AND_ASSIGN(BackgroundVerificationTask);
 };
 
 void OatFileManager::RunBackgroundVerification(const std::vector<const DexFile*>& dex_files,
-                                               jobject class_loader,
-                                               const char* class_loader_context) {
+                                               jobject class_loader) {
   Runtime* const runtime = Runtime::Current();
   Thread* const self = Thread::Current();
 
@@ -786,23 +779,40 @@ void OatFileManager::RunBackgroundVerification(const std::vector<const DexFile*>
     return;
   }
 
-  std::string dex_location;
-  std::string vdex_path;
-  if (OatFileAssistant::AnonymousDexVdexLocation(GetDexFileHeaders(dex_files),
-                                                 kRuntimeISA,
-                                                 &dex_location,
-                                                 &vdex_path)) {
-    if (verification_thread_pool_ == nullptr) {
-      verification_thread_pool_.reset(
-          new ThreadPool("Verification thread pool", /* num_threads= */ 1));
-      verification_thread_pool_->StartWorkers(self);
-    }
-    verification_thread_pool_->AddTask(self, new BackgroundVerificationTask(
-        dex_files,
-        class_loader,
-        class_loader_context,
-        vdex_path));
+  if (dex_files.size() < 1) {
+    // Nothing to verify.
+    return;
   }
+
+  std::string dex_location = dex_files[0]->GetLocation();
+  const std::string& data_dir = Runtime::Current()->GetProcessDataDirectory();
+  if (!android::base::StartsWith(dex_location, data_dir)) {
+    // For now, we only run background verification for secondary dex files.
+    // Running it for primary or split APKs could have some undesirable
+    // side-effects, like overloading the device on app startup.
+    return;
+  }
+
+  std::string error_msg;
+  std::string odex_filename;
+  if (!OatFileAssistant::DexLocationToOdexFilename(dex_location,
+                                                   kRuntimeISA,
+                                                   &odex_filename,
+                                                   &error_msg)) {
+    LOG(WARNING) << "Could not get odex filename for " << dex_location << ": " << error_msg;
+    return;
+  }
+
+  std::string vdex_filename = GetVdexFilename(odex_filename);
+  if (verification_thread_pool_ == nullptr) {
+    verification_thread_pool_.reset(
+        new ThreadPool("Verification thread pool", /* num_threads= */ 1));
+    verification_thread_pool_->StartWorkers(self);
+  }
+  verification_thread_pool_->AddTask(self, new BackgroundVerificationTask(
+      dex_files,
+      class_loader,
+      vdex_filename));
 }
 
 void OatFileManager::WaitForWorkersToBeCreated() {
