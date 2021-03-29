@@ -36,6 +36,7 @@
 #include "dex/descriptors_names.h"
 #include "dex/dex_file-inl.h"
 #include "dex/dex_file_loader.h"
+#include "gc/space/image_space.h"
 #include "handle_scope-inl.h"
 #include "jit/debugger_interface.h"
 #include "jni/jni_internal.h"
@@ -829,17 +830,42 @@ static jobjectArray DexFile_getDexFileOutputPaths(JNIEnv* env,
     return nullptr;
   }
 
-  OatFileAssistant oat_file_assistant(filename.c_str(),
-                                      target_instruction_set,
-                                      /* load_executable= */ false);
-
-  std::unique_ptr<OatFile> best_oat_file = oat_file_assistant.GetBestOatFile();
-  if (best_oat_file == nullptr) {
-    return nullptr;
+  std::string oat_filename;
+  std::string vdex_filename;
+  // Check if the file is in the boot classpath by looking at image spaces which
+  // have oat files.
+  for (gc::space::ImageSpace* space : Runtime::Current()->GetHeap()->GetBootImageSpaces()) {
+    const OatFile* oat_file = space->GetOatFile();
+    if (oat_file != nullptr) {
+      const std::vector<const OatDexFile*>& oat_dex_files = oat_file->GetOatDexFiles();
+      for (const OatDexFile* oat_dex_file : oat_dex_files) {
+        if (DexFileLoader::GetBaseLocation(oat_dex_file->GetDexFileLocation()) ==
+                filename.c_str()) {
+          oat_filename = GetSystemImageFilename(oat_file->GetLocation().c_str(),
+                                                target_instruction_set);
+          break;
+        }
+      }
+      if (!oat_filename.empty()) {
+        break;
+      }
+    }
   }
 
-  std::string oat_filename = best_oat_file->GetLocation();
-  std::string vdex_filename = GetVdexFilename(best_oat_file->GetLocation());
+  // If did not find a boot classpath oat file, lookup the oat file for an app.
+  if (oat_filename.empty()) {
+    OatFileAssistant oat_file_assistant(filename.c_str(),
+                                        target_instruction_set,
+                                        /* load_executable= */ false);
+
+    std::unique_ptr<OatFile> best_oat_file = oat_file_assistant.GetBestOatFile();
+    if (best_oat_file == nullptr) {
+      return nullptr;
+    }
+
+    oat_filename = best_oat_file->GetLocation();
+  }
+  vdex_filename = GetVdexFilename(oat_filename);
 
   ScopedLocalRef<jstring> jvdexFilename(env, env->NewStringUTF(vdex_filename.c_str()));
   if (jvdexFilename.get() == nullptr) {
