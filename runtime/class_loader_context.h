@@ -39,7 +39,6 @@ class ClassLoaderContext {
  public:
   enum class VerificationResult {
     kVerifies,
-    kForcedToSkipChecks,
     kMismatch,
   };
 
@@ -364,13 +363,6 @@ class ClassLoaderContext {
 
   // The class loader chain.
   std::unique_ptr<ClassLoaderInfo> class_loader_chain_;
-
-  // Whether or not the class loader context should be ignored at runtime when loading the oat
-  // files. When true, dex2oat will use OatFile::kSpecialSharedLibrary as the classpath key in
-  // the oat file.
-  // TODO(calin): Can we get rid of this and cover all relevant use cases?
-  // (e.g. packages using prebuild system packages as shared libraries b/36480683)
-  bool special_shared_library_;
 
   // The opening state of the dex files.
   ContextDexFilesState dex_files_state_;
