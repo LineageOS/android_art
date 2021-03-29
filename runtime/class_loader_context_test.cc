@@ -208,7 +208,6 @@ class ClassLoaderContextTest : public CommonRuntimeTest {
     ASSERT_TRUE(context != nullptr);
     ASSERT_EQ(context->dex_files_state_, ClassLoaderContext::ContextDexFilesState::kDexFilesOpened);
     ASSERT_FALSE(context->owns_the_dex_files_);
-    ASSERT_FALSE(context->special_shared_library_);
   }
 
   void VerifyClassLoaderDexFiles(ScopedObjectAccess& soa,
@@ -390,10 +389,10 @@ TEST_F(ClassLoaderContextTest, ParseValidEmptyContext) {
   VerifyClassLoaderPCL(context.get(), 0, "");
 }
 
-TEST_F(ClassLoaderContextTest, ParseValidSharedLibraryContext) {
+TEST_F(ClassLoaderContextTest, ParseInvalidSharedLibraryContext) {
+  // '&' used to be a special context.
   std::unique_ptr<ClassLoaderContext> context = ClassLoaderContext::Create("&");
-  // An shared library context should have no class loader in the chain.
-  VerifyContextSize(context.get(), 0);
+  ASSERT_TRUE(context == nullptr);
 }
 
 TEST_F(ClassLoaderContextTest, ParseValidContextPCL) {
@@ -484,12 +483,6 @@ TEST_F(ClassLoaderContextTest, ParseValidEmptyContextSharedLibrary) {
       ClassLoaderContext::Create("DLC[]{}");
   VerifyContextSize(context.get(), 1);
   VerifySharedLibrariesSize(context.get(), 0, 0);
-}
-
-TEST_F(ClassLoaderContextTest, ParseValidContextSpecialSymbol) {
-  std::unique_ptr<ClassLoaderContext> context =
-    ClassLoaderContext::Create(OatFile::kSpecialSharedLibrary);
-  VerifyContextSize(context.get(), 0);
 }
 
 TEST_F(ClassLoaderContextTest, ParseInvalidValidContexts) {
@@ -673,34 +666,6 @@ TEST_F(ClassLoaderContextTest, CreateClassLoaderWithEmptyContext) {
                             compilation_sources_raw);
   ASSERT_TRUE(class_loader->GetParent()->GetClass() ==
       soa.Decode<mirror::Class>(WellKnownClasses::java_lang_BootClassLoader));
-}
-
-TEST_F(ClassLoaderContextTest, CreateClassLoaderWithSharedLibraryContext) {
-  std::unique_ptr<ClassLoaderContext> context = ClassLoaderContext::Create("&");
-
-  ASSERT_TRUE(context->OpenDexFiles());
-
-  std::vector<std::unique_ptr<const DexFile>> compilation_sources = OpenTestDexFiles("MultiDex");
-
-  std::vector<const DexFile*> compilation_sources_raw =
-      MakeNonOwningPointerVector(compilation_sources);
-  jobject jclass_loader = context->CreateClassLoader(compilation_sources_raw);
-  ASSERT_TRUE(jclass_loader != nullptr);
-
-  ScopedObjectAccess soa(Thread::Current());
-
-  StackHandleScope<1> hs(soa.Self());
-  Handle<mirror::ClassLoader> class_loader = hs.NewHandle(
-      soa.Decode<mirror::ClassLoader>(jclass_loader));
-
-  // A shared library context should create a single PathClassLoader with only the compilation
-  // sources.
-  VerifyClassLoaderDexFiles(soa,
-      class_loader,
-      WellKnownClasses::dalvik_system_PathClassLoader,
-      compilation_sources_raw);
-  ASSERT_TRUE(class_loader->GetParent()->GetClass() ==
-  soa.Decode<mirror::Class>(WellKnownClasses::java_lang_BootClassLoader));
 }
 
 TEST_F(ClassLoaderContextTest, CreateClassLoaderWithComplexChain) {
@@ -1470,16 +1435,6 @@ TEST_F(ClassLoaderContextTest, CreateContextForClassLoaderIMC) {
   VerifyClassLoaderPCLFromTestDex(context.get(), 3, "ForClassLoaderA");
 }
 
-TEST_F(ClassLoaderContextTest, VerifyClassLoaderContextFirstElement) {
-  std::string context_spec = "PCL[]";
-  std::unique_ptr<ClassLoaderContext> context = ParseContextWithChecksums(context_spec);
-  ASSERT_TRUE(context != nullptr);
-  PretendContextOpenedDexFilesForChecksums(context.get());
-  // Ensure that the special shared library marks as verified for the first thing in the class path.
-  ASSERT_EQ(context->VerifyClassLoaderContextMatch(OatFile::kSpecialSharedLibrary),
-            ClassLoaderContext::VerificationResult::kVerifies);
-}
-
 TEST_F(ClassLoaderContextTest, VerifyClassLoaderContextMatch) {
   std::string context_spec = "PCL[a.dex*123:b.dex*456];DLC[c.dex*890]";
   std::unique_ptr<ClassLoaderContext> context = ParseContextWithChecksums(context_spec);
@@ -1537,17 +1492,6 @@ TEST_F(ClassLoaderContextTest, VerifyClassLoaderContextWithIMCMatch) {
 
   ASSERT_EQ(context->VerifyClassLoaderContextMatch(context_spec),
             ClassLoaderContext::VerificationResult::kVerifies);
-}
-
-TEST_F(ClassLoaderContextTest, VerifyClassLoaderContextMatchSpecial) {
-  std::string context_spec = "&";
-  std::unique_ptr<ClassLoaderContext> context = ParseContextWithChecksums(context_spec);
-  // Pretend that we successfully open the dex files to pass the DCHECKS.
-  // (as it's much easier to test all the corner cases without relying on actual dex files).
-  PretendContextOpenedDexFiles(context.get());
-
-  ASSERT_EQ(context->VerifyClassLoaderContextMatch(context_spec),
-            ClassLoaderContext::VerificationResult::kForcedToSkipChecks);
 }
 
 TEST_F(ClassLoaderContextTest, VerifyClassLoaderContextMatchWithSL) {
