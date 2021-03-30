@@ -93,8 +93,7 @@ class UnstartedRuntime {
                                           ShadowFrame* shadow_frame,
                                           JValue* result,
                                           size_t arg_offset,
-                                          bool long_form,
-                                          const char* caller) REQUIRES_SHARED(Locks::mutator_lock_);
+                                          bool long_form) REQUIRES_SHARED(Locks::mutator_lock_);
 
   static void InitializeInvokeHandlers(Thread* self) REQUIRES_SHARED(Locks::mutator_lock_);
   static void InitializeJNIHandlers(Thread* self) REQUIRES_SHARED(Locks::mutator_lock_);
