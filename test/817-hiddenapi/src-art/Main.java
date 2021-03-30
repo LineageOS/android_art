@@ -17,6 +17,8 @@
 import dalvik.system.PathClassLoader;
 import java.io.File;
 import java.lang.reflect.Method;
+import java.nio.file.Files;
+import java.util.Arrays;
 
 public class Main {
 
@@ -35,6 +37,43 @@ public class Main {
     Class<?> cls = Class.forName("TestCase", true, childLoader);
     Method m = cls.getDeclaredMethod("test");
     m.invoke(null);
+
+    // Create a new native library which 'childLoader' can load.
+    String absoluteLibraryPath = getNativeLibFileName(args[0]);
+
+    // Do the test for JNI code.
+    m = cls.getDeclaredMethod("testNative", String.class);
+    m.invoke(null, createNativeLibCopy(absoluteLibraryPath));
+  }
+
+  // Tries to find the absolute path of the native library whose basename is 'arg'.
+  private static String getNativeLibFileName(String arg) throws Exception {
+    String libName = System.mapLibraryName(arg);
+    Method libPathsMethod = Runtime.class.getDeclaredMethod("getLibPaths");
+    libPathsMethod.setAccessible(true);
+    String[] libPaths = (String[]) libPathsMethod.invoke(Runtime.getRuntime());
+    String nativeLibFileName = null;
+    for (String p : libPaths) {
+      String candidate = p + libName;
+      if (new File(candidate).exists()) {
+        nativeLibFileName = candidate;
+        break;
+      }
+    }
+    if (nativeLibFileName == null) {
+      throw new IllegalStateException("Didn't find " + libName + " in " +
+          Arrays.toString(libPaths));
+    }
+    return nativeLibFileName;
+  }
+
+  // Copy native library to a new file with a unique name so it does not
+  // conflict with other loaded instance of the same binary file.
+  private static String createNativeLibCopy(String nativeLibFileName) throws Exception {
+    String tempFileName = System.mapLibraryName("hiddenapitest");
+    File tempFile = new File(System.getenv("DEX_LOCATION"), tempFileName);
+    Files.copy(new File(nativeLibFileName).toPath(), tempFile.toPath());
+    return tempFile.getAbsolutePath();
   }
 
   private static final String DEX_PARENT_BOOT =
