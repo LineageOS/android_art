@@ -308,6 +308,15 @@ apex_defaults {
     },
 }
 
+apex_test {
+    name: "test_com.android.art",
+    defaults: ["com.android.art-devel-defaults"],
+    manifest: "test_apex_manifest.json",
+    file_contexts: ":com.android.art.debug-file_contexts",
+    certificate: ":com.android.art.certificate",
+    installable: false,
+}
+
 // Release version of the ART APEX module (not containing debug
 // variants nor tools), included in user builds. Also used for
 // storage-constrained devices in userdebug and eng builds.
