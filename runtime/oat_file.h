@@ -94,9 +94,6 @@ class PACKED(4) OatMethodOffsets {
 
 class OatFile {
  public:
-  // Special classpath that skips shared library check.
-  static constexpr const char* kSpecialSharedLibrary = "&";
-
   // Open an oat file. Returns null on failure.
   // The `dex_filenames` argument, if provided, overrides the dex locations
   // from oat file when opening the dex files if they are not embedded in the

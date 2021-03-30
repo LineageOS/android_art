@@ -179,7 +179,6 @@ std::vector<const OatFile*> OatFileManager::RegisterImageOatFiles(
 static bool ClassLoaderContextMatches(
     const OatFile* oat_file,
     const ClassLoaderContext* context,
-    bool* is_special_shared_library,
     /*out*/ std::string* error_msg) {
   DCHECK(oat_file != nullptr);
   DCHECK(error_msg != nullptr);
@@ -203,14 +202,9 @@ static bool ClassLoaderContextMatches(
       /*verify_names=*/ true,
       /*verify_checksums=*/ true);
   switch (result) {
-    case ClassLoaderContext::VerificationResult::kForcedToSkipChecks:
-      *is_special_shared_library = true;
-      return true;
     case ClassLoaderContext::VerificationResult::kMismatch:
-      *is_special_shared_library = false;
       return false;
     case ClassLoaderContext::VerificationResult::kVerifies:
-      *is_special_shared_library = false;
       return true;
   }
   LOG(FATAL) << "Unreachable";
@@ -287,14 +281,12 @@ std::vector<std::unique_ptr<const DexFile>> OatFileManager::OpenDexFilesFromOat(
 
     const OatFile* source_oat_file = nullptr;
     std::string error_msg;
-    bool is_special_shared_library = false;
     bool class_loader_context_matches = false;
     bool check_context = oat_file != nullptr && context != nullptr;
     if (check_context) {
         class_loader_context_matches =
             ClassLoaderContextMatches(oat_file.get(),
                                       context.get(),
-                                      /*out*/ &is_special_shared_library,
                                       /*out*/ &error_msg);
     }
     ScopedTrace context_results(StringPrintf(
@@ -311,7 +303,7 @@ std::vector<std::unique_ptr<const DexFile>> OatFileManager::OpenDexFilesFromOat(
         // We need to throw away the image space if we are debuggable but the oat-file source of the
         // image is not otherwise we might get classes with inlined methods or other such things.
         std::unique_ptr<gc::space::ImageSpace> image_space;
-        if (!is_special_shared_library && ShouldLoadAppImage(oat_file.get())) {
+        if (ShouldLoadAppImage(oat_file.get())) {
           image_space = oat_file_assistant.OpenImageSpace(oat_file.get());
         }
         if (image_space != nullptr) {

@@ -941,12 +941,6 @@ TEST_F(Dex2oatClassLoaderContextTest, EmptyContext) {
   RunTest("PCL[]", kEmptyClassPathKey, /*expected_success*/ true);
 }
 
-TEST_F(Dex2oatClassLoaderContextTest, SpecialContext) {
-  RunTest(OatFile::kSpecialSharedLibrary,
-          OatFile::kSpecialSharedLibrary,
-          /*expected_success*/ true);
-}
-
 TEST_F(Dex2oatClassLoaderContextTest, ContextWithTheSourceDexFiles) {
   std::string context = "PCL[" + GetUsedDexLocation() + "]";
   RunTest(context.c_str(), kEmptyClassPathKey, /*expected_success*/ true);
