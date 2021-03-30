@@ -38,39 +38,12 @@
 
 namespace art {
 
-struct InstructionDumper {
- public:
-  HInstruction* ins_;
-};
-
-bool operator==(const InstructionDumper& a, const InstructionDumper& b) {
-  return a.ins_ == b.ins_;
-}
-bool operator!=(const InstructionDumper& a, const InstructionDumper& b) {
-  return !(a == b);
-}
-
-std::ostream& operator<<(std::ostream& os, const InstructionDumper& id) {
-  if (id.ins_ == nullptr) {
-    return os << "NULL";
-  } else {
-    return os << "(" << id.ins_ << "): " << id.ins_->DumpWithArgs();
-  }
-}
-
 #define CHECK_SUBROUTINE_FAILURE() \
   do {                             \
     if (HasFatalFailure()) {       \
       return;                      \
     }                              \
   } while (false)
-
-#define EXPECT_INS_EQ(a, b) EXPECT_EQ(InstructionDumper{a}, InstructionDumper{b})
-#define EXPECT_INS_REMOVED(a) EXPECT_TRUE(IsRemoved(a)) << "Not removed: " << (InstructionDumper{a})
-#define EXPECT_INS_RETAINED(a) EXPECT_FALSE(IsRemoved(a)) << "Removed: " << (InstructionDumper{a})
-#define ASSERT_INS_EQ(a, b) ASSERT_EQ(InstructionDumper{a}, InstructionDumper{b})
-#define ASSERT_INS_REMOVED(a) ASSERT_TRUE(IsRemoved(a)) << "Not removed: " << (InstructionDumper{a})
-#define ASSERT_INS_RETAINED(a) ASSERT_FALSE(IsRemoved(a)) << "Removed: " << (InstructionDumper{a})
 
 template <typename SuperTest>
 class LoadStoreEliminationTestBase : public SuperTest, public OptimizingUnitTestHelper {
@@ -83,12 +56,6 @@ class LoadStoreEliminationTestBase : public SuperTest, public OptimizingUnitTest
   void TearDown() override {
     SuperTest::TearDown();
     gLogVerbosity.compiler = false;
-  }
-
-  AdjacencyListGraph SetupFromAdjacencyList(const std::string_view entry_name,
-                                            const std::string_view exit_name,
-                                            const std::vector<AdjacencyListGraph::Edge>& adj) {
-    return AdjacencyListGraph(graph_, GetAllocator(), entry_name, exit_name, adj);
   }
 
   void PerformLSE(bool with_partial = true) {
@@ -300,134 +267,6 @@ class LoadStoreEliminationTestBase : public SuperTest, public OptimizingUnitTest
     j_ = parameters_.back();
   }
 
-  void ManuallyBuildEnvFor(HInstruction* ins, const std::initializer_list<HInstruction*>& env) {
-    ArenaVector<HInstruction*> current_locals(env, GetAllocator()->Adapter(kArenaAllocInstruction));
-    OptimizingUnitTestHelper::ManuallyBuildEnvFor(ins, &current_locals);
-  }
-
-  HLoadClass* MakeClassLoad(std::optional<dex::TypeIndex> ti = std::nullopt) {
-    return new (GetAllocator()) HLoadClass(graph_->GetCurrentMethod(),
-                                           ti ? *ti : dex::TypeIndex(class_idx_++),
-                                           graph_->GetDexFile(),
-                                           /* klass= */ null_klass_,
-                                           /* is_referrers_class= */ false,
-                                           /* dex_pc= */ 0,
-                                           /* needs_access_check= */ false);
-  }
-
-  HNewInstance* MakeNewInstance(HInstruction* cls, uint32_t dex_pc = 0u) {
-    EXPECT_TRUE(cls->IsLoadClass() || cls->IsClinitCheck()) << *cls;
-    HLoadClass* load =
-        cls->IsLoadClass() ? cls->AsLoadClass() : cls->AsClinitCheck()->GetLoadClass();
-    return new (GetAllocator()) HNewInstance(cls,
-                                             dex_pc,
-                                             load->GetTypeIndex(),
-                                             graph_->GetDexFile(),
-                                             /* finalizable= */ false,
-                                             QuickEntrypointEnum::kQuickAllocObjectInitialized);
-  }
-
-  HInstanceFieldSet* MakeIFieldSet(HInstruction* inst,
-                                   HInstruction* data,
-                                   MemberOffset off,
-                                   uint32_t dex_pc = 0u) {
-    return new (GetAllocator()) HInstanceFieldSet(inst,
-                                                  data,
-                                                  /* field= */ nullptr,
-                                                  /* field_type= */ data->GetType(),
-                                                  /* field_offset= */ off,
-                                                  /* is_volatile= */ false,
-                                                  /* field_idx= */ 0,
-                                                  /* declaring_class_def_index= */ 0,
-                                                  graph_->GetDexFile(),
-                                                  dex_pc);
-  }
-
-  HInstanceFieldGet* MakeIFieldGet(HInstruction* inst,
-                                   DataType::Type type,
-                                   MemberOffset off,
-                                   uint32_t dex_pc = 0u) {
-    return new (GetAllocator()) HInstanceFieldGet(inst,
-                                                  /* field= */ nullptr,
-                                                  /* field_type= */ type,
-                                                  /* field_offset= */ off,
-                                                  /* is_volatile= */ false,
-                                                  /* field_idx= */ 0,
-                                                  /* declaring_class_def_index= */ 0,
-                                                  graph_->GetDexFile(),
-                                                  dex_pc);
-  }
-
-  HInvokeStaticOrDirect* MakeInvoke(DataType::Type return_type,
-                                    const std::vector<HInstruction*>& args) {
-    MethodReference method_reference{/* file= */ &graph_->GetDexFile(), /* index= */ method_idx_++};
-    HInvokeStaticOrDirect* res = new (GetAllocator())
-        HInvokeStaticOrDirect(GetAllocator(),
-                              args.size(),
-                              return_type,
-                              /* dex_pc= */ 0,
-                              method_reference,
-                              /* resolved_method= */ nullptr,
-                              HInvokeStaticOrDirect::DispatchInfo{},
-                              InvokeType::kStatic,
-                              /* resolved_method_reference= */ method_reference,
-                              HInvokeStaticOrDirect::ClinitCheckRequirement::kNone);
-    for (auto [ins, idx] : ZipCount(MakeIterationRange(args))) {
-      res->SetRawInputAt(idx, ins);
-    }
-    return res;
-  }
-
-  HPhi* MakePhi(const std::vector<HInstruction*>& ins) {
-    EXPECT_GE(ins.size(), 2u) << "Phi requires at least 2 inputs";
-    HPhi* phi =
-        new (GetAllocator()) HPhi(GetAllocator(), kNoRegNumber, ins.size(), ins[0]->GetType());
-    for (auto [i, idx] : ZipCount(MakeIterationRange(ins))) {
-      phi->SetRawInputAt(idx, i);
-    }
-    return phi;
-  }
-
-  void SetupExit(HBasicBlock* exit) {
-    exit->AddInstruction(new (GetAllocator()) HExit());
-  }
-
-  dex::TypeIndex DefaultTypeIndexForType(DataType::Type type) {
-    switch (type) {
-      case DataType::Type::kBool:
-        return dex::TypeIndex(1);
-      case DataType::Type::kUint8:
-      case DataType::Type::kInt8:
-        return dex::TypeIndex(2);
-      case DataType::Type::kUint16:
-      case DataType::Type::kInt16:
-        return dex::TypeIndex(3);
-      case DataType::Type::kUint32:
-      case DataType::Type::kInt32:
-        return dex::TypeIndex(4);
-      case DataType::Type::kUint64:
-      case DataType::Type::kInt64:
-        return dex::TypeIndex(5);
-      case DataType::Type::kReference:
-        return dex::TypeIndex(6);
-      case DataType::Type::kFloat32:
-        return dex::TypeIndex(7);
-      case DataType::Type::kFloat64:
-        return dex::TypeIndex(8);
-      case DataType::Type::kVoid:
-        EXPECT_TRUE(false) << "No type for void!";
-        return dex::TypeIndex(1000);
-    }
-  }
-
-  // Creates a parameter. The instruction is automatically added to the entry-block
-  HParameterValue* MakeParam(DataType::Type type, std::optional<dex::TypeIndex> ti = std::nullopt) {
-    HParameterValue* val = new (GetAllocator()) HParameterValue(
-        graph_->GetDexFile(), ti ? *ti : DefaultTypeIndexForType(type), param_count_++, type);
-    graph_->GetEntryBlock()->AddInstruction(val);
-    return val;
-  }
-
   HBasicBlock* pre_header_;
   HBasicBlock* loop_;
 
@@ -439,12 +278,6 @@ class LoadStoreEliminationTestBase : public SuperTest, public OptimizingUnitTest
   HInstruction* suspend_check_;
 
   HPhi* phi_;
-
-  size_t param_count_ = 0;
-  size_t class_idx_ = 42;
-  uint32_t method_idx_ = 100;
-
-  ScopedNullHandle<mirror::Class> null_klass_;
 };
 
 class LoadStoreEliminationTest : public LoadStoreEliminationTestBase<CommonCompilerTest> {};
@@ -2312,156 +2145,6 @@ TEST_F(LoadStoreEliminationTest, PartialLoadElimination2) {
   EXPECT_INS_REMOVED(write_right);
   EXPECT_INS_RETAINED(write_left);
   EXPECT_INS_RETAINED(call_left);
-}
-
-class PatternMatchGraphVisitor : public HGraphVisitor {
- private:
-  struct HandlerWrapper {
-   public:
-    virtual ~HandlerWrapper() {}
-    virtual void operator()(HInstruction* h) = 0;
-  };
-
-  template <HInstruction::InstructionKind kKind, typename F>
-  struct KindWrapper;
-
-#define GEN_HANDLER(nm, unused)                                                         \
-  template <typename F>                                                                 \
-  struct KindWrapper<HInstruction::InstructionKind::k##nm, F> : public HandlerWrapper { \
-   public:                                                                              \
-    explicit KindWrapper(F f) : f_(f) {}                                                \
-    void operator()(HInstruction* h) override {                                         \
-      if constexpr (std::is_invocable_v<F, H##nm*>) {                                   \
-        f_(h->As##nm());                                                                \
-      } else {                                                                          \
-        LOG(FATAL) << "Incorrect call with " << #nm;                                    \
-      }                                                                                 \
-    }                                                                                   \
-                                                                                        \
-   private:                                                                             \
-    F f_;                                                                               \
-  };
-
-  FOR_EACH_CONCRETE_INSTRUCTION(GEN_HANDLER)
-#undef GEN_HANDLER
-
-  template <typename F>
-  std::unique_ptr<HandlerWrapper> GetWrapper(HInstruction::InstructionKind kind, F f) {
-    switch (kind) {
-#define GEN_GETTER(nm, unused)               \
-  case HInstruction::InstructionKind::k##nm: \
-    return std::unique_ptr<HandlerWrapper>(  \
-        new KindWrapper<HInstruction::InstructionKind::k##nm, F>(f));
-      FOR_EACH_CONCRETE_INSTRUCTION(GEN_GETTER)
-#undef GEN_GETTER
-      default:
-        LOG(FATAL) << "Unable to handle kind " << kind;
-        return nullptr;
-    }
-  }
-
- public:
-  template <typename... Inst>
-  explicit PatternMatchGraphVisitor(HGraph* graph, Inst... handlers) : HGraphVisitor(graph) {
-    FillHandlers(handlers...);
-  }
-
-  void VisitInstruction(HInstruction* instruction) override {
-    auto& h = handlers_[instruction->GetKind()];
-    if (h.get() != nullptr) {
-      (*h)(instruction);
-    }
-  }
-
- private:
-  template <typename Func>
-  constexpr HInstruction::InstructionKind GetKind() {
-#define CHECK_INST(nm, unused)                       \
-    if constexpr (std::is_invocable_v<Func, H##nm*>) { \
-      return HInstruction::InstructionKind::k##nm;     \
-    }
-    FOR_EACH_CONCRETE_INSTRUCTION(CHECK_INST);
-#undef CHECK_INST
-    static_assert(!std::is_invocable_v<Func, HInstruction*>,
-                  "Use on generic HInstruction not allowed");
-#define STATIC_ASSERT_ABSTRACT(nm, unused) && !std::is_invocable_v<Func, H##nm*>
-    static_assert(true FOR_EACH_ABSTRACT_INSTRUCTION(STATIC_ASSERT_ABSTRACT),
-                  "Must not be abstract instruction");
-#undef STATIC_ASSERT_ABSTRACT
-#define STATIC_ASSERT_CONCRETE(nm, unused) || std::is_invocable_v<Func, H##nm*>
-    static_assert(false FOR_EACH_CONCRETE_INSTRUCTION(STATIC_ASSERT_CONCRETE),
-                  "Must be a concrete instruction");
-#undef STATIC_ASSERT_CONCRETE
-    return HInstruction::InstructionKind::kLastInstructionKind;
-  }
-  template <typename First>
-  void FillHandlers(First h1) {
-    HInstruction::InstructionKind type = GetKind<First>();
-    CHECK_NE(type, HInstruction::kLastInstructionKind)
-        << "Unknown instruction kind. Only concrete ones please.";
-    handlers_[type] = GetWrapper(type, h1);
-  }
-
-  template <typename First, typename... Inst>
-  void FillHandlers(First h1, Inst... handlers) {
-    FillHandlers(h1);
-    FillHandlers<Inst...>(handlers...);
-  }
-
-  std::array<std::unique_ptr<HandlerWrapper>, HInstruction::InstructionKind::kLastInstructionKind>
-      handlers_;
-};
-
-template <typename... Target>
-std::tuple<std::vector<Target*>...> FindAllInstructions(
-    HGraph* graph,
-    std::variant<std::nullopt_t, HBasicBlock*, std::initializer_list<HBasicBlock*>> blks =
-        std::nullopt) {
-  std::tuple<std::vector<Target*>...> res;
-  PatternMatchGraphVisitor vis(
-      graph, [&](Target* t) { std::get<std::vector<Target*>>(res).push_back(t); }...);
-
-  if (std::holds_alternative<std::initializer_list<HBasicBlock*>>(blks)) {
-    for (HBasicBlock* blk : std::get<std::initializer_list<HBasicBlock*>>(blks)) {
-      vis.VisitBasicBlock(blk);
-    }
-  } else if (std::holds_alternative<std::nullopt_t>(blks)) {
-    vis.VisitInsertionOrder();
-  } else {
-    vis.VisitBasicBlock(std::get<HBasicBlock*>(blks));
-  }
-  return res;
-}
-
-template <typename... Target>
-std::tuple<Target*...> FindSingleInstructions(
-    HGraph* graph,
-    std::variant<std::nullopt_t, HBasicBlock*, std::initializer_list<HBasicBlock*>> blks =
-        std::nullopt) {
-  std::tuple<Target*...> res;
-  PatternMatchGraphVisitor vis(graph, [&](Target* t) {
-    EXPECT_EQ(std::get<Target*>(res), nullptr)
-        << *std::get<Target*>(res) << " already found but found " << *t << "!";
-    std::get<Target*>(res) = t;
-  }...);
-  if (std::holds_alternative<std::initializer_list<HBasicBlock*>>(blks)) {
-    for (HBasicBlock* blk : std::get<std::initializer_list<HBasicBlock*>>(blks)) {
-      vis.VisitBasicBlock(blk);
-    }
-  } else if (std::holds_alternative<std::nullopt_t>(blks)) {
-    vis.VisitInsertionOrder();
-  } else {
-    vis.VisitBasicBlock(std::get<HBasicBlock*>(blks));
-  }
-  return res;
-}
-
-template <typename Target>
-Target* FindSingleInstruction(
-    HGraph* graph,
-    std::variant<std::nullopt_t, HBasicBlock*, std::initializer_list<HBasicBlock*>> blks =
-        std::nullopt) {
-  return std::get<Target*>(FindSingleInstructions<Target>(graph, blks));
 }
 
 template<typename Iter, typename Func>
