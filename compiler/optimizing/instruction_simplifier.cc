@@ -958,14 +958,38 @@ void InstructionSimplifierVisitor::VisitPredicatedInstanceFieldGet(
         single_value = default_val->InputAt(idx);
       } else if (single_value != default_val->InputAt(idx) &&
                 !single_value->Equals(default_val->InputAt(idx))) {
-        // Multiple values, can't combine.
+        // Multiple values are associated with potential nulls, can't combine.
         return;
       }
     }
   }
-  if (single_value->StrictlyDominates(pred_get)) {
+  if (single_value == nullptr) {
+    // None of the inputs can be null so we can just remove the predicatedness
+    // of this instruction.
+    DCHECK(std::none_of(inputs.cbegin(), inputs.cend(), [](const HInstruction* input) {
+      return input->CanBeNull();
+    }));
+    HInstruction* replace_with = new (GetGraph()->GetAllocator())
+        HInstanceFieldGet(pred_get->GetTarget(),
+                          pred_get->GetFieldInfo().GetField(),
+                          pred_get->GetFieldType(),
+                          pred_get->GetFieldOffset(),
+                          pred_get->IsVolatile(),
+                          pred_get->GetFieldInfo().GetFieldIndex(),
+                          pred_get->GetFieldInfo().GetDeclaringClassDefIndex(),
+                          pred_get->GetFieldInfo().GetDexFile(),
+                          pred_get->GetDexPc());
+    if (pred_get->GetType() == DataType::Type::kReference) {
+      replace_with->SetReferenceTypeInfo(pred_get->GetReferenceTypeInfo());
+    }
+    pred_get->GetBlock()->InsertInstructionBefore(replace_with, pred_get);
+    pred_get->ReplaceWith(replace_with);
+    pred_get->GetBlock()->RemoveInstruction(pred_get);
+    RecordSimplification();
+  } else if (single_value->StrictlyDominates(pred_get)) {
     // Combine all the maybe null values into one.
     pred_get->ReplaceInput(single_value, 0);
+    RecordSimplification();
   }
 }
 
