@@ -55,13 +55,37 @@ class InstructionHandler {
  public:
 #define HANDLER_ATTRIBUTES ALWAYS_INLINE FLATTEN WARN_UNUSED REQUIRES_SHARED(Locks::mutator_lock_)
 
+  HANDLER_ATTRIBUTES bool CheckTransactionAbort() {
+    if (transaction_active && Runtime::Current()->IsTransactionAborted()) {
+      // Transaction abort cannot be caught by catch handlers.
+      // Preserve the abort exception while doing non-standard return.
+      StackHandleScope<1u> hs(Self());
+      Handle<mirror::Throwable> abort_exception = hs.NewHandle(Self()->GetException());
+      DCHECK(abort_exception != nullptr);
+      DCHECK(abort_exception->GetClass()->DescriptorEquals(Transaction::kAbortExceptionDescriptor));
+      Self()->ClearException();
+      PerformNonStandardReturn<kMonitorState>(Self(),
+                                              shadow_frame_,
+                                              ctx_->result,
+                                              Instrumentation(),
+                                              Accessor().InsSize(),
+                                              inst_->GetDexPc(Insns()));
+      Self()->SetException(abort_exception.Get());
+      ExitInterpreterLoop();
+      return false;
+    }
+    return true;
+  }
+
   HANDLER_ATTRIBUTES bool CheckForceReturn() {
-    if (PerformNonStandardReturn<kMonitorState>(Self(),
-                                                shadow_frame_,
-                                                ctx_->result,
-                                                Instrumentation(),
-                                                Accessor().InsSize(),
-                                                inst_->GetDexPc(Insns()))) {
+    if (shadow_frame_.GetForcePopFrame()) {
+      DCHECK(Runtime::Current()->AreNonStandardExitsEnabled());
+      PerformNonStandardReturn<kMonitorState>(Self(),
+                                              shadow_frame_,
+                                              ctx_->result,
+                                              Instrumentation(),
+                                              Accessor().InsSize(),
+                                              inst_->GetDexPc(Insns()));
       ExitInterpreterLoop();
       return false;
     }
@@ -71,6 +95,9 @@ class InstructionHandler {
   HANDLER_ATTRIBUTES bool HandlePendingException() {
     DCHECK(Self()->IsExceptionPending());
     Self()->AllowThreadSuspension();
+    if (!CheckTransactionAbort()) {
+      return false;
+    }
     if (!CheckForceReturn()) {
       return false;
     }

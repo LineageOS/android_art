@@ -216,7 +216,7 @@ class UnstartedRuntimeTest : public CommonRuntimeTest {
   void PrepareForAborts() REQUIRES_SHARED(Locks::mutator_lock_) {
     ObjPtr<mirror::Object> result = Runtime::Current()->GetClassLinker()->FindClass(
         Thread::Current(),
-        Transaction::kAbortExceptionSignature,
+        Transaction::kAbortExceptionDescriptor,
         ScopedNullHandle<mirror::ClassLoader>());
     CHECK(result != nullptr);
   }
