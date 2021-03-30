@@ -18,11 +18,11 @@ import java.lang.reflect.Field;
 import java.util.Map;
 
 public class Main implements Runnable {
-    static final int numberOfThreads = 5;
-    static final int totalOperations = 1000;
+    static final int NUMBER_OF_THREADS = 5;
+    static final int TOTAL_OPERATIONS = 900;
 
     public static void main(String[] args) throws Exception {
-        final Thread[] threads = new Thread[numberOfThreads];
+        final Thread[] threads = new Thread[NUMBER_OF_THREADS];
         for (int t = 0; t < threads.length; t++) {
             threads[t] = new Thread(new Main());
             threads[t].start();
@@ -87,7 +87,7 @@ public class Main implements Runnable {
     }
 
     public void run() {
-        for (int i = 0; i < totalOperations; ++i) {
+        for (int i = 0; i < TOTAL_OPERATIONS; ++i) {
             test_getId();
         }
     }
