@@ -24,10 +24,12 @@
 #include <cstdint>
 #include <fstream>
 #include <iostream>
+#include <optional>
 #include <ostream>
 #include <set>
 #include <string>
 #include <string_view>
+#include <tuple>
 #include <unordered_set>
 #include <vector>
 
@@ -1121,6 +1123,8 @@ class ProfMan final {
           break;
         }
       }
+    } else {
+      LOG(WARNING) << "Could not find method " << method_idx;
     }
   }
 
@@ -1251,6 +1255,71 @@ class ProfMan final {
 
     friend std::ostream& operator<<(std::ostream& os, const InlineCacheSegment& ics);
   };
+
+  struct ClassMethodReference {
+    TypeReference type_;
+    uint32_t method_index_;
+
+    bool operator==(const ClassMethodReference& ref) {
+      return ref.type_ == type_ && ref.method_index_ == method_index_;
+    }
+    bool operator!=(const ClassMethodReference& ref) {
+      return !(*this == ref);
+    }
+  };
+
+  // Try to perform simple method resolution to produce a more useful profile.
+  // This will resolve to the nearest class+method-index which is within the
+  // same dexfile and in a declared supertype of the starting class. It will
+  // return nullopt if it cannot find an appropriate method or the nearest
+  // possibility is private.
+  // TODO: This should ideally support looking in other dex files. That's getting
+  // to the point of needing to have a whole class-linker so it's probably not
+  // worth it.
+  std::optional<ClassMethodReference> ResolveMethod(TypeReference class_ref,
+                                                    uint32_t method_index) {
+    const DexFile* dex = class_ref.dex_file;
+    const dex::ClassDef* def = dex->FindClassDef(class_ref.TypeIndex());
+    if (def == nullptr || method_index >= dex->NumMethodIds()) {
+      // Class not in dex-file.
+      return std::nullopt;
+    }
+    if (LIKELY(dex->GetCodeItemOffset(*def, method_index).has_value())) {
+      return ClassMethodReference{class_ref, method_index};
+    }
+    // What to look for.
+    const dex::MethodId& method_id = dex->GetMethodId(method_index);
+    // No going between different dexs so use name and proto directly
+    const dex::ProtoIndex& method_proto = method_id.proto_idx_;
+    const dex::StringIndex& method_name = method_id.name_idx_;
+    // Floyd's algo to prevent infinite loops.
+    // Slow-iterator position for Floyd's
+    dex::TypeIndex slow_class_type = def->class_idx_;
+    // Whether to take a step with the slow iterator.
+    bool update_slow = false;
+    for (dex::TypeIndex cur_candidate = def->superclass_idx_;
+         cur_candidate != dex::TypeIndex::Invalid() && cur_candidate != slow_class_type;) {
+      const dex::ClassDef* cur_class_def = dex->FindClassDef(cur_candidate);
+      if (cur_class_def == nullptr) {
+        // We left the dex file.
+        return std::nullopt;
+      }
+      const dex::MethodId* cur_id =
+          dex->FindMethodIdByIndex(cur_candidate, method_name, method_proto);
+      if (cur_id != nullptr) {
+        if (dex->GetCodeItemOffset(*cur_class_def, dex->GetIndexForMethodId(*cur_id)).has_value()) {
+          return ClassMethodReference{TypeReference(dex, cur_candidate),
+                                      dex->GetIndexForMethodId(*cur_id)};
+        }
+      }
+      // Floyd's algo step.
+      cur_candidate = cur_class_def->superclass_idx_;
+      slow_class_type =
+          update_slow ? dex->FindClassDef(slow_class_type)->superclass_idx_ : slow_class_type;
+      update_slow = !update_slow;
+    }
+    return std::nullopt;
+  }
 
   // Process a line defining a class or a method and its inline caches.
   // Upon success return true and add the class or the method info to profile.
@@ -1388,68 +1457,114 @@ class ProfMan final {
 
     const uint32_t method_index = FindMethodIndex(class_ref, method_spec);
     if (method_index == dex::kDexNoIndex) {
+      LOG(WARNING) << "Could not find method " << klass << "->" << method_spec;
       return false;
     }
 
-    std::vector<ProfileMethodInfo::ProfileInlineCache> inline_caches;
-    for (const InlineCacheSegment& segment : segments) {
-      std::vector<uint32_t> dex_pcs;
-      if (segment.IsSingleReceiver()) {
-        DCHECK_EQ(segments.size(), 1u);
-        dex_pcs.resize(1, -1);
-        // TODO This single invoke format should really be phased out and removed.
-        if (!HasSingleInvoke(class_ref, method_index, &dex_pcs[0])) {
-          return false;
-        }
-      } else {
-        // Get the type-ref the method code will use.
-        std::string receiver_str(segment.GetReceiverType());
-        const dex::TypeId* type_id = class_ref.dex_file->FindTypeId(receiver_str.c_str());
-        if (type_id == nullptr) {
-          LOG(WARNING) << "Could not find class: " << segment.GetReceiverType() << " in dex-file "
-                       << class_ref.dex_file << ". Ignoring IC group: '" << segment << "'";
-          continue;
-        }
-        dex::TypeIndex target_index = class_ref.dex_file->GetIndexForTypeId(*type_id);
+    std::optional<ClassMethodReference>
+        resolved_class_method_ref = ResolveMethod(class_ref, method_index);
 
-        GetAllInvokes(class_ref, method_index, target_index, &dex_pcs);
-      }
-      bool missing_types = segment.GetIcTargets()[0] == kMissingTypesMarker;
-      bool megamorphic_types = segment.GetIcTargets()[0] == kMegamorphicTypesMarker;
-      std::vector<TypeReference> classes(
-          missing_types || megamorphic_types ? 0u : segment.NumIcTargets(),
-          TypeReference(/* dex_file= */ nullptr, dex::TypeIndex()));
-      if (!missing_types && !megamorphic_types) {
-        size_t class_it = 0;
-        for (const std::string_view& ic_class : segment.GetIcTargets()) {
-          if (ic_class.empty()) {
-            break;
+    std::vector<ProfileMethodInfo::ProfileInlineCache> inline_caches;
+    // We can only create inline-caches when we actually have code we can
+    // examine. If we couldn't resolve the method don't bother trying to create
+    // inline-caches.
+    if (resolved_class_method_ref) {
+      for (const InlineCacheSegment &segment : segments) {
+        std::vector<uint32_t> dex_pcs;
+        if (segment.IsSingleReceiver()) {
+          DCHECK_EQ(segments.size(), 1u);
+          dex_pcs.resize(1, -1);
+          // TODO This single invoke format should really be phased out and
+          // removed.
+          if (!HasSingleInvoke(class_ref, method_index, &dex_pcs[0])) {
+            return false;
           }
-          if (!FindClass(dex_files, ic_class, &(classes[class_it++]))) {
-            LOG(segment.IsSingleReceiver() ? ERROR : WARNING)
-                << "Could not find class: " << ic_class << " in " << segment;
-            if (segment.IsSingleReceiver()) {
-              return false;
-            } else {
-              // Be a bit more forgiving with profiles from servers.
-              missing_types = true;
-              classes.clear();
+        } else {
+          // Get the type-ref the method code will use.
+          std::string receiver_str(segment.GetReceiverType());
+          const dex::TypeId *type_id =
+              class_ref.dex_file->FindTypeId(receiver_str.c_str());
+          if (type_id == nullptr) {
+            LOG(WARNING) << "Could not find class: "
+                         << segment.GetReceiverType() << " in dex-file "
+                         << class_ref.dex_file << ". Ignoring IC group: '"
+                         << segment << "'";
+            continue;
+          }
+          dex::TypeIndex target_index =
+              class_ref.dex_file->GetIndexForTypeId(*type_id);
+
+          GetAllInvokes(resolved_class_method_ref->type_,
+                        resolved_class_method_ref->method_index_,
+                        target_index,
+                        &dex_pcs);
+        }
+        bool missing_types = segment.GetIcTargets()[0] == kMissingTypesMarker;
+        bool megamorphic_types =
+            segment.GetIcTargets()[0] == kMegamorphicTypesMarker;
+        std::vector<TypeReference> classes(
+            missing_types || megamorphic_types ? 0u : segment.NumIcTargets(),
+            TypeReference(/* dex_file= */ nullptr, dex::TypeIndex()));
+        if (!missing_types && !megamorphic_types) {
+          size_t class_it = 0;
+          for (const std::string_view &ic_class : segment.GetIcTargets()) {
+            if (ic_class.empty()) {
               break;
             }
+            if (!FindClass(dex_files, ic_class, &(classes[class_it++]))) {
+              LOG(segment.IsSingleReceiver() ? ERROR : WARNING)
+                  << "Could not find class: " << ic_class << " in " << segment;
+              if (segment.IsSingleReceiver()) {
+                return false;
+              } else {
+                // Be a bit more forgiving with profiles from servers.
+                missing_types = true;
+                classes.clear();
+                break;
+              }
+            }
           }
+          // Make sure we are actually the correct size
+          classes.resize(class_it, TypeReference(nullptr, dex::TypeIndex()));
         }
-        // Make sure we are actually the correct size
-        classes.resize(class_it, TypeReference(nullptr, dex::TypeIndex()));
-      }
-      for (size_t dex_pc : dex_pcs) {
-        inline_caches.emplace_back(dex_pc, missing_types, classes, megamorphic_types);
+        for (size_t dex_pc : dex_pcs) {
+          inline_caches.emplace_back(dex_pc, missing_types, classes,
+                                     megamorphic_types);
+        }
       }
     }
     MethodReference ref(class_ref.dex_file, method_index);
     if (is_hot) {
-      profile->AddMethod(ProfileMethodInfo(ref, inline_caches),
-          static_cast<ProfileCompilationInfo::MethodHotness::Flag>(flags),
-          annotation);
+      ClassMethodReference orig_cmr { class_ref, method_index };
+      if (!inline_caches.empty() &&
+          resolved_class_method_ref &&
+          orig_cmr != *resolved_class_method_ref) {
+        // We have inline-caches on a method that doesn't actually exist. We
+        // want to put the inline caches on the resolved version of the method
+        // (if we could find one) and just mark the actual method as present.
+        const DexFile *dex = resolved_class_method_ref->type_.dex_file;
+        LOG(VERBOSE) << "Adding "
+                     << dex->PrettyMethod(
+                            resolved_class_method_ref->method_index_)
+                     << " as alias for " << dex->PrettyMethod(method_index);
+        // The inline-cache refers to a supertype of the actual profile line.
+        // Include this supertype method in the profile as well.
+        MethodReference resolved_ref(class_ref.dex_file,
+                                     resolved_class_method_ref->method_index_);
+        profile->AddMethod(
+            ProfileMethodInfo(resolved_ref, inline_caches),
+            static_cast<ProfileCompilationInfo::MethodHotness::Flag>(flags),
+            annotation);
+        profile->AddMethod(
+            ProfileMethodInfo(ref),
+            static_cast<ProfileCompilationInfo::MethodHotness::Flag>(flags),
+            annotation);
+      } else {
+        profile->AddMethod(
+            ProfileMethodInfo(ref, inline_caches),
+            static_cast<ProfileCompilationInfo::MethodHotness::Flag>(flags),
+            annotation);
+      }
     }
     if (flags != 0) {
       if (!profile->AddMethod(ProfileMethodInfo(ref),
