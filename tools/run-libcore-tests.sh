@@ -269,7 +269,7 @@ if [ $execution_mode = "device" ]; then
     if $debug; then
       default_timeout_secs=1440
     else
-      default_timeout_secs=900
+      default_timeout_secs=1200
     fi
   elif $heap_poisoning && $debug; then
     # Increase the timeout for heap poisoning and debug combo
