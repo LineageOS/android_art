@@ -37,25 +37,66 @@ cc_defaults {
         android: {
             // Use the 32-bit version of profman on devices.
             compile_multilib: "prefer32",
+            shared_libs: [
+                "libbase",
+            ],
+        },
+        host: {
+            whole_static_libs: [
+                "libbase",
+            ],
         },
         darwin: {
             enabled: true,
         },
     },
+}
 
-    shared_libs: [
-        "libbase",
+// Collect all the static defaults and build a host-only static library, which
+// is then used for the (mostly) static host profman binary.
+art_cc_library_static {
+    name: "libprofman_static",
+    device_supported: false,
+    host_supported: true,
+    defaults: [
+        "art_defaults",
+        "libartbase_static_defaults",
+        "libdexfile_static_defaults",
+        "libprofile_static_defaults",
+    ],
+}
+
+art_cc_library_static {
+    name: "libprofmand_static",
+    device_supported: false,
+    host_supported: true,
+    defaults: [
+        "art_debug_defaults",
+        "libartbased_static_defaults",
+        "libdexfiled_static_defaults",
+        "libprofiled_static_defaults",
     ],
 }
 
 art_cc_binary {
     name: "profman",
     defaults: ["profman-defaults"],
-    shared_libs: [
-        "libprofile",
-        "libdexfile",
-        "libartbase",
-    ],
+    target: {
+        android: {
+            shared_libs: [
+                "libartbase",
+                "libdexfile",
+                "libprofile",
+            ],
+        },
+        host: {
+            // Make the host binary static, except for system libraries. This
+            // avoids having to bundle host dynamic libs in prebuilts.
+            static_libs: ["libprofman_static"],
+            stl: "c++_static",
+
+        },
+    },
     apex_available: [
         "com.android.art",
         "com.android.art.debug",
@@ -68,11 +109,22 @@ art_cc_binary {
         "art_debug_defaults",
         "profman-defaults",
     ],
-    shared_libs: [
-        "libprofiled",
-        "libdexfiled",
-        "libartbased",
-    ],
+    target: {
+        android: {
+            shared_libs: [
+                "libartbased",
+                "libdexfiled",
+                "libprofiled",
+            ],
+        },
+        host: {
+            // Make the host binary static, except for system libraries. This
+            // avoids having to bundle host dynamic libs in prebuilts.
+            static_libs: ["libprofmand_static"],
+            stl: "c++_static",
+
+        },
+    },
     apex_available: [
         "com.android.art.debug",
     ],

@@ -303,14 +303,13 @@ static inline JValue Execute(
         // any value.
         DCHECK(Runtime::Current()->AreNonStandardExitsEnabled());
         JValue ret = JValue();
-        bool res = PerformNonStandardReturn<MonitorState::kNoMonitorsLocked>(
+        PerformNonStandardReturn<MonitorState::kNoMonitorsLocked>(
             self,
             shadow_frame,
             ret,
             instrumentation,
             accessor.InsSize(),
             0);
-        DCHECK(res) << "Expected to perform non-standard return!";
         return ret;
       }
       if (UNLIKELY(self->IsExceptionPending())) {
@@ -321,14 +320,13 @@ static inline JValue Execute(
         JValue ret = JValue();
         if (UNLIKELY(shadow_frame.GetForcePopFrame())) {
           DCHECK(Runtime::Current()->AreNonStandardExitsEnabled());
-          bool res = PerformNonStandardReturn<MonitorState::kNoMonitorsLocked>(
+          PerformNonStandardReturn<MonitorState::kNoMonitorsLocked>(
               self,
               shadow_frame,
               ret,
               instrumentation,
               accessor.InsSize(),
               0);
-          DCHECK(res) << "Expected to perform non-standard return!";
         }
         return ret;
       }

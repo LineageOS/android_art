@@ -158,7 +158,8 @@ NeedsMethodExitEvent(const instrumentation::Instrumentation* ins)
 template <bool kMonitorCounting>
 static NO_INLINE void UnlockHeldMonitors(Thread* self, ShadowFrame* shadow_frame)
     REQUIRES_SHARED(Locks::mutator_lock_) {
-  DCHECK(shadow_frame->GetForcePopFrame());
+  DCHECK(shadow_frame->GetForcePopFrame() ||
+         Runtime::Current()->IsTransactionAborted());
   // Unlock all monitors.
   if (kMonitorCounting && shadow_frame->GetMethod()->MustCountLocks()) {
     // Get the monitors from the shadow-frame monitor-count data.
@@ -194,7 +195,7 @@ enum class MonitorState {
 };
 
 template<MonitorState kMonitorState>
-static inline ALWAYS_INLINE WARN_UNUSED bool PerformNonStandardReturn(
+static inline ALWAYS_INLINE void PerformNonStandardReturn(
       Thread* self,
       ShadowFrame& frame,
       JValue& result,
@@ -202,28 +203,23 @@ static inline ALWAYS_INLINE WARN_UNUSED bool PerformNonStandardReturn(
       uint16_t num_dex_inst,
       uint32_t dex_pc) REQUIRES_SHARED(Locks::mutator_lock_) {
   static constexpr bool kMonitorCounting = (kMonitorState == MonitorState::kCountingMonitors);
-  if (UNLIKELY(frame.GetForcePopFrame())) {
-    ObjPtr<mirror::Object> thiz(frame.GetThisObject(num_dex_inst));
-    StackHandleScope<1> hs(self);
-    Handle<mirror::Object> h_thiz(hs.NewHandle(thiz));
-    DCHECK(Runtime::Current()->AreNonStandardExitsEnabled());
-    if (UNLIKELY(self->IsExceptionPending())) {
-      LOG(WARNING) << "Suppressing exception for non-standard method exit: "
-                   << self->GetException()->Dump();
-      self->ClearException();
-    }
-    if (kMonitorState != MonitorState::kNoMonitorsLocked) {
-      UnlockHeldMonitors<kMonitorCounting>(self, &frame);
-    }
-    DoMonitorCheckOnExit<kMonitorCounting>(self, &frame);
-    result = JValue();
-    if (UNLIKELY(NeedsMethodExitEvent(instrumentation))) {
-      SendMethodExitEvents(
-          self, instrumentation, frame, h_thiz.Get(), frame.GetMethod(), dex_pc, result);
-    }
-    return true;
+  ObjPtr<mirror::Object> thiz(frame.GetThisObject(num_dex_inst));
+  StackHandleScope<1u> hs(self);
+  Handle<mirror::Object> h_thiz(hs.NewHandle(thiz));
+  if (UNLIKELY(self->IsExceptionPending())) {
+    LOG(WARNING) << "Suppressing exception for non-standard method exit: "
+                 << self->GetException()->Dump();
+    self->ClearException();
   }
-  return false;
+  if (kMonitorState != MonitorState::kNoMonitorsLocked) {
+    UnlockHeldMonitors<kMonitorCounting>(self, &frame);
+  }
+  DoMonitorCheckOnExit<kMonitorCounting>(self, &frame);
+  result = JValue();
+  if (UNLIKELY(NeedsMethodExitEvent(instrumentation))) {
+    SendMethodExitEvents(
+        self, instrumentation, frame, h_thiz.Get(), frame.GetMethod(), dex_pc, result);
+  }
 }
 
 // Handles all invoke-XXX/range instructions except for invoke-polymorphic[/range].

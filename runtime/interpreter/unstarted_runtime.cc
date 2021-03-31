@@ -127,24 +127,17 @@ void UnstartedRuntime::UnstartedCharacterToUpperCase(
 }
 
 // Helper function to deal with class loading in an unstarted runtime.
-static void UnstartedRuntimeFindClass(Thread* self, Handle<mirror::String> className,
-                                      Handle<mirror::ClassLoader> class_loader, JValue* result,
-                                      const std::string& method_name, bool initialize_class,
-                                      bool abort_if_not_found)
+static void UnstartedRuntimeFindClass(Thread* self,
+                                      Handle<mirror::String> className,
+                                      Handle<mirror::ClassLoader> class_loader,
+                                      JValue* result,
+                                      bool initialize_class)
     REQUIRES_SHARED(Locks::mutator_lock_) {
   CHECK(className != nullptr);
   std::string descriptor(DotToDescriptor(className->ToModifiedUtf8().c_str()));
   ClassLinker* class_linker = Runtime::Current()->GetClassLinker();
 
   ObjPtr<mirror::Class> found = class_linker->FindClass(self, descriptor.c_str(), class_loader);
-  if (found == nullptr && abort_if_not_found) {
-    if (!self->IsExceptionPending()) {
-      AbortTransactionOrFail(self, "%s failed in un-started runtime for class: %s",
-                             method_name.c_str(),
-                             PrettyDescriptor(descriptor.c_str()).c_str());
-    }
-    return;
-  }
   if (found != nullptr && initialize_class) {
     StackHandleScope<1> hs(self);
     HandleWrapperObjPtr<mirror::Class> h_class = hs.NewHandleWrapper(&found);
@@ -164,9 +157,23 @@ static void UnstartedRuntimeFindClass(Thread* self, Handle<mirror::String> class
 static void CheckExceptionGenerateClassNotFound(Thread* self)
     REQUIRES_SHARED(Locks::mutator_lock_) {
   if (self->IsExceptionPending()) {
-    // If it is not the transaction abort exception, wrap it.
-    std::string type(mirror::Object::PrettyTypeOf(self->GetException()));
-    if (type != Transaction::kAbortExceptionDescriptor) {
+    Runtime* runtime = Runtime::Current();
+    DCHECK_EQ(runtime->IsTransactionAborted(),
+              self->GetException()->GetClass()->DescriptorEquals(
+                  Transaction::kAbortExceptionDescriptor))
+        << self->GetException()->GetClass()->PrettyDescriptor();
+    if (runtime->IsActiveTransaction()) {
+      // The boot class path at run time may contain additional dex files with
+      // the required class definition(s). We cannot throw a normal exception at
+      // compile time because a class initializer could catch it and successfully
+      // initialize a class differently than when executing at run time.
+      // If we're not aborting the transaction yet, abort now. b/183691501
+      if (!runtime->IsTransactionAborted()) {
+        AbortTransactionF(self, "ClassNotFoundException");
+      }
+    } else {
+      // If not in a transaction, it cannot be the transaction abort exception. Wrap it.
+      DCHECK(!runtime->IsTransactionAborted());
       self->ThrowNewWrappedException("Ljava/lang/ClassNotFoundException;",
                                      "ClassNotFoundException");
     }
@@ -206,8 +213,7 @@ void UnstartedRuntime::UnstartedClassForNameCommon(Thread* self,
                                                    ShadowFrame* shadow_frame,
                                                    JValue* result,
                                                    size_t arg_offset,
-                                                   bool long_form,
-                                                   const char* caller) {
+                                                   bool long_form) {
   ObjPtr<mirror::String> class_name = GetClassName(self, shadow_frame, arg_offset);
   if (class_name == nullptr) {
     return;
@@ -239,20 +245,18 @@ void UnstartedRuntime::UnstartedClassForNameCommon(Thread* self,
                             h_class_name,
                             ScopedNullHandle<mirror::ClassLoader>(),
                             result,
-                            caller,
-                            initialize_class,
-                            false);
+                            initialize_class);
   CheckExceptionGenerateClassNotFound(self);
 }
 
 void UnstartedRuntime::UnstartedClassForName(
     Thread* self, ShadowFrame* shadow_frame, JValue* result, size_t arg_offset) {
-  UnstartedClassForNameCommon(self, shadow_frame, result, arg_offset, false, "Class.forName");
+  UnstartedClassForNameCommon(self, shadow_frame, result, arg_offset, /*long_form=*/ false);
 }
 
 void UnstartedRuntime::UnstartedClassForNameLong(
     Thread* self, ShadowFrame* shadow_frame, JValue* result, size_t arg_offset) {
-  UnstartedClassForNameCommon(self, shadow_frame, result, arg_offset, true, "Class.forName");
+  UnstartedClassForNameCommon(self, shadow_frame, result, arg_offset, /*long_form=*/ true);
 }
 
 void UnstartedRuntime::UnstartedClassGetPrimitiveClass(
@@ -271,7 +275,7 @@ void UnstartedRuntime::UnstartedClassGetPrimitiveClass(
 
 void UnstartedRuntime::UnstartedClassClassForName(
     Thread* self, ShadowFrame* shadow_frame, JValue* result, size_t arg_offset) {
-  UnstartedClassForNameCommon(self, shadow_frame, result, arg_offset, true, "Class.classForName");
+  UnstartedClassForNameCommon(self, shadow_frame, result, arg_offset, /*long_form=*/ true);
 }
 
 void UnstartedRuntime::UnstartedClassNewInstance(
@@ -710,13 +714,27 @@ void UnstartedRuntime::UnstartedVmClassLoaderFindLoadedClass(
   StackHandleScope<2> hs(self);
   Handle<mirror::String> h_class_name(hs.NewHandle(class_name));
   Handle<mirror::ClassLoader> h_class_loader(hs.NewHandle(class_loader));
-  UnstartedRuntimeFindClass(self, h_class_name, h_class_loader, result,
-                            "VMClassLoader.findLoadedClass", false, false);
+  UnstartedRuntimeFindClass(self,
+                            h_class_name,
+                            h_class_loader,
+                            result,
+                            /*initialize_class=*/ false);
   // This might have an error pending. But semantics are to just return null.
   if (self->IsExceptionPending()) {
-    // If it is an InternalError, keep it. See CheckExceptionGenerateClassNotFound.
-    std::string type(mirror::Object::PrettyTypeOf(self->GetException()));
-    if (type != "java.lang.InternalError") {
+    Runtime* runtime = Runtime::Current();
+    DCHECK_EQ(runtime->IsTransactionAborted(),
+              self->GetException()->GetClass()->DescriptorEquals(
+                  Transaction::kAbortExceptionDescriptor))
+        << self->GetException()->GetClass()->PrettyDescriptor();
+    if (runtime->IsActiveTransaction()) {
+      // If we're not aborting the transaction yet, abort now. b/183691501
+      // See CheckExceptionGenerateClassNotFound() for more detailed explanation.
+      if (!runtime->IsTransactionAborted()) {
+        AbortTransactionF(self, "ClassNotFoundException");
+      }
+    } else {
+      // If not in a transaction, it cannot be the transaction abort exception. Clear it.
+      DCHECK(!runtime->IsTransactionAborted());
       self->ClearException();
     }
   }
