@@ -5862,6 +5862,10 @@ bool ClassLinker::EnsureInitialized(Thread* self,
   if (!success) {
     if (can_init_fields && can_init_parents) {
       CHECK(self->IsExceptionPending()) << c->PrettyClass();
+    } else {
+      // There may or may not be an exception pending. If there is, clear it.
+      // We propagate the exception only if we can initialize fields and parents.
+      self->ClearException();
     }
   } else {
     self->AssertNoPendingException();
