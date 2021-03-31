@@ -274,7 +274,9 @@ class ProfileCompilationInfo {
 
     const std::string& GetOriginPackageName() const { return origin_package_name_; }
 
-    bool operator==(const ProfileSampleAnnotation& other) const;
+    bool operator==(const ProfileSampleAnnotation& other) const {
+      return origin_package_name_ == other.origin_package_name_;
+    }
 
     bool operator<(const ProfileSampleAnnotation& other) const {
       return origin_package_name_ < other.origin_package_name_;
@@ -707,21 +709,6 @@ class ProfileCompilationInfo {
       const DexFile* dex_file,
       /*out*/ std::vector<const ProfileCompilationInfo::DexFileData*>* result) const;
 
-  // Inflate the input buffer (in_buffer) of size in_size. It returns a buffer of
-  // compressed data for the input buffer of "compressed_data_size" size.
-  std::unique_ptr<uint8_t[]> DeflateBuffer(const uint8_t* in_buffer,
-                                           uint32_t in_size,
-                                           /*out*/uint32_t* compressed_data_size);
-
-  // Inflate the input buffer(in_buffer) of size in_size. out_size is the expected output
-  // size of the buffer. It puts the output in out_buffer. It returns Z_STREAM_END on
-  // success. On error, it returns Z_STREAM_ERROR if the compressed data is inconsistent
-  // and Z_DATA_ERROR if the stream ended prematurely or the stream has extra data.
-  int InflateBuffer(const uint8_t* in_buffer,
-                    uint32_t in_size,
-                    uint32_t out_size,
-                    /*out*/uint8_t* out_buffer);
-
   // Parsing functionality.
 
   // The information present in the header of each profile line.
@@ -786,43 +773,7 @@ class ProfileCompilationInfo {
   };
 
   // A helper structure to make sure we don't read past our buffers in the loops.
-  struct SafeBuffer {
-   public:
-    explicit SafeBuffer(size_t size) : storage_(new uint8_t[size]) {
-      ptr_current_ = storage_.get();
-      ptr_end_ = ptr_current_ + size;
-    }
-
-    // Reads the content of the descriptor at the current position.
-    ProfileLoadStatus Fill(ProfileSource& source,
-                           const std::string& debug_stage,
-                           /*out*/std::string* error);
-
-    // Reads an uint value (high bits to low bits) and advances the current pointer
-    // with the number of bits read.
-    template <typename T> bool ReadUintAndAdvance(/*out*/ T* value);
-
-    // Compares the given data with the content current pointer. If the contents are
-    // equal it advances the current pointer by data_size.
-    bool CompareAndAdvance(const uint8_t* data, size_t data_size);
-
-    // Advances current pointer by data_size.
-    void Advance(size_t data_size);
-
-    // Returns the count of unread bytes.
-    size_t CountUnreadBytes();
-
-    // Returns the current pointer.
-    const uint8_t* GetCurrentPtr();
-
-    // Get the underlying raw buffer.
-    uint8_t* Get() { return storage_.get(); }
-
-   private:
-    std::unique_ptr<uint8_t[]> storage_;
-    uint8_t* ptr_end_;
-    uint8_t* ptr_current_;
-  };
+  struct SafeBuffer;
 
   ProfileLoadStatus OpenSource(int32_t fd,
                                /*out*/ std::unique_ptr<ProfileSource>* source,
@@ -1032,7 +983,7 @@ class FlattenProfileData {
   // Class data.
   SafeMap<TypeReference, ItemMetadata> class_metadata_;
   // Maximum aggregation counter for all methods.
-  // This is essentially a cache equal to the max size of any method's annation set.
+  // This is essentially a cache equal to the max size of any method's annotation set.
   // It avoids the traversal of all the methods which can be quite expensive.
   uint32_t max_aggregation_for_methods_;
   // Maximum aggregation counter for all classes.
