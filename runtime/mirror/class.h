@@ -923,15 +923,6 @@ class MANAGED Class final : public Object {
                                  PointerSize pointer_size)
       REQUIRES_SHARED(Locks::mutator_lock_);
 
-  // Return the first accessible method from the list of interfaces implemented by
-  // this. For knowing if a method is accessible, we call through
-  // `hiddenapi::ShouldDenyAccessToMember`.
-  ArtMethod* FindAccessibleInterfaceMethod(
-      ArtMethod* implementation_method,
-      const hiddenapi::AccessContext& access_context,
-      PointerSize pointer_size)
-      REQUIRES_SHARED(Locks::mutator_lock_);
-
   // Find a method with the given name and signature in a non-interface class.
   //
   // Search for the method in the class, following the JLS rules which conflict with the RI
