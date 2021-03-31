@@ -19,11 +19,11 @@
 #
 
 import argparse
+import itertools
 import shlex
 import subprocess
 import os
 import os.path
-
 
 def run_print(lst):
   return " ".join(map(shlex.quote, lst))
@@ -68,6 +68,14 @@ def parse_args():
       help="functions to add to a profile. Probably want to pass --compiler-filter=speed-profile with this. All functions are marked as 'hot'. Use --profile-file for more control."
   )
   parser.add_argument(
+      "--add-bcp",
+      action="append",
+      default=[],
+      nargs=2,
+      metavar=("BCP_FILE", "BCP_LOCATION"),
+      help="File and location to add to the boot-class-path. Note no deduplication is attempted."
+  )
+  parser.add_argument(
       "--arch",
       action="store",
       choices=["arm", "arm64", "x86", "x86_64", "host64", "host32"],
@@ -89,7 +97,9 @@ def parse_args():
   return parser.parse_known_args()
 
 
-def get_bcp_runtime_args(image, arch):
+def get_bcp_runtime_args(additions, image, arch):
+  add_files = map(lambda a: a[0], additions)
+  add_locs = map(lambda a: a[1], additions)
   if arch != "host32" and arch != "host64":
     args = [
         "art/tools/host_bcp.sh",
@@ -101,8 +111,29 @@ def get_bcp_runtime_args(image, arch):
     print("=START=======================================")
     res = subprocess.run(args, capture_output=True, text=True)
     print("=END=========================================")
-    res.check_returncode()
-    return res.stdout.split()
+    if res.returncode != 0:
+      print("Falling back to com.android.art BCP")
+      args = [
+          "art/tools/host_bcp.sh",
+          os.path.expandvars(
+              "${{OUT}}/apex/com.android.art.debug/javalib/{}/boot.oat".format(arch)),
+          "--use-first-dir"
+      ]
+      print("Running: {}".format(run_print(args)))
+      print("=START=======================================")
+      res = subprocess.run(args, capture_output=True, text=True)
+      print("=END=========================================")
+      res.check_returncode()
+    segments = res.stdout.split()
+    def extend_bcp(segment: str):
+      # TODO We should make the bcp have absolute paths.
+      if segment.startswith("-Xbootclasspath:"):
+        return ":".join(itertools.chain((segment,), add_files))
+      elif segment.startswith("-Xbootclasspath-locations:"):
+        return ":".join(itertools.chain((segment,), add_locs))
+      else:
+        return segment
+    return list(map(extend_bcp, segments))
   else:
     # Host we just use the bcp locations for both.
     res = open(
@@ -112,10 +143,13 @@ def get_bcp_runtime_args(image, arch):
     bcp_tag = b"bootclasspath\0"
     bcp_start = res.find(bcp_tag) + len(bcp_tag)
     bcp = res[bcp_start:bcp_start + res[bcp_start:].find(b"\0")]
-    str_bcp = bcp.decode()
+    img_bcp = bcp.decode()
+    # TODO We should make the str_bcp have absolute paths.
+    str_bcp = ":".join(itertools.chain((img_bcp,), add_files))
+    str_bcp_loc = ":".join(itertools.chain((img_bcp,), add_locs))
     return [
-        "--runtime-arg", "-Xbootclasspath:{}".format(str_bcp), "--runtime-arg",
-        "-Xbootclasspath-locations:{}".format(str_bcp)
+        "--runtime-arg", "-Xbootclasspath:{}".format(str_bcp),
+        "--runtime-arg", "-Xbootclasspath-locations:{}".format(str_bcp_loc)
     ]
 
 
@@ -127,6 +161,12 @@ def get_profile_args(args, location_base):
   """Handle all the profile file options."""
   if args.profile_file is None and len(args.profile_line) == 0:
     return []
+  if args.profile_file:
+    with open(args.profile_file, "rb") as prof:
+      prof_magic = prof.read(4)
+      if prof_magic == b'pro\0':
+        # Looks like the profile-file is a binary profile. Just use it directly
+        return ['--profile-file={}'.format(args.profile_file)]
   if args.debug_profman:
     profman_args = ["lldb-server", "g", ":5039", "--", args.profman]
   else:
@@ -180,7 +220,7 @@ def main():
     location_base = "/system/framework"
     real_arch = args.arch
     boot_image = os.path.expandvars(":".join([
-        "${OUT}/apex/com.android.art.debug/javalib/boot.art",
+        "${OUT}/apex/art_boot_images/javalib/boot.art",
         "${OUT}/system/framework/boot-framework.art"
     ]))
     android_root = os.path.expandvars("$OUT/system")
@@ -188,7 +228,7 @@ def main():
       extra.append("--dex-location={}".format(
           os.path.join(location_base, os.path.basename(f))))
       extra.append("--dex-file={}".format(f))
-  extra += get_bcp_runtime_args(boot_image, args.arch)
+  extra += get_bcp_runtime_args(args.add_bcp, boot_image, args.arch)
   extra += get_profile_args(args, location_base)
   extra.append("--instruction-set={}".format(real_arch))
   extra.append("--boot-image={}".format(boot_image))
