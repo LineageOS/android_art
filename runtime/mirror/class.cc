@@ -1794,5 +1794,29 @@ size_t Class::GetMethodIdOffset(ArtMethod* method, PointerSize pointer_size) {
   return res;
 }
 
+ArtMethod* Class::FindAccessibleInterfaceMethod(ArtMethod* implementation_method,
+                                                PointerSize pointer_size)
+    REQUIRES_SHARED(Locks::mutator_lock_) {
+  ObjPtr<mirror::IfTable> iftable = GetIfTable();
+  for (int32_t i = 0, iftable_count = iftable->Count(); i < iftable_count; ++i) {
+    ObjPtr<mirror::PointerArray> methods = iftable->GetMethodArrayOrNull(i);
+    if (methods == nullptr) {
+      continue;
+    }
+    for (size_t j = 0, count = iftable->GetMethodArrayCount(i); j < count; ++j) {
+      if (implementation_method == methods->GetElementPtrSize<ArtMethod*>(j, pointer_size)) {
+        ObjPtr<mirror::Class> iface = iftable->GetInterface(i);
+        ArtMethod* interface_method = &iface->GetVirtualMethodsSlice(pointer_size)[j];
+        // If the interface method is part of the public SDK, return it.
+        if ((hiddenapi::GetRuntimeFlags(interface_method) & kAccPublicApi) != 0) {
+          return interface_method;
+        }
+      }
+    }
+  }
+  return nullptr;
+}
+
+
 }  // namespace mirror
 }  // namespace art
