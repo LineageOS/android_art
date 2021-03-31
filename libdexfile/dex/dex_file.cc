@@ -286,6 +286,13 @@ const MethodId* DexFile::FindMethodId(const TypeId& declaring_klass,
   const dex::TypeIndex class_idx = GetIndexForTypeId(declaring_klass);
   const dex::StringIndex name_idx = GetIndexForStringId(name);
   const dex::ProtoIndex proto_idx = GetIndexForProtoId(signature);
+  return FindMethodIdByIndex(class_idx, name_idx, proto_idx);
+}
+
+const MethodId* DexFile::FindMethodIdByIndex(dex::TypeIndex class_idx,
+                                             dex::StringIndex name_idx,
+                                             dex::ProtoIndex proto_idx) const {
+  // Binary search MethodIds knowing that they are sorted by class_idx, name_idx then proto_idx
   int32_t lo = 0;
   int32_t hi = NumMethodIds() - 1;
   while (hi >= lo) {
@@ -306,6 +313,9 @@ const MethodId* DexFile::FindMethodId(const TypeId& declaring_klass,
         } else if (proto_idx < method.proto_idx_) {
           hi = mid - 1;
         } else {
+          DCHECK_EQ(class_idx, method.class_idx_);
+          DCHECK_EQ(proto_idx, method.proto_idx_);
+          DCHECK_EQ(name_idx, method.name_idx_);
           return &method;
         }
       }
