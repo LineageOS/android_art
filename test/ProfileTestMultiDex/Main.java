@@ -72,6 +72,12 @@ class TestInline {
   }
 }
 
+class TestInlineSubtype extends TestInline {
+  public void foobar() {
+    this.inlineMonomorphic(new SubA());
+  }
+}
+
 abstract class Secret {
   abstract int getIdentity();
 }

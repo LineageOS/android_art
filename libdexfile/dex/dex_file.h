@@ -381,6 +381,10 @@ class DexFile {
                                     const dex::StringId& name,
                                     const dex::ProtoId& signature) const;
 
+  const dex::MethodId* FindMethodIdByIndex(dex::TypeIndex declaring_klass,
+                                           dex::StringIndex name,
+                                           dex::ProtoIndex signature) const;
+
   // Returns the declaring class descriptor string of a method id.
   const char* GetMethodDeclaringClassDescriptor(const dex::MethodId& method_id) const;
 
