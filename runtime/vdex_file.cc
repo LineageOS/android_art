@@ -269,7 +269,8 @@ bool VdexFile::WriteToDisk(const std::string& path,
 
   // Write checksum section.
   for (const DexFile* dex_file : dex_files) {
-    const uint32_t* checksum_ptr = &dex_file->GetHeader().checksum_;
+    uint32_t checksum = dex_file->GetLocationChecksum();
+    const uint32_t* checksum_ptr = &checksum;
     static_assert(sizeof(*checksum_ptr) == sizeof(VdexFile::VdexChecksum));
     if (!out->WriteFully(reinterpret_cast<const char*>(checksum_ptr),
                          sizeof(VdexFile::VdexChecksum))) {
