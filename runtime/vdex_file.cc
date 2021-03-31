@@ -150,6 +150,20 @@ std::unique_ptr<VdexFile> VdexFile::OpenAtAddress(uint8_t* mmap_addr,
     return nullptr;
   }
 
+  if (!writable) {
+    Runtime* runtime = Runtime::Current();
+    // The runtime might not be available at this point if we're running
+    // dex2oat or oatdump.
+    if (runtime != nullptr) {
+      size_t madvise_size_limit = runtime->GetMadviseWillNeedSizeVdex();
+      Runtime::MadviseFileForRange(madvise_size_limit,
+                                   vdex->Size(),
+                                   vdex->Begin(),
+                                   vdex->End(),
+                                   vdex_filename);
+    }
+  }
+
   return vdex;
 }
 
