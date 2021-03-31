@@ -104,6 +104,149 @@ static bool ChecksumMatch(uint32_t dex_file_checksum, uint32_t checksum) {
   return kDebugIgnoreChecksum || dex_file_checksum == checksum;
 }
 
+namespace {
+
+// Deflate the input buffer `in_buffer`. It returns a buffer of
+// compressed data for the input buffer of `*compressed_data_size` size.
+std::unique_ptr<uint8_t[]> DeflateBuffer(ArrayRef<const uint8_t> in_buffer,
+                                         /*out*/ uint32_t* compressed_data_size) {
+  z_stream strm;
+  strm.zalloc = Z_NULL;
+  strm.zfree = Z_NULL;
+  strm.opaque = Z_NULL;
+  int init_ret = deflateInit(&strm, 1);
+  if (init_ret != Z_OK) {
+    return nullptr;
+  }
+
+  uint32_t out_size = dchecked_integral_cast<uint32_t>(deflateBound(&strm, in_buffer.size()));
+
+  std::unique_ptr<uint8_t[]> compressed_buffer(new uint8_t[out_size]);
+  strm.avail_in = in_buffer.size();
+  strm.next_in = const_cast<uint8_t*>(in_buffer.data());
+  strm.avail_out = out_size;
+  strm.next_out = &compressed_buffer[0];
+  int ret = deflate(&strm, Z_FINISH);
+  if (ret == Z_STREAM_ERROR) {
+    return nullptr;
+  }
+  *compressed_data_size = out_size - strm.avail_out;
+
+  int end_ret = deflateEnd(&strm);
+  if (end_ret != Z_OK) {
+    return nullptr;
+  }
+
+  return compressed_buffer;
+}
+
+// Inflate the data from `in_buffer` into `out_buffer`. The `out_buffer.size()`
+// is the expected output size of the buffer. It returns Z_STREAM_END on success.
+// On error, it returns Z_STREAM_ERROR if the compressed data is inconsistent
+// and Z_DATA_ERROR if the stream ended prematurely or the stream has extra data.
+int InflateBuffer(ArrayRef<const uint8_t> in_buffer, /*out*/ ArrayRef<uint8_t> out_buffer) {
+  /* allocate inflate state */
+  z_stream strm;
+  strm.zalloc = Z_NULL;
+  strm.zfree = Z_NULL;
+  strm.opaque = Z_NULL;
+  strm.avail_in = in_buffer.size();
+  strm.next_in = const_cast<uint8_t*>(in_buffer.data());
+  strm.avail_out = out_buffer.size();
+  strm.next_out = out_buffer.data();
+
+  int init_ret = inflateInit(&strm);
+  if (init_ret != Z_OK) {
+    return init_ret;
+  }
+
+  int ret = inflate(&strm, Z_NO_FLUSH);
+  if (strm.avail_in != 0 || strm.avail_out != 0) {
+    return Z_DATA_ERROR;
+  }
+
+  int end_ret = inflateEnd(&strm);
+  if (end_ret != Z_OK) {
+    return end_ret;
+  }
+
+  return ret;
+}
+
+}  // anonymous namespace
+
+struct ProfileCompilationInfo::SafeBuffer {
+ public:
+  explicit SafeBuffer(size_t size)
+      : storage_(new uint8_t[size]),
+        ptr_current_(storage_.get()),
+        ptr_end_(ptr_current_ + size) {}
+
+  // Reads the content of the descriptor at the current position.
+  ProfileLoadStatus Fill(ProfileSource& source,
+                         const std::string& debug_stage,
+                         /*out*/std::string* error) {
+    size_t byte_count = (ptr_end_ - ptr_current_) * sizeof(*ptr_current_);
+    uint8_t* buffer = ptr_current_;
+    return source.Read(buffer, byte_count, debug_stage, error);
+  }
+
+  // Reads an uint value and advances the current pointer.
+  template <typename T>
+  bool ReadUintAndAdvance(/*out*/ T* value) {
+    static_assert(std::is_unsigned<T>::value, "Type is not unsigned");
+    if (sizeof(T) > CountUnreadBytes()) {
+      return false;
+    }
+    *value = 0;
+    for (size_t i = 0; i < sizeof(T); i++) {
+      *value += ptr_current_[i] << (i * kBitsPerByte);
+    }
+    ptr_current_ += sizeof(T);
+    return true;
+  }
+
+  // Compares the given data with the content at the current pointer.
+  // If the contents are equal it advances the current pointer by data_size.
+  bool CompareAndAdvance(const uint8_t* data, size_t data_size) {
+    if (data_size > CountUnreadBytes()) {
+      return false;
+    }
+    if (memcmp(ptr_current_, data, data_size) == 0) {
+      ptr_current_ += data_size;
+      return true;
+    }
+    return false;
+  }
+
+  // Advances current pointer by data_size.
+  void Advance(size_t data_size) {
+    DCHECK_LE(data_size, CountUnreadBytes());
+    ptr_current_ += data_size;
+  }
+
+  // Returns the count of unread bytes.
+  size_t CountUnreadBytes() {
+    DCHECK_LE(static_cast<void*>(ptr_current_), static_cast<void*>(ptr_end_));
+    return (ptr_end_ - ptr_current_) * sizeof(*ptr_current_);
+  }
+
+  // Returns the current pointer.
+  const uint8_t* GetCurrentPtr() {
+    return ptr_current_;
+  }
+
+  // Get the underlying raw buffer.
+  uint8_t* Get() {
+    return storage_.get();
+  }
+
+ private:
+  std::unique_ptr<uint8_t[]> storage_;
+  uint8_t* ptr_current_;
+  uint8_t* ptr_end_;
+};
+
 ProfileCompilationInfo::ProfileCompilationInfo(ArenaPool* custom_arena_pool, bool for_boot_image)
     : default_arena_pool_(),
       allocator_(custom_arena_pool),
@@ -501,10 +644,9 @@ bool ProfileCompilationInfo::Save(int fd) {
                   dex_data.bitmap_storage.end());
   }
 
+  ArrayRef<const uint8_t> in_buffer(buffer.data(), required_capacity);
   uint32_t output_size = 0;
-  std::unique_ptr<uint8_t[]> compressed_buffer = DeflateBuffer(buffer.data(),
-                                                               required_capacity,
-                                                               &output_size);
+  std::unique_ptr<uint8_t[]> compressed_buffer = DeflateBuffer(in_buffer, &output_size);
 
   if (output_size > GetSizeWarningThresholdBytes()) {
     LOG(WARNING) << "Profile data size exceeds "
@@ -913,53 +1055,6 @@ static int testEOF(int fd) {
   return TEMP_FAILURE_RETRY(read(fd, buffer, 1));
 }
 
-// Reads an uint value previously written with AddUintToBuffer.
-template <typename T>
-bool ProfileCompilationInfo::SafeBuffer::ReadUintAndAdvance(/*out*/T* value) {
-  static_assert(std::is_unsigned<T>::value, "Type is not unsigned");
-  if (ptr_current_ + sizeof(T) > ptr_end_) {
-    return false;
-  }
-  *value = 0;
-  for (size_t i = 0; i < sizeof(T); i++) {
-    *value += ptr_current_[i] << (i * kBitsPerByte);
-  }
-  ptr_current_ += sizeof(T);
-  return true;
-}
-
-bool ProfileCompilationInfo::SafeBuffer::CompareAndAdvance(const uint8_t* data, size_t data_size) {
-  if (ptr_current_ + data_size > ptr_end_) {
-    return false;
-  }
-  if (memcmp(ptr_current_, data, data_size) == 0) {
-    ptr_current_ += data_size;
-    return true;
-  }
-  return false;
-}
-
-ProfileCompilationInfo::ProfileLoadStatus ProfileCompilationInfo::SafeBuffer::Fill(
-      ProfileSource& source,
-      const std::string& debug_stage,
-      /*out*/ std::string* error) {
-  size_t byte_count = (ptr_end_ - ptr_current_) * sizeof(*ptr_current_);
-  uint8_t* buffer = ptr_current_;
-  return source.Read(buffer, byte_count, debug_stage, error);
-}
-
-size_t ProfileCompilationInfo::SafeBuffer::CountUnreadBytes() {
-  return (ptr_end_ - ptr_current_) * sizeof(*ptr_current_);
-}
-
-const uint8_t* ProfileCompilationInfo::SafeBuffer::GetCurrentPtr() {
-  return ptr_current_;
-}
-
-void ProfileCompilationInfo::SafeBuffer::Advance(size_t data_size) {
-  ptr_current_ += data_size;
-}
-
 ProfileCompilationInfo::ProfileLoadStatus ProfileCompilationInfo::ReadProfileHeader(
       ProfileSource& source,
       /*out*/ProfileIndexType* number_of_dex_files,
@@ -1362,10 +1457,9 @@ ProfileCompilationInfo::ProfileLoadStatus ProfileCompilationInfo::LoadInternal(
 
   SafeBuffer uncompressed_data(uncompressed_data_size);
 
-  int ret = InflateBuffer(compressed_data.get(),
-                          compressed_data_size,
-                          uncompressed_data_size,
-                          uncompressed_data.Get());
+  ArrayRef<const uint8_t> in_buffer(compressed_data.get(), compressed_data_size);
+  ArrayRef<uint8_t> out_buffer(uncompressed_data.Get(), uncompressed_data_size);
+  int ret = InflateBuffer(in_buffer, out_buffer);
 
   if (ret != Z_STREAM_END) {
     *error += "Error reading uncompressed profile data";
@@ -1460,60 +1554,6 @@ bool ProfileCompilationInfo::RemapProfileIndex(
     dex_profile_index_remap->Put(i, dex_data->profile_index);
   }
   return true;
-}
-
-std::unique_ptr<uint8_t[]> ProfileCompilationInfo::DeflateBuffer(const uint8_t* in_buffer,
-                                                                 uint32_t in_size,
-                                                                 uint32_t* compressed_data_size) {
-  z_stream strm;
-  strm.zalloc = Z_NULL;
-  strm.zfree = Z_NULL;
-  strm.opaque = Z_NULL;
-  int ret = deflateInit(&strm, 1);
-  if (ret != Z_OK) {
-    return nullptr;
-  }
-
-  uint32_t out_size = deflateBound(&strm, in_size);
-
-  std::unique_ptr<uint8_t[]> compressed_buffer(new uint8_t[out_size]);
-  strm.avail_in = in_size;
-  strm.next_in = const_cast<uint8_t*>(in_buffer);
-  strm.avail_out = out_size;
-  strm.next_out = &compressed_buffer[0];
-  ret = deflate(&strm, Z_FINISH);
-  if (ret == Z_STREAM_ERROR) {
-    return nullptr;
-  }
-  *compressed_data_size = out_size - strm.avail_out;
-  deflateEnd(&strm);
-  return compressed_buffer;
-}
-
-int ProfileCompilationInfo::InflateBuffer(const uint8_t* in_buffer,
-                                          uint32_t in_size,
-                                          uint32_t expected_uncompressed_data_size,
-                                          uint8_t* out_buffer) {
-  z_stream strm;
-
-  /* allocate inflate state */
-  strm.zalloc = Z_NULL;
-  strm.zfree = Z_NULL;
-  strm.opaque = Z_NULL;
-  strm.avail_in = in_size;
-  strm.next_in = const_cast<uint8_t*>(in_buffer);
-  strm.avail_out = expected_uncompressed_data_size;
-  strm.next_out = out_buffer;
-
-  int ret;
-  inflateInit(&strm);
-  ret = inflate(&strm, Z_NO_FLUSH);
-
-  if (strm.avail_in != 0 || strm.avail_out != 0) {
-    return Z_DATA_ERROR;
-  }
-  inflateEnd(&strm);
-  return ret;
 }
 
 bool ProfileCompilationInfo::MergeWith(const ProfileCompilationInfo& other,
@@ -2130,11 +2170,6 @@ std::ostream& operator<<(std::ostream& stream,
          << ",num_method_ids=" << dumper.GetNumMethodIds()
          << "]";
   return stream;
-}
-
-bool ProfileCompilationInfo::ProfileSampleAnnotation::operator==(
-      const ProfileSampleAnnotation& other) const {
-  return origin_package_name_ == other.origin_package_name_;
 }
 
 void ProfileCompilationInfo::WriteProfileIndex(
