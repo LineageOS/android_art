@@ -2238,7 +2238,7 @@ class InitializeClassVisitor : public CompilationVisitor {
             // compiler and will be pruned by ImageWriter.
             Handle<mirror::Class> exception_class =
                 hs.NewHandle(class_linker->FindClass(self,
-                                                     Transaction::kAbortExceptionSignature,
+                                                     Transaction::kAbortExceptionDescriptor,
                                                      class_loader));
             bool exception_initialized =
                 class_linker->EnsureInitialized(self, exception_class, true, true);
