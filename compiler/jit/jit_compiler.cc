@@ -194,6 +194,7 @@ bool JitCompiler::CompileMethod(
     uint64_t duration_us = timer.Stop();
     VLOG(jit) << "Compilation of " << method->PrettyMethod() << " took "
               << PrettyDuration(UsToNs(duration_us));
+    runtime->GetMetrics()->JitMethodCompileCount()->AddOne();
   }
 
   // Trim maps to reduce memory usage.
