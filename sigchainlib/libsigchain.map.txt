@@ -16,10 +16,10 @@
 
 LIBSIGCHAIN_1 {
   global:
-    EnsureFrontOfChain;
-    AddSpecialSignalHandlerFn;
-    RemoveSpecialSignalHandlerFn;
-    SkipAddSignalHandler;
+    # Export no symbols - the only external entry points are libc overrides.
+    # Since this section cannot be empty for APEX stubs generation we provide a
+    # phony entry.
+    LibsigchainNonexistentFunction;
   local:
     *;
 };
