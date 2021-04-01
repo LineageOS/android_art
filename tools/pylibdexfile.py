@@ -15,7 +15,7 @@
 # limitations under the License.
 
 #
-# This script can get info out of dexfiles using libdexfile.so external API
+# This script can get info out of dexfiles using libdexfile_external
 #
 
 from abc import ABC
@@ -24,8 +24,8 @@ import os.path
 import functools
 import zipfile
 
-libdexfile = CDLL(
-    os.path.expandvars("$ANDROID_HOST_OUT/lib64/libdexfile.so"))
+libdexfile_external = CDLL(
+    os.path.expandvars("$ANDROID_HOST_OUT/lib64/libdexfile_external.so"))
 
 DexFileStr = c_void_p
 ExtDexFile = c_void_p
@@ -37,28 +37,28 @@ class ExtMethodInfo(Structure):
 
 
 AllMethodsCallback = CFUNCTYPE(c_int, POINTER(ExtMethodInfo), c_void_p)
-libdexfile.ExtDexFileOpenFromFd.argtypes = [
+libdexfile_external.ExtDexFileOpenFromFd.argtypes = [
     c_int, c_size_t, c_char_p,
     POINTER(DexFileStr),
     POINTER(ExtDexFile)
 ]
-libdexfile.ExtDexFileOpenFromFd.restype = c_int
-libdexfile.ExtDexFileOpenFromMemory.argtypes = [
+libdexfile_external.ExtDexFileOpenFromFd.restype = c_int
+libdexfile_external.ExtDexFileOpenFromMemory.argtypes = [
     c_void_p,
     POINTER(c_size_t), c_char_p,
     POINTER(DexFileStr),
     POINTER(ExtDexFile)
 ]
-libdexfile.ExtDexFileOpenFromMemory.restype = c_int
-libdexfile.ExtDexFileFree.argtypes = [ExtDexFile]
-libdexfile.ExtDexFileGetAllMethodInfos.argtypes = [
+libdexfile_external.ExtDexFileOpenFromMemory.restype = c_int
+libdexfile_external.ExtDexFileFree.argtypes = [ExtDexFile]
+libdexfile_external.ExtDexFileGetAllMethodInfos.argtypes = [
     ExtDexFile, c_int, AllMethodsCallback, c_void_p
 ]
-libdexfile.ExtDexFileGetString.argtypes = [
+libdexfile_external.ExtDexFileGetString.argtypes = [
     DexFileStr, POINTER(c_size_t)
 ]
-libdexfile.ExtDexFileGetString.restype = c_char_p
-libdexfile.ExtDexFileFreeString.argtypes = [DexFileStr]
+libdexfile_external.ExtDexFileGetString.restype = c_char_p
+libdexfile_external.ExtDexFileFreeString.argtypes = [DexFileStr]
 
 
 class DexClass(object):
@@ -105,9 +105,9 @@ class Method(object):
   def __init__(self, mi):
     self.offset = mi.offset
     self.len = mi.len
-    self.name = libdexfile.ExtDexFileGetString(
+    self.name = libdexfile_external.ExtDexFileGetString(
         mi.name, byref(c_size_t(0))).decode("utf-8")
-    libdexfile.ExtDexFileFreeString(mi.name)
+    libdexfile_external.ExtDexFileFreeString(mi.name)
 
   def __repr__(self):
     return "(" + self.name + ")"
@@ -164,8 +164,8 @@ class BaseDexFile(ABC):
       meths.append(Method(info[0]))
       return 0
 
-    libdexfile.ExtDexFileGetAllMethodInfos(self.ext_dex_file_,
-                                           c_int(1), my_cb, c_void_p())
+    libdexfile_external.ExtDexFileGetAllMethodInfos(self.ext_dex_file_,
+                                                    c_int(1), my_cb, c_void_p())
     return meths
 
 
@@ -176,14 +176,14 @@ class FdDexFile(BaseDexFile):
     super().__init__()
     res_fle_ptr = pointer(c_void_p())
     err_ptr = pointer(c_void_p())
-    res = libdexfile.ExtDexFileOpenFromFd(
+    res = libdexfile_external.ExtDexFileOpenFromFd(
         c_int(fd), 0, create_string_buffer(bytes(loc, "utf-8")), err_ptr,
         res_fle_ptr)
     if res == 0:
-      err = libdexfile.ExtDexFileGetString(err_ptr.contents,
-                                           byref(c_size_t()))
+      err = libdexfile_external.ExtDexFileGetString(err_ptr.contents,
+                                                    byref(c_size_t()))
       out = Exception("Failed to open file: {}. Error was: {}".format(loc, err))
-      libdexfile.ExtDexFileFreeString(err_ptr.contents)
+      libdexfile_external.ExtDexFileFreeString(err_ptr.contents)
       raise out
     self.ext_dex_file_ = res_fle_ptr.contents
 
@@ -209,14 +209,14 @@ class MemDexFile(BaseDexFile):
     self.mem_ref = (c_byte * len(dat)).from_buffer_copy(dat)
     res_fle_ptr = pointer(c_void_p())
     err_ptr = pointer(c_void_p())
-    res = libdexfile.ExtDexFileOpenFromMemory(
+    res = libdexfile_external.ExtDexFileOpenFromMemory(
         self.mem_ref, byref(c_size_t(len(dat))),
         create_string_buffer(bytes(loc, "utf-8")), err_ptr, res_fle_ptr)
     if res == 0:
-      err = libdexfile.ExtDexFileGetString(err_ptr.contents,
-                                           byref(c_size_t()))
+      err = libdexfile_external.ExtDexFileGetString(err_ptr.contents,
+                                                    byref(c_size_t()))
       out = Exception("Failed to open file: {}. Error was: {}".format(loc, err))
-      libdexfile.ExtDexFileFreeString(err_ptr.contents)
+      libdexfile_external.ExtDexFileFreeString(err_ptr.contents)
       raise out
     self.ext_dex_file_ = res_fle_ptr.contents
 
