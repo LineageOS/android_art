@@ -150,6 +150,20 @@ std::unique_ptr<VdexFile> VdexFile::OpenAtAddress(uint8_t* mmap_addr,
     return nullptr;
   }
 
+  if (!writable) {
+    Runtime* runtime = Runtime::Current();
+    // The runtime might not be available at this point if we're running
+    // dex2oat or oatdump.
+    if (runtime != nullptr) {
+      size_t madvise_size_limit = runtime->GetMadviseWillNeedSizeVdex();
+      Runtime::MadviseFileForRange(madvise_size_limit,
+                                   vdex->Size(),
+                                   vdex->Begin(),
+                                   vdex->End(),
+                                   vdex_filename);
+    }
+  }
+
   return vdex;
 }
 
@@ -269,7 +283,8 @@ bool VdexFile::WriteToDisk(const std::string& path,
 
   // Write checksum section.
   for (const DexFile* dex_file : dex_files) {
-    const uint32_t* checksum_ptr = &dex_file->GetHeader().checksum_;
+    uint32_t checksum = dex_file->GetLocationChecksum();
+    const uint32_t* checksum_ptr = &checksum;
     static_assert(sizeof(*checksum_ptr) == sizeof(VdexFile::VdexChecksum));
     if (!out->WriteFully(reinterpret_cast<const char*>(checksum_ptr),
                          sizeof(VdexFile::VdexChecksum))) {

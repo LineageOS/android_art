@@ -64,6 +64,11 @@ art_cc_library_static {
         "libdexfile_static_defaults",
         "libprofile_static_defaults",
     ],
+    target: {
+        darwin: {
+            enabled: true,
+        },
+    },
 }
 
 art_cc_library_static {
@@ -76,6 +81,11 @@ art_cc_library_static {
         "libdexfiled_static_defaults",
         "libprofiled_static_defaults",
     ],
+    target: {
+        darwin: {
+            enabled: true,
+        },
+    },
 }
 
 art_cc_binary {
