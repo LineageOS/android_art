@@ -50,7 +50,7 @@ art_runtime_base_binaries_prefer32_on_device_first_on_host = [
 // the ART APEX.
 art_runtime_base_native_shared_libs = [
     // External API (having APEX stubs).
-    "libdexfile_external",
+    "libdexfile",
     "libnativebridge",
     "libnativehelper",
     "libnativeloader",
@@ -106,7 +106,7 @@ art_runtime_debug_native_shared_libs = [
     "libadbconnectiond",
     "libartd",
     "libartd-compiler",
-    "libdexfiled_external",
+    "libdexfiled",
     "libopenjdkjvmd",
     "libopenjdkjvmtid",
 ]
