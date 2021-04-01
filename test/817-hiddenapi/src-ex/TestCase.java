@@ -24,4 +24,13 @@ public class TestCase {
     }
   }
 
+  public static void testNative(String library) {
+    System.load(library);
+    int value = testNativeInternal();
+    if (value != 42) {
+      throw new Error("Expected 42, got " + value);
+    }
+  }
+
+  public static native int testNativeInternal();
 }
