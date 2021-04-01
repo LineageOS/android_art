@@ -320,6 +320,16 @@ inline ArtMethod* ClassLinker::GetResolvedMethod(uint32_t method_idx, ArtMethod*
     // Check if the invoke type matches the class type.
     ObjPtr<mirror::DexCache> dex_cache = referrer->GetDexCache();
     ObjPtr<mirror::ClassLoader> class_loader = referrer->GetClassLoader();
+    const dex::MethodId& method_id = referrer->GetDexFile()->GetMethodId(method_idx);
+    ObjPtr<mirror::Class> cls = LookupResolvedType(method_id.class_idx_, dex_cache, class_loader);
+    if (cls == nullptr) {
+      // The verifier breaks the invariant that a resolved method must have its
+      // class in the class table. Because this method should only lookup and not
+      // resolve class, return null. The caller is responsible for calling
+      // `ResolveMethod` afterwards.
+      // b/73760543
+      return nullptr;
+    }
     if (CheckInvokeClassMismatch</* kThrow= */ false>(dex_cache, type, method_idx, class_loader)) {
       return nullptr;
     }
