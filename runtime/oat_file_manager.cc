@@ -803,16 +803,18 @@ void OatFileManager::RunBackgroundVerification(const std::vector<const DexFile*>
     return;
   }
 
-  std::string vdex_filename = GetVdexFilename(odex_filename);
-  if (verification_thread_pool_ == nullptr) {
-    verification_thread_pool_.reset(
-        new ThreadPool("Verification thread pool", /* num_threads= */ 1));
-    verification_thread_pool_->StartWorkers(self);
+  {
+    WriterMutexLock mu(self, *Locks::oat_file_manager_lock_);
+    if (verification_thread_pool_ == nullptr) {
+      verification_thread_pool_.reset(
+          new ThreadPool("Verification thread pool", /* num_threads= */ 1));
+      verification_thread_pool_->StartWorkers(self);
+    }
   }
   verification_thread_pool_->AddTask(self, new BackgroundVerificationTask(
       dex_files,
       class_loader,
-      vdex_filename));
+      GetVdexFilename(odex_filename)));
 }
 
 void OatFileManager::WaitForWorkersToBeCreated() {
