@@ -164,7 +164,7 @@ ThreadPool::ThreadPool(const char* name,
                        bool create_peers,
                        size_t worker_stack_size)
   : name_(name),
-    task_queue_lock_("task queue lock"),
+    task_queue_lock_("task queue lock", kGenericBottomLock),
     task_queue_condition_("task queue condition", task_queue_lock_),
     completion_condition_("task completion condition", task_queue_lock_),
     started_(false),
