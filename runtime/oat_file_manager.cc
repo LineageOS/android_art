@@ -845,7 +845,14 @@ void OatFileManager::SetOnlyUseSystemOatFiles() {
 
   for (const std::unique_ptr<const OatFile>& oat_file : oat_files_) {
     if (boot_set.find(oat_file.get()) == boot_set.end()) {
-      CHECK(LocationIsOnSystem(oat_file->GetLocation().c_str())) << oat_file->GetLocation();
+      if (!LocationIsOnSystem(oat_file->GetLocation().c_str())) {
+        // When the file is not on system, we check whether the oat file has any
+        // AOT or DEX code. It is a fatal error if it has.
+        if (CompilerFilter::IsAotCompilationEnabled(oat_file->GetCompilerFilter()) ||
+            oat_file->ContainsDexCode()) {
+          LOG(FATAL) << "Executing untrusted code from " << oat_file->GetLocation();
+        }
+      }
     }
   }
   only_use_system_oat_files_ = true;
