@@ -15,4 +15,12 @@
 # limitations under the License.
 
 # Disable dex2oat of secondary dex files.
-exec ${RUN} $@ --no-secondary-compilation
+${RUN} "$@" --no-secondary-compilation
+return_status1=$?
+
+# Set low RAM to hit the Madvise code which used to crash
+${RUN} "$@" --runtime-option -XX:LowMemoryMode --no-secondary-compilation
+return_status2=$?
+
+# Make sure we don't silently ignore an early failure.
+(exit $return_status1) && (exit $return_status2)
