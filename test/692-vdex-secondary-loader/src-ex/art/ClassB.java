@@ -14,14 +14,10 @@
  * limitations under the License.
  */
 
-public class TestCase {
+package art;
 
-  public static void test() {
-    // This call should be successful as the method is accessible through the interface.
-    int value = new InheritAbstract().methodPublicSdkNotInAbstractParent();
-    if (value != 42) {
-      throw new Error("Expected 42, got " + value);
-    }
+public class ClassB {
+  public static void printHello() {
+    System.out.println(ClassA.getHello());
   }
-
 }
