@@ -1,4 +1,4 @@
-LIBDEXFILE_1 {
+LIBDEXFILE_EXTERNAL_1 {
   global:
     ExtDexFileClose;
     ExtDexFileGetAllMethodInfos;
