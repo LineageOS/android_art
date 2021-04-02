@@ -9004,38 +9004,6 @@ ObjPtr<mirror::Class> ClassLinker::DoResolveType(dex::TypeIndex type_idx,
   return resolved;
 }
 
-// Return the first accessible method from the list of interfaces implemented by
-// `klass`. For knowing if a method is accessible, we call through
-// `hiddenapi::ShouldDenyAccessToMember`.
-static ArtMethod* FindAccessibleInterfaceMethod(ObjPtr<mirror::Class> klass,
-                                                ObjPtr<mirror::DexCache> dex_cache,
-                                                ObjPtr<mirror::ClassLoader> class_loader,
-                                                ArtMethod* resolved_method,
-                                                PointerSize pointer_size)
-      REQUIRES_SHARED(Locks::mutator_lock_) {
-  ObjPtr<mirror::IfTable> iftable = klass->GetIfTable();
-  for (int32_t i = 0, iftable_count = iftable->Count(); i < iftable_count; ++i) {
-    ObjPtr<mirror::PointerArray> methods = iftable->GetMethodArrayOrNull(i);
-    if (methods == nullptr) {
-      continue;
-    }
-    for (size_t j = 0, count = iftable->GetMethodArrayCount(i); j < count; ++j) {
-      if (resolved_method == methods->GetElementPtrSize<ArtMethod*>(j, pointer_size)) {
-        ObjPtr<mirror::Class> iface = iftable->GetInterface(i);
-        ArtMethod* interface_method = &iface->GetVirtualMethodsSlice(pointer_size)[j];
-        // Pass AccessMethod::kNone instead of kLinking to not warn on the
-        // access. We'll only warn later if we could not find a visible method.
-        if (!hiddenapi::ShouldDenyAccessToMember(interface_method,
-                                                 hiddenapi::AccessContext(class_loader, dex_cache),
-                                                 hiddenapi::AccessMethod::kNone)) {
-          return interface_method;
-        }
-      }
-    }
-  }
-  return nullptr;
-}
-
 ArtMethod* ClassLinker::FindResolvedMethod(ObjPtr<mirror::Class> klass,
                                            ObjPtr<mirror::DexCache> dex_cache,
                                            ObjPtr<mirror::ClassLoader> class_loader,
@@ -9060,12 +9028,8 @@ ArtMethod* ClassLinker::FindResolvedMethod(ObjPtr<mirror::Class> klass,
     // The resolved method that we have found cannot be accessed due to
     // hiddenapi (typically it is declared up the hierarchy and is not an SDK
     // method). Try to find an interface method from the implemented interfaces which is
-    // accessible.
-    ArtMethod* itf_method = FindAccessibleInterfaceMethod(klass,
-                                                          dex_cache,
-                                                          class_loader,
-                                                          resolved,
-                                                          image_pointer_size_);
+    // part of the SDK.
+    ArtMethod* itf_method = klass->FindAccessibleInterfaceMethod(resolved, image_pointer_size_);
     if (itf_method == nullptr) {
       // No interface method. Call ShouldDenyAccessToMember again but this time
       // with AccessMethod::kLinking to ensure that an appropriate warning is

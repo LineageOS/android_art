@@ -803,16 +803,18 @@ void OatFileManager::RunBackgroundVerification(const std::vector<const DexFile*>
     return;
   }
 
-  std::string vdex_filename = GetVdexFilename(odex_filename);
-  if (verification_thread_pool_ == nullptr) {
-    verification_thread_pool_.reset(
-        new ThreadPool("Verification thread pool", /* num_threads= */ 1));
-    verification_thread_pool_->StartWorkers(self);
+  {
+    WriterMutexLock mu(self, *Locks::oat_file_manager_lock_);
+    if (verification_thread_pool_ == nullptr) {
+      verification_thread_pool_.reset(
+          new ThreadPool("Verification thread pool", /* num_threads= */ 1));
+      verification_thread_pool_->StartWorkers(self);
+    }
   }
   verification_thread_pool_->AddTask(self, new BackgroundVerificationTask(
       dex_files,
       class_loader,
-      vdex_filename));
+      GetVdexFilename(odex_filename)));
 }
 
 void OatFileManager::WaitForWorkersToBeCreated() {
@@ -845,7 +847,14 @@ void OatFileManager::SetOnlyUseSystemOatFiles() {
 
   for (const std::unique_ptr<const OatFile>& oat_file : oat_files_) {
     if (boot_set.find(oat_file.get()) == boot_set.end()) {
-      CHECK(LocationIsOnSystem(oat_file->GetLocation().c_str())) << oat_file->GetLocation();
+      if (!LocationIsOnSystem(oat_file->GetLocation().c_str())) {
+        // When the file is not on system, we check whether the oat file has any
+        // AOT or DEX code. It is a fatal error if it has.
+        if (CompilerFilter::IsAotCompilationEnabled(oat_file->GetCompilerFilter()) ||
+            oat_file->ContainsDexCode()) {
+          LOG(FATAL) << "Executing untrusted code from " << oat_file->GetLocation();
+        }
+      }
     }
   }
   only_use_system_oat_files_ = true;
