@@ -657,6 +657,7 @@ cc_defaults {
         "708-jit-cache-churn/jit.cc",
         "720-thread-priority/thread_priority.cc",
         "800-smali/jni.cc",
+        "817-hiddenapi/test_native.cc",
         "909-attach-agent/disallow_debugging.cc",
         "1001-app-image-regions/app_image_regions.cc",
         "1002-notify-startup/startup_interface.cc",

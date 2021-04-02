@@ -83,6 +83,9 @@ class MetricsReporter {
   // If synchronous is set to true, this function will block until the report has completed.
   void RequestMetricsReport(bool synchronous = true);
 
+  void SetCompilationInfo(CompilationReason compilation_reason,
+                          CompilerFilter::Filter compiler_filter);
+
   static constexpr const char* kBackgroundThreadName = "Metrics Background Reporting Thread";
 
  private:
@@ -95,7 +98,7 @@ class MetricsReporter {
   void MaybeResetTimeout();
 
   // Outputs the current state of the metrics to the destination set by config_.
-  void ReportMetrics() const;
+  void ReportMetrics();
 
   ReportingConfig config_;
   Runtime* runtime_;
@@ -122,16 +125,25 @@ class MetricsReporter {
     bool synchronous;
   };
 
+  struct CompilationInfoMessage {
+    CompilationReason compilation_reason;
+    CompilerFilter::Filter compiler_filter;
+  };
+
   MessageQueue<ShutdownRequestedMessage,
                StartupCompletedMessage,
                BeginSessionMessage,
-               RequestMetricsReportMessage>
+               RequestMetricsReportMessage,
+               CompilationInfoMessage>
       messages_;
 
   // A message indicating a requested report has been finished.
   struct ReportCompletedMessage {};
 
   MessageQueue<ReportCompletedMessage> thread_to_host_messages_;
+
+  SessionData session_data_{};
+  bool session_started_{false};
 };
 
 }  // namespace metrics

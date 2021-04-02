@@ -20,6 +20,7 @@
 
 #include <sys/types.h>
 #include <unistd.h>
+#include <iomanip>
 
 #include "unwindstack/Regs.h"
 #include "unwindstack/RegsGetLocal.h"
@@ -43,6 +44,10 @@ namespace art {
 // gcstress this isn't a huge deal.
 #if defined(__linux__)
 
+// Strict integrity check of the backtrace:
+// All methods must have a name, all the way to "main".
+static constexpr bool kStrictUnwindChecks = true;
+
 struct UnwindHelper : public TLSData {
   static constexpr const char* kTlsKey = "UnwindHelper::kTlsKey";
 
@@ -56,7 +61,7 @@ struct UnwindHelper : public TLSData {
     unwinder_.SetArch(arch_);
     unwinder_.SetJitDebug(jit_.get());
     unwinder_.SetDexFiles(dex_.get());
-    unwinder_.SetResolveNames(false);
+    unwinder_.SetResolveNames(kStrictUnwindChecks);
     unwindstack::Elf::SetCachingEnabled(true);
   }
 
@@ -84,17 +89,28 @@ struct UnwindHelper : public TLSData {
 };
 
 void BacktraceCollector::Collect() {
-  if (!CollectImpl()) {
+  unwindstack::Unwinder* unwinder = UnwindHelper::Get(Thread::Current(), max_depth_)->Unwinder();
+  if (!CollectImpl(unwinder)) {
     // Reparse process mmaps to detect newly loaded libraries and retry.
     UnwindHelper::Get(Thread::Current(), max_depth_)->Reparse();
-    if (!CollectImpl()) {
-      // Failed to unwind stack. Ignore for now.
+    if (!CollectImpl(unwinder)) {
+      if (kStrictUnwindChecks) {
+        LOG(ERROR) << "Failed to unwind stack:";
+        std::vector<unwindstack::FrameData>& frames = unwinder->frames();
+        for (auto it = frames.begin(); it != frames.end(); it++) {
+          if (it == frames.begin() || std::prev(it)->map_name != it->map_name) {
+            LOG(ERROR) << "  map_name  " << it->map_name.c_str();
+          }
+          LOG(ERROR) << "  " << std::setw(8) << std::setfill('0') << std::hex <<
+            it->rel_pc << "  " << it->function_name.c_str();
+        }
+        LOG(FATAL);
+      }
     }
   }
 }
 
-bool BacktraceCollector::CollectImpl() {
-  unwindstack::Unwinder* unwinder = UnwindHelper::Get(Thread::Current(), max_depth_)->Unwinder();
+bool BacktraceCollector::CollectImpl(unwindstack::Unwinder* unwinder) {
   std::unique_ptr<unwindstack::Regs> regs(unwindstack::Regs::CreateFromLocal());
   RegsGetLocal(regs.get());
   unwinder->SetRegs(regs.get());
@@ -111,11 +127,23 @@ bool BacktraceCollector::CollectImpl() {
       if (RoundUp(it->pc, align) == reinterpret_cast<uintptr_t>(GetQuickInstrumentationExitPc())) {
         return true;
       }
+
+      if (kStrictUnwindChecks) {
+        if (it->function_name.empty()) {
+          return false;
+        } else if (it->function_name == "main" || it->function_name == "start_thread") {
+          return true;
+        }
+      }
     }
   }
 
   if (unwinder->LastErrorCode() == unwindstack::ERROR_INVALID_MAP) {
     return false;
+  }
+  if (kStrictUnwindChecks) {
+    // We have not found "main". That is ok if we stopped the backtrace early.
+    return unwinder->NumFrames() == max_depth_;
   }
 
   return true;
