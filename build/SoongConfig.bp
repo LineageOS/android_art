@@ -11,22 +11,6 @@ soong_config_bool_variable {
 }
 
 soong_config_module_type {
-    name: "art_module_sdk",
-    module_type: "sdk",
-    config_namespace: "art_module",
-    bool_variables: ["source_build"],
-    properties: ["enabled"],
-}
-
-soong_config_module_type {
-    name: "art_module_exports",
-    module_type: "module_exports",
-    config_namespace: "art_module",
-    bool_variables: ["source_build"],
-    properties: ["enabled"],
-}
-
-soong_config_module_type {
     name: "art_module_apex_defaults",
     module_type: "apex_defaults",
     config_namespace: "art_module",
@@ -43,8 +27,32 @@ soong_config_module_type {
 }
 
 soong_config_module_type {
+    name: "art_module_exports",
+    module_type: "module_exports",
+    config_namespace: "art_module",
+    bool_variables: ["source_build"],
+    properties: ["enabled"],
+}
+
+soong_config_module_type {
     name: "art_module_genrule_defaults",
     module_type: "genrule_defaults",
+    config_namespace: "art_module",
+    bool_variables: ["source_build"],
+    properties: ["enabled"],
+}
+
+soong_config_module_type {
+    name: "art_module_java_defaults",
+    module_type: "java_defaults",
+    config_namespace: "art_module",
+    bool_variables: ["source_build"],
+    properties: ["enabled"],
+}
+
+soong_config_module_type {
+    name: "art_module_sdk",
+    module_type: "sdk",
     config_namespace: "art_module",
     bool_variables: ["source_build"],
     properties: ["enabled"],

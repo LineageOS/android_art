@@ -6242,6 +6242,89 @@ TEST_F(LoadStoreEliminationTest, PredicatedLoad3) {
 
 // // ENTRY
 // obj = new Obj();
+// if (parameter_value) {
+//   // LEFT
+//   obj.field = 3;
+//   escape(obj);
+// } else {
+//   // RIGHT - Leave it as default value
+// }
+// EXIT
+// predicated-ELIMINATE
+// return obj.field
+TEST_F(LoadStoreEliminationTest, PredicatedLoadDefaultValue) {
+  VariableSizedHandleScope vshs(Thread::Current());
+  CreateGraph(/*handles=*/&vshs);
+  AdjacencyListGraph blks(SetupFromAdjacencyList("entry",
+                                                 "exit",
+                                                 {{"entry", "left"},
+                                                  {"entry", "right"},
+                                                  {"left", "breturn"},
+                                                  {"right", "breturn"},
+                                                  {"breturn", "exit"}}));
+#define GET_BLOCK(name) HBasicBlock* name = blks.Get(#name)
+  GET_BLOCK(entry);
+  GET_BLOCK(exit);
+  GET_BLOCK(breturn);
+  GET_BLOCK(left);
+  GET_BLOCK(right);
+#undef GET_BLOCK
+  EnsurePredecessorOrder(breturn, {left, right});
+  HInstruction* bool_value = MakeParam(DataType::Type::kBool);
+  HInstruction* null_const = graph_->GetNullConstant();
+  HInstruction* c0 = graph_->GetIntConstant(0);
+  HInstruction* c3 = graph_->GetIntConstant(3);
+
+  HInstruction* cls = MakeClassLoad();
+  HInstruction* new_inst = MakeNewInstance(cls);
+  HInstruction* if_inst = new (GetAllocator()) HIf(bool_value);
+  entry->AddInstruction(cls);
+  entry->AddInstruction(new_inst);
+  entry->AddInstruction(if_inst);
+  ManuallyBuildEnvFor(cls, {});
+  new_inst->CopyEnvironmentFrom(cls->GetEnvironment());
+
+  HInstruction* write_left = MakeIFieldSet(new_inst, c3, MemberOffset(32));
+  HInstruction* call_left = MakeInvoke(DataType::Type::kVoid, { new_inst });
+  HInstruction* goto_left = new (GetAllocator()) HGoto();
+  left->AddInstruction(write_left);
+  left->AddInstruction(call_left);
+  left->AddInstruction(goto_left);
+  call_left->CopyEnvironmentFrom(cls->GetEnvironment());
+
+  HInstruction* goto_right = new (GetAllocator()) HGoto();
+  right->AddInstruction(goto_right);
+
+  HInstruction* read_bottom = MakeIFieldGet(new_inst, DataType::Type::kInt32, MemberOffset(32));
+  HInstruction* return_exit = new (GetAllocator()) HReturn(read_bottom);
+  breturn->AddInstruction(read_bottom);
+  breturn->AddInstruction(return_exit);
+
+  SetupExit(exit);
+
+  // PerformLSE expects this to be empty.
+  graph_->ClearDominanceInformation();
+  LOG(INFO) << "Pre LSE " << blks;
+  PerformLSEWithPartial();
+  LOG(INFO) << "Post LSE " << blks;
+
+  EXPECT_INS_REMOVED(read_bottom);
+  EXPECT_INS_RETAINED(write_left);
+  EXPECT_INS_RETAINED(call_left);
+  HPredicatedInstanceFieldGet* pred_get =
+      FindSingleInstruction<HPredicatedInstanceFieldGet>(graph_, breturn);
+  HPhi* merge_alloc = FindSingleInstruction<HPhi>(graph_, breturn);
+  ASSERT_NE(merge_alloc, nullptr);
+  EXPECT_TRUE(merge_alloc->InputAt(0)->IsNewInstance()) << *merge_alloc;
+  EXPECT_EQ(merge_alloc->InputAt(0)->InputAt(0), cls) << *merge_alloc << " cls? " << *cls;
+  EXPECT_EQ(merge_alloc->InputAt(1), null_const);
+  ASSERT_NE(pred_get, nullptr);
+  EXPECT_INS_EQ(pred_get->GetTarget(), merge_alloc);
+  EXPECT_INS_EQ(pred_get->GetDefaultValue(), c0) << " pred-get is: " << *pred_get;
+}
+
+// // ENTRY
+// obj = new Obj();
 // // ALL should be kept
 // switch (parameter_value) {
 //   case 1:

@@ -3613,9 +3613,13 @@ HInstruction* LSEVisitor::GetPartialValueAt(HNewInstance* orig_new_inst, HInstru
     HInstruction* res = Replacement(pred).GetInstruction();
     LSE_VLOG << pred << " materialized to " << res->DumpWithArgs();
     return res;
+  } else if (pred.IsDefault()) {
+    HInstruction* res = GetDefaultValue(read->GetType());
+    LSE_VLOG << pred << " materialized to " << res->DumpWithArgs();
+    return res;
   }
   LOG(FATAL) << "Unable to find unescaped value at " << read->DumpWithArgs()
-             << "! This should be impossible!";
+             << "! This should be impossible! Value is " << pred;
   UNREACHABLE();
 }
 

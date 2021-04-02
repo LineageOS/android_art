@@ -923,6 +923,12 @@ class MANAGED Class final : public Object {
                                  PointerSize pointer_size)
       REQUIRES_SHARED(Locks::mutator_lock_);
 
+  // Return the first public SDK method from the list of interfaces implemented by
+  // this class.
+  ArtMethod* FindAccessibleInterfaceMethod(ArtMethod* implementation_method,
+                                           PointerSize pointer_size)
+      REQUIRES_SHARED(Locks::mutator_lock_);
+
   // Find a method with the given name and signature in a non-interface class.
   //
   // Search for the method in the class, following the JLS rules which conflict with the RI

@@ -18,6 +18,7 @@ package {
 
 java_test_host {
     name: "odsign_e2e_tests",
+    defaults: ["art_module_source_build_java_defaults"],
     srcs: ["test-src/**/*.java"],
     libs: ["tradefed"],
     static_libs: [

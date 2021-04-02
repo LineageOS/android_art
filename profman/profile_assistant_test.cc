@@ -15,6 +15,8 @@
  */
 
 #include <gtest/gtest.h>
+#include <sstream>
+#include <string>
 
 #include "android-base/file.h"
 #include "android-base/strings.h"
@@ -24,6 +26,7 @@
 #include "base/utils.h"
 #include "common_runtime_test.h"
 #include "dex/descriptors_names.h"
+#include "dex/dex_file_structs.h"
 #include "dex/dex_instruction-inl.h"
 #include "dex/dex_instruction_iterator.h"
 #include "dex/type_reference.h"
@@ -1512,6 +1515,99 @@ TEST_F(ProfileAssistantTest, MergeProfilesWithDifferentDexOrder) {
 
   // The information from profile must remain the same.
   CheckProfileInfo(profile1, info1);
+}
+
+TEST_F(ProfileAssistantTest, TestProfileCreateWithSubtype) {
+  // Create the profile content.
+  std::vector<std::string> profile_methods = {
+      "HLTestInlineSubtype;->inlineMonomorphic(LSuper;)I+]LSuper;LSubA;",
+  };
+  std::string input_file_contents;
+  for (std::string& m : profile_methods) {
+    input_file_contents += m + std::string("\n");
+  }
+
+  // Create the profile and save it to disk.
+  ScratchFile profile_file;
+  std::string dex_filename = GetTestDexFileName("ProfileTestMultiDex");
+  ASSERT_TRUE(CreateProfile(input_file_contents, profile_file.GetFilename(), dex_filename));
+
+  // Load the profile from disk.
+  ProfileCompilationInfo info;
+  profile_file.GetFile()->ResetOffset();
+  ASSERT_TRUE(info.Load(GetFd(profile_file)));
+  LOG(ERROR) << profile_file.GetFilename();
+
+  // Load the dex files and verify that the profile contains the expected
+  // methods info.
+  ScopedObjectAccess soa(Thread::Current());
+  jobject class_loader = LoadDex("ProfileTestMultiDex");
+  ASSERT_NE(class_loader, nullptr);
+
+  // NB This is the supertype of the declared line!
+  ArtMethod* inline_monomorphic_super =
+      GetVirtualMethod(class_loader, "LTestInline;", "inlineMonomorphic");
+  const DexFile* dex_file = inline_monomorphic_super->GetDexFile();
+
+  // Verify that the inline cache is present in the superclass
+  ProfileCompilationInfo::MethodHotness hotness_super = info.GetMethodHotness(
+      MethodReference(dex_file, inline_monomorphic_super->GetDexMethodIndex()));
+  ASSERT_TRUE(hotness_super.IsHot());
+  const ProfileCompilationInfo::InlineCacheMap* inline_caches = hotness_super.GetInlineCacheMap();
+  ASSERT_EQ(inline_caches->size(), 1u);
+  const ProfileCompilationInfo::DexPcData& dex_pc_data = inline_caches->begin()->second;
+  dex::TypeIndex target_type_index(dex_file->GetIndexForTypeId(*dex_file->FindTypeId("LSubA;")));
+  ASSERT_EQ(1u, dex_pc_data.classes.size());
+  ASSERT_EQ(target_type_index, dex_pc_data.classes.begin()->type_index);
+
+  // Verify that the method is present in subclass but there are no
+  // inline-caches (since there is no code).
+  const dex::MethodId& super_method_id =
+      dex_file->GetMethodId(inline_monomorphic_super->GetDexMethodIndex());
+  uint32_t sub_method_index = dex_file->GetIndexForMethodId(
+      *dex_file->FindMethodId(*dex_file->FindTypeId("LTestInlineSubtype;"),
+                              dex_file->GetStringId(super_method_id.name_idx_),
+                              dex_file->GetProtoId(super_method_id.proto_idx_)));
+  ProfileCompilationInfo::MethodHotness hotness_sub =
+      info.GetMethodHotness(MethodReference(dex_file, sub_method_index));
+  ASSERT_TRUE(hotness_sub.IsHot());
+  ASSERT_EQ(hotness_sub.GetInlineCacheMap()->size(), 0u);
+}
+
+TEST_F(ProfileAssistantTest, TestProfileCreateWithSubtypeAndDump) {
+  // Create the profile content.
+  std::vector<std::string> profile_methods = {
+      "HLTestInlineSubtype;->inlineMonomorphic(LSuper;)I+]LSuper;LSubA;",
+  };
+  std::string input_file_contents;
+  for (std::string& m : profile_methods) {
+    input_file_contents += m + std::string("\n");
+  }
+
+  // Create the profile and save it to disk.
+  ScratchFile profile_file;
+  std::string dex_filename = GetTestDexFileName("ProfileTestMultiDex");
+  ASSERT_TRUE(CreateProfile(input_file_contents, profile_file.GetFilename(), dex_filename));
+
+  std::string dump_ic;
+  ASSERT_TRUE(DumpClassesAndMethods(
+      profile_file.GetFilename(), &dump_ic, GetTestDexFileName("ProfileTestMultiDex")));
+
+  std::vector<std::string> lines;
+  std::stringstream dump_stream(dump_ic);
+  std::string cur;
+  while (std::getline(dump_stream, cur, '\n')) {
+    lines.push_back(std::move(cur));
+  }
+
+  EXPECT_EQ(lines.size(), 2u);
+  EXPECT_TRUE(std::find(lines.cbegin(),
+                        lines.cend(),
+                        "HLTestInline;->inlineMonomorphic(LSuper;)I+]LSuper;LSubA;") !=
+              lines.cend());
+  EXPECT_TRUE(std::find(lines.cbegin(),
+                        lines.cend(),
+                        "HLTestInlineSubtype;->inlineMonomorphic(LSuper;)I") != lines.cend());
 }
 
 TEST_F(ProfileAssistantTest, TestProfileCreateWithInvalidData) {
