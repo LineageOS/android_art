@@ -76,6 +76,10 @@ def get_parser():
   profiles.add_argument("--input-profile", help="a profile to use for bisect")
   parser.add_argument(
       "--output-source", help="human readable file create the profile from")
+  parser.add_argument("--test-exec", help="file to exec (without arguments) to test a" +
+                                           " candidate. Test should exit 0 if the issue" +
+                                           " is not present and non-zero if the issue is" +
+                                           " present.")
   parser.add_argument("output_file", help="file we will write the profiles to")
   return parser
 
@@ -97,11 +101,8 @@ def dump_files(meths, args, output):
   profman.check_returncode()
 
 
-def run_test(meths, args):
-  with open(args.output_source, "wt") as output:
-    dump_files(meths, args, output)
-    print("Currently testing {} methods. ~{} rounds to go.".format(
-        len(meths), 1 + math.floor(math.log2(len(meths)))))
+def get_answer(args):
+  if args.test_exec is None:
     while True:
       answer = input("Does the file at {} cause the issue (y/n):".format(
           args.output_file))
@@ -111,7 +112,21 @@ def run_test(meths, args):
         return "n"
       else:
         print("Please enter 'y' or 'n' only!")
+  else:
+    test_args = shlex.split(args.test_exec)
+    print(" ".join(map(shlex.quote, test_args)))
+    answer = subprocess.run(test_args)
+    if answer.returncode == 0:
+      return "n"
+    else:
+      return "y"
 
+def run_test(meths, args):
+  with open(args.output_source, "wt") as output:
+    dump_files(meths, args, output)
+    print("Currently testing {} methods. ~{} rounds to go.".format(
+        len(meths), 1 + math.floor(math.log2(len(meths)))))
+  return get_answer(args)
 
 def main():
   parser = get_parser()
