@@ -2140,8 +2140,11 @@ void OatDexFile::MadviseDexFile(const DexFile& dex_file, MadviseState state) {
   if (oat_dex_file != nullptr) {
     // Should always be there.
     const DexLayoutSections* const sections = oat_dex_file->GetDexLayoutSections();
-    CHECK(sections != nullptr);
-    sections->Madvise(&dex_file, state);
+    if (sections != nullptr) {
+      sections->Madvise(&dex_file, state);
+    } else {
+      DCHECK(oat_dex_file->IsBackedByVdexOnly());
+    }
   }
 }
 
