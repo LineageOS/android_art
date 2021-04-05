@@ -77,13 +77,6 @@ void MetricsReporter::RequestMetricsReport(bool synchronous) {
   }
 }
 
-void MetricsReporter::SetCompilationInfo(CompilationReason compilation_reason,
-                                         CompilerFilter::Filter compiler_filter) {
-  if (thread_.has_value()) {
-    messages_.SendMessage(CompilationInfoMessage{compilation_reason, compiler_filter});
-  }
-}
-
 void MetricsReporter::BackgroundThreadRun() {
   LOG_STREAM(DEBUG) << "Metrics reporting thread started";
 
@@ -115,7 +108,10 @@ void MetricsReporter::BackgroundThreadRun() {
     messages_.SwitchReceive(
         [&](BeginSessionMessage message) {
           LOG_STREAM(DEBUG) << "Received session metadata";
-          session_data_ = message.session_data;
+
+          for (auto& backend : backends_) {
+            backend->BeginSession(message.session_data);
+          }
         },
         [&]([[maybe_unused]] ShutdownRequestedMessage message) {
           LOG_STREAM(DEBUG) << "Shutdown request received";
@@ -143,11 +139,6 @@ void MetricsReporter::BackgroundThreadRun() {
         [&]([[maybe_unused]] StartupCompletedMessage message) {
           LOG_STREAM(DEBUG) << "App startup completed, reporting metrics";
           ReportMetrics();
-        },
-        [&](CompilationInfoMessage message) {
-          LOG_STREAM(DEBUG) << "Compilation info received";
-          session_data_.compilation_reason = message.compilation_reason;
-          session_data_.compiler_filter = message.compiler_filter;
         });
   }
 
@@ -163,15 +154,8 @@ void MetricsReporter::MaybeResetTimeout() {
   }
 }
 
-void MetricsReporter::ReportMetrics() {
+void MetricsReporter::ReportMetrics() const {
   ArtMetrics* metrics{runtime_->GetMetrics()};
-
-  if (!session_started_) {
-    for (auto& backend : backends_) {
-      backend->BeginSession(session_data_);
-    }
-    session_started_ = true;
-  }
 
   for (auto& backend : backends_) {
     metrics->ReportAllMetrics(backend.get());
