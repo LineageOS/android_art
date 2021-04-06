@@ -5239,17 +5239,6 @@ MethodVerifier::FailureData MethodVerifier::VerifyMethod(Thread* self,
       }
     }
 
-    if (verifier.HasInstructionThatWillThrow()) {
-      // The dead code after the throw is not verified and might be invalid. This may cause
-      // the JIT compiler to crash since it assumes that all the code is valid.
-      set_dont_compile = true;
-      if (aot_mode) {
-        // Make HasInstructionThatWillThrow a soft error to trigger
-        // re-verification at runtime.
-        result.kind = FailureKind::kSoftFailure;
-      }
-    }
-
     if (method != nullptr) {
       verifier_callback->SetDontCompile(method, set_dont_compile);
       verifier_callback->SetMustCountLocks(method, must_count_locks);
