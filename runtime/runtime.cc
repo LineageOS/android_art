@@ -3063,6 +3063,14 @@ void Runtime::NotifyStartupCompleted() {
   ProfileSaver::NotifyStartupCompleted();
 
   if (metrics_reporter_ != nullptr) {
+    const OatFile* primary_oat_file = oat_file_manager_->GetPrimaryOatFile();
+    if (primary_oat_file != nullptr) {
+      const char* compilation_reason = primary_oat_file->GetCompilationReason();
+      metrics_reporter_->SetCompilationInfo(
+          compilation_reason != nullptr ? metrics::CompilationReasonFromName(compilation_reason) :
+                                          metrics::CompilationReason::kUnknown,
+          primary_oat_file->GetCompilerFilter());
+    }
     metrics_reporter_->NotifyStartupCompleted();
   }
 }

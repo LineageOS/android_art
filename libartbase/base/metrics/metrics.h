@@ -83,8 +83,14 @@ enum class CompilationReason {
   kError,
   kUnknown,
   kFirstBoot,
-  kBoot,
+  kBootAfterOTA,
+  kPostBoot,
   kInstall,
+  kInstallFast,
+  kInstallBulk,
+  kInstallBulkSecondary,
+  kInstallBulkDowngraded,
+  kInstallBulkSecondaryDowngraded,
   kBgDexopt,
   kABOTA,
   kInactive,
@@ -95,26 +101,88 @@ enum class CompilationReason {
 constexpr const char* CompilationReasonName(CompilationReason reason) {
   switch (reason) {
     case CompilationReason::kError:
-      return "Error";
+      return "error";
     case CompilationReason::kUnknown:
-      return "Unknown";
+      return "unknown";
     case CompilationReason::kFirstBoot:
-      return "FirstBoot";
-    case CompilationReason::kBoot:
-      return "Boot";
+      return "first-boot";
+    case CompilationReason::kBootAfterOTA:
+      return "boot-after-ota";
+    case CompilationReason::kPostBoot:
+      return "post-boot";
     case CompilationReason::kInstall:
-      return "Install";
+      return "install";
+    case CompilationReason::kInstallFast:
+      return "install-fast";
+    case CompilationReason::kInstallBulk:
+      return "install-bulk";
+    case CompilationReason::kInstallBulkSecondary:
+      return "install-bulk-secondary";
+    case CompilationReason::kInstallBulkDowngraded:
+      return "install-bulk-downgraded";
+    case CompilationReason::kInstallBulkSecondaryDowngraded:
+      return "install-bulk-secondary-downgraded";
     case CompilationReason::kBgDexopt:
-      return "BgDexopt";
+      return "bg-dexopt";
     case CompilationReason::kABOTA:
-      return "ABOTA";
+      return "ab-ota";
     case CompilationReason::kInactive:
-      return "Inactive";
+      return "inactive";
     case CompilationReason::kShared:
-      return "Shared";
+      return "shared";
     case CompilationReason::kInstallWithDexMetadata:
-      return "InstallWithDexMetadata";
+      return "install-with-dex-metadata";
   }
+}
+
+constexpr CompilationReason CompilationReasonFromName(std::string_view name) {
+  // Names come from PackageManagerServiceCompilerMapping.java
+  if (name == "unknown") {
+    return CompilationReason::kUnknown;
+  }
+  if (name == "first-boot") {
+    return CompilationReason::kFirstBoot;
+  }
+  if (name == "boot-after-ota") {
+    return CompilationReason::kBootAfterOTA;
+  }
+  if (name == "post-boot") {
+    return CompilationReason::kPostBoot;
+  }
+  if (name == "install") {
+    return CompilationReason::kInstall;
+  }
+  if (name == "install-fast") {
+    return CompilationReason::kInstallFast;
+  }
+  if (name == "install-bulk") {
+    return CompilationReason::kInstallBulk;
+  }
+  if (name == "install-bulk-secondary") {
+    return CompilationReason::kInstallBulkSecondary;
+  }
+  if (name == "install-bulk-downgraded") {
+    return CompilationReason::kInstallBulkDowngraded;
+  }
+  if (name == "install-bulk-secondary-downgraded") {
+    return CompilationReason::kInstallBulkSecondaryDowngraded;
+  }
+  if (name == "bg-dexopt") {
+    return CompilationReason::kBgDexopt;
+  }
+  if (name == "ab-ota") {
+    return CompilationReason::kABOTA;
+  }
+  if (name == "inactive") {
+    return CompilationReason::kInactive;
+  }
+  if (name == "shared") {
+    return CompilationReason::kShared;
+  }
+  if (name == "install-with-dex-metadata") {
+    return CompilationReason::kInstallWithDexMetadata;
+  }
+  return CompilationReason::kError;
 }
 
 // SessionData contains metadata about a metrics session (basically the lifetime of an ART process).
