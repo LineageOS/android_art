@@ -174,7 +174,7 @@ libcore_java_libs = [
 
 // ART Java libraries
 art_java_libs = [
-    "artservice",
+    "service-art",
 ]
 
 // Native libraries that support the core Java libraries.

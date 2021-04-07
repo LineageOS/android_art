@@ -11,20 +11,24 @@
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
- * limitations under the License.
+ * limitations under the License
  */
 
 package com.android.server.art;
 
-/**
- * This class provides a system API for functionality provided by the ART
- * module.
- */
-@libcore.api.CorePlatformApi
-public final class ArtService {
-    static final String LOG_TAG = "ArtService";
+import static org.junit.Assert.assertEquals;
 
-    static String getMsg() {
-        return "Hello world!";
+import com.android.server.art.ArtManagerLocal;
+
+import org.junit.Before;
+import org.junit.Rule;
+import org.junit.Test;
+
+public class ArtManagerLocalTests {
+    private ArtManagerLocal mArtManagerLocal;
+
+    @Before
+    public void setup() {
+        mArtManagerLocal = new ArtManagerLocal();
     }
 }
