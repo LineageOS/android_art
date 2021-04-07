@@ -198,12 +198,31 @@ class HashSet {
 
   HashSet(double min_load_factor, double max_load_factor) noexcept
       : HashSet(min_load_factor, max_load_factor, allocator_type()) {}
-
   HashSet(double min_load_factor, double max_load_factor, const allocator_type& alloc) noexcept
+      : HashSet(min_load_factor, max_load_factor, HashFn(), Pred(), alloc) {}
+
+  HashSet(const HashFn& hashfn,
+          const Pred& pred) noexcept
+      : HashSet(kDefaultMinLoadFactor, kDefaultMaxLoadFactor, hashfn, pred) {}
+  HashSet(const HashFn& hashfn,
+          const Pred& pred,
+          const allocator_type& alloc) noexcept
+      : HashSet(kDefaultMinLoadFactor, kDefaultMaxLoadFactor, hashfn, pred, alloc) {}
+
+  HashSet(double min_load_factor,
+          double max_load_factor,
+          const HashFn& hashfn,
+          const Pred& pred) noexcept
+      : HashSet(min_load_factor, max_load_factor, hashfn, pred, allocator_type()) {}
+  HashSet(double min_load_factor,
+          double max_load_factor,
+          const HashFn& hashfn,
+          const Pred& pred,
+          const allocator_type& alloc) noexcept
       : allocfn_(alloc),
-        hashfn_(),
+        hashfn_(hashfn),
         emptyfn_(),
-        pred_(),
+        pred_(pred),
         num_elements_(0u),
         num_buckets_(0u),
         elements_until_expand_(0u),
