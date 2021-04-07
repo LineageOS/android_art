@@ -28,7 +28,7 @@ package {
 }
 
 java_test {
-    name: "ArtManagerLocalTests",
+    name: "ArtServiceTests",
 
     // Include all test java files.
     srcs: [
@@ -36,10 +36,9 @@ java_test {
     ],
 
     static_libs: [
-        "junit",
+        "androidx.test.runner",
         "service-art.impl",
     ],
 
-    platform_apis: true,
     test_suites: ["general-tests"],
 }
