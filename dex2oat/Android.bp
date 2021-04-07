@@ -67,6 +67,7 @@ art_cc_defaults {
     shared_libs: [
         "libbase",
         "libcrypto", // For SHA-1 checksumming of build ID
+        "liblog",
         "liblz4",
         "libz",
     ],
@@ -78,6 +79,7 @@ cc_defaults {
     whole_static_libs: [
         "libbase",
         "libcrypto",
+        "liblog",
         "liblz4",
         "libz",
     ],
@@ -211,6 +213,7 @@ cc_defaults {
                 "libbase",
                 "libcrypto",
                 "liblz4", // libart(d)-dex2oat dependency; must be repeated here since it's a static lib.
+                "liblog",
                 "libsigchain",
                 "libz",
             ],
@@ -421,6 +424,7 @@ art_cc_library_static {
         "libartd-disassembler",
         "libbase",
         "liblz4", // libartd-dex2oat dependency; must be repeated here since it's a static lib.
+        "liblog",
     ],
     static_libs: [
         "libartd-dex2oat",
@@ -510,6 +514,7 @@ art_cc_test {
         "libbase",
         "libcrypto",
         "liblz4", // libartd-dex2oat dependency; must be repeated here since it's a static lib.
+        "liblog",
         "libprofiled",
         "libsigchain",
         "libziparchive",
