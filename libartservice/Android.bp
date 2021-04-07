@@ -42,14 +42,71 @@ cc_library {
     export_shared_lib_headers: ["libbase"],
 }
 
-java_library {
-    // This Java Language Library contains the ART Service class that will be
-    // loaded by the System Server.
+// This variable definition and many of the settings involved in the
+// service-art target are taken from the
+// framework-system-server-module-defaults target and its dependencies.  These
+// target are not used directly because they have a dependency on a
+// frameworks/base library which is not available in the unbundled ART build
+// servers (framework-annotations-lib).
+//
+// TODO (b/183133670): Remove this hack and use the
+//   framework-system-server-module-defaults target
+mainline_stubs_args = "--error UnhiddenSystemApi " +
+    "--hide BroadcastBehavior " +
+    "--hide CallbackInterface " +
+    "--hide DeprecationMismatch " +
+    "--hide HiddenSuperclass " +
+    "--hide HiddenTypedefConstant " +
+    "--hide HiddenTypeParameter " +
+    "--hide MissingPermission " +
+    "--hide RequiresPermission " +
+    "--hide SdkConstant " +
+    "--hide Todo " +
+    "--hide Typo " +
+    "--hide UnavailableSymbol "
 
-    name: "artservice",
+// Provides the API and implementation of the ART Service class that will be
+// loaded by the System Server.
+java_sdk_library {
+    // This target is named 'service-art' to conform to the naming conventions
+    // for JAR files in the System Server.
+    name: "service-art",
+    permitted_packages: ["com.android.server.art"],
+
+    system_server: {
+        enabled: true,
+        sdk_version: "module_current",
+    },
+
+    // Prevent dependencies that do not specify an sdk_version from accessing the
+    // implementation library by default and force them to use stubs instead.
+    default_to_stubs: true,
+
+    api_lint: {
+        enabled: true,
+    },
+
+    annotations_enabled: true,
+
+    // installable implies we'll create a non-apex (platform) variant, which
+    // we shouldn't ordinarily need (and it can create issues), so disable that.
+    installable: false,
+
     visibility: [
         "//art:__subpackages__",
+        "//frameworks/base/services/core",
+        "//frameworks/base/apex:__subpackages__",
+        "//packages/modules:__subpackages__",
     ],
+
+    impl_library_visibility: [
+        ":__pkg__",
+        "//art/libartservice/tests",
+        "//frameworks/base",
+    ],
+
+    stubs_library_visibility: ["//visibility:public"],
+    stubs_source_visibility: ["//visibility:private"],
 
     apex_available: [
         "com.android.art",
@@ -58,13 +115,34 @@ java_library {
     sdk_version: "core_platform",
     min_sdk_version: "31",
 
+    // This is not actually part of the public API but this is the only
+    // way to define a custom API surface.
+    public: {
+        enabled: true,
+        sdk_version: "module_current",
+    },
+
+    // The API elements are the ones annotated with
+    //   libcore.api.CorePlatformApi(status=libcore.api.CorePlatformApi.Status.STABLE)
+    droiddoc_options: [
+        mainline_stubs_args,
+        "--show-single-annotation libcore.api.CorePlatformApi\\(status=libcore.api.CorePlatformApi.Status.STABLE\\)",
+    ],
+
+    // Temporarily disable compatibility with previous released APIs.
+    // TODO - remove once prototype has stabilized
+    //   running "m update-api" will give instructions on what to do next
+    unsafe_ignore_missing_latest_api: true,
+
+    // This cannot be accessed by apps using <uses-library> in their manifest.
+    shared_library: false,
+
     srcs: [
-        "service/java/com/android/server/art/ArtService.java",
+        "service/java/com/android/server/art/ArtManagerLocal.java",
     ],
 
     libs: [
         "art.module.api.annotations.for.system.modules",
-        "unsupportedappusage",
     ],
 
     plugins: ["java_api_finder"],

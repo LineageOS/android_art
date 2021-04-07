@@ -1386,5 +1386,10 @@
         "tests": ["821-madvise-willneed"],
         "variant": "jvm",
         "description": ["Adding custom madvise flags. Not to be tested on default jvm"]
+    },
+    {
+        "tests": ["692-vdex-secondary-loader"],
+        "env_vars": {"ART_USE_READ_BARRIER": "false"},
+        "description": ["Uses the low-ram flag which does not work with CMS"]
     }
 ]
