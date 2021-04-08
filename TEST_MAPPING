@@ -295,9 +295,6 @@
       "name": "ArtServiceTests"
     },
     {
-      "name": "ArtGtestsTarget"
-    },
-    {
       "name": "art-run-test-001-HelloWorld"
     },
     {
