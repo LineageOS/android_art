@@ -596,11 +596,8 @@ class Generator:
         "BootImageProfileTest",
         "ArtServiceTests",
     ]
-    art_gtests = [
-        "ArtGtestsTarget",
-    ]
     presubmit_run_tests = run_test_module_names[0:num_presubmit_run_tests]
-    presubmit_tests = other_presubmit_tests + art_gtests + presubmit_run_tests
+    presubmit_tests = other_presubmit_tests + presubmit_run_tests
     presubmit_tests_dict = [{"name": t} for t in presubmit_tests]
 
     # Postsubmits.
