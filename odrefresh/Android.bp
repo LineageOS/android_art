@@ -30,12 +30,15 @@ cc_defaults {
     srcs: [
         "odrefresh.cc",
         "odr_fs_utils.cc",
+        "odr_metrics.cc",
+        "odr_metrics_record.cc",
     ],
     local_include_dirs: ["include"],
     header_libs: ["dexoptanalyzer_headers"],
     generated_sources: [
         "apex-info-list",
         "art-apex-cache-info",
+        "art-odrefresh-operator-srcs",
     ],
     shared_libs: [
         "libartpalette",
@@ -79,6 +82,16 @@ cc_library_headers {
         "//apex_available:platform", // For odsign.
     ],
     visibility: ["//visibility:public"],
+}
+
+gensrcs {
+    name: "art-odrefresh-operator-srcs",
+    cmd: "$(location generate_operator_out) art/odrefresh $(in) > $(out)",
+    tools: ["generate_operator_out"],
+    srcs: [
+        "odr_metrics.h",
+    ],
+    output_extension: "operator_out.cc",
 }
 
 art_cc_binary {
@@ -126,16 +139,19 @@ art_cc_test {
     defaults: [
         "art_gtest_defaults",
     ],
+    generated_sources: ["art-odrefresh-operator-srcs"],
     header_libs: ["odrefresh_headers"],
     srcs: [
         "odr_artifacts_test.cc",
         "odr_fs_utils.cc",
         "odr_fs_utils_test.cc",
+        "odr_metrics.cc",
+        "odr_metrics_test.cc",
+        "odr_metrics_record.cc",
+        "odr_metrics_record_test.cc",
         "odrefresh_test.cc",
     ],
-    shared_libs: [
-        "libbase",
-    ],
+    shared_libs: ["libbase"],
 }
 
 xsd_config {

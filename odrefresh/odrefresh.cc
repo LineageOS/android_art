@@ -64,12 +64,14 @@
 #include "dex/art_dex_file_loader.h"
 #include "dexoptanalyzer.h"
 #include "exec_utils.h"
+#include "log/log.h"
 #include "palette/palette.h"
 #include "palette/palette_types.h"
 
 #include "odr_artifacts.h"
 #include "odr_config.h"
 #include "odr_fs_utils.h"
+#include "odr_metrics.h"
 
 namespace art {
 namespace odrefresh {
@@ -479,7 +481,9 @@ class OnDeviceRefresh final {
     return true;
   }
 
-  WARN_UNUSED ExitCode CheckArtifactsAreUpToDate() {
+  WARN_UNUSED ExitCode CheckArtifactsAreUpToDate(OdrMetrics& metrics) {
+    metrics.SetStage(OdrMetrics::Stage::kCheck);
+
     // Clean-up helper used to simplify clean-ups and handling failures there.
     auto cleanup_return = [this](ExitCode exit_code) {
       return CleanApexdataDirectory() ? exit_code : ExitCode::kCleanupFailed;
@@ -487,8 +491,9 @@ class OnDeviceRefresh final {
 
     const auto apex_info = GetArtApexInfo();
     if (!apex_info.has_value()) {
-      // This should never happen, but do not proceed if it does.
+      // This should never happen, further up-to-date checks are not possible if it does.
       LOG(ERROR) << "Could not get ART APEX info.";
+      metrics.SetTrigger(OdrMetrics::Trigger::kApexVersionMismatch);
       return cleanup_return(ExitCode::kCompilationRequired);
     }
 
@@ -502,30 +507,40 @@ class OnDeviceRefresh final {
       // If the cache info file does not exist, assume compilation is required because the
       // file is missing and because the current ART APEX is not factory installed.
       PLOG(ERROR) << "No prior cache-info file: " << QuotePath(cache_info_filename_);
+      metrics.SetTrigger(OdrMetrics::Trigger::kApexVersionMismatch);
       return cleanup_return(ExitCode::kCompilationRequired);
     }
 
     // Get and parse the ART APEX cache info file.
     std::optional<art_apex::CacheInfo> cache_info = ReadCacheInfo();
     if (!cache_info.has_value()) {
+      // This should never happen, further up-to-date checks are not possible if it does.
       PLOG(ERROR) << "Failed to read cache-info file: " << QuotePath(cache_info_filename_);
+      metrics.SetTrigger(OdrMetrics::Trigger::kUnknown);
       return cleanup_return(ExitCode::kCompilationRequired);
     }
 
     // Generate current module info for the current ART APEX.
     const auto current_info = GenerateArtModuleInfo();
     if (!current_info.has_value()) {
+      // This should never happen, further up-to-date checks are not possible if it does.
       LOG(ERROR) << "Failed to generate cache provenance.";
+      metrics.SetTrigger(OdrMetrics::Trigger::kUnknown);
       return cleanup_return(ExitCode::kCompilationRequired);
     }
+
+    // Record ART Apex version for metrics reporting.
+    metrics.SetArtApexVersion(current_info->getVersionCode());
 
     // Check whether the current cache ART module info differs from the current ART module info.
     // Always check APEX version.
     const auto cached_info = cache_info->getFirstArtModuleInfo();
+
     if (cached_info->getVersionCode() != current_info->getVersionCode()) {
       LOG(INFO) << "ART APEX version code mismatch ("
                 << cached_info->getVersionCode()
                 << " != " << current_info->getVersionCode() << ").";
+      metrics.SetTrigger(OdrMetrics::Trigger::kApexVersionMismatch);
       return cleanup_return(ExitCode::kCompilationRequired);
     }
 
@@ -533,6 +548,7 @@ class OnDeviceRefresh final {
       LOG(INFO) << "ART APEX version code mismatch ("
                 << cached_info->getVersionName()
                 << " != " << current_info->getVersionName() << ").";
+      metrics.SetTrigger(OdrMetrics::Trigger::kApexVersionMismatch);
       return cleanup_return(ExitCode::kCompilationRequired);
     }
 
@@ -550,6 +566,7 @@ class OnDeviceRefresh final {
         (!cache_info->hasDex2oatBootClasspath() ||
          !cache_info->getFirstDex2oatBootClasspath()->hasComponent())) {
       LOG(INFO) << "Missing Dex2oatBootClasspath components.";
+      metrics.SetTrigger(OdrMetrics::Trigger::kDexFilesChanged);
       return cleanup_return(ExitCode::kCompilationRequired);
     }
 
@@ -558,6 +575,7 @@ class OnDeviceRefresh final {
         cache_info->getFirstDex2oatBootClasspath()->getComponent();
     if (!CheckComponents(expected_bcp_components, bcp_components, &error_msg)) {
       LOG(INFO) << "Dex2OatClasspath components mismatch: " << error_msg;
+      metrics.SetTrigger(OdrMetrics::Trigger::kDexFilesChanged);
       return cleanup_return(ExitCode::kCompilationRequired);
     }
 
@@ -580,6 +598,7 @@ class OnDeviceRefresh final {
         (!cache_info->hasSystemServerClasspath() ||
          !cache_info->getFirstSystemServerClasspath()->hasComponent())) {
       LOG(INFO) << "Missing SystemServerClasspath components.";
+      metrics.SetTrigger(OdrMetrics::Trigger::kDexFilesChanged);
       return cleanup_system_server_return(ExitCode::kCompilationRequired);
     }
 
@@ -587,6 +606,7 @@ class OnDeviceRefresh final {
         cache_info->getFirstSystemServerClasspath()->getComponent();
     if (!CheckComponents(expected_system_server_components, system_server_components, &error_msg)) {
       LOG(INFO) << "SystemServerClasspath components mismatch: " << error_msg;
+      metrics.SetTrigger(OdrMetrics::Trigger::kDexFilesChanged);
       return cleanup_system_server_return(ExitCode::kCompilationRequired);
     }
 
@@ -598,6 +618,7 @@ class OnDeviceRefresh final {
     for (const InstructionSet isa : config_.GetBootExtensionIsas()) {
       if (!BootExtensionArtifactsExistOnData(isa, &error_msg)) {
         LOG(INFO) << "Incomplete boot extension artifacts. " << error_msg;
+        metrics.SetTrigger(OdrMetrics::Trigger::kMissingArtifacts);
         return cleanup_boot_extensions_return(ExitCode::kCompilationRequired, isa);
       }
     }
@@ -608,6 +629,7 @@ class OnDeviceRefresh final {
       // `SystemServerArtifactsExistOnData()` checks in compilation order so it is possible some of
       // the artifacts are here. We likely ran out of space compiling the system_server artifacts.
       // Any artifacts present are usable.
+      metrics.SetTrigger(OdrMetrics::Trigger::kMissingArtifacts);
       return ExitCode::kCompilationRequired;
     }
 
@@ -980,8 +1002,10 @@ class OnDeviceRefresh final {
 
   WARN_UNUSED bool CompileBootExtensionArtifacts(const InstructionSet isa,
                                                  const std::string& staging_dir,
+                                                 OdrMetrics& metrics,
                                                  uint32_t* dex2oat_invocation_count,
                                                  std::string* error_msg) const {
+    ScopedOdrCompilationTimer compilation_timer(metrics);
     std::vector<std::string> args;
     args.push_back(config_.GetDex2Oat());
 
@@ -1032,12 +1056,14 @@ class OnDeviceRefresh final {
       std::unique_ptr<File> staging_file(OS::CreateEmptyFile(staging_location.c_str()));
       if (staging_file == nullptr) {
         PLOG(ERROR) << "Failed to create " << kind << " file: " << staging_location;
+        metrics.SetStatus(OdrMetrics::Status::kIoError);
         EraseFiles(staging_files);
         return false;
       }
 
       if (fchmod(staging_file->Fd(), S_IRUSR | S_IWUSR) != 0) {
         PLOG(ERROR) << "Could not set file mode on " << QuotePath(staging_location);
+        metrics.SetStatus(OdrMetrics::Status::kIoError);
         EraseFiles(staging_files);
         return false;
       }
@@ -1048,6 +1074,7 @@ class OnDeviceRefresh final {
 
     const std::string install_location = android::base::Dirname(image_location);
     if (!EnsureDirectoryExists(install_location)) {
+      metrics.SetStatus(OdrMetrics::Status::kIoError);
       return false;
     }
 
@@ -1061,15 +1088,19 @@ class OnDeviceRefresh final {
     }
 
     bool timed_out = false;
-    if (ExecAndReturnCode(args, timeout, &timed_out, error_msg) != 0) {
+    int dex2oat_exit_code = ExecAndReturnCode(args, timeout, &timed_out, error_msg);
+    if (dex2oat_exit_code != 0) {
       if (timed_out) {
-        // TODO(oth): record timeout event for compiling boot extension
+        metrics.SetStatus(OdrMetrics::Status::kTimeLimitExceeded);
+      } else {
+        metrics.SetStatus(OdrMetrics::Status::kDex2OatError);
       }
       EraseFiles(staging_files);
       return false;
     }
 
     if (!MoveOrEraseFiles(staging_files, install_location)) {
+      metrics.SetStatus(OdrMetrics::Status::kInstallFailed);
       return false;
     }
 
@@ -1080,8 +1111,10 @@ class OnDeviceRefresh final {
   }
 
   WARN_UNUSED bool CompileSystemServerArtifacts(const std::string& staging_dir,
+                                                OdrMetrics& metrics,
                                                 uint32_t* dex2oat_invocation_count,
                                                 std::string* error_msg) const {
+    ScopedOdrCompilationTimer compilation_timer(metrics);
     std::vector<std::string> classloader_context;
 
     const std::string dex2oat = config_.GetDex2Oat();
@@ -1104,6 +1137,7 @@ class OnDeviceRefresh final {
       if (classloader_context.empty()) {
         // All images are in the same directory, we only need to check on the first iteration.
         if (!EnsureDirectoryExists(install_location)) {
+          metrics.SetStatus(OdrMetrics::Status::kIoError);
           return false;
         }
       }
@@ -1124,6 +1158,7 @@ class OnDeviceRefresh final {
         std::unique_ptr<File> staging_file(OS::CreateEmptyFile(staging_location.c_str()));
         if (staging_file == nullptr) {
           PLOG(ERROR) << "Failed to create " << kind << " file: " << staging_location;
+          metrics.SetStatus(OdrMetrics::Status::kIoError);
           EraseFiles(staging_files);
           return false;
         }
@@ -1152,15 +1187,19 @@ class OnDeviceRefresh final {
       }
 
       bool timed_out = false;
-      if (!Exec(args, error_msg)) {
+      int dex2oat_exit_code = ExecAndReturnCode(args, timeout, &timed_out, error_msg);
+      if (dex2oat_exit_code != 0) {
         if (timed_out) {
-          // TODO(oth): record timeout event for compiling boot extension
+          metrics.SetStatus(OdrMetrics::Status::kTimeLimitExceeded);
+        } else {
+          metrics.SetStatus(OdrMetrics::Status::kDex2OatError);
         }
         EraseFiles(staging_files);
         return false;
       }
 
       if (!MoveOrEraseFiles(staging_files, install_location)) {
+        metrics.SetStatus(OdrMetrics::Status::kInstallFailed);
         return false;
       }
 
@@ -1181,28 +1220,39 @@ class OnDeviceRefresh final {
     android::base::SetProperty("service.bootanim.progress", std::to_string(value));
   }
 
-  WARN_UNUSED ExitCode Compile(bool force_compile) const {
+
+  WARN_UNUSED ExitCode Compile(OdrMetrics& metrics, bool force_compile) const {
     ReportSpace();  // TODO(oth): Factor available space into compilation logic.
 
+    const char* staging_dir = nullptr;
+    metrics.SetStage(OdrMetrics::Stage::kPreparation);
     // Clean-up existing files.
     if (force_compile && !CleanApexdataDirectory()) {
+      metrics.SetStatus(OdrMetrics::Status::kIoError);
+      return ExitCode::kCleanupFailed;
+    }
+
+    // Create staging area and assign label for generating compilation artifacts.
+    if (PaletteCreateOdrefreshStagingDirectory(&staging_dir) != PALETTE_STATUS_OK) {
+      metrics.SetStatus(OdrMetrics::Status::kStagingFailed);
       return ExitCode::kCleanupFailed;
     }
 
     // Emit cache info before compiling. This can be used to throttle compilation attempts later.
     WriteCacheInfo();
 
-    // Create staging area and assign label for generating compilation artifacts.
-    const char* staging_dir;
-    if (PaletteCreateOdrefreshStagingDirectory(&staging_dir) != PALETTE_STATUS_OK) {
-      return ExitCode::kCompilationFailed;
-    }
-
     std::string error_msg;
 
     uint32_t dex2oat_invocation_count = 0;
     ReportNextBootAnimationProgress(dex2oat_invocation_count);
-    for (const InstructionSet isa : config_.GetBootExtensionIsas()) {
+
+    const auto& bcp_instruction_sets = config_.GetBootExtensionIsas();
+    DCHECK(!bcp_instruction_sets.empty() && bcp_instruction_sets.size() <= 2);
+    for (const InstructionSet isa : bcp_instruction_sets) {
+      auto stage = (isa == bcp_instruction_sets.front()) ?
+                       OdrMetrics::Stage::kPrimaryBootClasspath :
+                       OdrMetrics::Stage::kSecondaryBootClasspath;
+      metrics.SetStage(stage);
       if (force_compile || !BootExtensionArtifactsExistOnData(isa, &error_msg)) {
         // Remove artifacts we are about to generate. Ordinarily these are removed in the checking
         // step, but this is not always run (e.g. during manual testing).
@@ -1210,7 +1260,7 @@ class OnDeviceRefresh final {
             return ExitCode::kCleanupFailed;
         }
         if (!CompileBootExtensionArtifacts(
-                isa, staging_dir, &dex2oat_invocation_count, &error_msg)) {
+                isa, staging_dir, metrics, &dex2oat_invocation_count, &error_msg)) {
           LOG(ERROR) << "Compilation of BCP failed: " << error_msg;
           if (!config_.GetDryRun() && !CleanDirectory(staging_dir)) {
             return ExitCode::kCleanupFailed;
@@ -1221,7 +1271,9 @@ class OnDeviceRefresh final {
     }
 
     if (force_compile || !SystemServerArtifactsExistOnData(&error_msg)) {
-      if (!CompileSystemServerArtifacts(staging_dir, &dex2oat_invocation_count, &error_msg)) {
+      metrics.SetStage(OdrMetrics::Stage::kSystemServerClasspath);
+      if (!CompileSystemServerArtifacts(
+              staging_dir, metrics, &dex2oat_invocation_count, &error_msg)) {
         LOG(ERROR) << "Compilation of system_server failed: " << error_msg;
         if (!config_.GetDryRun() && !CleanDirectory(staging_dir)) {
           return ExitCode::kCleanupFailed;
@@ -1230,6 +1282,7 @@ class OnDeviceRefresh final {
       }
     }
 
+    metrics.SetStage(OdrMetrics::Stage::kComplete);
     return ExitCode::kCompilationSuccess;
   }
 
@@ -1341,26 +1394,28 @@ class OnDeviceRefresh final {
 
   static int main(int argc, const char** argv) {
     OdrConfig config(argv[0]);
-
     int n = InitializeConfig(argc, argv, &config);
     argv += n;
     argc -= n;
-
     if (argc != 1) {
       UsageError("Expected 1 argument, but have %d.", argc);
     }
 
+    OdrMetrics metrics(kOdrefreshArtifactDirectory);
     OnDeviceRefresh odr(config);
     for (int i = 0; i < argc; ++i) {
       std::string_view action(argv[i]);
       if (action == "--check") {
         // Fast determination of whether artifacts are up to date.
-        return odr.CheckArtifactsAreUpToDate();
+        return odr.CheckArtifactsAreUpToDate(metrics);
       } else if (action == "--compile") {
-        const ExitCode e = odr.CheckArtifactsAreUpToDate();
-        return (e == ExitCode::kCompilationRequired) ? odr.Compile(/*force_compile=*/false) : e;
+        const ExitCode exit_code = odr.CheckArtifactsAreUpToDate(metrics);
+        if (exit_code == ExitCode::kCompilationRequired) {
+          return odr.Compile(metrics, /*force_compile=*/false);
+        }
+        return exit_code;
       } else if (action == "--force-compile") {
-        return odr.Compile(/*force_compile=*/true);
+        return odr.Compile(metrics, /*force_compile=*/true);
       } else if (action == "--verify") {
         // Slow determination of whether artifacts are up to date. These are too slow for checking
         // during boot (b/181689036).
