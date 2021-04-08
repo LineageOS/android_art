@@ -394,4 +394,98 @@ TEST_F(HashSetTest, Preallocated) {
   ASSERT_TRUE(hash_set.owns_data_);
 }
 
+class SmallIndexEmptyFn {
+ public:
+  void MakeEmpty(uint16_t& item) const {
+    item = std::numeric_limits<uint16_t>::max();
+  }
+  bool IsEmpty(const uint16_t& item) const {
+    return item == std::numeric_limits<uint16_t>::max();
+  }
+};
+
+class StatefulHashFn {
+ public:
+  explicit StatefulHashFn(const std::vector<std::string>* strings)
+      : strings_(strings) {}
+
+  size_t operator() (const uint16_t& index) const {
+    CHECK_LT(index, strings_->size());
+    return (*this)((*strings_)[index]);
+  }
+
+  size_t operator() (std::string_view s) const {
+    return DataHash()(s);
+  }
+
+ private:
+  const std::vector<std::string>* strings_;
+};
+
+class StatefulPred {
+ public:
+  explicit StatefulPred(const std::vector<std::string>* strings)
+      : strings_(strings) {}
+
+  bool operator() (const uint16_t& lhs, const uint16_t& rhs) const {
+    CHECK_LT(rhs, strings_->size());
+    return (*this)(lhs, (*strings_)[rhs]);
+  }
+
+  bool operator() (const uint16_t& lhs, std::string_view rhs) const {
+    CHECK_LT(lhs, strings_->size());
+    return (*strings_)[lhs] == rhs;
+  }
+
+ private:
+  const std::vector<std::string>* strings_;
+};
+
+TEST_F(HashSetTest, StatefulHashSet) {
+  std::vector<std::string> strings{
+      "duplicate",
+      "a",
+      "b",
+      "xyz",
+      "___",
+      "123",
+      "placeholder",
+      "duplicate"
+  };
+  const size_t duplicateFirstIndex = 0;
+  const size_t duplicateSecondIndex = strings.size() - 1u;
+  const size_t otherIndex = 1u;
+
+  StatefulHashFn hashfn(&strings);
+  StatefulPred pred(&strings);
+  HashSet<uint16_t, SmallIndexEmptyFn, StatefulHashFn, StatefulPred> hash_set(hashfn, pred);
+  for (size_t index = 0, size = strings.size(); index != size; ++index) {
+    bool inserted = hash_set.insert(index).second;
+    ASSERT_EQ(index != duplicateSecondIndex, inserted) << index;
+  }
+
+  // Check search by string.
+  for (size_t index = 0, size = strings.size(); index != size; ++index) {
+    auto it = hash_set.find(strings[index]);
+    ASSERT_FALSE(it == hash_set.end());
+    ASSERT_EQ(index == duplicateSecondIndex ? duplicateFirstIndex : index, *it) << index;
+  }
+  ASSERT_TRUE(hash_set.find("missing") == hash_set.end());
+
+  // Check search by index.
+  for (size_t index = 0, size = strings.size(); index != size; ++index) {
+    auto it = hash_set.find(index);
+    ASSERT_FALSE(it == hash_set.end());
+    ASSERT_EQ(index == duplicateSecondIndex ? duplicateFirstIndex : index, *it) << index;
+  }
+  // Note: Searching for index >= strings.size() is not supported by Stateful{HashFn,Pred}.
+
+  // Test removal and search by missing index.
+  auto remove_it = hash_set.find(otherIndex);
+  ASSERT_FALSE(remove_it == hash_set.end());
+  hash_set.erase(remove_it);
+  auto search_it = hash_set.find(otherIndex);
+  ASSERT_TRUE(search_it == hash_set.end());
+}
+
 }  // namespace art
