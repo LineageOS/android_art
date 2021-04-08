@@ -440,6 +440,7 @@ libart_cc_defaults {
         "libsigchain",
         "libunwindstack",
     ],
+    static_libs: ["libodrstatslog"],
     export_include_dirs: ["."],
     // ART's macros.h depends on libbase's macros.h.
     // Note: runtime_options.h depends on cmdline. But we don't really want to export this
@@ -458,6 +459,7 @@ libart_static_cc_defaults {
         "liblzma", // libelffile dependency; must be repeated here since it's a static lib.
         "libnativebridge",
         "libnativeloader",
+        "libodrstatslog",
         "libsigchain_fake",
         "libunwindstack",
         "libz",
