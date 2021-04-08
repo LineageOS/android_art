@@ -2833,7 +2833,7 @@ void LSEVisitor::PrepareForPartialPhiComputation() {
   std::replace_if(
       phi_placeholder_replacements_.begin(),
       phi_placeholder_replacements_.end(),
-      [](const Value& val) { return val.IsPureUnknown(); },
+      [](const Value& val) { return !val.IsDefault() && !val.IsInstruction(); },
       Value::Invalid());
 }
 
@@ -2978,7 +2978,7 @@ class PartialLoadStoreEliminationHelper {
       }
 
       ReplaceInput(to_replace);
-      RemoveInput(to_remove);
+      RemoveAndReplaceInputs(to_remove);
       CreateConstructorFences(constructor_fences);
       PredicateInstructions(to_predicate);
 
@@ -3092,7 +3092,7 @@ class PartialLoadStoreEliminationHelper {
       }
     }
 
-    void RemoveInput(const ScopedArenaVector<HInstruction*>& to_remove) {
+    void RemoveAndReplaceInputs(const ScopedArenaVector<HInstruction*>& to_remove) {
       for (HInstruction* ins : to_remove) {
         if (ins->GetBlock() == nullptr) {
           // Already dealt with.
@@ -3100,6 +3100,30 @@ class PartialLoadStoreEliminationHelper {
         }
         DCHECK(BeforeAllEscapes(ins->GetBlock())) << *ins;
         if (ins->IsInstanceFieldGet() || ins->IsInstanceFieldSet()) {
+          bool instruction_has_users =
+              ins->IsInstanceFieldGet() && (!ins->GetUses().empty() || !ins->GetEnvUses().empty());
+          if (instruction_has_users) {
+            // Make sure any remaining users of read are replaced.
+            HInstruction* replacement =
+                helper_->lse_->GetPartialValueAt(OriginalNewInstance(), ins);
+            // NB ReplaceInput will remove a use from the list so this is
+            // guaranteed to finish eventually.
+            while (!ins->GetUses().empty()) {
+              const HUseListNode<HInstruction*>& use = ins->GetUses().front();
+              use.GetUser()->ReplaceInput(replacement, use.GetIndex());
+            }
+            while (!ins->GetEnvUses().empty()) {
+              const HUseListNode<HEnvironment*>& use = ins->GetEnvUses().front();
+              use.GetUser()->ReplaceInput(replacement, use.GetIndex());
+            }
+          } else {
+            DCHECK(ins->GetUses().empty())
+                << "Instruction has users!\n"
+                << ins->DumpWithArgs() << "\nUsers are " << ins->GetUses();
+            DCHECK(ins->GetEnvUses().empty())
+                << "Instruction has users!\n"
+                << ins->DumpWithArgs() << "\nUsers are " << ins->GetEnvUses();
+          }
           ins->GetBlock()->RemoveInstruction(ins);
         } else {
           // Can only be obj == other, obj != other, obj == obj (!?) or, obj != obj (!?)
@@ -3554,9 +3578,8 @@ HInstruction* LSEVisitor::SetupPartialMaterialization(PartialLoadStoreEliminatio
     info = field_infos_[loc_off];
     DCHECK(loc->GetIndex() == nullptr);
     Value value = ReplacementOrValue(heap_values_for_[old_pred->GetBlockId()][loc_off].value);
-    if (value.NeedsLoopPhi()) {
+    if (value.NeedsLoopPhi() || value.IsMergedUnknown()) {
       Value repl = phi_placeholder_replacements_[PhiPlaceholderIndex(value.GetPhiPlaceholder())];
-      DCHECK(!repl.IsUnknown());
       DCHECK(repl.IsDefault() || repl.IsInvalid() || repl.IsInstruction())
           << repl << " from " << value << " pred is " << old_pred->GetBlockId();
       if (!repl.IsInvalid()) {
