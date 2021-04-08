@@ -39,6 +39,8 @@
 
 namespace art {
 
+static constexpr bool kDebugArgs = false;
+
 // Test class that provides some helpers to set a test up for compilation using dex2oat.
 class Dex2oatEnvironmentTest : public CommonRuntimeTest {
  public:
@@ -171,6 +173,62 @@ class Dex2oatEnvironmentTest : public CommonRuntimeTest {
   // files should be located.
   const std::string& GetOdexDir() const {
     return odex_dir_;
+  }
+
+  int Dex2Oat(const std::vector<std::string>& dex2oat_args,
+              std::string* output,
+              std::string* error_msg) {
+    std::vector<std::string> argv;
+    if (!CommonRuntimeTest::StartDex2OatCommandLine(&argv, error_msg)) {
+      ::testing::AssertionFailure() << "Could not start dex2oat cmd line " << *error_msg;
+    }
+
+    Runtime* runtime = Runtime::Current();
+    if (!runtime->IsVerificationEnabled()) {
+      argv.push_back("--compiler-filter=assume-verified");
+    }
+
+    if (runtime->MustRelocateIfPossible()) {
+      argv.push_back("--runtime-arg");
+      argv.push_back("-Xrelocate");
+    } else {
+      argv.push_back("--runtime-arg");
+      argv.push_back("-Xnorelocate");
+    }
+
+    if (!kIsTargetBuild) {
+      argv.push_back("--host");
+    }
+
+    argv.insert(argv.end(), dex2oat_args.begin(), dex2oat_args.end());
+
+    // We must set --android-root.
+    const char* android_root = getenv("ANDROID_ROOT");
+    CHECK(android_root != nullptr);
+    argv.push_back("--android-root=" + std::string(android_root));
+
+    if (kDebugArgs) {
+      std::string all_args;
+      for (const std::string& arg : argv) {
+        all_args += arg + " ";
+      }
+      LOG(ERROR) << all_args;
+    }
+
+    // We need dex2oat to actually log things.
+    auto post_fork_fn = []() { return setenv("ANDROID_LOG_TAGS", "*:d", 1) == 0; };
+    ForkAndExecResult res = ForkAndExec(argv, post_fork_fn, output);
+    if (res.stage != ForkAndExecResult::kFinished) {
+      *error_msg = strerror(errno);
+      ::testing::AssertionFailure() << "Failed to finish dex2oat invocation: " << *error_msg;
+    }
+
+    if (!res.StandardSuccess()) {
+      // We cannot use ASSERT_TRUE since the method returns an int and not void.
+      ::testing::AssertionFailure() << "dex2oat fork/exec failed: " << *error_msg;
+    }
+
+    return res.status_code;
   }
 
  private:
