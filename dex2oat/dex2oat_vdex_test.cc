@@ -266,4 +266,34 @@ TEST_F(Dex2oatVdexTest, VerifyCorruptVdexFile) {
       extra_args)) << output_;
 }
 
+// Check that if the input dm a vdex with mismatching checksums the compilation fails
+TEST_F(Dex2oatVdexTest, VerifyInputDmWithMismatchedChecksums) {
+  std::string error_msg;
+
+  // Generate a vdex file for Dex2oatVdexTestDex.
+  std::unique_ptr<const DexFile> dex_file(OpenTestDexFile("Dex2oatVdexTestDex"));
+
+  ASSERT_TRUE(RunDex2oat(
+      dex_file->GetLocation(),
+      GetOdex(dex_file),
+      /*public_sdk=*/ nullptr,
+      /*copy_dex_files=*/ false));
+
+  // Create the .dm file with the output.
+  std::string dm_file = GetScratchDir() + "/base.dm";
+  CreateDexMetadata(GetVdex(dex_file), dm_file);
+  std::vector<std::string> extra_args;
+  extra_args.push_back("--dm-file=" + dm_file);
+
+  // Try to compile Main using an input dm which contains the vdex for
+  // Dex2oatVdexTestDex. It should fail.
+  std::unique_ptr<const DexFile> dex_file2(OpenTestDexFile("Main"));
+  ASSERT_FALSE(RunDex2oat(
+      dex_file2->GetLocation(),
+      GetOdex(dex_file2, "v2"),
+      /*public_sdk=*/ nullptr,
+      /*copy_dex_files=*/ false,
+      extra_args)) << output_;
+}
+
 }  // namespace art
