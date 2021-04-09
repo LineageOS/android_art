@@ -29,12 +29,6 @@ art_cc_defaults {
     name: "art_test_defaults",
     host_supported: true,
     target: {
-        android: {
-            test_for: [
-                "com.android.art",
-                "com.android.art.debug",
-            ],
-        },
         android_arm: {
             relative_install_path: "art/arm",
         },
@@ -54,8 +48,6 @@ art_cc_defaults {
     cflags: [
         "-Wno-frame-larger-than=",
     ],
-    // Tests aren't generally included in any APEX, but this is necessary to
-    // avoid duplicate install rules for them by making them unavailable to platform.
     apex_available: [
         "com.android.art.debug",
     ],
@@ -159,10 +151,6 @@ art_cc_defaults {
     },
     apex_available: [
         "com.android.art.debug",
-        // TODO(b/183882457): This lib doesn't go into com.android.art, but
-        // apex_available lists need to be the same for internal libs to avoid
-        // stubs, and this depends on libdexfiled and others.
-        "com.android.art",
     ],
 }
 
@@ -199,10 +187,6 @@ art_cc_library {
     },
     apex_available: [
         "com.android.art.debug",
-        // TODO(b/183882457): This lib doesn't go into com.android.art, but
-        // apex_available lists need to be the same for internal libs to avoid
-        // stubs, and this depends on libdexfiled and others.
-        "com.android.art",
     ],
 }
 
@@ -1051,10 +1035,6 @@ art_cc_test {
             suffix: "64",
         },
     },
-    test_for: [
-        "com.android.art",
-        "com.android.art.debug",
-    ],
 }
 
 art_cc_test {
@@ -1071,10 +1051,6 @@ art_cc_test {
     ],
     test_suites: ["general-tests"],
     test_config: "art-gtests-target-chroot.xml",
-    test_for: [
-        "com.android.art",
-        "com.android.art.debug",
-    ],
 }
 
 filegroup {
