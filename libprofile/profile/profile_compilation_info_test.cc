@@ -922,6 +922,32 @@ TEST_F(ProfileCompilationInfoTest, UpdateProfileKeyOk) {
   }
 }
 
+TEST_F(ProfileCompilationInfoTest, UpdateProfileKeyOkWithAnnotation) {
+  std::vector<std::unique_ptr<const DexFile>> dex_files;
+  dex_files.push_back(std::unique_ptr<const DexFile>(dex1_renamed));
+  dex_files.push_back(std::unique_ptr<const DexFile>(dex2_renamed));
+
+  ProfileCompilationInfo info;
+  ProfileCompilationInfo::ProfileSampleAnnotation annotation("test.package");
+  AddMethod(&info, dex1, /* method_idx= */ 0, Hotness::kFlagHot, annotation);
+  AddMethod(&info, dex2, /* method_idx= */ 0, Hotness::kFlagHot, annotation);
+
+  // Update the profile keys based on the original dex files
+  ASSERT_TRUE(info.UpdateProfileKeys(dex_files));
+
+  // Verify that we find the methods when searched with the original dex files.
+  for (const std::unique_ptr<const DexFile>& dex : dex_files) {
+    ProfileCompilationInfo::MethodHotness loaded_hotness =
+        GetMethod(info, dex.get(), /* method_idx= */ 0, annotation);
+    ASSERT_TRUE(loaded_hotness.IsHot());
+  }
+
+  // Release the ownership as this is held by the test class;
+  for (std::unique_ptr<const DexFile>& dex : dex_files) {
+    UNUSED(dex.release());
+  }
+}
+
 TEST_F(ProfileCompilationInfoTest, UpdateProfileKeyOkButNoUpdate) {
   std::vector<std::unique_ptr<const DexFile>> dex_files;
   dex_files.push_back(std::unique_ptr<const DexFile>(dex1));
