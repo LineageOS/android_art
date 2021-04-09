@@ -5866,6 +5866,152 @@ TEST_F(LoadStoreEliminationTest, MultiPredicatedLoad3) {
   EXPECT_INS_EQ(bottom_phi->InputAt(1), moved_ni2);
 }
 
+// // ENTRY
+// obj = new Obj();
+// if (param1) {
+//   obj.field = 3;
+//   noescape();
+// } else {
+//   obj.field = 2;
+//   noescape();
+// }
+// int abc;
+// if (parameter_value) {
+//   // LEFT
+//   abc = 4;
+//   escape(obj);
+// } else {
+//   // RIGHT
+//   // ELIMINATE
+//   noescape();
+//   abc = obj.field + 4;
+// }
+// abc = phi
+// EXIT
+// predicated-ELIMINATE
+// return obj.field + abc
+TEST_F(LoadStoreEliminationTest, PredicatedLoad4) {
+  VariableSizedHandleScope vshs(Thread::Current());
+  CreateGraph(/*handles=*/&vshs);
+  AdjacencyListGraph blks(SetupFromAdjacencyList("entry",
+                                                 "exit",
+                                                 {{"entry", "start_left"},
+                                                  {"entry", "start_right"},
+                                                  {"start_left", "mid"},
+                                                  {"start_right", "mid"},
+                                                  {"mid", "left"},
+                                                  {"mid", "right"},
+                                                  {"left", "breturn"},
+                                                  {"right", "breturn"},
+                                                  {"breturn", "exit"}}));
+#define GET_BLOCK(name) HBasicBlock* name = blks.Get(#name)
+  GET_BLOCK(entry);
+  GET_BLOCK(exit);
+  GET_BLOCK(breturn);
+  GET_BLOCK(left);
+  GET_BLOCK(right);
+  GET_BLOCK(mid);
+  GET_BLOCK(start_left);
+  GET_BLOCK(start_right);
+#undef GET_BLOCK
+  EnsurePredecessorOrder(breturn, {left, right});
+  EnsurePredecessorOrder(mid, {start_left, start_right});
+  HInstruction* bool_value = MakeParam(DataType::Type::kBool);
+  HInstruction* bool_value2 = MakeParam(DataType::Type::kBool);
+  HInstruction* null_const = graph_->GetNullConstant();
+  HInstruction* c2 = graph_->GetIntConstant(2);
+  HInstruction* c3 = graph_->GetIntConstant(3);
+  HInstruction* c4 = graph_->GetIntConstant(4);
+
+  HInstruction* cls = MakeClassLoad();
+  HInstruction* new_inst = MakeNewInstance(cls);
+  HInstruction* if_inst = new (GetAllocator()) HIf(bool_value);
+  entry->AddInstruction(cls);
+  entry->AddInstruction(new_inst);
+  entry->AddInstruction(if_inst);
+  ManuallyBuildEnvFor(cls, {});
+  new_inst->CopyEnvironmentFrom(cls->GetEnvironment());
+
+  HInstruction* write_start_left = MakeIFieldSet(new_inst, c3, MemberOffset(32));
+  HInstruction* call_start_left = MakeInvoke(DataType::Type::kVoid, { });
+  start_left->AddInstruction(write_start_left);
+  start_left->AddInstruction(call_start_left);
+  start_left->AddInstruction(new (GetAllocator()) HGoto());
+  call_start_left->CopyEnvironmentFrom(cls->GetEnvironment());
+
+  HInstruction* write_start_right = MakeIFieldSet(new_inst, c2, MemberOffset(32));
+  HInstruction* call_start_right = MakeInvoke(DataType::Type::kVoid, { });
+  start_right->AddInstruction(write_start_right);
+  start_right->AddInstruction(call_start_right);
+  start_right->AddInstruction(new (GetAllocator()) HGoto());
+  call_start_right->CopyEnvironmentFrom(cls->GetEnvironment());
+
+  mid->AddInstruction(new (GetAllocator()) HIf(bool_value2));
+
+  HInstruction* call_left = MakeInvoke(DataType::Type::kVoid, { new_inst });
+  HInstruction* goto_left = new (GetAllocator()) HGoto();
+  left->AddInstruction(call_left);
+  left->AddInstruction(goto_left);
+  call_left->CopyEnvironmentFrom(cls->GetEnvironment());
+
+  HInstruction* call_right = MakeInvoke(DataType::Type::kVoid, { });
+  HInstruction* read_right = MakeIFieldGet(new_inst, DataType::Type::kInt32, MemberOffset(32));
+  HInstruction* add_right = new (GetAllocator()) HAdd(DataType::Type::kInt32, read_right, c4);
+  HInstruction* goto_right = new (GetAllocator()) HGoto();
+  right->AddInstruction(call_right);
+  right->AddInstruction(read_right);
+  right->AddInstruction(add_right);
+  right->AddInstruction(goto_right);
+  call_right->CopyEnvironmentFrom(cls->GetEnvironment());
+
+  HPhi* phi_bottom = MakePhi({c4, add_right});
+  HInstruction* read_bottom = MakeIFieldGet(new_inst, DataType::Type::kInt32, MemberOffset(32));
+  HInstruction* add_bottom =
+      new (GetAllocator()) HAdd(DataType::Type::kInt32, read_bottom, phi_bottom);
+  HInstruction* return_exit = new (GetAllocator()) HReturn(add_bottom);
+  breturn->AddPhi(phi_bottom);
+  breturn->AddInstruction(read_bottom);
+  breturn->AddInstruction(add_bottom);
+  breturn->AddInstruction(return_exit);
+
+  SetupExit(exit);
+
+  // PerformLSE expects this to be empty.
+  graph_->ClearDominanceInformation();
+  LOG(INFO) << "Pre LSE " << blks;
+  PerformLSEWithPartial();
+  LOG(INFO) << "Post LSE " << blks;
+
+  EXPECT_INS_REMOVED(read_bottom);
+  EXPECT_INS_REMOVED(read_right);
+  EXPECT_INS_RETAINED(call_left);
+  EXPECT_INS_RETAINED(call_right);
+  EXPECT_INS_RETAINED(call_start_left);
+  EXPECT_INS_RETAINED(call_start_right);
+  std::vector<HPhi*> merges;
+  HPredicatedInstanceFieldGet* pred_get =
+      FindSingleInstruction<HPredicatedInstanceFieldGet>(graph_, breturn);
+  std::tie(merges) = FindAllInstructions<HPhi>(graph_, breturn);
+  ASSERT_EQ(merges.size(), 3u);
+  HPhi* merge_value_return = FindOrNull(merges.begin(), merges.end(), [&](HPhi* p) {
+    return p != phi_bottom && p->GetType() == DataType::Type::kInt32;
+  });
+  HPhi* merge_alloc = FindOrNull(merges.begin(), merges.end(), [](HPhi* p) {
+    return p->GetType() == DataType::Type::kReference;
+  });
+  ASSERT_NE(merge_alloc, nullptr);
+  EXPECT_TRUE(merge_alloc->InputAt(0)->IsNewInstance()) << *merge_alloc;
+  EXPECT_EQ(merge_alloc->InputAt(0)->InputAt(0), cls) << *merge_alloc << " cls? " << *cls;
+  EXPECT_EQ(merge_alloc->InputAt(1), null_const);
+  ASSERT_NE(pred_get, nullptr);
+  EXPECT_INS_EQ(pred_get->GetTarget(), merge_alloc);
+  EXPECT_INS_EQ(pred_get->GetDefaultValue(), merge_value_return) << " pred-get is: " << *pred_get;
+  EXPECT_INS_EQ(merge_value_return->InputAt(0), graph_->GetIntConstant(0))
+      << " merge val is: " << *merge_value_return;
+  EXPECT_INS_EQ(merge_value_return->InputAt(1), FindSingleInstruction<HPhi>(graph_, mid))
+      << " merge val is: " << *merge_value_return;
+}
+
 // Based on structure seen in `java.util.Set java.util.Collections$UnmodifiableMap.entrySet()`
 // We end up having to update a PHI generated by normal LSE.
 // // ENTRY
@@ -7134,6 +7280,170 @@ TEST_F(LoadStoreEliminationTest, PartialLoopPhis5) {
   EXPECT_INS_EQ(mat_set->InputAt(1), loop_header_phi);
   EXPECT_INS_REMOVED(write_loop_right) << *write_loop_right;
   EXPECT_INS_REMOVED(write_pre_header) << *write_pre_header;
+}
+
+// // ENTRY
+// obj = new Obj();
+// obj.field = 3;
+// if (param) {
+//   while (!test()) {
+//     if (test2()) {
+//       noescape();
+//     } else {
+//       abc = obj.field;
+//       obj.field = abc + 5;
+//       noescape();
+//     }
+//   }
+//   escape(obj);
+// } else {
+// }
+// return obj.field
+TEST_F(LoadStoreEliminationTest, PartialLoopPhis6) {
+  VariableSizedHandleScope vshs(Thread::Current());
+  CreateGraph(/*handles=*/&vshs);
+  AdjacencyListGraph blks(SetupFromAdjacencyList("entry",
+                                                 "exit",
+                                                 {{"entry", "start"},
+                                                  {"start", "left"},
+                                                  {"start", "right"},
+                                                  {"left", "loop_pre_header"},
+
+                                                  {"loop_pre_header", "loop_header"},
+                                                  {"loop_header", "escape"},
+                                                  {"loop_header", "loop_body"},
+                                                  {"loop_body", "loop_if_left"},
+                                                  {"loop_body", "loop_if_right"},
+                                                  {"loop_if_left", "loop_header"},
+                                                  {"loop_if_right", "loop_header"},
+
+                                                  {"escape", "breturn"},
+                                                  {"right", "breturn"},
+                                                  {"breturn", "exit"}}));
+#define GET_BLOCK(name) HBasicBlock* name = blks.Get(#name)
+  GET_BLOCK(entry);
+  GET_BLOCK(exit);
+  GET_BLOCK(breturn);
+  GET_BLOCK(left);
+  GET_BLOCK(right);
+  GET_BLOCK(start);
+  GET_BLOCK(escape);
+
+  GET_BLOCK(loop_pre_header);
+  GET_BLOCK(loop_header);
+  GET_BLOCK(loop_body);
+  GET_BLOCK(loop_if_left);
+  GET_BLOCK(loop_if_right);
+#undef GET_BLOCK
+  EnsurePredecessorOrder(breturn, {escape, right});
+  EnsurePredecessorOrder(loop_header, {loop_pre_header, loop_if_left, loop_if_right});
+  CHECK_SUBROUTINE_FAILURE();
+  HInstruction* bool_val = MakeParam(DataType::Type::kBool);
+  HInstruction* c3 = graph_->GetIntConstant(3);
+  HInstruction* c5 = graph_->GetIntConstant(5);
+
+  HInstruction* cls = MakeClassLoad();
+  HInstruction* new_inst = MakeNewInstance(cls);
+  HInstruction* write_entry = MakeIFieldSet(new_inst, c3, MemberOffset(32));
+  HInstruction* entry_goto = new (GetAllocator()) HGoto();
+  entry->AddInstruction(cls);
+  entry->AddInstruction(new_inst);
+  entry->AddInstruction(write_entry);
+  entry->AddInstruction(entry_goto);
+  ManuallyBuildEnvFor(cls, {});
+  new_inst->CopyEnvironmentFrom(cls->GetEnvironment());
+
+  start->AddInstruction(new (GetAllocator()) HIf(bool_val));
+
+  HInstruction* left_goto = new (GetAllocator()) HGoto();
+  left->AddInstruction(left_goto);
+
+  HInstruction* goto_preheader = new (GetAllocator()) HGoto();
+  loop_pre_header->AddInstruction(goto_preheader);
+
+  HInstruction* suspend_check_header = new (GetAllocator()) HSuspendCheck();
+  HInstruction* call_header = MakeInvoke(DataType::Type::kBool, {});
+  HInstruction* if_header = new (GetAllocator()) HIf(call_header);
+  loop_header->AddInstruction(suspend_check_header);
+  loop_header->AddInstruction(call_header);
+  loop_header->AddInstruction(if_header);
+  call_header->CopyEnvironmentFrom(cls->GetEnvironment());
+  suspend_check_header->CopyEnvironmentFrom(cls->GetEnvironment());
+
+  HInstruction* call_loop_body = MakeInvoke(DataType::Type::kBool, {});
+  HInstruction* if_loop_body = new (GetAllocator()) HIf(call_loop_body);
+  loop_body->AddInstruction(call_loop_body);
+  loop_body->AddInstruction(if_loop_body);
+  call_loop_body->CopyEnvironmentFrom(cls->GetEnvironment());
+
+  HInstruction* call_loop_left = MakeInvoke(DataType::Type::kVoid, {});
+  HInstruction* goto_loop_left = new (GetAllocator()) HGoto();
+  loop_if_left->AddInstruction(call_loop_left);
+  loop_if_left->AddInstruction(goto_loop_left);
+  call_loop_left->CopyEnvironmentFrom(cls->GetEnvironment());
+
+  HInstruction* read_loop_right = MakeIFieldGet(new_inst, DataType::Type::kInt32, MemberOffset(32));
+  HInstruction* add_loop_right =
+      new (GetAllocator()) HAdd(DataType::Type::kInt32, c5, read_loop_right);
+  HInstruction* write_loop_right = MakeIFieldSet(new_inst, add_loop_right, MemberOffset(32));
+  HInstruction* call_loop_right = MakeInvoke(DataType::Type::kVoid, {});
+  HInstruction* goto_loop_right = new (GetAllocator()) HGoto();
+  loop_if_right->AddInstruction(read_loop_right);
+  loop_if_right->AddInstruction(add_loop_right);
+  loop_if_right->AddInstruction(write_loop_right);
+  loop_if_right->AddInstruction(call_loop_right);
+  loop_if_right->AddInstruction(goto_loop_right);
+  call_loop_right->CopyEnvironmentFrom(cls->GetEnvironment());
+
+  HInstruction* call_escape = MakeInvoke(DataType::Type::kVoid, { new_inst });
+  HInstruction* goto_escape = new (GetAllocator()) HGoto();
+  escape->AddInstruction(call_escape);
+  escape->AddInstruction(goto_escape);
+  call_escape->CopyEnvironmentFrom(cls->GetEnvironment());
+
+  HInstruction* goto_right = new (GetAllocator()) HGoto();
+  right->AddInstruction(goto_right);
+
+  HInstruction* read_bottom = MakeIFieldGet(new_inst, DataType::Type::kInt32, MemberOffset(32));
+  HInstruction* return_exit = new (GetAllocator()) HReturn(read_bottom);
+  breturn->AddInstruction(read_bottom);
+  breturn->AddInstruction(return_exit);
+
+  SetupExit(exit);
+
+  // PerformLSE expects this to be empty.
+  graph_->ClearDominanceInformation();
+  LOG(INFO) << "Pre LSE " << blks;
+  PerformLSEWithPartial();
+  LOG(INFO) << "Post LSE " << blks;
+
+  HPredicatedInstanceFieldGet* pred_get =
+      FindSingleInstruction<HPredicatedInstanceFieldGet>(graph_, breturn);
+  EXPECT_INS_REMOVED(read_bottom) << *read_bottom;
+  ASSERT_TRUE(pred_get != nullptr);
+  HPhi* inst_return_phi = pred_get->GetTarget()->AsPhi();
+  ASSERT_TRUE(inst_return_phi != nullptr) << pred_get->GetTarget()->DumpWithArgs();
+  EXPECT_INS_EQ(inst_return_phi->InputAt(0),
+                FindSingleInstruction<HNewInstance>(graph_, escape->GetSinglePredecessor()));
+  EXPECT_INS_EQ(inst_return_phi->InputAt(1), graph_->GetNullConstant());
+  EXPECT_INS_EQ(pred_get->GetDefaultValue()->InputAt(0), graph_->GetIntConstant(0));
+  EXPECT_INS_EQ(pred_get->GetDefaultValue()->InputAt(1), c3);
+  HPhi* loop_header_phi = FindSingleInstruction<HPhi>(graph_, loop_header);
+  ASSERT_NE(loop_header_phi, nullptr);
+  EXPECT_INS_EQ(loop_header_phi->InputAt(0), c3);
+  EXPECT_INS_EQ(loop_header_phi->InputAt(1), loop_header_phi);
+  EXPECT_INS_EQ(loop_header_phi->InputAt(2), add_loop_right);
+  EXPECT_INS_EQ(add_loop_right->InputAt(0), c5);
+  EXPECT_INS_EQ(add_loop_right->InputAt(1), loop_header_phi);
+  HInstanceFieldSet* mat_set =
+      FindSingleInstruction<HInstanceFieldSet>(graph_, escape->GetSinglePredecessor());
+  ASSERT_NE(mat_set, nullptr);
+  EXPECT_INS_EQ(mat_set->InputAt(1), loop_header_phi);
+  EXPECT_INS_REMOVED(write_loop_right);
+  EXPECT_INS_REMOVED(write_entry);
+  EXPECT_INS_RETAINED(call_header);
+  EXPECT_INS_RETAINED(call_loop_left);
+  EXPECT_INS_RETAINED(call_loop_right);
 }
 
 // TODO This should really be in an Instruction simplifier Gtest but (1) that
