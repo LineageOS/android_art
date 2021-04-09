@@ -527,7 +527,7 @@ class ReleaseChecker:
     self._checker.check_symlinked_multilib_executable('dalvikvm')
 
     # Check exported libraries for ART.
-    self._checker.check_native_library('libdexfile')
+    self._checker.check_native_library('libdexfile_external')
     self._checker.check_native_library('libnativebridge')
     self._checker.check_native_library('libnativehelper')
     self._checker.check_native_library('libnativeloader')
@@ -542,6 +542,7 @@ class ReleaseChecker:
     self._checker.check_native_library('libartpalette')
     self._checker.check_native_library('libartservice')
     self._checker.check_native_library('libarttools')
+    self._checker.check_native_library('libdexfile')
     self._checker.check_native_library('libdexfile_support')
     self._checker.check_native_library('libdt_fd_forward')
     self._checker.check_native_library('libopenjdkjvm')
@@ -676,9 +677,6 @@ class DebugChecker:
     self._checker.check_symlinked_multilib_executable('imgdiagd')
     self._checker.check_executable('profmand')
 
-    # Check exported libraries for ART.
-    self._checker.check_native_library('libdexfiled')
-
     # Check internal libraries for ART.
     self._checker.check_native_library('libadbconnectiond')
     self._checker.check_native_library('libartbased')
@@ -686,6 +684,7 @@ class DebugChecker:
     self._checker.check_native_library('libartd-compiler')
     self._checker.check_native_library('libartd-dexlayout')
     self._checker.check_native_library('libartd-disassembler')
+    self._checker.check_native_library('libdexfiled')
     self._checker.check_native_library('libopenjdkjvmd')
     self._checker.check_native_library('libopenjdkjvmtid')
     self._checker.check_native_library('libprofiled')
@@ -708,6 +707,7 @@ class DebugTargetChecker:
     self._checker.check_executable('oatdumpd')
 
     # Check ART internal libraries.
+    self._checker.check_native_library('libdexfiled_external')
     self._checker.check_native_library('libperfetto_hprofd')
 
     # Check internal native library dependencies.

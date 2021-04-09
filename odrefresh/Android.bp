@@ -113,10 +113,6 @@ art_cc_binary {
     ],
     apex_available: [
         "com.android.art.debug",
-        // TODO(b/183882457): This binary doesn't go into com.android.art, but
-        // apex_available lists need to be the same for internal libs to avoid
-        // stubs, and this depends on libartd.
-        "com.android.art",
     ],
 }
 

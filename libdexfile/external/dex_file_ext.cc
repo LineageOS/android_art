@@ -18,6 +18,7 @@
 
 #include <inttypes.h>
 #include <stdint.h>
+#include <sys/mman.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
@@ -42,7 +43,6 @@
 #include <dex/dex_file_loader.h>
 
 extern "C" {
-
 // Wraps DexFile to add the caching needed by the external interface. This is
 // what gets passed over as ExtDexFile*.
 struct ExtDexFile {
