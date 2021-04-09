@@ -65,7 +65,7 @@ art_module_sdk {
 
             native_shared_libs: [
                 "libandroidio",
-                "libdexfile",
+                "libdexfile_external",
                 "libnativebridge",
                 "libnativehelper",
                 "libnativeloader",
@@ -77,7 +77,7 @@ art_module_sdk {
             ],
 
             native_static_libs: [
-                "libdexfile_static",
+                "libdexfile_external_static",
                 "libnativehelper_lazy",
             ],
         },
