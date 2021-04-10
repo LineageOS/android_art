@@ -63,34 +63,36 @@ class PACKED(4) OatQuickMethodHeader {
     return pc - reinterpret_cast<uintptr_t>(GetEntryPoint());
   }
 
-  bool IsOptimized() const {
+  ALWAYS_INLINE bool IsOptimized() const {
     uintptr_t code = reinterpret_cast<uintptr_t>(code_);
     DCHECK_NE(data_, 0u) << std::hex << code;          // Probably a padding of native code.
     DCHECK_NE(data_, 0xFFFFFFFF) << std::hex << code;  // Probably a stub or trampoline.
     return (data_ & kIsCodeInfoMask) != 0;
   }
 
-  const uint8_t* GetOptimizedCodeInfoPtr() const {
+  ALWAYS_INLINE const uint8_t* GetOptimizedCodeInfoPtr() const {
     uint32_t offset = GetCodeInfoOffset();
     DCHECK_NE(offset, 0u);
     return code_ - offset;
   }
 
-  uint8_t* GetOptimizedCodeInfoPtr() {
+  ALWAYS_INLINE uint8_t* GetOptimizedCodeInfoPtr() {
     uint32_t offset = GetCodeInfoOffset();
     DCHECK_NE(offset, 0u);
     return code_ - offset;
   }
 
-  const uint8_t* GetCode() const {
+  ALWAYS_INLINE const uint8_t* GetCode() const {
     return code_;
   }
 
-  uint32_t GetCodeSize() const {
-    return IsOptimized() ? CodeInfo::DecodeCodeSize(this) : (data_ & kCodeSizeMask);
+  ALWAYS_INLINE uint32_t GetCodeSize() const {
+    return LIKELY(IsOptimized())
+        ? CodeInfo::DecodeCodeSize(GetOptimizedCodeInfoPtr())
+        : (data_ & kCodeSizeMask);
   }
 
-  uint32_t GetCodeInfoOffset() const {
+  ALWAYS_INLINE uint32_t GetCodeInfoOffset() const {
     DCHECK(IsOptimized());
     return data_ & kCodeInfoMask;
   }

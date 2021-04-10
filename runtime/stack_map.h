@@ -296,10 +296,29 @@ class CodeInfo {
   ALWAYS_INLINE explicit CodeInfo(const OatQuickMethodHeader* header);
 
   // The following methods decode only part of the data.
-  static QuickMethodFrameInfo DecodeFrameInfo(const uint8_t* data);
   static CodeInfo DecodeGcMasksOnly(const OatQuickMethodHeader* header);
   static CodeInfo DecodeInlineInfoOnly(const OatQuickMethodHeader* header);
-  static uint32_t DecodeCodeSize(const OatQuickMethodHeader* header);
+
+  ALWAYS_INLINE static uint32_t DecodeCodeSize(const uint8_t* code_info_data) {
+    return DecodeHeaderOnly(code_info_data).code_size_;
+  }
+
+  ALWAYS_INLINE static QuickMethodFrameInfo DecodeFrameInfo(const uint8_t* code_info_data) {
+    CodeInfo code_info = DecodeHeaderOnly(code_info_data);
+    return QuickMethodFrameInfo(code_info.packed_frame_size_ * kStackAlignment,
+                                code_info.core_spill_mask_,
+                                code_info.fp_spill_mask_);
+  }
+
+  ALWAYS_INLINE static CodeInfo DecodeHeaderOnly(const uint8_t* code_info_data) {
+    CodeInfo code_info;
+    BitMemoryReader reader(code_info_data);
+    std::array<uint32_t, kNumHeaders> header = reader.ReadInterleavedVarints<kNumHeaders>();
+    ForEachHeaderField([&code_info, &header](size_t i, auto member_pointer) {
+      code_info.*member_pointer = header[i];
+    });
+    return code_info;
+  }
 
   ALWAYS_INLINE const BitTable<StackMap>& GetStackMaps() const {
     return stack_maps_;
