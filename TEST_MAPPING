@@ -212,9 +212,6 @@
       "name": "art-run-test-100-reflect2[com.google.android.art.apex]"
     },
     {
-      "name": "art-run-test-1004-checker-volatile-ref-load[com.google.android.art.apex]"
-    },
-    {
       "name": "art-run-test-101-fibonacci[com.google.android.art.apex]"
     },
     {
@@ -503,9 +500,6 @@
     },
     {
       "name": "art-run-test-100-reflect2"
-    },
-    {
-      "name": "art-run-test-1004-checker-volatile-ref-load"
     },
     {
       "name": "art-run-test-101-fibonacci"

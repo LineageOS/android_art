@@ -61,13 +61,6 @@ CodeInfo::CodeInfo(const uint8_t* data, size_t* num_read_bits)
 CodeInfo::CodeInfo(const OatQuickMethodHeader* header)
     : CodeInfo(header->GetOptimizedCodeInfoPtr()) {}
 
-QuickMethodFrameInfo CodeInfo::DecodeFrameInfo(const uint8_t* data) {
-  CodeInfo code_info(data);
-  return QuickMethodFrameInfo(code_info.packed_frame_size_ * kStackAlignment,
-                              code_info.core_spill_mask_,
-                              code_info.fp_spill_mask_);
-}
-
 CodeInfo CodeInfo::DecodeGcMasksOnly(const OatQuickMethodHeader* header) {
   CodeInfo code_info(header->GetOptimizedCodeInfoPtr());
   CodeInfo copy;  // Copy to dead-code-eliminate all fields that we do not need.
@@ -85,10 +78,6 @@ CodeInfo CodeInfo::DecodeInlineInfoOnly(const OatQuickMethodHeader* header) {
   copy.inline_infos_ = code_info.inline_infos_;
   copy.method_infos_ = code_info.method_infos_;
   return copy;
-}
-
-uint32_t CodeInfo::DecodeCodeSize(const OatQuickMethodHeader* header) {
-  return CodeInfo(header->GetOptimizedCodeInfoPtr()).code_size_;
 }
 
 size_t CodeInfo::Deduper::Dedupe(const uint8_t* code_info_data) {
