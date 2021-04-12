@@ -1862,7 +1862,7 @@ bool HInliner::CanInlineBody(const HGraph* callee_graph,
     for (HInstructionIterator instr_it(block->GetInstructions());
          !instr_it.Done();
          instr_it.Advance()) {
-      if (++number_of_instructions >= inlining_budget_) {
+      if (++number_of_instructions > inlining_budget_) {
         LOG_FAIL(stats_, MethodCompilationStat::kNotInlinedInstructionBudget)
             << "Method " << resolved_method->PrettyMethod()
             << " is not inlined because the outer method has reached"
@@ -1871,7 +1871,7 @@ bool HInliner::CanInlineBody(const HGraph* callee_graph,
       }
       HInstruction* current = instr_it.Current();
       if (current->NeedsEnvironment() &&
-          (total_number_of_dex_registers_ >= kMaximumNumberOfCumulatedDexRegisters)) {
+          (total_number_of_dex_registers_ > kMaximumNumberOfCumulatedDexRegisters)) {
         LOG_FAIL(stats_, MethodCompilationStat::kNotInlinedEnvironmentBudget)
             << "Method " << resolved_method->PrettyMethod()
             << " is not inlined because its caller has reached"
@@ -2057,7 +2057,7 @@ void HInliner::RunOptimizations(HGraph* callee_graph,
 
   // Bail early for pathological cases on the environment (for example recursive calls,
   // or too large environment).
-  if (total_number_of_dex_registers_ >= kMaximumNumberOfCumulatedDexRegisters) {
+  if (total_number_of_dex_registers_ > kMaximumNumberOfCumulatedDexRegisters) {
     LOG_NOTE() << "Calls in " << callee_graph->GetArtMethod()->PrettyMethod()
              << " will not be inlined because the outer method has reached"
              << " its environment budget limit.";
