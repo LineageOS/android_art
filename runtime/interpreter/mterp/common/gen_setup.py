@@ -19,7 +19,7 @@
 # the templated snippets. Those define all the helper functions used below.
 
 import sys, re
-from cStringIO import StringIO
+from io import StringIO
 
 out = StringIO()  # File-like in-memory buffer.
 handler_size_bytes = "MTERP_HANDLER_SIZE"
