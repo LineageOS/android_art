@@ -313,6 +313,10 @@ if [ $execution_mode = "device" -o $execution_mode = "host" ]; then
     # of -XX:AlwayLogExplicitGcs:false.
     vogar_args="$vogar_args --vm-arg -XX:LongPauseLogThreshold=15" # 15 ms (default: 5ms)
   else
+    if $debug; then
+      expectations="$expectations --expectations art/tools/libcore_debug_failures.txt"
+    fi
+
     # We only run this package when user has not specified packages
     # to run and not under gcstress / debug as it can cause timeouts. See
     # b/78228743 and b/178351808.
