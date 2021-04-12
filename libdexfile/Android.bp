@@ -46,10 +46,19 @@ cc_defaults {
         "dex/type_lookup_table.cc",
         "dex/utf.cc",
     ],
-    header_libs: ["jni_headers"],
-    export_header_lib_headers: ["jni_headers"],
+    header_libs: [
+        "jni_headers",
+        "libdexfile_external_headers",
+    ],
+    export_header_lib_headers: [
+        "jni_headers",
+        "libdexfile_external_headers",
+    ],
     target: {
         android: {
+            srcs: [
+                "external/dex_file_ext.cc",
+            ],
             static_libs: [
                 "libziparchive",
             ],
@@ -67,6 +76,9 @@ cc_defaults {
             ],
         },
         not_windows: {
+            srcs: [
+                "external/dex_file_ext.cc",
+            ],
             shared_libs: [
                 "libziparchive",
                 "libz",
@@ -188,6 +200,11 @@ art_cc_library {
         "com.android.art",
         "com.android.art.debug",
     ],
+    stubs: {
+        // TODO(b/143978909): Rename and move this file to this directory.
+        symbol_file: "external/libdexfile_external.map.txt",
+        versions: ["1"],
+    },
 }
 
 art_cc_library {
@@ -233,6 +250,11 @@ art_cc_library {
         // stubs, and libartd depends on this.
         "com.android.art",
     ],
+    stubs: {
+        // TODO(b/143978909): Rename and move this file to this directory.
+        symbol_file: "external/libdexfile_external.map.txt",
+        versions: ["1"],
+    },
 }
 
 art_cc_test {
@@ -308,69 +330,6 @@ cc_library_headers {
     min_sdk_version: "S",
 }
 
-cc_defaults {
-    name: "libdexfile_external-defaults",
-    host_supported: true,
-    srcs: [
-        "external/dex_file_ext.cc",
-    ],
-    header_libs: [
-        "jni_headers",
-        "libdexfile_external_headers",
-    ],
-    shared_libs: [
-        "libbase",
-    ],
-    stubs: {
-        symbol_file: "external/libdexfile_external.map.txt",
-        versions: ["1"],
-    },
-    export_header_lib_headers: [
-        "jni_headers",
-        "libdexfile_external_headers",
-    ],
-}
-
-art_cc_library {
-    name: "libdexfile_external",
-    defaults: [
-        "art_defaults",
-        "libdexfile_external-defaults",
-    ],
-    visibility: ["//visibility:public"],
-    target: {
-        darwin: {
-            enabled: true,
-        },
-    },
-    shared_libs: [
-        "libdexfile",
-    ],
-    apex_available: [
-        "com.android.art",
-        "com.android.art.debug",
-    ],
-}
-
-art_cc_library {
-    name: "libdexfiled_external",
-    defaults: [
-        "art_debug_defaults",
-        "libdexfile_external-defaults",
-    ],
-    target: {
-        darwin: {
-            enabled: true,
-        },
-    },
-    shared_libs: [
-        "libdexfiled",
-    ],
-    apex_available: [
-        "com.android.art.debug",
-    ],
-}
-
 art_cc_test {
     name: "art_libdexfile_external_tests",
     host_supported: true,
@@ -398,7 +357,7 @@ art_cc_library {
     srcs: [
         "external/dex_file_supp.cc",
     ],
-    runtime_libs: ["libdexfile_external"],
+    runtime_libs: ["libdexfile"],
     shared_libs: [
         "liblog",
         "libbase",
@@ -430,7 +389,7 @@ art_cc_test {
     shared_libs: [
         "libartbase",
         "libbase",
-        "libdexfile_external",
+        "libdexfile",
         "libdexfile_support",
     ],
 }
@@ -452,7 +411,7 @@ cc_defaults {
         "libdexfile_static_defaults",
     ],
     whole_static_libs: [
-        "libdexfile_external",
+        "libdexfile",
         "libdexfile_support_static",
     ],
 }
@@ -463,8 +422,8 @@ cc_defaults {
         "libdexfiled_static_defaults",
     ],
     whole_static_libs: [
+        "libdexfiled",
         "libdexfile_support_static",
-        "libdexfiled_external",
     ],
 }
 
@@ -482,7 +441,7 @@ art_cc_test {
 // This is not allowed in any module that may end up in an APEX or platform
 // image, so visibility is restrictive.
 cc_library_static {
-    name: "libdexfile_external_static",
+    name: "libdexfile_static",
     host_supported: true,
     visibility: [
         // Required for simpleperf, libsimpleperf_record, and libsimpleperf_report
@@ -501,14 +460,14 @@ cc_library_static {
 }
 
 art_cc_test {
-    name: "art_libdexfile_external_static_tests",
+    name: "art_libdexfile_static_tests",
     host_supported: true,
     test_suites: ["general-tests"],
     srcs: [
         "external/dex_file_supp_test.cc",
     ],
     static_libs: [
-        "libdexfile_external_static",
+        "libdexfile_static",
     ],
     enabled: false,
     target: {
@@ -518,7 +477,7 @@ art_cc_test {
     },
     // TODO(b/181740144): Enable a ubsan check to create a dependency on
     // ubsan_minimal. It's needed to be able to link with the prebuilt
-    // libdexfile_external_static.a, which contains libziparchive.a, which is
+    // libdexfile_static.a, which contains libziparchive.a, which is
     // built with some ubsan checks
     // (https://cs.android.com/android/platform/superproject/+/master:system/libziparchive/Android.bp;l=47-59;drc=c7b498fdf2002194709e40ea58ce39f43684fc14)
     // that the SDK snapshots currently don't propagate properly for static

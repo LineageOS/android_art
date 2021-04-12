@@ -65,10 +65,10 @@ bool TryLoadLibdexfileExternal([[maybe_unused]] std::string* err_msg) {
     // Check which version is already loaded to avoid loading both debug and
     // release builds. We might also be backtracing from separate process, in
     // which case neither is loaded.
-    const char* so_name = "libdexfiled_external.so";
+    const char* so_name = "libdexfiled.so";
     void* handle = dlopen(so_name, RTLD_NOLOAD | RTLD_NOW | RTLD_NODELETE);
     if (handle == nullptr) {
-      so_name = "libdexfile_external.so";
+      so_name = "libdexfile.so";
       handle = dlopen(so_name, RTLD_NOW | RTLD_GLOBAL | RTLD_NODELETE);
     }
     if (handle == nullptr) {
