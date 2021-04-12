@@ -1008,6 +1008,7 @@
           "804-class-extends-itself",
           "816-illegal-new-array",
           "819-verification-runtime",
+          "823-cha-inlining",
           "900-hello-plugin",
           "901-hello-ti-agent",
           "903-hello-tagging",
