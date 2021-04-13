@@ -313,7 +313,8 @@ if [ $execution_mode = "device" -o $execution_mode = "host" ]; then
     # of -XX:AlwayLogExplicitGcs:false.
     vogar_args="$vogar_args --vm-arg -XX:LongPauseLogThreshold=15" # 15 ms (default: 5ms)
   else
-    if $debug; then
+    # Include debug expectations if not on fugu.
+    if $debug && $getrandom; then
       expectations="$expectations --expectations art/tools/libcore_debug_failures.txt"
     fi
 
