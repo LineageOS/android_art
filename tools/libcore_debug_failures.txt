@@ -1,0 +1,17 @@
+/*
+ * This file contains expectations for ART's buildbot when running in debug mode
+ * (without gcstress).
+ *
+ * The script that uses this file is art/tools/run-libcore-tests.sh.
+ */
+
+[
+{
+  description: "Timeouts with device for debug builds.",
+  result: EXEC_FAILED,
+  bug: 181968447,
+  modes: [device],
+  names: ["libcore.java.math.BigIntegerTest#test_Constructor_IILjava_util_Random",
+          "libcore.java.math.BigIntegerTest#test_probablePrime"]
+}
+]
