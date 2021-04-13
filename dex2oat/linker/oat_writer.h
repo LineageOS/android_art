@@ -114,12 +114,6 @@ enum class CopyOption {
 //
 class OatWriter {
  public:
-  enum class CreateTypeLookupTable {
-    kCreate,
-    kDontCreate,
-    kDefault = kCreate
-  };
-
   OatWriter(const CompilerOptions& compiler_options,
             TimingLogger* timings,
             ProfileCompilationInfo* info,
@@ -143,25 +137,21 @@ class OatWriter {
   // a zip file with one or more dex files.
   bool AddDexFileSource(
       const char* filename,
-      const char* location,
-      CreateTypeLookupTable create_type_lookup_table = CreateTypeLookupTable::kDefault);
+      const char* location);
   // Add dex file source(s) from a file specified by a file handle.
   // Note: The `dex_file_fd` specifies a plain dex file or a zip file.
   bool AddDexFileSource(
       File&& dex_file_fd,
-      const char* location,
-      CreateTypeLookupTable create_type_lookup_table = CreateTypeLookupTable::kDefault);
+      const char* location);
   // Add dex file source from raw memory.
   bool AddRawDexFileSource(
       const ArrayRef<const uint8_t>& data,
       const char* location,
-      uint32_t location_checksum,
-      CreateTypeLookupTable create_type_lookup_table = CreateTypeLookupTable::kDefault);
+      uint32_t location_checksum);
   // Add dex file source(s) from a vdex file.
   bool AddVdexDexFilesSource(
       const VdexFile& vdex_file,
-      const char* location,
-      CreateTypeLookupTable create_type_lookup_table = CreateTypeLookupTable::kDefault);
+      const char* location);
   dchecked_vector<std::string> GetSourceLocations() const;
 
   // Write raw dex files to the vdex file, mmap the file and open the dex files from it.

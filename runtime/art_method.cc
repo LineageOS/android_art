@@ -94,11 +94,14 @@ ArtMethod* ArtMethod::GetNonObsoleteMethod() {
 }
 
 ArtMethod* ArtMethod::GetSingleImplementation(PointerSize pointer_size) {
-  if (!IsAbstract()) {
-    // A non-abstract's single implementation is itself.
+  if (IsInvokable()) {
+    // An invokable method single implementation is itself.
     return this;
   }
-  return reinterpret_cast<ArtMethod*>(GetDataPtrSize(pointer_size));
+  DCHECK(!IsDefaultConflicting());
+  ArtMethod* m = reinterpret_cast<ArtMethod*>(GetDataPtrSize(pointer_size));
+  CHECK(m == nullptr || !m->IsDefaultConflicting());
+  return m;
 }
 
 ArtMethod* ArtMethod::FromReflectedMethod(const ScopedObjectAccessAlreadyRunnable& soa,
@@ -736,9 +739,9 @@ void ArtMethod::CopyFrom(ArtMethod* src, PointerSize image_pointer_size) {
           image_pointer_size);
     }
   }
-    if (interpreter::IsNterpSupported() &&
-        (GetEntryPointFromQuickCompiledCodePtrSize(image_pointer_size) ==
-            interpreter::GetNterpEntryPoint())) {
+  if (interpreter::IsNterpSupported() &&
+      (GetEntryPointFromQuickCompiledCodePtrSize(image_pointer_size) ==
+          interpreter::GetNterpEntryPoint())) {
     // If the entrypoint is nterp, it's too early to check if the new method
     // will support it. So for simplicity, use the interpreter bridge.
     SetEntryPointFromQuickCompiledCodePtrSize(GetQuickToInterpreterBridge(), image_pointer_size);

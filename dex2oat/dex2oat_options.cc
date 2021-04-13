@@ -336,6 +336,10 @@ Parser CreateDex2oatArgumentParser() {
                          {"always", linker::CopyOption::kAlways}})
           .WithHelp("enable|disable copying the dex files into the output vdex.")
           .IntoKey(M::CopyDexFiles)
+      .Define("--force-allow-oj-inlines")
+          .WithHelp("Disables automatic no-inline for core-oj on host. Has no effect on target."
+                    " FOR TESTING USE ONLY! DO NOT DISTRIBUTE BINARIES BUILT WITH THIS OPTION!")
+          .IntoKey(M::ForceAllowOjInlines)
       .Define("--write-invocation-to=_")
           .WithHelp("Write the invocation commandline to the given file for later use. Used to\n"
                     "test determinism with different args.")
