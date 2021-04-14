@@ -80,7 +80,9 @@ TEST(TestDexFileBuilderTest, SimpleTest) {
   EXPECT_EQ(2u, builder.GetTypeIdx("Ljava/lang/Class;"));
   EXPECT_EQ(0u, builder.GetFieldIdx("LTestClass;", "[I", "intField"));
   EXPECT_EQ(1u, builder.GetMethodIdx("LTestClass;", "()I", "foo"));
-  EXPECT_EQ(0u, builder.GetMethodIdx("LTestClass;", "(Ljava/lang/Object;[Ljava/lang/Object;)LTestClass;", "bar"));
+  EXPECT_EQ(0u, builder.GetMethodIdx("LTestClass;",
+                                     "(Ljava/lang/Object;[Ljava/lang/Object;)LTestClass;",
+                                     "bar"));
 }
 
 }  // namespace art

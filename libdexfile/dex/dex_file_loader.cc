@@ -220,6 +220,30 @@ bool DexFileLoader::GetMultiDexChecksums(
 }
 
 std::unique_ptr<const DexFile> DexFileLoader::Open(
+    const std::string& location,
+    uint32_t location_checksum,
+    std::vector<uint8_t>&& memory,
+    const OatDexFile* oat_dex_file,
+    bool verify,
+    bool verify_checksum,
+    std::string* error_msg) {
+  auto memory_data = memory.data();
+  auto memory_size = memory.size();
+  return OpenCommon(memory_data,
+                    memory_size,
+                    /*data_base=*/ nullptr,
+                    /*data_size=*/ 0,
+                    location,
+                    location_checksum,
+                    oat_dex_file,
+                    verify,
+                    verify_checksum,
+                    error_msg,
+                    std::make_unique<VectorContainer>(std::move(memory)),
+                    /*verify_result=*/ nullptr);
+}
+
+std::unique_ptr<const DexFile> DexFileLoader::Open(
     const uint8_t* base,
     size_t size,
     const std::string& location,
