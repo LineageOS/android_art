@@ -267,7 +267,8 @@ if [ $execution_mode = "device" ]; then
   # the default timeout.
   if $gcstress; then
     if $debug; then
-      default_timeout_secs=1440
+      # Increasing for unwinding changes (b/185305054).
+      default_timeout_secs=1800
     else
       default_timeout_secs=1200
     fi
