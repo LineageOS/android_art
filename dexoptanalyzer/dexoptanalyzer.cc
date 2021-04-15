@@ -298,10 +298,23 @@ class DexoptAnalyzer final {
         Usage("Invalid --class-loader-context '%s'", context_str_.c_str());
       }
     }
+    if (class_loader_context != nullptr) {
+      size_t dir_index = dex_file_.rfind('/');
+      std::string classpath_dir = (dir_index != std::string::npos)
+          ? dex_file_.substr(0, dir_index)
+          : "";
+
+      if (!class_loader_context->OpenDexFiles(classpath_dir,
+                                              context_fds_,
+                                              /*only_read_checksums=*/ true)) {
+        return ReturnCode::kDex2OatFromScratch;
+      }
+    }
 
     std::unique_ptr<OatFileAssistant> oat_file_assistant;
     oat_file_assistant = std::make_unique<OatFileAssistant>(dex_file_.c_str(),
                                                             isa_,
+                                                            class_loader_context.get(),
                                                             /*load_executable=*/ false,
                                                             /*only_load_system_executable=*/ false,
                                                             vdex_fd_,
@@ -314,8 +327,6 @@ class DexoptAnalyzer final {
     }
 
     int dexoptNeeded = oat_file_assistant->GetDexOptNeeded(compiler_filter_,
-                                                           class_loader_context.get(),
-                                                           context_fds_,
                                                            assume_profile_changed_,
                                                            downgrade_);
 

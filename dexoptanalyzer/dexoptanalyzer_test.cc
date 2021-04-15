@@ -79,18 +79,23 @@ class DexoptAnalyzerTest : public DexoptTest {
               bool assume_profile_changed = false,
               bool downgrade = false,
               const char* class_loader_context = "PCL[]") {
-    int dexoptanalyzerResult = Analyze(
-        dex_file, compiler_filter, assume_profile_changed, class_loader_context);
-    dexoptanalyzerResult = DexoptanalyzerToOatFileAssistant(dexoptanalyzerResult);
-    OatFileAssistant oat_file_assistant(dex_file.c_str(), kRuntimeISA, /*load_executable=*/ false);
-    std::vector<int> context_fds;
-
     std::unique_ptr<ClassLoaderContext> context = class_loader_context == nullptr
         ? nullptr
         : ClassLoaderContext::Create(class_loader_context);
+    if (context != nullptr) {
+      std::vector<int> context_fds;
+      ASSERT_TRUE(context->OpenDexFiles("", context_fds, /*only_read_checksums*/ true));
+    }
 
+    int dexoptanalyzerResult = Analyze(
+        dex_file, compiler_filter, assume_profile_changed, class_loader_context);
+    dexoptanalyzerResult = DexoptanalyzerToOatFileAssistant(dexoptanalyzerResult);
+    OatFileAssistant oat_file_assistant(dex_file.c_str(),
+                                        kRuntimeISA,
+                                        context.get(),
+                                        /*load_executable=*/ false);
     int assistantResult = oat_file_assistant.GetDexOptNeeded(
-        compiler_filter, context.get(), context_fds, assume_profile_changed, downgrade);
+        compiler_filter, assume_profile_changed, downgrade);
     EXPECT_EQ(assistantResult, dexoptanalyzerResult);
   }
 };
