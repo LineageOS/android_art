@@ -106,9 +106,9 @@ def get_answer(args):
     while True:
       answer = input("Does the file at {} cause the issue (y/n):".format(
           args.output_file))
-      if answer[0].lower() == "y":
+      if len(answer) >= 1 and answer[0].lower() == "y":
         return "y"
-      elif answer[0].lower() == "n":
+      elif len(answer) >= 1 and answer[0].lower() == "n":
         return "n"
       else:
         print("Please enter 'y' or 'n' only!")

@@ -25,41 +25,29 @@ import functools
 import zipfile
 
 libdexfile = CDLL(
-    os.path.expandvars("$ANDROID_HOST_OUT/lib64/libdexfile.so"))
+    os.path.expandvars("$ANDROID_HOST_OUT/lib64/libdexfiled.so"))
 
-DexFileStr = c_void_p
 ExtDexFile = c_void_p
-
 
 class ExtMethodInfo(Structure):
   """Output format for MethodInfo"""
-  _fields_ = [("offset", c_int32), ("len", c_int32), ("name", DexFileStr)]
+  _fields_ = [("sizeof_struct", c_size_t),
+              ("addr", c_int32),
+              ("size", c_int32),
+              ("name", POINTER(c_char)),
+              ("name_size", c_size_t)]
 
-
-AllMethodsCallback = CFUNCTYPE(c_int, POINTER(ExtMethodInfo), c_void_p)
-libdexfile.ExtDexFileOpenFromFd.argtypes = [
-    c_int, c_size_t, c_char_p,
-    POINTER(DexFileStr),
-    POINTER(ExtDexFile)
-]
-libdexfile.ExtDexFileOpenFromFd.restype = c_int
+AllMethodsCallback = CFUNCTYPE(c_int, c_void_p, POINTER(ExtMethodInfo))
 libdexfile.ExtDexFileOpenFromMemory.argtypes = [
     c_void_p,
-    POINTER(c_size_t), c_char_p,
-    POINTER(DexFileStr),
+    POINTER(c_size_t),
+    c_char_p,
     POINTER(ExtDexFile)
 ]
 libdexfile.ExtDexFileOpenFromMemory.restype = c_int
-libdexfile.ExtDexFileFree.argtypes = [ExtDexFile]
 libdexfile.ExtDexFileGetAllMethodInfos.argtypes = [
     ExtDexFile, c_int, AllMethodsCallback, c_void_p
 ]
-libdexfile.ExtDexFileGetString.argtypes = [
-    DexFileStr, POINTER(c_size_t)
-]
-libdexfile.ExtDexFileGetString.restype = c_char_p
-libdexfile.ExtDexFileFreeString.argtypes = [DexFileStr]
-
 
 class DexClass(object):
   """Accessor for DexClass Data"""
@@ -103,11 +91,9 @@ class Method(object):
   """Method info wrapper"""
 
   def __init__(self, mi):
-    self.offset = mi.offset
-    self.len = mi.len
-    self.name = libdexfile.ExtDexFileGetString(
-        mi.name, byref(c_size_t(0))).decode("utf-8")
-    libdexfile.ExtDexFileFreeString(mi.name)
+    self.offset = mi.addr
+    self.len = mi.size
+    self.name = string_at(mi.name, mi.name_size).decode("utf-8")
 
   def __repr__(self):
     return "(" + self.name + ")"
@@ -159,7 +145,7 @@ class BaseDexFile(ABC):
     meths = []
 
     @AllMethodsCallback
-    def my_cb(info, _):
+    def my_cb(_, info):
       """Callback visitor for method infos"""
       meths.append(Method(info[0]))
       return 0
@@ -167,37 +153,6 @@ class BaseDexFile(ABC):
     libdexfile.ExtDexFileGetAllMethodInfos(self.ext_dex_file_,
                                            c_int(1), my_cb, c_void_p())
     return meths
-
-
-class FdDexFile(BaseDexFile):
-  """DexFile using an opened file-descriptor"""
-
-  def __init__(self, fd, loc):
-    super().__init__()
-    res_fle_ptr = pointer(c_void_p())
-    err_ptr = pointer(c_void_p())
-    res = libdexfile.ExtDexFileOpenFromFd(
-        c_int(fd), 0, create_string_buffer(bytes(loc, "utf-8")), err_ptr,
-        res_fle_ptr)
-    if res == 0:
-      err = libdexfile.ExtDexFileGetString(err_ptr.contents,
-                                           byref(c_size_t()))
-      out = Exception("Failed to open file: {}. Error was: {}".format(loc, err))
-      libdexfile.ExtDexFileFreeString(err_ptr.contents)
-      raise out
-    self.ext_dex_file_ = res_fle_ptr.contents
-
-
-class FileDexFile(FdDexFile):
-  """DexFile using a file"""
-
-  def __init__(self, file, loc):
-    if type(file) == str:
-      self.file = open(file, "rb")
-    else:
-      self.file = file
-    super().__init__(self.file.fileno(), loc)
-
 
 class MemDexFile(BaseDexFile):
   """DexFile using memory"""
@@ -208,18 +163,24 @@ class MemDexFile(BaseDexFile):
     # Don't want GC to screw us over.
     self.mem_ref = (c_byte * len(dat)).from_buffer_copy(dat)
     res_fle_ptr = pointer(c_void_p())
-    err_ptr = pointer(c_void_p())
     res = libdexfile.ExtDexFileOpenFromMemory(
         self.mem_ref, byref(c_size_t(len(dat))),
-        create_string_buffer(bytes(loc, "utf-8")), err_ptr, res_fle_ptr)
-    if res == 0:
-      err = libdexfile.ExtDexFileGetString(err_ptr.contents,
-                                           byref(c_size_t()))
-      out = Exception("Failed to open file: {}. Error was: {}".format(loc, err))
-      libdexfile.ExtDexFileFreeString(err_ptr.contents)
-      raise out
+        create_string_buffer(bytes(loc, "utf-8")), res_fle_ptr)
+    if res != 0:
+      raise Exception("Failed to open file: {}. Error {}.".format(loc, res))
     self.ext_dex_file_ = res_fle_ptr.contents
 
+class FileDexFile(MemDexFile):
+  """DexFile using a file"""
+
+  def __init__(self, file, loc):
+    if type(file) == str:
+      self.file = open(file, "rb")
+      self.loc = file
+    else:
+      self.file = file
+      self.loc = "file_obj"
+    super().__init__(self.file.read(), self.loc)
 
 def OpenJar(fle):
   """Opens all classes[0-9]*.dex files in a zip archive"""
