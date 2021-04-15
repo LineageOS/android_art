@@ -476,13 +476,26 @@ static bool ReadIndexBssMapping(OatFile* oat_file,
 }
 
 void OatFileBase::Setup(const std::vector<const DexFile*>& dex_files) {
+  uint32_t i = 0;
+  const uint8_t* type_lookup_table_start = nullptr;
   for (const DexFile* dex_file : dex_files) {
+    type_lookup_table_start = vdex_->GetNextTypeLookupTableData(type_lookup_table_start, i++);
     std::string dex_location = dex_file->GetLocation();
     std::string canonical_location = DexFileLoader::GetDexCanonicalLocation(dex_location.c_str());
 
+    const uint8_t* type_lookup_table_data = nullptr;
+    if (type_lookup_table_start != nullptr &&
+        (reinterpret_cast<uint32_t*>(type_lookup_table_start[0]) != 0)) {
+      type_lookup_table_data = type_lookup_table_start + sizeof(uint32_t);
+    }
     // Create an OatDexFile and add it to the owning container.
-    OatDexFile* oat_dex_file =
-        new OatDexFile(this, dex_file->Begin(), dex_file->GetLocationChecksum(), dex_location, canonical_location);
+    OatDexFile* oat_dex_file = new OatDexFile(
+        this,
+        dex_file->Begin(),
+        dex_file->GetLocationChecksum(),
+        dex_location,
+        canonical_location,
+        type_lookup_table_data);
     dex_file->SetOatDexFile(oat_dex_file);
     oat_dex_files_storage_.push_back(oat_dex_file);
 
@@ -861,11 +874,11 @@ bool OatFileBase::Setup(int zip_fd,
       return false;
     }
     const uint8_t* lookup_table_data = lookup_table_offset != 0u
-        ? Begin() + lookup_table_offset
+        ? DexBegin() + lookup_table_offset
         : nullptr;
     if (lookup_table_offset != 0u &&
-        (UNLIKELY(lookup_table_offset > Size()) ||
-            UNLIKELY(Size() - lookup_table_offset <
+        (UNLIKELY(lookup_table_offset > DexSize()) ||
+            UNLIKELY(DexSize() - lookup_table_offset <
                      TypeLookupTable::RawDataLength(header->class_defs_size_)))) {
       *error_msg = StringPrintf("In oat file '%s' found OatDexFile #%zu for '%s' with truncated "
                                     "type lookup table, offset %u of %zu, class defs %u",
@@ -1543,23 +1556,34 @@ class OatFileBackedByVdex final : public OatFileBase {
   }
 
   static OatFileBackedByVdex* Open(int zip_fd,
-                                   std::unique_ptr<VdexFile>&& vdex_file,
+                                   std::unique_ptr<VdexFile>&& unique_vdex_file,
                                    const std::string& dex_location,
                                    std::string* error_msg) {
+    VdexFile* vdex_file = unique_vdex_file.get();
     std::unique_ptr<OatFileBackedByVdex> oat_file(new OatFileBackedByVdex(vdex_file->GetName()));
+    // SetVdex will take ownership of the VdexFile.
+    oat_file->SetVdex(unique_vdex_file.release());
     if (vdex_file->HasDexSection()) {
       uint32_t i = 0;
+      const uint8_t* type_lookup_table_start = nullptr;
       for (const uint8_t* dex_file_start = vdex_file->GetNextDexFileData(nullptr, i);
            dex_file_start != nullptr;
            dex_file_start = vdex_file->GetNextDexFileData(dex_file_start, ++i)) {
         // Create the OatDexFile and add it to the owning container.
         std::string location = DexFileLoader::GetMultiDexLocation(i, dex_location.c_str());
         std::string canonical_location = DexFileLoader::GetDexCanonicalLocation(location.c_str());
+        type_lookup_table_start = vdex_file->GetNextTypeLookupTableData(type_lookup_table_start, i);
+        const uint8_t* type_lookup_table_data = nullptr;
+        if (type_lookup_table_start != nullptr &&
+            (reinterpret_cast<uint32_t*>(type_lookup_table_start[0]) != 0)) {
+          type_lookup_table_data = type_lookup_table_start + sizeof(uint32_t);
+        }
         OatDexFile* oat_dex_file = new OatDexFile(oat_file.get(),
                                                   dex_file_start,
                                                   vdex_file->GetLocationChecksum(i),
                                                   location,
-                                                  canonical_location);
+                                                  canonical_location,
+                                                  type_lookup_table_data);
         oat_file->oat_dex_files_storage_.push_back(oat_dex_file);
 
         std::string_view key(oat_dex_file->GetDexFileLocation());
@@ -1597,8 +1621,6 @@ class OatFileBackedByVdex final : public OatFileBase {
       oat_file->Setup(MakeNonOwningPointerVector(oat_file->external_dex_files_));
     }
 
-    // SetVdex will take ownership of the VdexFile.
-    oat_file->SetVdex(vdex_file.release());
     return oat_file.release();
   }
 
@@ -1958,12 +1980,18 @@ OatDexFile::OatDexFile(const OatFile* oat_file,
       oat_class_offsets_pointer_(oat_class_offsets_pointer),
       lookup_table_(),
       dex_layout_sections_(dex_layout_sections) {
+  InitializeTypeLookupTable();
+  DCHECK(!IsBackedByVdexOnly());
+}
+
+void OatDexFile::InitializeTypeLookupTable() {
   // Initialize TypeLookupTable.
   if (lookup_table_data_ != nullptr) {
     // Peek the number of classes from the DexFile.
     const DexFile::Header* dex_header = reinterpret_cast<const DexFile::Header*>(dex_file_pointer_);
     const uint32_t num_class_defs = dex_header->class_defs_size_;
-    if (lookup_table_data_ + TypeLookupTable::RawDataLength(num_class_defs) > GetOatFile()->End()) {
+    if (lookup_table_data_ + TypeLookupTable::RawDataLength(num_class_defs) >
+            GetOatFile()->DexEnd()) {
       LOG(WARNING) << "found truncated lookup table in " << dex_file_location_;
     } else {
       const uint8_t* dex_data = dex_file_pointer_;
@@ -1974,19 +2002,21 @@ OatDexFile::OatDexFile(const OatFile* oat_file,
       lookup_table_ = TypeLookupTable::Open(dex_data, lookup_table_data_, num_class_defs);
     }
   }
-  DCHECK(!IsBackedByVdexOnly());
 }
 
 OatDexFile::OatDexFile(const OatFile* oat_file,
                        const uint8_t* dex_file_pointer,
                        uint32_t dex_file_location_checksum,
                        const std::string& dex_file_location,
-                       const std::string& canonical_dex_file_location)
+                       const std::string& canonical_dex_file_location,
+                       const uint8_t* lookup_table_data)
     : oat_file_(oat_file),
       dex_file_location_(dex_file_location),
       canonical_dex_file_location_(canonical_dex_file_location),
       dex_file_location_checksum_(dex_file_location_checksum),
-      dex_file_pointer_(dex_file_pointer) {
+      dex_file_pointer_(dex_file_pointer),
+      lookup_table_data_(lookup_table_data) {
+  InitializeTypeLookupTable();
   DCHECK(IsBackedByVdexOnly());
 }
 
