@@ -969,13 +969,21 @@ def art_apex_test_main(test_args):
     # Device APEX.
     if test_args.flavor == FLAVOR_AUTO:
       logging.warning('--flavor=auto, trying to autodetect. This may be incorrect!')
-      for flavor in [ FLAVOR_RELEASE, FLAVOR_DEBUG, FLAVOR_TESTING ]:
-        flavor_pattern = '*.%s*' % flavor
+      # The order of flavors in the list below matters, as the release tag (empty string) will
+      # match any package name.
+      for flavor in [ FLAVOR_DEBUG, FLAVOR_TESTING, FLAVOR_RELEASE ]:
+        flavor_tag = flavor
+        # Special handling for the release flavor, whose name is no longer part of the Release ART
+        # APEX file name (`com.android.art.apex` / `com.android.art`).
+        if flavor == FLAVOR_RELEASE:
+          flavor_tag = ''
+        flavor_pattern = '*.%s*' % flavor_tag
         if fnmatch.fnmatch(test_args.apex, flavor_pattern):
           test_args.flavor = flavor
+          logging.warning('  Detected %s flavor', flavor)
           break
       if test_args.flavor == FLAVOR_AUTO:
-        logging.error('  Could not detect APEX flavor, neither \'%s\', \'%s\' nor \'%s\' in \'%s\'',
+        logging.error('  Could not detect APEX flavor, neither %s, %s nor %s for \'%s\'',
                     FLAVOR_RELEASE, FLAVOR_DEBUG, FLAVOR_TESTING, test_args.apex)
         return 1
 
