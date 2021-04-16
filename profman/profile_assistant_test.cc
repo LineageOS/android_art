@@ -35,59 +35,31 @@
 #include "mirror/class-inl.h"
 #include "obj_ptr-inl.h"
 #include "profile/profile_compilation_info.h"
+#include "profile/profile_test_helper.h"
 #include "profile_assistant.h"
 #include "scoped_thread_state_change-inl.h"
 
 namespace art {
 
-using Hotness = ProfileCompilationInfo::MethodHotness;
 using TypeReferenceSet = std::set<TypeReference, TypeReferenceValueComparator>;
-using ProfileInlineCache = ProfileMethodInfo::ProfileInlineCache;
 
 // TODO(calin): These tests share a lot with the ProfileCompilationInfo tests.
 // we should introduce a better abstraction to extract the common parts.
-class ProfileAssistantTest : public CommonRuntimeTest {
+class ProfileAssistantTest : public CommonRuntimeTest, public ProfileTestHelper {
  public:
   void PostRuntimeCreate() override {
     allocator_.reset(new ArenaAllocator(Runtime::Current()->GetArenaPool()));
 
-    dex1 = fake_dex_storage.AddFakeDex("location1", /* checksum= */ 1, /* num_method_ids= */ 10001);
-    dex2 = fake_dex_storage.AddFakeDex("location2", /* checksum= */ 2, /* num_method_ids= */ 10002);
-    dex3 = fake_dex_storage.AddFakeDex("location3", /* checksum= */ 3, /* num_method_ids= */ 10003);
-    dex4 = fake_dex_storage.AddFakeDex("location4", /* checksum= */ 4, /* num_method_ids= */ 10004);
+    dex1 = BuildDex("location1", /* checksum= */ 1, "LUnique1;", /* num_method_ids= */ 10001);
+    dex2 = BuildDex("location2", /* checksum= */ 2, "LUnique2;", /* num_method_ids= */ 10002);
+    dex3 = BuildDex("location3", /* checksum= */ 3, "LUnique3;", /* num_method_ids= */ 10003);
+    dex4 = BuildDex("location4", /* checksum= */ 4, "LUnique4;", /* num_method_ids= */ 10004);
 
-    dex1_checksum_missmatch = fake_dex_storage.AddFakeDex(
-        "location1", /* checksum= */ 12, /* num_method_ids= */ 10001);
+    dex1_checksum_missmatch =
+        BuildDex("location1", /* checksum= */ 12, "LUnique1;", /* num_method_ids= */ 10001);
   }
 
  protected:
-  bool AddMethod(ProfileCompilationInfo* info,
-                const DexFile* dex,
-                uint16_t method_idx,
-                const std::vector<ProfileInlineCache>& inline_caches,
-                Hotness::Flag flags) {
-    return info->AddMethod(
-        ProfileMethodInfo(MethodReference(dex, method_idx), inline_caches), flags);
-  }
-
-  bool AddMethod(ProfileCompilationInfo* info,
-                 const DexFile* dex,
-                 uint16_t method_idx,
-                 Hotness::Flag flags,
-                 const ProfileCompilationInfo::ProfileSampleAnnotation& annotation
-                    = ProfileCompilationInfo::ProfileSampleAnnotation::kNone) {
-    return info->AddMethod(ProfileMethodInfo(MethodReference(dex, method_idx)),
-                           flags,
-                           annotation);
-  }
-
-  bool AddClass(ProfileCompilationInfo* info,
-                const DexFile* dex,
-                dex::TypeIndex type_index) {
-    std::vector<dex::TypeIndex> classes = {type_index};
-    return info->AddClassesForDex(dex, classes.begin(), classes.end());
-  }
-
   void SetupProfile(const DexFile* dex_file1,
                     const DexFile* dex_file2,
                     uint16_t number_of_methods,
@@ -417,7 +389,7 @@ class ProfileAssistantTest : public CommonRuntimeTest {
     for (const TypeReference& type_ref : expected_clases) {
       for (const auto& class_ref : dex_pc_data.classes) {
         if (class_ref.type_index == type_ref.TypeIndex() &&
-            info.ProfileIndexMatchesDexFile(class_ref.dex_profile_index, type_ref.dex_file)) {
+            ProfileIndexMatchesDexFile(info, class_ref.dex_profile_index, type_ref.dex_file)) {
           found++;
         }
       }
@@ -476,7 +448,6 @@ class ProfileAssistantTest : public CommonRuntimeTest {
   const DexFile* dex3;
   const DexFile* dex4;
   const DexFile* dex1_checksum_missmatch;
-  FakeDexStorage fake_dex_storage;
 };
 
 TEST_F(ProfileAssistantTest, AdviseCompilationEmptyReferences) {
@@ -1827,11 +1798,10 @@ TEST_F(ProfileAssistantTest, CopyAndUpdateProfileKey) {
   ProfileCompilationInfo info1;
   uint16_t num_methods_to_add = std::min(d1.NumMethodIds(), d2.NumMethodIds());
 
-  FakeDexStorage local_storage;
-  const DexFile* dex_to_be_updated1 = local_storage.AddFakeDex(
-      "fake-location1", d1.GetLocationChecksum(), d1.NumMethodIds());
-  const DexFile* dex_to_be_updated2 = local_storage.AddFakeDex(
-      "fake-location2", d2.GetLocationChecksum(), d2.NumMethodIds());
+  const DexFile* dex_to_be_updated1 =
+      BuildDex("fake-location1", d1.GetLocationChecksum(), "LC;", d1.NumMethodIds());
+  const DexFile* dex_to_be_updated2 =
+      BuildDex("fake-location2", d2.GetLocationChecksum(), "LC;", d2.NumMethodIds());
   SetupProfile(dex_to_be_updated1,
                dex_to_be_updated2,
                num_methods_to_add,
