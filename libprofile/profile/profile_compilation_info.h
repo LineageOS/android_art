@@ -459,13 +459,6 @@ class ProfileCompilationInfo {
     return nullptr;
   }
 
-  // Helper function for tests.
-  bool ProfileIndexMatchesDexFile(ProfileIndexType profile_index, const DexFile* dex_file) const {
-    DCHECK(dex_file != nullptr);
-    std::array<const DexFile*, 1u> dex_files{dex_file};
-    return dex_file == FindDexFileForProfileIndex(profile_index, dex_files);
-  }
-
   DexReferenceDumper DumpDexReference(ProfileIndexType profile_index) const;
 
   // Dump all the loaded profile info into a string and returns it.
