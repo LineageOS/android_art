@@ -98,32 +98,24 @@ class OatFileAssistantTest : public DexoptTest {
     }
   }
 
-  int GetDexOptNeeded(OatFileAssistant* assistant,
-                      CompilerFilter::Filter compiler_filter,
-                      bool profile_changed) {
-    std::vector<int> context_fds;
-    return GetDexOptNeeded(assistant,
-        compiler_filter,
-        ClassLoaderContext::Default(),
-        context_fds,
-        profile_changed,
-        /*downgrade=*/ false);
-  }
-
   int GetDexOptNeeded(
       OatFileAssistant* assistant,
       CompilerFilter::Filter compiler_filter,
-      const std::unique_ptr<ClassLoaderContext>& context = ClassLoaderContext::Default(),
-      const std::vector<int>& context_fds = std::vector<int>(),
       bool profile_changed = false,
       bool downgrade = false) {
     return assistant->GetDexOptNeeded(
         compiler_filter,
-        context.get(),
-        context_fds,
         profile_changed,
         downgrade);
   }
+
+  static std::unique_ptr<ClassLoaderContext> InitializeDefaultContext() {
+    auto context = ClassLoaderContext::Default();
+    context->OpenDexFiles();
+    return context;
+  }
+
+  std::unique_ptr<ClassLoaderContext> default_context_ = InitializeDefaultContext();
 };
 
 class ScopedNonWritable {
@@ -181,7 +173,10 @@ TEST_F(OatFileAssistantTest, RelativeEncodedDexLocation) {
   ASSERT_TRUE(Dex2Oat(args, &error_msg)) << error_msg;
 
   // Verify we can load both dex files.
-  OatFileAssistant oat_file_assistant(dex_location.c_str(), kRuntimeISA, true);
+  OatFileAssistant oat_file_assistant(dex_location.c_str(),
+                                      kRuntimeISA,
+                                      default_context_.get(),
+                                      true);
 
   std::unique_ptr<OatFile> oat_file = oat_file_assistant.GetBestOatFile();
   ASSERT_TRUE(oat_file.get() != nullptr);
@@ -198,12 +193,12 @@ TEST_F(OatFileAssistantTest, MakeUpToDateWithContext) {
   Copy(GetDexSrc1(), dex_location);
   Copy(GetDexSrc2(), context_location);
 
-  OatFileAssistant oat_file_assistant(dex_location.c_str(), kRuntimeISA, false);
-
   std::string context_str = "PCL[" + context_location + "]";
   std::unique_ptr<ClassLoaderContext> context = ClassLoaderContext::Create(context_str);
   ASSERT_TRUE(context != nullptr);
   ASSERT_TRUE(context->OpenDexFiles());
+
+  OatFileAssistant oat_file_assistant(dex_location.c_str(), kRuntimeISA, context.get(), false);
 
   std::string error_msg;
   std::vector<std::string> args;
@@ -213,7 +208,8 @@ TEST_F(OatFileAssistantTest, MakeUpToDateWithContext) {
   ASSERT_TRUE(Dex2Oat(args, &error_msg)) << error_msg;
 
   std::unique_ptr<OatFile> oat_file = oat_file_assistant.GetBestOatFile();
-  EXPECT_NE(nullptr, oat_file.get());
+  ASSERT_NE(nullptr, oat_file.get());
+  ASSERT_NE(nullptr, oat_file->GetOatHeader().GetStoreValueByKey(OatHeader::kClassPathKey));
   EXPECT_EQ(context->EncodeContextForOatFile(""),
             oat_file->GetOatHeader().GetStoreValueByKey(OatHeader::kClassPathKey));
 }
@@ -225,27 +221,27 @@ TEST_F(OatFileAssistantTest, GetDexOptNeededWithUpToDateContextRelative) {
   Copy(GetDexSrc1(), dex_location);
   Copy(GetDexSrc2(), context_location);
 
-  OatFileAssistant oat_file_assistant(dex_location.c_str(), kRuntimeISA, false);
+  // A relative context simulates a dependent split context.
+  std::unique_ptr<ClassLoaderContext> relative_context =
+      ClassLoaderContext::Create("PCL[ContextDex.jar]");
+  ASSERT_TRUE(relative_context != nullptr);
+  std::vector<int> context_fds;
+  ASSERT_TRUE(relative_context->OpenDexFiles(GetScratchDir(), context_fds));
 
-  std::string context_str = "PCL[" + context_location + "]";
-  std::unique_ptr<ClassLoaderContext> context = ClassLoaderContext::Create(context_str);
-  ASSERT_TRUE(context != nullptr);
-  ASSERT_TRUE(context->OpenDexFiles());
+  OatFileAssistant oat_file_assistant(dex_location.c_str(),
+                                      kRuntimeISA,
+                                      relative_context.get(),
+                                      false);
 
   std::string error_msg;
   std::vector<std::string> args;
   args.push_back("--dex-file=" + dex_location);
   args.push_back("--oat-file=" + odex_location);
-  args.push_back("--class-loader-context=" + context_str);
+  args.push_back("--class-loader-context=PCL[" + context_location + "]");
   ASSERT_TRUE(Dex2Oat(args, &error_msg)) << error_msg;
 
-  // A relative context simulates a dependent split context.
-  std::unique_ptr<ClassLoaderContext> relative_context =
-      ClassLoaderContext::Create("PCL[ContextDex.jar]");
   EXPECT_EQ(-OatFileAssistant::kNoDexOptNeeded,
-            GetDexOptNeeded(&oat_file_assistant,
-                CompilerFilter::kDefaultCompilerFilter,
-                relative_context));
+            GetDexOptNeeded(&oat_file_assistant, CompilerFilter::kDefaultCompilerFilter));
 }
 
 // Case: We have a DEX file, but no OAT file for it.
@@ -254,7 +250,10 @@ TEST_F(OatFileAssistantTest, DexNoOat) {
   std::string dex_location = GetScratchDir() + "/DexNoOat.jar";
   Copy(GetDexSrc1(), dex_location);
 
-  OatFileAssistant oat_file_assistant(dex_location.c_str(), kRuntimeISA, false);
+  OatFileAssistant oat_file_assistant(dex_location.c_str(),
+                                      kRuntimeISA,
+                                      default_context_.get(),
+                                      false);
 
   EXPECT_EQ(OatFileAssistant::kDex2OatFromScratch,
       GetDexOptNeeded(&oat_file_assistant, CompilerFilter::kExtract));
@@ -283,7 +282,10 @@ TEST_F(OatFileAssistantTest, DexNoOat) {
 TEST_F(OatFileAssistantTest, NoDexNoOat) {
   std::string dex_location = GetScratchDir() + "/NoDexNoOat.jar";
 
-  OatFileAssistant oat_file_assistant(dex_location.c_str(), kRuntimeISA, true);
+  OatFileAssistant oat_file_assistant(dex_location.c_str(),
+                                      kRuntimeISA,
+                                      default_context_.get(),
+                                      true);
 
   EXPECT_EQ(OatFileAssistant::kNoDexOptNeeded,
       GetDexOptNeeded(&oat_file_assistant, CompilerFilter::kSpeed));
@@ -304,7 +306,10 @@ TEST_F(OatFileAssistantTest, OdexUpToDate) {
 
   // Force the use of oat location by making the dex parent not writable.
   OatFileAssistant oat_file_assistant(
-      dex_location.c_str(), kRuntimeISA, /*load_executable=*/ false);
+      dex_location.c_str(),
+      kRuntimeISA,
+      default_context_.get(),
+      /*load_executable=*/ false);
 
   EXPECT_EQ(-OatFileAssistant::kNoDexOptNeeded,
             GetDexOptNeeded(&oat_file_assistant, CompilerFilter::kSpeed));
@@ -341,7 +346,10 @@ TEST_F(OatFileAssistantTest, OdexUpToDatePartialBootImage) {
 
   // Force the use of oat location by making the dex parent not writable.
   OatFileAssistant oat_file_assistant(
-      dex_location.c_str(), kRuntimeISA, /*load_executable=*/ false);
+      dex_location.c_str(),
+      kRuntimeISA,
+      default_context_.get(),
+      /*load_executable=*/ false);
 
   EXPECT_EQ(-OatFileAssistant::kNoDexOptNeeded,
             GetDexOptNeeded(&oat_file_assistant, CompilerFilter::kSpeed));
@@ -381,7 +389,10 @@ TEST_F(OatFileAssistantTest, OdexUpToDateSymLink) {
   ASSERT_EQ(0, symlink(scratch_dir.c_str(), link.c_str()));
   dex_location = link + "/OdexUpToDate.jar";
 
-  OatFileAssistant oat_file_assistant(dex_location.c_str(), kRuntimeISA, false);
+  OatFileAssistant oat_file_assistant(dex_location.c_str(),
+                                      kRuntimeISA,
+                                      default_context_.get(),
+                                      false);
 
   EXPECT_EQ(-OatFileAssistant::kNoDexOptNeeded,
       GetDexOptNeeded(&oat_file_assistant, CompilerFilter::kSpeed));
@@ -415,7 +426,10 @@ TEST_F(OatFileAssistantTest, OatUpToDate) {
   ScopedNonWritable scoped_non_writable(dex_location);
   ASSERT_TRUE(scoped_non_writable.IsSuccessful());
 
-  OatFileAssistant oat_file_assistant(dex_location.c_str(), kRuntimeISA, false);
+  OatFileAssistant oat_file_assistant(dex_location.c_str(),
+                                      kRuntimeISA,
+                                      default_context_.get(),
+                                      false);
 
   EXPECT_EQ(OatFileAssistant::kNoDexOptNeeded,
       GetDexOptNeeded(&oat_file_assistant, CompilerFilter::kSpeed));
@@ -458,6 +472,7 @@ TEST_F(OatFileAssistantTest, GetDexOptNeededWithFd) {
 
   OatFileAssistant oat_file_assistant(dex_location.c_str(),
                                       kRuntimeISA,
+                                      default_context_.get(),
                                       false,
                                       false,
                                       vdex_fd.get(),
@@ -496,6 +511,7 @@ TEST_F(OatFileAssistantTest, GetDexOptNeededWithInvalidOdexFd) {
 
   OatFileAssistant oat_file_assistant(dex_location.c_str(),
                                       kRuntimeISA,
+                                      default_context_.get(),
                                       false,
                                       false,
                                       vdex_fd.get(),
@@ -531,6 +547,7 @@ TEST_F(OatFileAssistantTest, GetDexOptNeededWithInvalidVdexFd) {
 
   OatFileAssistant oat_file_assistant(dex_location.c_str(),
                                       kRuntimeISA,
+                                      default_context_.get(),
                                       false,
                                       false,
                                       /* vdex_fd= */ -1,
@@ -555,6 +572,7 @@ TEST_F(OatFileAssistantTest, GetDexOptNeededWithInvalidOdexVdexFd) {
   android::base::unique_fd zip_fd(open(dex_location.c_str(), O_RDONLY | O_CLOEXEC));
   OatFileAssistant oat_file_assistant(dex_location.c_str(),
                                       kRuntimeISA,
+                                      default_context_.get(),
                                       false,
                                       false,
                                       /* vdex_fd= */ -1,
@@ -579,7 +597,10 @@ TEST_F(OatFileAssistantTest, VdexUpToDateNoOdex) {
   GenerateOdexForTest(dex_location, odex_location, CompilerFilter::kSpeed);
   ASSERT_EQ(0, unlink(odex_location.c_str()));
 
-  OatFileAssistant oat_file_assistant(dex_location.c_str(), kRuntimeISA, false);
+  OatFileAssistant oat_file_assistant(dex_location.c_str(),
+                                      kRuntimeISA,
+                                      default_context_.get(),
+                                      false);
 
   EXPECT_EQ(-OatFileAssistant::kNoDexOptNeeded,
       GetDexOptNeeded(&oat_file_assistant, CompilerFilter::kVerify));
@@ -608,7 +629,10 @@ TEST_F(OatFileAssistantTest, EmptyVdexOdex) {
   ScratchFile vdex_file(vdex_location.c_str());
   ScratchFile odex_file(odex_location.c_str());
 
-  OatFileAssistant oat_file_assistant(dex_location.c_str(), kRuntimeISA, false);
+  OatFileAssistant oat_file_assistant(dex_location.c_str(),
+                                      kRuntimeISA,
+                                      default_context_.get(),
+                                      false);
   EXPECT_EQ(OatFileAssistant::kDex2OatFromScratch,
       GetDexOptNeeded(&oat_file_assistant, CompilerFilter::kSpeed));
 }
@@ -634,7 +658,10 @@ TEST_F(OatFileAssistantTest, VdexUpToDateNoOat) {
 
   ScopedNonWritable scoped_non_writable(dex_location);
   ASSERT_TRUE(scoped_non_writable.IsSuccessful());
-  OatFileAssistant oat_file_assistant(dex_location.c_str(), kRuntimeISA, false);
+  OatFileAssistant oat_file_assistant(dex_location.c_str(),
+                                      kRuntimeISA,
+                                      default_context_.get(),
+                                      false);
 
   EXPECT_EQ(OatFileAssistant::kDex2OatForFilter,
       GetDexOptNeeded(&oat_file_assistant, CompilerFilter::kSpeed));
@@ -657,7 +684,10 @@ TEST_F(OatFileAssistantTest, ProfileOatUpToDate) {
   ScopedNonWritable scoped_non_writable(dex_location);
   ASSERT_TRUE(scoped_non_writable.IsSuccessful());
 
-  OatFileAssistant oat_file_assistant(dex_location.c_str(), kRuntimeISA, false);
+  OatFileAssistant oat_file_assistant(dex_location.c_str(),
+                                      kRuntimeISA,
+                                      default_context_.get(),
+                                      false);
 
   EXPECT_EQ(OatFileAssistant::kNoDexOptNeeded,
       GetDexOptNeeded(&oat_file_assistant, CompilerFilter::kSpeedProfile, false));
@@ -690,7 +720,10 @@ TEST_F(OatFileAssistantTest, MultiDexOatUpToDate) {
   ScopedNonWritable scoped_non_writable(dex_location);
   ASSERT_TRUE(scoped_non_writable.IsSuccessful());
 
-  OatFileAssistant oat_file_assistant(dex_location.c_str(), kRuntimeISA, true);
+  OatFileAssistant oat_file_assistant(dex_location.c_str(),
+                                      kRuntimeISA,
+                                      default_context_.get(),
+                                      true);
   EXPECT_EQ(OatFileAssistant::kNoDexOptNeeded,
       GetDexOptNeeded(&oat_file_assistant, CompilerFilter::kSpeed));
   EXPECT_TRUE(oat_file_assistant.HasDexFiles());
@@ -726,7 +759,10 @@ TEST_F(OatFileAssistantTest, MultiDexNonMainOutOfDate) {
   ScopedNonWritable scoped_non_writable(dex_location);
   ASSERT_TRUE(scoped_non_writable.IsSuccessful());
 
-  OatFileAssistant oat_file_assistant(dex_location.c_str(), kRuntimeISA, true);
+  OatFileAssistant oat_file_assistant(dex_location.c_str(),
+                                      kRuntimeISA,
+                                      default_context_.get(),
+                                      true);
   EXPECT_EQ(OatFileAssistant::kDex2OatFromScratch,
       GetDexOptNeeded(&oat_file_assistant, CompilerFilter::kSpeed));
   EXPECT_TRUE(oat_file_assistant.HasDexFiles());
@@ -752,7 +788,10 @@ TEST_F(OatFileAssistantTest, OatDexOutOfDate) {
   ScopedNonWritable scoped_non_writable(dex_location);
   ASSERT_TRUE(scoped_non_writable.IsSuccessful());
 
-  OatFileAssistant oat_file_assistant(dex_location.c_str(), kRuntimeISA, false);
+  OatFileAssistant oat_file_assistant(dex_location.c_str(),
+                                      kRuntimeISA,
+                                      default_context_.get(),
+                                      false);
   EXPECT_EQ(OatFileAssistant::kDex2OatFromScratch,
       GetDexOptNeeded(&oat_file_assistant, CompilerFilter::kExtract));
   EXPECT_EQ(OatFileAssistant::kDex2OatFromScratch,
@@ -782,7 +821,10 @@ TEST_F(OatFileAssistantTest, VdexDexOutOfDate) {
   ASSERT_EQ(0, unlink(odex_location.c_str()));
   Copy(GetDexSrc2(), dex_location);
 
-  OatFileAssistant oat_file_assistant(dex_location.c_str(), kRuntimeISA, false);
+  OatFileAssistant oat_file_assistant(dex_location.c_str(),
+                                      kRuntimeISA,
+                                      default_context_.get(),
+                                      false);
 
   EXPECT_EQ(OatFileAssistant::kDex2OatFromScratch,
       GetDexOptNeeded(&oat_file_assistant, CompilerFilter::kSpeed));
@@ -799,7 +841,10 @@ TEST_F(OatFileAssistantTest, VdexMultiDexNonMainOutOfDate) {
   ASSERT_EQ(0, unlink(odex_location.c_str()));
   Copy(GetMultiDexSrc2(), dex_location);
 
-  OatFileAssistant oat_file_assistant(dex_location.c_str(), kRuntimeISA, false);
+  OatFileAssistant oat_file_assistant(dex_location.c_str(),
+                                      kRuntimeISA,
+                                      default_context_.get(),
+                                      false);
 
   EXPECT_EQ(OatFileAssistant::kDex2OatFromScratch,
       GetDexOptNeeded(&oat_file_assistant, CompilerFilter::kSpeed));
@@ -824,7 +869,10 @@ TEST_F(OatFileAssistantTest, OatImageOutOfDate) {
   ScopedNonWritable scoped_non_writable(dex_location);
   ASSERT_TRUE(scoped_non_writable.IsSuccessful());
 
-  OatFileAssistant oat_file_assistant(dex_location.c_str(), kRuntimeISA, false);
+  OatFileAssistant oat_file_assistant(dex_location.c_str(),
+                                      kRuntimeISA,
+                                      default_context_.get(),
+                                      false);
   EXPECT_EQ(OatFileAssistant::kNoDexOptNeeded,
       GetDexOptNeeded(&oat_file_assistant, CompilerFilter::kExtract));
   EXPECT_EQ(OatFileAssistant::kNoDexOptNeeded,
@@ -866,7 +914,10 @@ TEST_F(OatFileAssistantTest, OatVerifyAtRuntimeImageOutOfDate) {
   ScopedNonWritable scoped_non_writable(dex_location);
   ASSERT_TRUE(scoped_non_writable.IsSuccessful());
 
-  OatFileAssistant oat_file_assistant(dex_location.c_str(), kRuntimeISA, false);
+  OatFileAssistant oat_file_assistant(dex_location.c_str(),
+                                      kRuntimeISA,
+                                      default_context_.get(),
+                                      false);
   EXPECT_EQ(OatFileAssistant::kNoDexOptNeeded,
       GetDexOptNeeded(&oat_file_assistant, CompilerFilter::kExtract));
   EXPECT_EQ(OatFileAssistant::kDex2OatForFilter,
@@ -888,7 +939,10 @@ TEST_F(OatFileAssistantTest, DexOdexNoOat) {
   GenerateOdexForTest(dex_location, odex_location, CompilerFilter::kSpeed);
 
   // Verify the status.
-  OatFileAssistant oat_file_assistant(dex_location.c_str(), kRuntimeISA, false);
+  OatFileAssistant oat_file_assistant(dex_location.c_str(),
+                                      kRuntimeISA,
+                                      default_context_.get(),
+                                      false);
 
   EXPECT_EQ(OatFileAssistant::kNoDexOptNeeded,
       GetDexOptNeeded(&oat_file_assistant, CompilerFilter::kExtract));
@@ -913,7 +967,10 @@ TEST_F(OatFileAssistantTest, ResourceOnlyDex) {
   Copy(GetResourceOnlySrc1(), dex_location);
 
   // Verify the status.
-  OatFileAssistant oat_file_assistant(dex_location.c_str(), kRuntimeISA, true);
+  OatFileAssistant oat_file_assistant(dex_location.c_str(),
+                                      kRuntimeISA,
+                                      default_context_.get(),
+                                      true);
 
   EXPECT_EQ(OatFileAssistant::kNoDexOptNeeded,
       GetDexOptNeeded(&oat_file_assistant, CompilerFilter::kSpeed));
@@ -948,7 +1005,10 @@ TEST_F(OatFileAssistantTest, OdexOatOverlap) {
   GenerateOatForTest(dex_location.c_str(), CompilerFilter::kSpeed);
 
   // Verify things don't go bad.
-  OatFileAssistant oat_file_assistant(dex_location.c_str(), kRuntimeISA, true);
+  OatFileAssistant oat_file_assistant(dex_location.c_str(),
+                                      kRuntimeISA,
+                                      default_context_.get(),
+                                      true);
 
   EXPECT_EQ(OatFileAssistant::kNoDexOptNeeded,
             GetDexOptNeeded(&oat_file_assistant, CompilerFilter::kSpeed));
@@ -978,7 +1038,10 @@ TEST_F(OatFileAssistantTest, DexVerifyAtRuntimeOdexNoOat) {
   GenerateOdexForTest(dex_location, odex_location, CompilerFilter::kExtract);
 
   // Verify the status.
-  OatFileAssistant oat_file_assistant(dex_location.c_str(), kRuntimeISA, false);
+  OatFileAssistant oat_file_assistant(dex_location.c_str(),
+                                      kRuntimeISA,
+                                      default_context_.get(),
+                                      false);
 
   EXPECT_EQ(OatFileAssistant::kNoDexOptNeeded,
       GetDexOptNeeded(&oat_file_assistant, CompilerFilter::kExtract));
@@ -1009,7 +1072,10 @@ TEST_F(OatFileAssistantTest, LoadOatUpToDate) {
   ASSERT_TRUE(scoped_non_writable.IsSuccessful());
 
   // Load the oat using an oat file assistant.
-  OatFileAssistant oat_file_assistant(dex_location.c_str(), kRuntimeISA, true);
+  OatFileAssistant oat_file_assistant(dex_location.c_str(),
+                                      kRuntimeISA,
+                                      default_context_.get(),
+                                      true);
 
   std::unique_ptr<OatFile> oat_file = oat_file_assistant.GetBestOatFile();
   ASSERT_TRUE(oat_file.get() != nullptr);
@@ -1037,7 +1103,10 @@ TEST_F(OatFileAssistantTest, LoadExecInterpretOnlyOatUpToDate) {
   ASSERT_TRUE(scoped_non_writable.IsSuccessful());
 
   // Load the oat using an oat file assistant.
-  OatFileAssistant oat_file_assistant(dex_location.c_str(), kRuntimeISA, true);
+  OatFileAssistant oat_file_assistant(dex_location.c_str(),
+                                      kRuntimeISA,
+                                      default_context_.get(),
+                                      true);
 
   std::unique_ptr<OatFile> oat_file = oat_file_assistant.GetBestOatFile();
   ASSERT_TRUE(oat_file.get() != nullptr);
@@ -1066,7 +1135,10 @@ TEST_F(OatFileAssistantTest, LoadNoExecOatUpToDate) {
   GenerateOatForTest(dex_location.c_str(), CompilerFilter::kSpeed);
 
   // Load the oat using an oat file assistant.
-  OatFileAssistant oat_file_assistant(dex_location.c_str(), kRuntimeISA, false);
+  OatFileAssistant oat_file_assistant(dex_location.c_str(),
+                                      kRuntimeISA,
+                                      default_context_.get(),
+                                      false);
 
   std::unique_ptr<OatFile> oat_file = oat_file_assistant.GetBestOatFile();
   ASSERT_TRUE(oat_file.get() != nullptr);
@@ -1119,7 +1191,10 @@ TEST_F(OatFileAssistantTest, NonAbsoluteDexLocation) {
   Copy(GetDexSrc1(), abs_dex_location);
 
   std::string dex_location = MakePathRelative(abs_dex_location);
-  OatFileAssistant oat_file_assistant(dex_location.c_str(), kRuntimeISA, true);
+  OatFileAssistant oat_file_assistant(dex_location.c_str(),
+                                      kRuntimeISA,
+                                      default_context_.get(),
+                                      true);
 
   EXPECT_FALSE(oat_file_assistant.IsInBootClassPath());
   EXPECT_EQ(OatFileAssistant::kDex2OatFromScratch,
@@ -1133,7 +1208,10 @@ TEST_F(OatFileAssistantTest, NonAbsoluteDexLocation) {
 TEST_F(OatFileAssistantTest, ShortDexLocation) {
   std::string dex_location = "/xx";
 
-  OatFileAssistant oat_file_assistant(dex_location.c_str(), kRuntimeISA, true);
+  OatFileAssistant oat_file_assistant(dex_location.c_str(),
+                                      kRuntimeISA,
+                                      default_context_.get(),
+                                      true);
 
   EXPECT_FALSE(oat_file_assistant.IsInBootClassPath());
   EXPECT_EQ(OatFileAssistant::kNoDexOptNeeded,
@@ -1149,7 +1227,10 @@ TEST_F(OatFileAssistantTest, LongDexExtension) {
   std::string dex_location = GetScratchDir() + "/LongDexExtension.jarx";
   Copy(GetDexSrc1(), dex_location);
 
-  OatFileAssistant oat_file_assistant(dex_location.c_str(), kRuntimeISA, false);
+  OatFileAssistant oat_file_assistant(dex_location.c_str(),
+                                      kRuntimeISA,
+                                      default_context_.get(),
+                                      false);
 
   EXPECT_EQ(OatFileAssistant::kDex2OatFromScratch,
       GetDexOptNeeded(&oat_file_assistant, CompilerFilter::kSpeed));
@@ -1255,7 +1336,7 @@ TEST_F(OatFileAssistantTest, RaceToGenerate) {
 
 // Case: We have a DEX file and an ODEX file, and no OAT file,
 // Expect: We should load the odex file executable.
-TEST_F(DexoptTest, LoadDexOdexNoOat) {
+TEST_F(OatFileAssistantTest, LoadDexOdexNoOat) {
   std::string dex_location = GetScratchDir() + "/LoadDexOdexNoOat.jar";
   std::string odex_location = GetOdexDir() + "/LoadDexOdexNoOat.odex";
 
@@ -1264,7 +1345,10 @@ TEST_F(DexoptTest, LoadDexOdexNoOat) {
   GenerateOdexForTest(dex_location, odex_location, CompilerFilter::kSpeed);
 
   // Load the oat using an executable oat file assistant.
-  OatFileAssistant oat_file_assistant(dex_location.c_str(), kRuntimeISA, true);
+  OatFileAssistant oat_file_assistant(dex_location.c_str(),
+                                      kRuntimeISA,
+                                      default_context_.get(),
+                                      true);
 
   std::unique_ptr<OatFile> oat_file = oat_file_assistant.GetBestOatFile();
   ASSERT_TRUE(oat_file.get() != nullptr);
@@ -1276,7 +1360,7 @@ TEST_F(DexoptTest, LoadDexOdexNoOat) {
 
 // Case: We have a MultiDEX file and an ODEX file, and no OAT file.
 // Expect: We should load the odex file executable.
-TEST_F(DexoptTest, LoadMultiDexOdexNoOat) {
+TEST_F(OatFileAssistantTest, LoadMultiDexOdexNoOat) {
   std::string dex_location = GetScratchDir() + "/LoadMultiDexOdexNoOat.jar";
   std::string odex_location = GetOdexDir() + "/LoadMultiDexOdexNoOat.odex";
 
@@ -1285,7 +1369,10 @@ TEST_F(DexoptTest, LoadMultiDexOdexNoOat) {
   GenerateOdexForTest(dex_location, odex_location, CompilerFilter::kSpeed);
 
   // Load the oat using an executable oat file assistant.
-  OatFileAssistant oat_file_assistant(dex_location.c_str(), kRuntimeISA, true);
+  OatFileAssistant oat_file_assistant(dex_location.c_str(),
+                                      kRuntimeISA,
+                                      default_context_.get(),
+                                      true);
 
   std::unique_ptr<OatFile> oat_file = oat_file_assistant.GetBestOatFile();
   ASSERT_TRUE(oat_file.get() != nullptr);
@@ -1367,24 +1454,39 @@ TEST_F(OatFileAssistantTest, GetDexOptNeededWithOutOfDateContext) {
   {
     std::unique_ptr<ClassLoaderContext> updated_context = ClassLoaderContext::Create(context_str);
     ASSERT_TRUE(updated_context != nullptr);
-    OatFileAssistant oat_file_assistant(dex_location.c_str(), kRuntimeISA, false);
-    // DexOptNeeded should advise compilation from scratch when the context changes.
-    EXPECT_EQ(OatFileAssistant::kDex2OatFromScratch,
-              GetDexOptNeeded(&oat_file_assistant,
-                    CompilerFilter::kDefaultCompilerFilter,
-                    updated_context));
+    std::vector<int> context_fds;
+    ASSERT_TRUE(updated_context->OpenDexFiles("", context_fds,  /*only_read_checksums*/ true));
+    OatFileAssistant oat_file_assistant(
+        dex_location.c_str(), kRuntimeISA, updated_context.get(), false);
+    // DexOptNeeded should advise compilation for filter when the context changes.
+    EXPECT_EQ(-OatFileAssistant::kDex2OatForFilter,
+              GetDexOptNeeded(&oat_file_assistant, CompilerFilter::kDefaultCompilerFilter));
   }
   {
     std::unique_ptr<ClassLoaderContext> updated_context = ClassLoaderContext::Create(context_str);
     ASSERT_TRUE(updated_context != nullptr);
-    OatFileAssistant oat_file_assistant(dex_location.c_str(), kRuntimeISA, false);
+    std::vector<int> context_fds;
+    ASSERT_TRUE(updated_context->OpenDexFiles("", context_fds,  /*only_read_checksums*/ true));
+    OatFileAssistant oat_file_assistant(
+        dex_location.c_str(), kRuntimeISA, updated_context.get(), false);
     // Now check that DexOptNeeded does not advise compilation if we only extracted the file.
     args.push_back("--compiler-filter=extract");
     ASSERT_TRUE(Dex2Oat(args, &error_msg)) << error_msg;
     EXPECT_EQ(OatFileAssistant::kNoDexOptNeeded,
-              GetDexOptNeeded(&oat_file_assistant,
-                    CompilerFilter::kExtract,
-                    updated_context));
+              GetDexOptNeeded(&oat_file_assistant, CompilerFilter::kExtract));
+  }
+  {
+    std::unique_ptr<ClassLoaderContext> updated_context = ClassLoaderContext::Create(context_str);
+    ASSERT_TRUE(updated_context != nullptr);
+    std::vector<int> context_fds;
+    ASSERT_TRUE(updated_context->OpenDexFiles("", context_fds,  /*only_read_checksums*/ true));
+    OatFileAssistant oat_file_assistant(
+        dex_location.c_str(), kRuntimeISA, updated_context.get(), false);
+    // Now check that DexOptNeeded does not advise compilation if we only verify the file.
+    args.push_back("--compiler-filter=verify");
+    ASSERT_TRUE(Dex2Oat(args, &error_msg)) << error_msg;
+    EXPECT_EQ(OatFileAssistant::kNoDexOptNeeded,
+              GetDexOptNeeded(&oat_file_assistant, CompilerFilter::kExtract));
   }
 }
 
