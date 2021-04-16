@@ -81,8 +81,7 @@ enum VdexSection : uint32_t {
   kChecksumSection = 0,
   kDexFileSection = 1,
   kVerifierDepsSection = 2,
-  kTypeLookupTableSection = 3,
-  kNumberOfSections = 4,
+  kNumberOfSections = 3,
 };
 
 class VdexFile {
@@ -167,10 +166,6 @@ class VdexFile {
   }
   uint32_t GetNumberOfDexFiles() const {
     return GetSectionHeader(VdexSection::kChecksumSection).section_size / sizeof(VdexChecksum);
-  }
-
-  bool HasTypeLookupTableSection() const {
-    return GetVdexFileHeader().GetNumberOfSections() >= (kTypeLookupTableSection + 1);
   }
 
   const VdexChecksum* GetDexChecksumsArray() const {
@@ -272,8 +267,6 @@ class VdexFile {
   // is none.
   const uint8_t* GetNextDexFileData(const uint8_t* cursor, uint32_t dex_file_index) const;
 
-  const uint8_t* GetNextTypeLookupTableData(const uint8_t* cursor, uint32_t dex_file_index) const;
-
   // Get the location checksum of the dex file number `dex_file_index`.
   uint32_t GetLocationChecksum(uint32_t dex_file_index) const {
     DCHECK_LT(dex_file_index, GetNumberOfDexFiles());
@@ -313,11 +306,6 @@ class VdexFile {
   const uint8_t* DexBegin() const {
     DCHECK(HasDexSection());
     return Begin() + GetSectionHeader(VdexSection::kDexFileSection).section_offset;
-  }
-
-  const uint8_t* TypeLookupTableDataBegin() const {
-    DCHECK(HasTypeLookupTableSection());
-    return Begin() + GetSectionHeader(VdexSection::kTypeLookupTableSection).section_offset;
   }
 
   MemMap mmap_;
