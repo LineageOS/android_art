@@ -26,6 +26,7 @@
 
 #include <android-base/logging.h>
 
+#include "base/array_ref.h"
 #include "base/bit_utils.h"
 #include "dex/dex_file_loader.h"
 #include "dex/standard_dex_file.h"
@@ -35,24 +36,22 @@ namespace art {
 class TestDexFileBuilder {
  public:
   TestDexFileBuilder()
-      : strings_(), types_(), fields_(), protos_(), dex_file_data_() {
+      : strings_(), types_(), fields_(), protos_() {
   }
 
   void AddString(const std::string& str) {
-    CHECK(dex_file_data_.empty());
-    auto it = strings_.emplace(str, IdxAndDataOffset()).first;
-    CHECK_LT(it->first.length(), 128u);  // Don't allow multi-byte length in uleb128.
+    CHECK_LT(str.length(), 128u);  // Don't allow multi-byte length in uleb128.
+    strings_.emplace(str, IdxAndDataOffset());
   }
 
   void AddType(const std::string& descriptor) {
-    CHECK(dex_file_data_.empty());
     AddString(descriptor);
     types_.emplace(descriptor, 0u);
   }
 
-  void AddField(const std::string& class_descriptor, const std::string& type,
+  void AddField(const std::string& class_descriptor,
+                const std::string& type,
                 const std::string& name) {
-    CHECK(dex_file_data_.empty());
     AddType(class_descriptor);
     AddType(type);
     AddString(name);
@@ -60,9 +59,9 @@ class TestDexFileBuilder {
     fields_.emplace(key, 0u);
   }
 
-  void AddMethod(const std::string& class_descriptor, const std::string& signature,
+  void AddMethod(const std::string& class_descriptor,
+                 const std::string& signature,
                  const std::string& name) {
-    CHECK(dex_file_data_.empty());
     AddType(class_descriptor);
     AddString(name);
 
@@ -81,9 +80,8 @@ class TestDexFileBuilder {
     methods_.emplace(method_key, 0u);
   }
 
-  // NOTE: The builder holds the actual data, so it must live as long as the dex file.
-  std::unique_ptr<const DexFile> Build(const std::string& dex_location) {
-    CHECK(dex_file_data_.empty());
+  std::unique_ptr<const DexFile> Build(const std::string& dex_location,
+                                       uint32_t location_checksum = 0u) {
     union {
       uint8_t data[sizeof(DexFile::Header)];
       uint64_t force_alignment;
@@ -164,19 +162,22 @@ class TestDexFileBuilder {
     header->data_off_ = (data_section_size != 0u) ? data_section_offset : 0u;
 
     uint32_t total_size = data_section_offset + data_section_size;
-
-    dex_file_data_.resize(total_size);
+    std::vector<uint8_t> dex_file_data(total_size, 0u);
 
     for (const auto& entry : strings_) {
       CHECK_LT(entry.first.size(), 128u);
       uint32_t raw_offset = data_section_offset + entry.second.data_offset;
-      dex_file_data_[raw_offset] = static_cast<uint8_t>(entry.first.size());
-      std::memcpy(&dex_file_data_[raw_offset + 1], entry.first.c_str(), entry.first.size() + 1);
-      Write32(string_ids_offset + entry.second.idx * sizeof(dex::StringId), raw_offset);
+      dex_file_data[raw_offset] = static_cast<uint8_t>(entry.first.size());
+      std::memcpy(&dex_file_data[raw_offset + 1], entry.first.c_str(), entry.first.size() + 1);
+      Write32(dex_file_data,
+              string_ids_offset + entry.second.idx * sizeof(dex::StringId),
+              raw_offset);
     }
 
     for (const auto& entry : types_) {
-      Write32(type_ids_offset + entry.second * sizeof(dex::TypeId), GetStringIdx(entry.first));
+      Write32(dex_file_data,
+              type_ids_offset + entry.second * sizeof(dex::TypeId),
+              GetStringIdx(entry.first));
       ++type_idx;
     }
 
@@ -185,14 +186,15 @@ class TestDexFileBuilder {
       uint32_t type_list_offset =
           (num_args != 0u) ? data_section_offset + entry.second.data_offset : 0u;
       uint32_t raw_offset = proto_ids_offset + entry.second.idx * sizeof(dex::ProtoId);
-      Write32(raw_offset + 0u, GetStringIdx(entry.first.shorty));
-      Write16(raw_offset + 4u, GetTypeIdx(entry.first.return_type));
-      Write32(raw_offset + 8u, type_list_offset);
+      Write32(dex_file_data, raw_offset + 0u, GetStringIdx(entry.first.shorty));
+      Write16(dex_file_data, raw_offset + 4u, GetTypeIdx(entry.first.return_type));
+      Write32(dex_file_data, raw_offset + 8u, type_list_offset);
       if (num_args != 0u) {
         CHECK_NE(entry.second.data_offset, 0u);
-        Write32(type_list_offset, num_args);
+        Write32(dex_file_data, type_list_offset, num_args);
         for (size_t i = 0; i != num_args; ++i) {
-          Write16(type_list_offset + 4u + i * sizeof(dex::TypeItem),
+          Write16(dex_file_data,
+                  type_list_offset + 4u + i * sizeof(dex::TypeItem),
                   GetTypeIdx(entry.first.args[i]));
         }
       }
@@ -200,46 +202,46 @@ class TestDexFileBuilder {
 
     for (const auto& entry : fields_) {
       uint32_t raw_offset = field_ids_offset + entry.second * sizeof(dex::FieldId);
-      Write16(raw_offset + 0u, GetTypeIdx(entry.first.class_descriptor));
-      Write16(raw_offset + 2u, GetTypeIdx(entry.first.type));
-      Write32(raw_offset + 4u, GetStringIdx(entry.first.name));
+      Write16(dex_file_data, raw_offset + 0u, GetTypeIdx(entry.first.class_descriptor));
+      Write16(dex_file_data, raw_offset + 2u, GetTypeIdx(entry.first.type));
+      Write32(dex_file_data, raw_offset + 4u, GetStringIdx(entry.first.name));
     }
 
     for (const auto& entry : methods_) {
       uint32_t raw_offset = method_ids_offset + entry.second * sizeof(dex::MethodId);
-      Write16(raw_offset + 0u, GetTypeIdx(entry.first.class_descriptor));
+      Write16(dex_file_data, raw_offset + 0u, GetTypeIdx(entry.first.class_descriptor));
       auto it = protos_.find(*entry.first.proto);
       CHECK(it != protos_.end());
-      Write16(raw_offset + 2u, it->second.idx);
-      Write32(raw_offset + 4u, GetStringIdx(entry.first.name));
+      Write16(dex_file_data, raw_offset + 2u, it->second.idx);
+      Write32(dex_file_data, raw_offset + 4u, GetStringIdx(entry.first.name));
     }
 
     // Leave signature as zeros.
 
-    header->file_size_ = dex_file_data_.size();
+    header->file_size_ = dex_file_data.size();
 
     // Write the complete header early, as part of it needs to be checksummed.
-    std::memcpy(&dex_file_data_[0], header_data.data, sizeof(DexFile::Header));
+    std::memcpy(&dex_file_data[0], header_data.data, sizeof(DexFile::Header));
 
     // Checksum starts after the checksum field.
     size_t skip = sizeof(header->magic_) + sizeof(header->checksum_);
     header->checksum_ = adler32(adler32(0L, Z_NULL, 0),
-                                dex_file_data_.data() + skip,
-                                dex_file_data_.size() - skip);
+                                dex_file_data.data() + skip,
+                                dex_file_data.size() - skip);
 
     // Write the complete header again, just simpler that way.
-    std::memcpy(&dex_file_data_[0], header_data.data, sizeof(DexFile::Header));
+    std::memcpy(&dex_file_data[0], header_data.data, sizeof(DexFile::Header));
+
+    // Do not protect the final data from writing. Some tests need to modify it.
 
     static constexpr bool kVerify = false;
     static constexpr bool kVerifyChecksum = false;
     std::string error_msg;
-    const DexFileLoader dex_file_loader;
-    std::unique_ptr<const DexFile> dex_file(dex_file_loader.Open(
-        &dex_file_data_[0],
-        dex_file_data_.size(),
+    std::unique_ptr<const DexFile> dex_file(DexFileLoader::Open(
         dex_location,
-        0u,
-        nullptr,
+        location_checksum,
+        std::move(dex_file_data),
+        /*oat_dex_file=*/ nullptr,
         kVerify,
         kVerifyChecksum,
         &error_msg));
@@ -366,25 +368,25 @@ class TestDexFileBuilder {
     return key;
   }
 
-  void Write32(size_t offset, uint32_t value) {
-    CHECK_LE(offset + 4u, dex_file_data_.size());
-    CHECK_EQ(dex_file_data_[offset + 0], 0u);
-    CHECK_EQ(dex_file_data_[offset + 1], 0u);
-    CHECK_EQ(dex_file_data_[offset + 2], 0u);
-    CHECK_EQ(dex_file_data_[offset + 3], 0u);
-    dex_file_data_[offset + 0] = static_cast<uint8_t>(value >> 0);
-    dex_file_data_[offset + 1] = static_cast<uint8_t>(value >> 8);
-    dex_file_data_[offset + 2] = static_cast<uint8_t>(value >> 16);
-    dex_file_data_[offset + 3] = static_cast<uint8_t>(value >> 24);
+  static void Write32(std::vector<uint8_t>& dex_file_data, size_t offset, uint32_t value) {
+    CHECK_LE(offset + 4u, dex_file_data.size());
+    CHECK_EQ(dex_file_data[offset + 0], 0u);
+    CHECK_EQ(dex_file_data[offset + 1], 0u);
+    CHECK_EQ(dex_file_data[offset + 2], 0u);
+    CHECK_EQ(dex_file_data[offset + 3], 0u);
+    dex_file_data[offset + 0] = static_cast<uint8_t>(value >> 0);
+    dex_file_data[offset + 1] = static_cast<uint8_t>(value >> 8);
+    dex_file_data[offset + 2] = static_cast<uint8_t>(value >> 16);
+    dex_file_data[offset + 3] = static_cast<uint8_t>(value >> 24);
   }
 
-  void Write16(size_t offset, uint32_t value) {
+  static void Write16(std::vector<uint8_t>& dex_file_data, size_t offset, uint32_t value) {
     CHECK_LE(value, 0xffffu);
-    CHECK_LE(offset + 2u, dex_file_data_.size());
-    CHECK_EQ(dex_file_data_[offset + 0], 0u);
-    CHECK_EQ(dex_file_data_[offset + 1], 0u);
-    dex_file_data_[offset + 0] = static_cast<uint8_t>(value >> 0);
-    dex_file_data_[offset + 1] = static_cast<uint8_t>(value >> 8);
+    CHECK_LE(offset + 2u, dex_file_data.size());
+    CHECK_EQ(dex_file_data[offset + 0], 0u);
+    CHECK_EQ(dex_file_data[offset + 1], 0u);
+    dex_file_data[offset + 0] = static_cast<uint8_t>(value >> 0);
+    dex_file_data[offset + 1] = static_cast<uint8_t>(value >> 8);
   }
 
   std::map<std::string, IdxAndDataOffset> strings_;
@@ -392,8 +394,6 @@ class TestDexFileBuilder {
   std::map<FieldKey, uint32_t, FieldKeyComparator> fields_;
   std::map<ProtoKey, IdxAndDataOffset, ProtoKeyComparator> protos_;
   std::map<MethodKey, uint32_t, MethodKeyComparator> methods_;
-
-  std::vector<uint8_t> dex_file_data_;
 };
 
 }  // namespace art
