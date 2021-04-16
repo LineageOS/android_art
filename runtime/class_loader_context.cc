@@ -412,7 +412,9 @@ bool ClassLoaderContext::OpenDexFiles(const std::string& classpath_dir,
   // no dex files. So that we can distinguish the real failures...
   const ArtDexFileLoader dex_file_loader;
   std::vector<ClassLoaderInfo*> work_list;
-  CHECK(class_loader_chain_ != nullptr);
+  if (class_loader_chain_ == nullptr) {
+    return true;
+  }
   work_list.push_back(class_loader_chain_.get());
   size_t dex_file_index = 0;
   while (!work_list.empty()) {
@@ -1155,7 +1157,9 @@ std::unique_ptr<ClassLoaderContext> ClassLoaderContext::CreateContextForClassLoa
     jobjectArray dex_elements) {
   ScopedTrace trace(__FUNCTION__);
 
-  CHECK(class_loader != nullptr);
+  if (class_loader == nullptr) {
+    return nullptr;
+  }
   ScopedObjectAccess soa(Thread::Current());
   StackHandleScope<2> hs(soa.Self());
   Handle<mirror::ClassLoader> h_class_loader =
