@@ -177,6 +177,40 @@ std::vector<const OatFile*> OatFileManager::RegisterImageOatFiles(
   return oat_files;
 }
 
+static bool ClassLoaderContextMatches(
+    const OatFile* oat_file,
+    const ClassLoaderContext* context,
+    /*out*/ std::string* error_msg) {
+  DCHECK(oat_file != nullptr);
+  DCHECK(error_msg != nullptr);
+  DCHECK(context != nullptr);
+
+  if (oat_file->IsBackedByVdexOnly()) {
+    // Only a vdex file, we don't depend on the class loader context.
+    return true;
+  }
+
+  if (!CompilerFilter::IsVerificationEnabled(oat_file->GetCompilerFilter())) {
+    // If verification is not enabled we don't need to check if class loader context matches
+    // as the oat file is either extracted or assumed verified.
+    return true;
+  }
+
+  // If the oat file loading context matches the context used during compilation then we accept
+  // the oat file without addition checks
+  ClassLoaderContext::VerificationResult result = context->VerifyClassLoaderContextMatch(
+      oat_file->GetClassLoaderContext(),
+      /*verify_names=*/ true,
+      /*verify_checksums=*/ true);
+  switch (result) {
+    case ClassLoaderContext::VerificationResult::kMismatch:
+      return false;
+    case ClassLoaderContext::VerificationResult::kVerifies:
+      return true;
+  }
+  LOG(FATAL) << "Unreachable";
+}
+
 bool OatFileManager::ShouldLoadAppImage(const OatFile* source_oat_file) const {
   Runtime* const runtime = Runtime::Current();
   return kEnableAppImage && (!runtime->IsJavaDebuggable() || source_oat_file->IsDebuggable());
@@ -199,18 +233,18 @@ std::vector<std::unique_ptr<const DexFile>> OatFileManager::OpenDexFilesFromOat(
   Runtime* const runtime = Runtime::Current();
 
   std::vector<std::unique_ptr<const DexFile>> dex_files;
-  std::unique_ptr<ClassLoaderContext> context(
-      ClassLoaderContext::CreateContextForClassLoader(class_loader, dex_elements));
 
   // If the class_loader is null there's not much we can do. This happens if a dex files is loaded
   // directly with DexFile APIs instead of using class loaders.
   if (class_loader == nullptr) {
     LOG(WARNING) << "Opening an oat file without a class loader. "
                  << "Are you using the deprecated DexFile APIs?";
-  } else if (context != nullptr) {
+  } else {
+    std::unique_ptr<ClassLoaderContext> context(
+        ClassLoaderContext::CreateContextForClassLoader(class_loader, dex_elements));
+
     OatFileAssistant oat_file_assistant(dex_location,
                                         kRuntimeISA,
-                                        context.get(),
                                         runtime->GetOatFilesExecutable(),
                                         only_use_system_oat_files_);
 
@@ -246,7 +280,22 @@ std::vector<std::unique_ptr<const DexFile>> OatFileManager::OpenDexFilesFromOat(
         << "optimization-status-location=" << odex_location
         << " best_oat_file-location=" << oat_file->GetLocation();
 
-    if (oat_file != nullptr) {
+    const OatFile* source_oat_file = nullptr;
+    std::string error_msg;
+    bool class_loader_context_matches = false;
+    bool check_context = oat_file != nullptr && context != nullptr;
+    if (check_context) {
+        class_loader_context_matches =
+            ClassLoaderContextMatches(oat_file.get(),
+                                      context.get(),
+                                      /*out*/ &error_msg);
+    }
+    ScopedTrace context_results(StringPrintf(
+        "check_context=%s contex-ok=%s",
+        check_context ? "true" : "false",
+        class_loader_context_matches ? "true" : "false"));
+
+    if (class_loader_context_matches) {
       // Load the dex files from the oat file.
       bool added_image_space = false;
       if (oat_file->IsExecutable()) {
@@ -318,7 +367,6 @@ std::vector<std::unique_ptr<const DexFile>> OatFileManager::OpenDexFilesFromOat(
           // file as non-executable.
           OatFileAssistant nonexecutable_oat_file_assistant(dex_location,
                                                             kRuntimeISA,
-                                                            context.get(),
                                                             /*load_executable=*/false,
                                                             only_use_system_oat_files_);
           oat_file.reset(nonexecutable_oat_file_assistant.GetBestOatFile().release());
@@ -342,44 +390,46 @@ std::vector<std::unique_ptr<const DexFile>> OatFileManager::OpenDexFilesFromOat(
       }
 
       VLOG(class_linker) << "Registering " << oat_file->GetLocation();
-      *out_oat_file = RegisterOatFile(std::move(oat_file));
-    } else {
-      // oat_file == nullptr
-      // Verify if any of the dex files being loaded is already in the class path.
-      // If so, report an error with the current stack trace.
-      // Most likely the developer didn't intend to do this because it will waste
-      // performance and memory.
-      if (oat_file_assistant.GetBestStatus() == OatFileAssistant::kOatContextOutOfDate) {
-        std::set<const DexFile*> already_exists_in_classpath =
-            context->CheckForDuplicateDexFiles(MakeNonOwningPointerVector(dex_files));
-        if (!already_exists_in_classpath.empty()) {
-          ScopedTrace duplicate_dex_files("DuplicateDexFilesInContext");
-          auto duplicate_it = already_exists_in_classpath.begin();
-          std::string duplicates = (*duplicate_it)->GetLocation();
-          for (duplicate_it++ ; duplicate_it != already_exists_in_classpath.end(); duplicate_it++) {
-            duplicates += "," + (*duplicate_it)->GetLocation();
-          }
+      source_oat_file = RegisterOatFile(std::move(oat_file));
+      *out_oat_file = source_oat_file;
+    } else if (!error_msg.empty()) {
+      LOG(WARNING) << error_msg;
+    }
 
-          std::ostringstream out;
-          out << "Trying to load dex files which is already loaded in the same ClassLoader "
-              << "hierarchy.\n"
-              << "This is a strong indication of bad ClassLoader construct which leads to poor "
-              << "performance and wastes memory.\n"
-              << "The list of duplicate dex files is: " << duplicates << "\n"
-              << "The current class loader context is: "
-              << context->EncodeContextForOatFile("") << "\n"
-              << "Java stack trace:\n";
-
-          {
-            ScopedObjectAccess soa(self);
-            self->DumpJavaStack(out);
-          }
-
-          // We log this as an ERROR to stress the fact that this is most likely unintended.
-          // Note that ART cannot do anything about it. It is up to the app to fix their logic.
-          // Here we are trying to give a heads up on why the app might have performance issues.
-          LOG(ERROR) << out.str();
+    // Verify if any of the dex files being loaded is already in the class path.
+    // If so, report an error with the current stack trace.
+    // Most likely the developer didn't intend to do this because it will waste
+    // performance and memory.
+    if (context != nullptr && !class_loader_context_matches) {
+      std::set<const DexFile*> already_exists_in_classpath =
+          context->CheckForDuplicateDexFiles(MakeNonOwningPointerVector(dex_files));
+      if (!already_exists_in_classpath.empty()) {
+        ScopedTrace duplicate_dex_files("DuplicateDexFilesInContext");
+        auto duplicate_it = already_exists_in_classpath.begin();
+        std::string duplicates = (*duplicate_it)->GetLocation();
+        for (duplicate_it++ ; duplicate_it != already_exists_in_classpath.end(); duplicate_it++) {
+          duplicates += "," + (*duplicate_it)->GetLocation();
         }
+
+        std::ostringstream out;
+        out << "Trying to load dex files which is already loaded in the same ClassLoader "
+            << "hierarchy.\n"
+            << "This is a strong indication of bad ClassLoader construct which leads to poor "
+            << "performance and wastes memory.\n"
+            << "The list of duplicate dex files is: " << duplicates << "\n"
+            << "The current class loader context is: "
+            << context->EncodeContextForOatFile("") << "\n"
+            << "Java stack trace:\n";
+
+        {
+          ScopedObjectAccess soa(self);
+          self->DumpJavaStack(out);
+        }
+
+        // We log this as an ERROR to stress the fact that this is most likely unintended.
+        // Note that ART cannot do anything about it. It is up to the app to fix their logic.
+        // Here we are trying to give a heads up on why the app might have performance issues.
+        LOG(ERROR) << out.str();
       }
     }
   }
