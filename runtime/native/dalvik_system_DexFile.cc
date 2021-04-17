@@ -18,7 +18,6 @@
 
 #include <sstream>
 
-#include "android-base/file.h"
 #include "android-base/stringprintf.h"
 
 #include "base/casts.h"
@@ -542,26 +541,22 @@ static jint GetDexOptNeeded(JNIEnv* env,
       env->ThrowNew(iae.get(), message.c_str());
       return -1;
     }
-    std::vector<int> context_fds;
-    context->OpenDexFiles(android::base::Dirname(filename),
-                          context_fds,
-                          /*only_read_checksums*/ true);
   }
 
   // TODO: Verify the dex location is well formed, and throw an IOException if
   // not?
 
-  OatFileAssistant oat_file_assistant(filename,
-                                      target_instruction_set,
-                                      context.get(),
-                                      /* load_executable= */ false);
+  OatFileAssistant oat_file_assistant(filename, target_instruction_set, false);
 
   // Always treat elements of the bootclasspath as up-to-date.
   if (oat_file_assistant.IsInBootClassPath()) {
     return OatFileAssistant::kNoDexOptNeeded;
   }
 
+  std::vector<int> context_fds;
   return oat_file_assistant.GetDexOptNeeded(filter,
+                                            context.get(),
+                                            context_fds,
                                             profile_changed,
                                             downgrade);
 }
@@ -589,9 +584,7 @@ static jstring DexFile_getDexFileStatus(JNIEnv* env,
     return nullptr;
   }
 
-  OatFileAssistant oat_file_assistant(filename.c_str(),
-                                      target_instruction_set,
-                                      /* context= */ nullptr,
+  OatFileAssistant oat_file_assistant(filename.c_str(), target_instruction_set,
                                       /* load_executable= */ false);
   return env->NewStringUTF(oat_file_assistant.GetStatusDump().c_str());
 }
@@ -698,10 +691,7 @@ static jboolean DexFile_isDexOptNeeded(JNIEnv* env, jclass, jstring javaFilename
     return JNI_FALSE;
   }
 
-  OatFileAssistant oat_file_assistant(filename,
-                                      kRuntimeISA,
-                                      /* context= */ nullptr,
-                                      /* load_executable= */ false);
+  OatFileAssistant oat_file_assistant(filename, kRuntimeISA, false);
   return oat_file_assistant.IsUpToDate() ? JNI_FALSE : JNI_TRUE;
 }
 
@@ -838,11 +828,10 @@ static jobjectArray DexFile_getDexFileOutputPaths(JNIEnv* env,
     }
   }
 
-  // If we did not find a boot classpath oat file, lookup the oat file for an app.
+  // If did not find a boot classpath oat file, lookup the oat file for an app.
   if (oat_filename.empty()) {
     OatFileAssistant oat_file_assistant(filename.c_str(),
                                         target_instruction_set,
-                                        /* context= */ nullptr,
                                         /* load_executable= */ false);
 
     std::unique_ptr<OatFile> best_oat_file = oat_file_assistant.GetBestOatFile();
