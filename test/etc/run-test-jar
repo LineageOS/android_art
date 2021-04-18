@@ -878,6 +878,7 @@ linkroot_cmdline="true"
 linkroot_overlay_cmdline="true"
 setupapex_cmdline="true"
 installapex_cmdline="true"
+installapex_test_cmdline="true"
 
 linkdirs() {
   find "$1" -maxdepth 1 -mindepth 1 -type d | xargs -i ln -sf '{}' "$2"
@@ -911,6 +912,8 @@ elif [ "$USE_EXTRACTED_ZIPAPEX" = "y" ]; then
   if [ "$DEV_MODE" = "y" ]; then
     ln_options="--verbose"
   fi
+  # If the ${RUN} is executed multiple times we don't need to recreate the link
+  installapex_test_cmdline="test -L ${DEX_LOCATION}/zipapex"
   installapex_cmdline="ln -s -f ${ln_options} ${EXTRACTED_ZIPAPEX_LOC} ${DEX_LOCATION}/zipapex"
 fi
 
@@ -1334,7 +1337,7 @@ else
         echo EXPORT $var=${!var}
       done
       echo "$(declare -f linkdirs)"
-      echo "mkdir -p ${mkdir_locations} && $setupapex_cmdline && $installapex_cmdline && $linkroot_cmdline && $linkroot_overlay_cmdline && $profman_cmdline && $dex2oat_cmdline && $dm_cmdline && $vdex_cmdline && $strip_cmdline && $sync_cmdline && $cmdline"
+      echo "mkdir -p ${mkdir_locations} && $setupapex_cmdline && ( $installapex_test_cmdline || $installapex_cmdline ) && $linkroot_cmdline && $linkroot_overlay_cmdline && $profman_cmdline && $dex2oat_cmdline && $dm_cmdline && $vdex_cmdline && $strip_cmdline && $sync_cmdline && $cmdline"
     fi
 
     cd $ANDROID_BUILD_TOP
@@ -1349,7 +1352,7 @@ else
 
     mkdir -p ${mkdir_locations} || exit 1
     $setupapex_cmdline || { echo "zipapex extraction failed." >&2 ; exit 2; }
-    $installapex_cmdline || { echo "zipapex install failed. cmd was: ${installapex_cmdline}." >&2; find ${mkdir_locations} -type f >&2; exit 2; }
+    $installapex_test_cmdline || $installapex_cmdline || { echo "zipapex install failed. cmd was: ${installapex_test_cmdline} || ${installapex_cmdline}." >&2; find ${mkdir_locations} -type f >&2; exit 2; }
     $linkroot_cmdline || { echo "create symlink android-root failed." >&2 ; exit 2; }
     $linkroot_overlay_cmdline || { echo "overlay android-root failed." >&2 ; exit 2; }
     $profman_cmdline || { echo "Profman failed." >&2 ; exit 2; }
