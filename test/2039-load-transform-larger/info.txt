@@ -1,0 +1,3 @@
+Tests basic functions in the jvmti plugin.
+
+Test that making a class-object larger doesn't break anything.
