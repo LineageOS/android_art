@@ -1067,6 +1067,7 @@ class OnDeviceRefresh final {
 
   WARN_UNUSED bool CompileBootExtensionArtifacts(const InstructionSet isa,
                                                  const std::string& staging_dir,
+                                                 uint32_t* dex2oat_invocation_count,
                                                  std::string* error_msg) const {
     std::vector<std::string> args;
     args.push_back(config_.GetDex2Oat());
@@ -1159,10 +1160,14 @@ class OnDeviceRefresh final {
       return false;
     }
 
+    *dex2oat_invocation_count = *dex2oat_invocation_count + 1;
+    ReportNextBootAnimationProgress(*dex2oat_invocation_count);
+
     return true;
   }
 
   WARN_UNUSED bool CompileSystemServerArtifacts(const std::string& staging_dir,
+                                                uint32_t* dex2oat_invocation_count,
                                                 std::string* error_msg) const {
     std::vector<std::string> classloader_context;
 
@@ -1246,10 +1251,19 @@ class OnDeviceRefresh final {
         return false;
       }
 
+      *dex2oat_invocation_count = *dex2oat_invocation_count + 1;
+      ReportNextBootAnimationProgress(*dex2oat_invocation_count);
       classloader_context.emplace_back(jar);
     }
 
     return true;
+  }
+
+  void ReportNextBootAnimationProgress(uint32_t current_compilation) const {
+    uint32_t number_of_compilations =
+        config_.GetBootExtensionIsas().size() + systemserver_compilable_jars_.size();
+    uint32_t value = (100 * current_compilation) / number_of_compilations;
+    android::base::SetProperty("service.bootanim.progress", std::to_string(value));
   }
 
   WARN_UNUSED ExitCode Compile(bool force_compile) const {
@@ -1271,6 +1285,8 @@ class OnDeviceRefresh final {
 
     std::string error_msg;
 
+    uint32_t dex2oat_invocation_count = 0;
+    ReportNextBootAnimationProgress(dex2oat_invocation_count);
     for (const InstructionSet isa : config_.GetBootExtensionIsas()) {
       if (force_compile || !BootExtensionArtifactsExistOnData(isa, &error_msg)) {
         // Remove artifacts we are about to generate. Ordinarily these are removed in the checking
@@ -1278,7 +1294,8 @@ class OnDeviceRefresh final {
         if (!RemoveBootExtensionArtifactsFromData(isa)) {
             return ExitCode::kCleanupFailed;
         }
-        if (!CompileBootExtensionArtifacts(isa, staging_dir, &error_msg)) {
+        if (!CompileBootExtensionArtifacts(
+                isa, staging_dir, &dex2oat_invocation_count, &error_msg)) {
           LOG(ERROR) << "Compilation of BCP failed: " << error_msg;
           if (!RecursiveRemoveBelow(staging_dir)) {
             return ExitCode::kCleanupFailed;
@@ -1289,7 +1306,7 @@ class OnDeviceRefresh final {
     }
 
     if (force_compile || !SystemServerArtifactsExistOnData(&error_msg)) {
-      if (!CompileSystemServerArtifacts(staging_dir, &error_msg)) {
+      if (!CompileSystemServerArtifacts(staging_dir, &dex2oat_invocation_count, &error_msg)) {
         LOG(ERROR) << "Compilation of system_server failed: " << error_msg;
         if (!RecursiveRemoveBelow(staging_dir)) {
           return ExitCode::kCleanupFailed;
