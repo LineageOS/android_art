@@ -60,7 +60,7 @@ art_cc_library {
         // and binds the methods in the libartpalette-system library.
         android: {
             // libartpalette.so dlopen()'s libartpalette-system.
-            required: ["libartpalette-system"],
+            runtime_libs: ["libartpalette-system"],
             srcs: ["apex/palette.cc"],
             shared_libs: ["liblog"],
             version_script: "libartpalette.map.txt",
