@@ -2800,31 +2800,31 @@ ObjPtr<mirror::Class> ClassLinker::FindClassInBaseDexClassLoaderClassPath(
          IsDelegateLastClassLoader(soa, class_loader))
       << "Unexpected class loader for descriptor " << descriptor;
 
+  const DexFile* dex_file = nullptr;
+  const dex::ClassDef* class_def = nullptr;
   ObjPtr<mirror::Class> ret;
-  auto define_class = [&](const DexFile* cp_dex_file) REQUIRES_SHARED(Locks::mutator_lock_) {
-    const dex::ClassDef* dex_class_def = OatDexFile::FindClassDef(*cp_dex_file, descriptor, hash);
-    if (dex_class_def != nullptr) {
-      ObjPtr<mirror::Class> klass = DefineClass(soa.Self(),
-                                                descriptor,
-                                                hash,
-                                                class_loader,
-                                                *cp_dex_file,
-                                                *dex_class_def);
-      if (klass == nullptr) {
-        CHECK(soa.Self()->IsExceptionPending()) << descriptor;
-        FilterDexFileCaughtExceptions(soa.Self(), this);
-        // TODO: Is it really right to break here, and not check the other dex files?
-      } else {
-        DCHECK(!soa.Self()->IsExceptionPending());
-      }
-      ret = klass;
-      return false;  // Found a Class (or error == nullptr), stop visit.
+  auto find_class_def = [&](const DexFile* cp_dex_file) REQUIRES_SHARED(Locks::mutator_lock_) {
+    const dex::ClassDef* cp_class_def = OatDexFile::FindClassDef(*cp_dex_file, descriptor, hash);
+    if (cp_class_def != nullptr) {
+      dex_file = cp_dex_file;
+      class_def = cp_class_def;
+      return false;  // Found a class definition, stop visit.
     }
     return true;  // Continue with the next DexFile.
   };
+  VisitClassLoaderDexFiles(soa, class_loader, find_class_def);
 
-  VisitClassLoaderDexFiles(soa, class_loader, define_class);
-  return ret;
+  ObjPtr<mirror::Class> klass = nullptr;
+  if (class_def != nullptr) {
+    klass = DefineClass(soa.Self(), descriptor, hash, class_loader, *dex_file, *class_def);
+    if (UNLIKELY(klass == nullptr)) {
+      CHECK(soa.Self()->IsExceptionPending()) << descriptor;
+      FilterDexFileCaughtExceptions(soa.Self(), this);
+    } else {
+      DCHECK(!soa.Self()->IsExceptionPending());
+    }
+  }
+  return klass;
 }
 
 ObjPtr<mirror::Class> ClassLinker::FindClass(Thread* self,
