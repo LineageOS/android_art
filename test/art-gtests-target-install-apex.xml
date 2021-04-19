@@ -29,7 +29,7 @@
     </test>
 
     <!-- When this test is run in a Mainline context (e.g. with `mts-tradefed`), only enable it if
-         one the Mainline modules below is present on the device used for testing. -->
+         one of the Mainline modules below is present on the device used for testing. -->
     <object type="module_controller" class="com.android.tradefed.testtype.suite.module.MainlineTestModuleController">
         <!-- ART Mainline Module (internal version). -->
         <option name="mainline-module-package-name" value="com.google.android.art" />
