@@ -144,18 +144,24 @@ std::vector<const OatFile*> OatFileManager::GetBootOatFiles() const {
   return oat_files;
 }
 
-const OatFile* OatFileManager::GetPrimaryOatFile() const {
+bool OatFileManager::GetPrimaryOatFileInfo(std::string* compilation_reason,
+                                           CompilerFilter::Filter* compiler_filter) const {
   ReaderMutexLock mu(Thread::Current(), *Locks::oat_file_manager_lock_);
   std::vector<const OatFile*> boot_oat_files = GetBootOatFiles();
   if (!boot_oat_files.empty()) {
     for (const std::unique_ptr<const OatFile>& oat_file : oat_files_) {
       if (std::find(boot_oat_files.begin(), boot_oat_files.end(), oat_file.get()) ==
           boot_oat_files.end()) {
-        return oat_file.get();
+        const char* reason = oat_file->GetCompilationReason();
+        if (reason != nullptr) {
+          *compilation_reason = reason;
+        }
+        *compiler_filter = oat_file->GetCompilerFilter();
+        return true;
       }
     }
   }
-  return nullptr;
+  return false;
 }
 
 OatFileManager::OatFileManager()
