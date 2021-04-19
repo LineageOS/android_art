@@ -19,6 +19,8 @@
 
 #include "palette_types.h"
 
+#include "jni.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif  // __cplusplus
@@ -39,6 +41,13 @@ typedef struct paletteHooksInterface_ {
 
   // Notify the Hooks object that the runtime is loading a .oat file.
   void (*NotifyOatFileLoaded)(const char* path);
+
+  // Notify the Hooks object that a native call is starting.
+  void (*NotifyBeginJniInvocation)(JNIEnv* env);
+
+
+  // Notify the Hooks object that a native call is ending.
+  void (*NotifyEndJniInvocation)(JNIEnv* env);
 } paletteHooksInterface;
 
 struct PaletteHooks {
@@ -55,6 +64,12 @@ struct PaletteHooks {
   }
   void NotifyOatFileLoaded(const char* path) {
     return functions->NotifyOatFileLoaded(path);
+  }
+  void NotifyBeginJniInvocation(JNIEnv* env) {
+    return functions->NotifyBeginJniInvocation(env);
+  }
+  void NotifyEndJniInvocation(JNIEnv* env) {
+    return functions->NotifyEndJniInvocation(env);
   }
 #endif
 };
