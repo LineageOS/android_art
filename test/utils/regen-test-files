@@ -256,8 +256,16 @@ known_failing_tests = [
   "708-jit-cache-churn",
   "717-integer-value-of",
   "720-thread-priority",
-  "728-imt-conflict-zygote",  # Custom `run` script + dependency on `libarttest`.
-  "813-fp-args",              # Dependency on `libarttest`.
+  # 728-imt-conflict-zygote: Custom `run` script + dependency on `libarttest`.
+  "728-imt-conflict-zygote",
+  # 813-fp-args: Dependency on `libarttest`.
+  "813-fp-args",
+  # 821-many-args: Fails with:
+  #
+  #   Test command execution failed with status FAILED: CommandResult: exit code=1, out=, err=Exception in thread "main" java.lang.ArrayIndexOutOfBoundsException: length=0; index=0
+  #           at Main.main(Main.java:20)
+  #
+  "821-many-args",
   "900-hello-plugin",
   "901-hello-ti-agent",
   "902-hello-transformation",
