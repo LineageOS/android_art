@@ -297,6 +297,7 @@ class OatWriter {
                     /*inout*/ std::vector<MemMap>* opened_dex_files_map,
                     /*out*/ std::vector<std::unique_ptr<const DexFile>>* opened_dex_files);
   void WriteQuickeningInfo(/*out*/std::vector<uint8_t>* buffer);
+  void WriteTypeLookupTables(/*out*/std::vector<uint8_t>* buffer);
   void WriteVerifierDeps(verifier::VerifierDeps* verifier_deps,
                          /*out*/std::vector<uint8_t>* buffer);
 
@@ -321,8 +322,8 @@ class OatWriter {
   size_t WriteDataBimgRelRo(OutputStream* out, size_t file_offset, size_t relative_offset);
 
   bool RecordOatDataOffset(OutputStream* out);
-  bool WriteTypeLookupTables(OutputStream* oat_rodata,
-                             const std::vector<const DexFile*>& opened_dex_files);
+  void InitializeTypeLookupTables(
+      const std::vector<std::unique_ptr<const DexFile>>& opened_dex_files);
   bool WriteDexLayoutSections(OutputStream* oat_rodata,
                               const std::vector<const DexFile*>& opened_dex_files);
   bool WriteCodeAlignment(OutputStream* out, uint32_t aligned_code_delta);
@@ -391,6 +392,9 @@ class OatWriter {
 
   // Offset of section holding quickening info inside Vdex.
   size_t vdex_quickening_info_offset_;
+
+  // Offset of type lookup tables inside Vdex.
+  size_t vdex_lookup_tables_offset_;
 
   // OAT checksum.
   uint32_t oat_checksum_;
@@ -495,6 +499,8 @@ class OatWriter {
   uint32_t size_verifier_deps_alignment_;
   uint32_t size_quickening_info_;
   uint32_t size_quickening_info_alignment_;
+  uint32_t size_vdex_lookup_table_alignment_;
+  uint32_t size_vdex_lookup_table_;
   uint32_t size_interpreter_to_interpreter_bridge_;
   uint32_t size_interpreter_to_compiled_code_bridge_;
   uint32_t size_jni_dlsym_lookup_trampoline_;
@@ -528,8 +534,6 @@ class OatWriter {
   uint32_t size_oat_dex_file_public_type_bss_mapping_offset_;
   uint32_t size_oat_dex_file_package_type_bss_mapping_offset_;
   uint32_t size_oat_dex_file_string_bss_mapping_offset_;
-  uint32_t size_oat_lookup_table_alignment_;
-  uint32_t size_oat_lookup_table_;
   uint32_t size_oat_class_offsets_alignment_;
   uint32_t size_oat_class_offsets_;
   uint32_t size_oat_class_type_;
