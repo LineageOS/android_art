@@ -804,11 +804,17 @@ class Generator:
           ["TODO(rpl): Find a way to express this list in a more concise fashion."])
       mts_test_shards.append(art_run_test_shard)
 
-    # Libcore CTS test shard.
-    libcore_cts_test_shard_num = len(mts_test_shards)
-    libcore_cts_test_shard = self.create_mts_test_shard(
-        "Libcore CTS tests", ["CtsLibcoreTestCases"], libcore_cts_test_shard_num, 2020)
-    mts_test_shards.append(libcore_cts_test_shard)
+    # CTS Libcore non-OJ tests (`CtsLibcoreTestCases`) shard.
+    cts_libcore_tests_shard_num = len(mts_test_shards)
+    cts_libcore_tests_shard = self.create_mts_test_shard(
+        "CTS Libcore non-OJ tests", ["CtsLibcoreTestCases"], cts_libcore_tests_shard_num, 2020)
+    mts_test_shards.append(cts_libcore_tests_shard)
+
+    # CTS Libcore OJ tests (`CtsLibcoreOjTestCases`) shard.
+    cts_libcore_oj_tests_shard_num = len(mts_test_shards)
+    cts_libcore_oj_tests_shard = self.create_mts_test_shard(
+        "CTS Libcore OJ tests", ["CtsLibcoreOjTestCases"], cts_libcore_oj_tests_shard_num, 2021)
+    mts_test_shards.append(cts_libcore_oj_tests_shard)
 
     for s in mts_test_shards:
       s.regen_test_plan_file()
