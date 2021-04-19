@@ -2066,7 +2066,7 @@ OatFile::OatClass OatDexFile::GetOatClass(uint16_t class_def_index) const {
     // actual class status, because we need to do the assignability type checks.
     return OatFile::OatClass(oat_file_,
                              ClassStatus::kNotReady,
-                             /* type= */ kOatClassNoneCompiled,
+                             /* type= */ OatClassType::kNoneCompiled,
                              /* bitmap_size= */ 0u,
                              /* bitmap_pointer= */ nullptr,
                              /* methods_pointer= */ nullptr);
@@ -2087,7 +2087,7 @@ OatFile::OatClass OatDexFile::GetOatClass(uint16_t class_def_index) const {
   const uint8_t* type_pointer = status_pointer + sizeof(uint16_t);
   CHECK_LT(type_pointer, oat_file_->End()) << oat_file_->GetLocation();
   OatClassType type = static_cast<OatClassType>(*reinterpret_cast<const uint16_t*>(type_pointer));
-  CHECK_LT(type, kOatClassMax) << oat_file_->GetLocation();
+  CHECK_LT(type, OatClassType::kOatClassMax) << oat_file_->GetLocation();
 
   const uint8_t* after_type_pointer = type_pointer + sizeof(int16_t);
   CHECK_LE(after_type_pointer, oat_file_->End()) << oat_file_->GetLocation();
@@ -2095,8 +2095,8 @@ OatFile::OatClass OatDexFile::GetOatClass(uint16_t class_def_index) const {
   uint32_t bitmap_size = 0;
   const uint8_t* bitmap_pointer = nullptr;
   const uint8_t* methods_pointer = nullptr;
-  if (type != kOatClassNoneCompiled) {
-    if (type == kOatClassSomeCompiled) {
+  if (type != OatClassType::kNoneCompiled) {
+    if (type == OatClassType::kSomeCompiled) {
       bitmap_size = static_cast<uint32_t>(*reinterpret_cast<const uint32_t*>(after_type_pointer));
       bitmap_pointer = after_type_pointer + sizeof(bitmap_size);
       CHECK_LE(bitmap_pointer, oat_file_->End()) << oat_file_->GetLocation();
@@ -2187,25 +2187,25 @@ OatFile::OatClass::OatClass(const OatFile* oat_file,
     : oat_file_(oat_file), status_(status), type_(type),
       bitmap_(bitmap_pointer), methods_pointer_(methods_pointer) {
     switch (type_) {
-      case kOatClassAllCompiled: {
+      case OatClassType::kAllCompiled: {
         CHECK_EQ(0U, bitmap_size);
         CHECK(bitmap_pointer == nullptr);
         CHECK(methods_pointer != nullptr);
         break;
       }
-      case kOatClassSomeCompiled: {
+      case OatClassType::kSomeCompiled: {
         CHECK_NE(0U, bitmap_size);
         CHECK(bitmap_pointer != nullptr);
         CHECK(methods_pointer != nullptr);
         break;
       }
-      case kOatClassNoneCompiled: {
+      case OatClassType::kNoneCompiled: {
         CHECK_EQ(0U, bitmap_size);
         CHECK(bitmap_pointer == nullptr);
         CHECK(methods_pointer_ == nullptr);
         break;
       }
-      case kOatClassMax: {
+      case OatClassType::kOatClassMax: {
         LOG(FATAL) << "Invalid OatClassType " << type_;
         UNREACHABLE();
       }
@@ -2223,15 +2223,15 @@ uint32_t OatFile::OatClass::GetOatMethodOffsetsOffset(uint32_t method_index) con
 const OatMethodOffsets* OatFile::OatClass::GetOatMethodOffsets(uint32_t method_index) const {
   // NOTE: We don't keep the number of methods and cannot do a bounds check for method_index.
   if (methods_pointer_ == nullptr) {
-    CHECK_EQ(kOatClassNoneCompiled, type_);
+    CHECK_EQ(OatClassType::kNoneCompiled, type_);
     return nullptr;
   }
   size_t methods_pointer_index;
   if (bitmap_ == nullptr) {
-    CHECK_EQ(kOatClassAllCompiled, type_);
+    CHECK_EQ(OatClassType::kAllCompiled, type_);
     methods_pointer_index = method_index;
   } else {
-    CHECK_EQ(kOatClassSomeCompiled, type_);
+    CHECK_EQ(OatClassType::kSomeCompiled, type_);
     if (!BitVector::IsBitSet(bitmap_, method_index)) {
       return nullptr;
     }

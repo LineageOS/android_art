@@ -252,13 +252,13 @@ class OatSymbolizer final {
       const OatFile::OatClass oat_class = oat_dex_file->GetOatClass(class_def_index);
       OatClassType type = oat_class.GetType();
       switch (type) {
-        case kOatClassAllCompiled:
-        case kOatClassSomeCompiled:
+        case OatClassType::kAllCompiled:
+        case OatClassType::kSomeCompiled:
           WalkOatClass(oat_class, *dex_file, class_def_index);
           break;
 
-        case kOatClassNoneCompiled:
-        case kOatClassMax:
+        case OatClassType::kNoneCompiled:
+        case OatClassType::kOatClassMax:
           // Ignore.
           break;
       }
