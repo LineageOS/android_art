@@ -19,6 +19,6 @@ set -e
 
 # Write out the source file.
 mkdir src
-python ./genMain.py
+python3 ./genMain.py
 
 ./default-build "$@"
