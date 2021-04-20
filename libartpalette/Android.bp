@@ -54,13 +54,16 @@ art_cc_library {
         // support both prebuilts and sources present simultaneously.
         "//prebuilts/module_sdk/art/current/host-exports",
     ],
-    header_libs: ["libbase_headers"],
+    header_libs: [
+        "libbase_headers",
+        "jni_headers",
+    ],
     target: {
         // Targets supporting dlopen build the client library which loads
         // and binds the methods in the libartpalette-system library.
         android: {
             // libartpalette.so dlopen()'s libartpalette-system.
-            required: ["libartpalette-system"],
+            runtime_libs: ["libartpalette-system"],
             srcs: ["apex/palette.cc"],
             shared_libs: ["liblog"],
             version_script: "libartpalette.map.txt",
