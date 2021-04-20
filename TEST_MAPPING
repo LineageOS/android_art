@@ -279,6 +279,9 @@
     },
     {
       "name": "art-run-test-140-dce-regression[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-140-field-packing[com.google.android.art.apex]"
     }
   ],
   "presubmit": [
