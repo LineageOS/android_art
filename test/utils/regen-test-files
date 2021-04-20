@@ -446,7 +446,7 @@ presubmit_tests_percentage = 100
 # Percentage of ART run-tests (among the ones expected to succeed) to include in
 # the `mainline-presubmit` test group in `TEST_MAPPING` file.
 # This value has to be a number between 0 and 100.
-mainline_presubmit_tests_percentage = 25
+mainline_presubmit_tests_percentage = 50
 
 
 # Is `run_test` a Checker test (i.e. a test containing Checker

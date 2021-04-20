@@ -282,6 +282,288 @@
     },
     {
       "name": "art-run-test-140-field-packing[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-143-string-value[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-144-static-field-sigquit[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-151-OpenFileLimit[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-152-dead-large-object[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-153-reference-stress[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-156-register-dex-file-multi-loader[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-159-app-image-fields[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-163-app-image-methods[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-165-lock-owner-proxy[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-168-vmstack-annotated[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-170-interface-init[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-174-escaping-instance-of-bad-class[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-175-alloc-big-bignums[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-176-app-image-string[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-1960-checker-bounds-codegen[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-1961-checker-loop-vectorizer[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-201-built-in-except-detail-messages[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-2019-constantcalculationsinking[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-202-thread-oome[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-2020-InvokeVirtual-Inlining[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-2021-InvokeStatic-Inlining[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-2022-Invariantloops[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-2023-InvariantLoops_typecast[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-2024-InvariantNegativeLoop[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-2025-ChangedArrayValue[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-2026-DifferentMemoryLSCouples[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-2027-TwiceTheSameMemoryCouple[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-2028-MultiBackward[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-2029-contended-monitors[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-2030-long-running-child[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-2231-checker-heap-poisoning[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-2232-write-metrics-to-log[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-300-package-override[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-301-abstract-protected[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-302-float-conversion[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-304-method-tracing[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-401-optimizing-compiler[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-402-optimizing-control-flow[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-403-optimizing-long[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-404-optimizing-allocator[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-405-optimizing-long-allocator[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-406-fields[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-407-arrays[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-408-move-bug[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-409-materialized-condition[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-410-floats[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-411-checker-hdiv-hrem-pow2[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-411-checker-instruct-simplifier-hrem[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-411-optimizing-arith[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-413-regalloc-regression[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-414-static-fields[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-418-const-string[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-419-long-parameter[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-420-const-class[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-421-exceptions[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-421-large-frame[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-422-instanceof[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-422-type-conversion[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-423-invoke-interface[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-424-checkcast[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-426-monitor[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-427-bitwise[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-427-bounds[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-429-ssa-builder[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-430-live-register-slow-path[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-433-gvn[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-434-shifter-operand[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-435-try-finally-without-catch[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-436-rem-float[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-436-shift-constant[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-437-inline[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-438-volatile[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-439-npe[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-439-swap-double[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-440-stmp[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-441-checker-inliner[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-443-not-bool-inline[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-444-checker-nce[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-445-checker-licm[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-446-checker-inliner2[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-447-checker-inliner3[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-449-checker-bce-rem[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-450-checker-types[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-451-regression-add-float[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-451-spill-splot[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-455-checker-gvn[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-456-baseline-array-set[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-458-long-to-fpu[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-464-checker-inline-sharpen-calls[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-465-checker-clinit-gvn[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-469-condition-materialization[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-470-huge-method[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-471-deopt-environment[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-472-type-propagation[com.google.android.art.apex]"
     }
   ],
   "presubmit": [
