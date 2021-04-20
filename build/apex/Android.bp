@@ -245,7 +245,6 @@ apex_defaults {
     defaults: ["com.android.art-defaults"],
     compile_multilib: "both",
     manifest: "manifest-art.json",
-    boot_images: ["art-boot-image"],
     bootclasspath_fragments: ["art-bootclasspath-fragment"],
     compat_configs: ["libcore-platform-compat-config"],
     java_libs: libcore_java_libs + art_java_libs,
