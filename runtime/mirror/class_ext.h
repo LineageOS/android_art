@@ -33,6 +33,8 @@ namespace mirror {
 // C++ mirror of dalvik.system.ClassExt
 class MANAGED ClassExt : public Object {
  public:
+  MIRROR_CLASS("Ldalvik/system/ClassExt;");
+
   static uint32_t ClassSize(PointerSize pointer_size);
 
   // Size of an instance of dalvik.system.ClassExt.

@@ -149,6 +149,15 @@ class MANAGED Array : public Object {
 template<typename T>
 class MANAGED PrimitiveArray : public Array {
  public:
+  MIRROR_CLASS("[Z");
+  MIRROR_CLASS("[B");
+  MIRROR_CLASS("[C");
+  MIRROR_CLASS("[S");
+  MIRROR_CLASS("[I");
+  MIRROR_CLASS("[J");
+  MIRROR_CLASS("[F");
+  MIRROR_CLASS("[D");
+
   typedef T ElementType;
 
   static ObjPtr<PrimitiveArray<T>> Alloc(Thread* self, size_t length)
