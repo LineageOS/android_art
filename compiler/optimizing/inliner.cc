@@ -929,6 +929,14 @@ HInstruction* HInliner::AddTypeGuard(HInstruction* receiver,
   return compare;
 }
 
+static void MaybeReplaceAndRemove(HInstruction* new_instruction, HInstruction* old_instruction) {
+  DCHECK(new_instruction != old_instruction);
+  if (new_instruction != nullptr) {
+    old_instruction->ReplaceWith(new_instruction);
+  }
+  old_instruction->GetBlock()->RemoveInstruction(old_instruction);
+}
+
 bool HInliner::TryInlinePolymorphicCall(
     HInvoke* invoke_instruction,
     const StackHandleScope<InlineCache::kIndividualCacheSize>& classes) {
@@ -993,13 +1001,7 @@ bool HInliner::TryInlinePolymorphicCall(
                                            invoke_instruction,
                                            deoptimize);
       if (deoptimize) {
-        if (return_replacement != nullptr) {
-          invoke_instruction->ReplaceWith(return_replacement);
-        }
-        invoke_instruction->GetBlock()->RemoveInstruction(invoke_instruction);
-        // Because the inline cache data can be populated concurrently, we force the end of the
-        // iteration. Otherwise, we could see a new receiver type.
-        break;
+        MaybeReplaceAndRemove(return_replacement, invoke_instruction);
       } else {
         CreateDiamondPatternForPolymorphicInline(compare, return_replacement, invoke_instruction);
       }
@@ -1202,11 +1204,8 @@ bool HInliner::TryInlinePolymorphicCallToSameTarget(
         invoke_instruction->GetDexPc());
     bb_cursor->InsertInstructionAfter(deoptimize, compare);
     deoptimize->CopyEnvironmentFrom(invoke_instruction->GetEnvironment());
-    if (return_replacement != nullptr) {
-      invoke_instruction->ReplaceWith(return_replacement);
-    }
+    MaybeReplaceAndRemove(return_replacement, invoke_instruction);
     receiver->ReplaceUsesDominatedBy(deoptimize, deoptimize);
-    invoke_instruction->GetBlock()->RemoveInstruction(invoke_instruction);
     deoptimize->SetReferenceTypeInfo(receiver->GetReferenceTypeInfo());
   }
 
@@ -1233,41 +1232,8 @@ bool HInliner::TryInlineAndReplace(HInvoke* invoke_instruction,
   uint32_t dex_pc = invoke_instruction->GetDexPc();
   HInstruction* cursor = invoke_instruction->GetPrevious();
   HBasicBlock* bb_cursor = invoke_instruction->GetBlock();
-  bool should_remove_invoke_instruction = false;
 
-  // If invoke_instruction is devirtualized to a different method, give intrinsics
-  // another chance before we try to inline it.
-  if (invoke_instruction->GetResolvedMethod() != method && method->IsIntrinsic()) {
-    MaybeRecordStat(stats_, MethodCompilationStat::kIntrinsicRecognized);
-    if (invoke_instruction->IsInvokeInterface()) {
-      // We don't intrinsify an invoke-interface directly.
-      // Replace the invoke-interface with an invoke-virtual.
-      HInvokeVirtual* new_invoke = new (graph_->GetAllocator()) HInvokeVirtual(
-          graph_->GetAllocator(),
-          invoke_instruction->GetNumberOfArguments(),
-          invoke_instruction->GetType(),
-          invoke_instruction->GetDexPc(),
-          invoke_instruction->GetMethodReference(),  // Use interface method's reference.
-          method,
-          MethodReference(method->GetDexFile(), method->GetDexMethodIndex()),
-          method->GetMethodIndex());
-      DCHECK_NE(new_invoke->GetIntrinsic(), Intrinsics::kNone);
-      HInputsRef inputs = invoke_instruction->GetInputs();
-      for (size_t index = 0; index != inputs.size(); ++index) {
-        new_invoke->SetArgumentAt(index, inputs[index]);
-      }
-      invoke_instruction->GetBlock()->InsertInstructionBefore(new_invoke, invoke_instruction);
-      new_invoke->CopyEnvironmentFrom(invoke_instruction->GetEnvironment());
-      if (invoke_instruction->GetType() == DataType::Type::kReference) {
-        new_invoke->SetReferenceTypeInfo(invoke_instruction->GetReferenceTypeInfo());
-      }
-      return_replacement = new_invoke;
-      // invoke_instruction is replaced with new_invoke.
-      should_remove_invoke_instruction = true;
-    } else {
-      invoke_instruction->SetResolvedMethod(method);
-    }
-  } else if (!TryBuildAndInline(invoke_instruction, method, receiver_type, &return_replacement)) {
+  if (!TryBuildAndInline(invoke_instruction, method, receiver_type, &return_replacement)) {
     if (invoke_instruction->IsInvokeInterface()) {
       DCHECK(!method->IsProxyMethod());
       // Turn an invoke-interface into an invoke-virtual. An invoke-virtual is always
@@ -1322,27 +1288,17 @@ bool HInliner::TryInlineAndReplace(HInvoke* invoke_instruction,
         new_invoke->SetReferenceTypeInfo(invoke_instruction->GetReferenceTypeInfo());
       }
       return_replacement = new_invoke;
-      // invoke_instruction is replaced with new_invoke.
-      should_remove_invoke_instruction = true;
     } else {
       // TODO: Consider sharpening an invoke virtual once it is not dependent on the
       // compiler driver.
       return false;
     }
-  } else {
-    // invoke_instruction is inlined.
-    should_remove_invoke_instruction = true;
   }
 
   if (cha_devirtualize) {
     AddCHAGuard(invoke_instruction, dex_pc, cursor, bb_cursor);
   }
-  if (return_replacement != nullptr) {
-    invoke_instruction->ReplaceWith(return_replacement);
-  }
-  if (should_remove_invoke_instruction) {
-    invoke_instruction->GetBlock()->RemoveInstruction(invoke_instruction);
-  }
+  MaybeReplaceAndRemove(return_replacement, invoke_instruction);
   FixUpReturnReferenceType(method, return_replacement);
   if (do_rtp && ReturnTypeMoreSpecific(invoke_instruction, return_replacement)) {
     // Actual return value has a more specific type than the method's declared
@@ -1468,6 +1424,35 @@ bool HInliner::TryBuildAndInline(HInvoke* invoke_instruction,
                                  ArtMethod* method,
                                  ReferenceTypeInfo receiver_type,
                                  HInstruction** return_replacement) {
+  // If invoke_instruction is devirtualized to a different method, give intrinsics
+  // another chance before we try to inline it.
+  if (invoke_instruction->GetResolvedMethod() != method && method->IsIntrinsic()) {
+    MaybeRecordStat(stats_, MethodCompilationStat::kIntrinsicRecognized);
+    // For simplicity, always create a new instruction to replace the existing
+    // invoke.
+    HInvokeVirtual* new_invoke = new (graph_->GetAllocator()) HInvokeVirtual(
+        graph_->GetAllocator(),
+        invoke_instruction->GetNumberOfArguments(),
+        invoke_instruction->GetType(),
+        invoke_instruction->GetDexPc(),
+        invoke_instruction->GetMethodReference(),  // Use existing invoke's method's reference.
+        method,
+        MethodReference(method->GetDexFile(), method->GetDexMethodIndex()),
+        method->GetMethodIndex());
+    DCHECK_NE(new_invoke->GetIntrinsic(), Intrinsics::kNone);
+    HInputsRef inputs = invoke_instruction->GetInputs();
+    for (size_t index = 0; index != inputs.size(); ++index) {
+      new_invoke->SetArgumentAt(index, inputs[index]);
+    }
+    invoke_instruction->GetBlock()->InsertInstructionBefore(new_invoke, invoke_instruction);
+    new_invoke->CopyEnvironmentFrom(invoke_instruction->GetEnvironment());
+    if (invoke_instruction->GetType() == DataType::Type::kReference) {
+      new_invoke->SetReferenceTypeInfo(invoke_instruction->GetReferenceTypeInfo());
+    }
+    *return_replacement = new_invoke;
+    return true;
+  }
+
   // Check whether we're allowed to inline. The outermost compilation unit is the relevant
   // dex file here (though the transitivity of an inline chain would allow checking the caller).
   if (!MayInline(codegen_->GetCompilerOptions(),
