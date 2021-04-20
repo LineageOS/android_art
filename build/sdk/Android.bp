@@ -103,11 +103,9 @@ art_module_sdk {
             java_boot_libs: [
                 "apache-xml",
                 "bouncycastle",
+                "core-libart",
                 "core-oj",
-                // The following are boot libs that are provided as java_libs in
-                // art-module-test-exports.
-                // "core-libart",
-                // "okhttp",
+                "okhttp",
             ],
 
             java_header_libs: [
@@ -260,8 +258,8 @@ art_module_exports {
         "expected_cts_outputs",
 
         // Needed for robolectric.
-        "core-libart",
-        "okhttp",
+        "core-libart-for-host",
+        "okhttp-for-host",
 
         // Needed for CtsLibcore...TestCases
         "libcore-expectations-knownfailures-jar",
