@@ -65,12 +65,12 @@ extern "C" JNIEXPORT jboolean JNICALL Java_Main_hasOatCompiledCode(JNIEnv* env,
 
   OatClassType type = oat_class.GetType();
   switch (type) {
-    case kOatClassAllCompiled:
-    case kOatClassSomeCompiled:
+    case OatClassType::kAllCompiled:
+    case OatClassType::kSomeCompiled:
       return true;
 
-    case kOatClassNoneCompiled:
-    case kOatClassMax:
+    case OatClassType::kNoneCompiled:
+    case OatClassType::kOatClassMax:
       return false;
   }
 
