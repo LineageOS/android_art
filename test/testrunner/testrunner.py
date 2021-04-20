@@ -127,7 +127,7 @@ failed_tests = []
 skipped_tests = []
 
 # Flags
-n_thread = 0
+n_thread = -1
 total_test_count = 0
 verbose = False
 dry_run = False
@@ -272,12 +272,11 @@ def setup_test_env():
     _user_input_variants['address_sizes_target']['target'] = _user_input_variants['address_sizes']
 
   global n_thread
-  if n_thread == 0:
+  if n_thread == -1:
     if 'target' in _user_input_variants['target']:
-      # Use only half of the cores since fully loading the device tends to lead to timeouts.
-      n_thread = get_target_cpu_count() // 2
+      n_thread = get_default_threads('target')
     else:
-      n_thread = get_host_cpu_count()
+      n_thread = get_default_threads('host')
     print_text("Concurrency: " + str(n_thread) + "\n")
 
   global extra_arguments
@@ -1003,15 +1002,22 @@ def parse_test_name(test_name):
   return {parsed[12]}
 
 
-def get_target_cpu_count():
-  adb_command = 'adb shell getconf _NPROCESSORS_ONLN'
-  cpu_info_proc = subprocess.Popen(adb_command.split(), stdout=subprocess.PIPE)
-  return int(cpu_info_proc.stdout.read())
-
-
-def get_host_cpu_count():
-  return multiprocessing.cpu_count()
-
+def get_default_threads(target):
+  if target == 'target':
+    adb_command = 'adb shell cat /sys/devices/system/cpu/present'
+    cpu_info_proc = subprocess.Popen(adb_command.split(), stdout=subprocess.PIPE)
+    cpu_info = cpu_info_proc.stdout.read()
+    if type(cpu_info) is bytes:
+      cpu_info = cpu_info.decode('utf-8')
+    cpu_info_regex = r'\d*-(\d*)'
+    match = re.match(cpu_info_regex, cpu_info)
+    if match:
+      return int(match.group(1))
+    else:
+      raise ValueError('Unable to predict the concurrency for the target. '
+                       'Is device connected?')
+  else:
+    return multiprocessing.cpu_count()
 
 def parse_option():
   global verbose
