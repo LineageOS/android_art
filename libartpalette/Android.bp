@@ -54,10 +54,7 @@ art_cc_library {
         // support both prebuilts and sources present simultaneously.
         "//prebuilts/module_sdk/art/current/host-exports",
     ],
-    header_libs: [
-        "libbase_headers",
-        "jni_headers",
-    ],
+    header_libs: ["libbase_headers"],
     target: {
         // Targets supporting dlopen build the client library which loads
         // and binds the methods in the libartpalette-system library.
