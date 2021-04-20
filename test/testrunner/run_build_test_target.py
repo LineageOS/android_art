@@ -66,6 +66,16 @@ if not os.path.isdir(env.ANDROID_BUILD_TOP + '/frameworks/base'):
 print(custom_env)
 os.environ.update(custom_env)
 
+# always run installclean first remove any old installed files from previous builds.
+# this does not remove intermediate files, so it still avoids recompilation.
+clean_command = 'build/soong/soong_ui.bash --make-mode installclean'
+if env.DIST_DIR:
+  clean_command += ' dist'
+sys.stdout.write(str(clean_command) + '\n')
+sys.stdout.flush()
+if subprocess.call(clean_command.split()):
+  sys.exit(1)
+
 # build is just a binary/script that is directly executed to build any artifacts needed for the
 # test.
 if 'build' in target:
