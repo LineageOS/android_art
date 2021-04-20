@@ -477,7 +477,7 @@ TEST_F(OatTest, WriteRead) {
 
     const OatFile::OatClass oat_class = oat_dex_file->GetOatClass(accessor.GetClassDefIndex());
     CHECK_EQ(ClassStatus::kNotReady, oat_class.GetStatus()) << descriptor;
-    CHECK_EQ(kCompile ? OatClassType::kOatClassAllCompiled : OatClassType::kOatClassNoneCompiled,
+    CHECK_EQ(kCompile ? OatClassType::kAllCompiled : OatClassType::kNoneCompiled,
              oat_class.GetType()) << descriptor;
 
     size_t method_index = 0;
