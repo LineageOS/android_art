@@ -497,7 +497,7 @@ class Dex2oatVeryLargeTest : public Dex2oatTest {
         ASSERT_LT(class_def_count, std::numeric_limits<uint16_t>::max());
         for (uint16_t class_def_index = 0; class_def_index < class_def_count; ++class_def_index) {
           OatFile::OatClass oat_class = oat_dex_file->GetOatClass(class_def_index);
-          EXPECT_EQ(oat_class.GetType(), OatClassType::kOatClassNoneCompiled);
+          EXPECT_EQ(oat_class.GetType(), OatClassType::kNoneCompiled);
         }
       }
 
