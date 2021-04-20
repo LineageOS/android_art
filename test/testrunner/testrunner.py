@@ -127,7 +127,7 @@ failed_tests = []
 skipped_tests = []
 
 # Flags
-n_thread = -1
+n_thread = 0
 total_test_count = 0
 verbose = False
 dry_run = False
@@ -272,11 +272,12 @@ def setup_test_env():
     _user_input_variants['address_sizes_target']['target'] = _user_input_variants['address_sizes']
 
   global n_thread
-  if n_thread == -1:
+  if n_thread == 0:
     if 'target' in _user_input_variants['target']:
-      n_thread = get_default_threads('target')
+      # Use only half of the cores since fully loading the device tends to lead to timeouts.
+      n_thread = get_target_cpu_count() // 2
     else:
-      n_thread = get_default_threads('host')
+      n_thread = get_host_cpu_count()
     print_text("Concurrency: " + str(n_thread) + "\n")
 
   global extra_arguments
@@ -1002,22 +1003,24 @@ def parse_test_name(test_name):
   return {parsed[12]}
 
 
-def get_default_threads(target):
-  if target == 'target':
-    adb_command = 'adb shell cat /sys/devices/system/cpu/present'
-    cpu_info_proc = subprocess.Popen(adb_command.split(), stdout=subprocess.PIPE)
-    cpu_info = cpu_info_proc.stdout.read()
-    if type(cpu_info) is bytes:
-      cpu_info = cpu_info.decode('utf-8')
-    cpu_info_regex = r'\d*-(\d*)'
-    match = re.match(cpu_info_regex, cpu_info)
-    if match:
-      return int(match.group(1))
-    else:
-      raise ValueError('Unable to predict the concurrency for the target. '
-                       'Is device connected?')
+def get_target_cpu_count():
+  adb_command = 'adb shell cat /sys/devices/system/cpu/present'
+  cpu_info_proc = subprocess.Popen(adb_command.split(), stdout=subprocess.PIPE)
+  cpu_info = cpu_info_proc.stdout.read()
+  if type(cpu_info) is bytes:
+    cpu_info = cpu_info.decode('utf-8')
+  cpu_info_regex = r'\d*-(\d*)'
+  match = re.match(cpu_info_regex, cpu_info)
+  if match:
+    return int(match.group(1)) + 1  # Add one to convert from "last-index" to "count"
   else:
-    return multiprocessing.cpu_count()
+    raise ValueError('Unable to predict the concurrency for the target. '
+                     'Is device connected?')
+
+
+def get_host_cpu_count():
+  return multiprocessing.cpu_count()
+
 
 def parse_option():
   global verbose
@@ -1041,7 +1044,8 @@ def parse_option():
   parser.add_argument('-t', '--test', action='append', dest='tests', help='name(s) of the test(s)')
   global_group = parser.add_argument_group('Global options',
                                            'Options that affect all tests being run')
-  global_group.add_argument('-j', type=int, dest='n_thread')
+  global_group.add_argument('-j', type=int, dest='n_thread', help="""Number of CPUs to use.
+                            Defaults to half of CPUs on target and all CPUs on host.""")
   global_group.add_argument('--timeout', default=timeout, type=int, dest='timeout')
   global_group.add_argument('--verbose', '-v', action='store_true', dest='verbose')
   global_group.add_argument('--dry-run', action='store_true', dest='dry_run')
