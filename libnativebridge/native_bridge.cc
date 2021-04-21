@@ -233,10 +233,10 @@ bool LoadNativeBridge(const char* nb_library_filename,
             // Store the handle for later.
             native_bridge_handle = handle;
           } else {
-            callbacks = nullptr;
-            dlclose(handle);
             ALOGW("Unsupported native bridge API in %s (is version %d not compatible with %d)",
                   nb_library_filename, callbacks->version, NAMESPACE_VERSION);
+            callbacks = nullptr;
+            dlclose(handle);
           }
         } else {
           dlclose(handle);
