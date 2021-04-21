@@ -2089,30 +2089,35 @@ OatFile::OatClass OatDexFile::GetOatClass(uint16_t class_def_index) const {
   ClassStatus status = enum_cast<ClassStatus>(status_value);
   OatClassType type = enum_cast<OatClassType>(type_value);
 
-  uint32_t bitmap_size = 0;
+  uint32_t num_methods = 0;
   const uint32_t* bitmap_pointer = nullptr;
   const OatMethodOffsets* methods_pointer = nullptr;
   if (type != OatClassType::kNoneCompiled) {
+    CHECK_LE(sizeof(uint32_t), static_cast<size_t>(oat_file_->End() - current_pointer))
+        << oat_file_->GetLocation();
+    num_methods = *reinterpret_cast<const uint32_t*>(current_pointer);
+    current_pointer += sizeof(uint32_t);
+    CHECK_NE(num_methods, 0u) << oat_file_->GetLocation();
+    uint32_t num_method_offsets;
     if (type == OatClassType::kSomeCompiled) {
-      CHECK_LE(sizeof(uint32_t), static_cast<size_t>(oat_file_->End() - current_pointer))
-          << oat_file_->GetLocation();
-      bitmap_size = *reinterpret_cast<const uint32_t*>(current_pointer);
-      current_pointer += sizeof(uint32_t);
+      uint32_t bitmap_size = BitVector::BitsToWords(num_methods) * BitVector::kWordBytes;
       CHECK_LE(bitmap_size, static_cast<size_t>(oat_file_->End() - current_pointer))
           << oat_file_->GetLocation();
       bitmap_pointer = reinterpret_cast<const uint32_t*>(current_pointer);
       current_pointer += bitmap_size;
-      CHECK_LE(BitVector::NumSetBits(bitmap_pointer, bitmap_size * kBitsPerByte),
-               static_cast<size_t>(oat_file_->End() - current_pointer) / sizeof(OatMethodOffsets))
-          << oat_file_->GetLocation();
+      // Note: The bits in range [num_methods, bitmap_size * kBitsPerByte)
+      // should be zero but we're not verifying that.
+      num_method_offsets = BitVector::NumSetBits(bitmap_pointer, num_methods);
     } else {
-      // TODO: We do not have enough information here to check if the array extends beyond
-      // the end of the oat file. We should record the number of methods in the oat file.
+      num_method_offsets = num_methods;
     }
+    CHECK_LE(num_method_offsets,
+             static_cast<size_t>(oat_file_->End() - current_pointer) / sizeof(OatMethodOffsets))
+        << oat_file_->GetLocation();
     methods_pointer = reinterpret_cast<const OatMethodOffsets*>(current_pointer);
   }
 
-  return OatFile::OatClass(oat_file_, status, type, bitmap_size, bitmap_pointer, methods_pointer);
+  return OatFile::OatClass(oat_file_, status, type, num_methods, bitmap_pointer, methods_pointer);
 }
 
 const dex::ClassDef* OatDexFile::FindClassDef(const DexFile& dex_file,
@@ -2182,35 +2187,18 @@ void OatDexFile::MadviseDexFile(const DexFile& dex_file, MadviseState state) {
 OatFile::OatClass::OatClass(const OatFile* oat_file,
                             ClassStatus status,
                             OatClassType type,
-                            uint32_t bitmap_size,
+                            uint32_t num_methods,
                             const uint32_t* bitmap_pointer,
                             const OatMethodOffsets* methods_pointer)
-    : oat_file_(oat_file), status_(status), type_(type),
-      bitmap_(bitmap_pointer), methods_pointer_(methods_pointer) {
-    switch (type_) {
-      case OatClassType::kAllCompiled: {
-        CHECK_EQ(0U, bitmap_size);
-        CHECK(bitmap_pointer == nullptr);
-        CHECK(methods_pointer != nullptr);
-        break;
-      }
-      case OatClassType::kSomeCompiled: {
-        CHECK_NE(0U, bitmap_size);
-        CHECK(bitmap_pointer != nullptr);
-        CHECK(methods_pointer != nullptr);
-        break;
-      }
-      case OatClassType::kNoneCompiled: {
-        CHECK_EQ(0U, bitmap_size);
-        CHECK(bitmap_pointer == nullptr);
-        CHECK(methods_pointer_ == nullptr);
-        break;
-      }
-      case OatClassType::kOatClassMax: {
-        LOG(FATAL) << "Invalid OatClassType " << type_;
-        UNREACHABLE();
-      }
-    }
+    : oat_file_(oat_file),
+      status_(status),
+      type_(type),
+      num_methods_(num_methods),
+      bitmap_(bitmap_pointer),
+      methods_pointer_(methods_pointer) {
+  DCHECK_EQ(num_methods != 0u, type != OatClassType::kNoneCompiled);
+  DCHECK_EQ(bitmap_pointer != nullptr, type == OatClassType::kSomeCompiled);
+  DCHECK_EQ(methods_pointer != nullptr, type != OatClassType::kNoneCompiled);
 }
 
 uint32_t OatFile::OatClass::GetOatMethodOffsetsOffset(uint32_t method_index) const {
@@ -2222,11 +2210,13 @@ uint32_t OatFile::OatClass::GetOatMethodOffsetsOffset(uint32_t method_index) con
 }
 
 const OatMethodOffsets* OatFile::OatClass::GetOatMethodOffsets(uint32_t method_index) const {
-  // NOTE: We don't keep the number of methods and cannot do a bounds check for method_index.
+  // NOTE: We don't keep the number of methods for `kNoneCompiled` and cannot do
+  // a bounds check for `method_index` in that case.
   if (methods_pointer_ == nullptr) {
     CHECK_EQ(OatClassType::kNoneCompiled, type_);
     return nullptr;
   }
+  CHECK_LT(method_index, num_methods_) << oat_file_->GetLocation();
   size_t methods_pointer_index;
   if (bitmap_ == nullptr) {
     CHECK_EQ(OatClassType::kAllCompiled, type_);
@@ -2238,6 +2228,12 @@ const OatMethodOffsets* OatFile::OatClass::GetOatMethodOffsets(uint32_t method_i
     }
     size_t num_set_bits = BitVector::NumSetBits(bitmap_, method_index);
     methods_pointer_index = num_set_bits;
+  }
+  if (kIsDebugBuild) {
+    size_t size_until_end = dchecked_integral_cast<size_t>(
+        oat_file_->End() - reinterpret_cast<const uint8_t*>(methods_pointer_));
+    CHECK_LE(methods_pointer_index, size_until_end / sizeof(OatMethodOffsets))
+        << oat_file_->GetLocation();
   }
   const OatMethodOffsets& oat_method_offsets = methods_pointer_[methods_pointer_index];
   return &oat_method_offsets;
