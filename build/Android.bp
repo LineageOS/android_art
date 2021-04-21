@@ -354,7 +354,7 @@ java_library {
     name: "conscrypt-host",
     installable: true,
     hostdex: true,
-    static_libs: ["conscrypt"],
+    static_libs: ["conscrypt-for-host"],
 
     // Tests and build files rely on this file to be installed as "conscrypt-hostdex",
     // therefore set a stem. Without it, the file would be installed as
