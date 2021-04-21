@@ -32,6 +32,26 @@ public class Main {
     return cs.charAt(0);
   }
 
+  /// CHECK-START: char Main.$noinline$inlinePolymorphic(java.lang.CharSequence) inliner (before)
+  /// CHECK:       InvokeInterface method_name:java.lang.CharSequence.charAt
+
+  /// CHECK-START: char Main.$noinline$inlinePolymorphic(java.lang.CharSequence) inliner (after)
+  /// CHECK:       InvokeVirtual method_name:java.lang.String.charAt intrinsic:StringCharAt
+  /// CHECK:       Deoptimize
+
+  /// CHECK-START: char Main.$noinline$inlinePolymorphic(java.lang.CharSequence) instruction_simplifier$after_inlining (after)
+  /// CHECK:       Deoptimize
+
+  /// CHECK-START: char Main.$noinline$inlinePolymorphic(java.lang.CharSequence) instruction_simplifier$after_inlining (after)
+  /// CHECK-NOT:   InvokeInterface
+
+  /// CHECK-START: char Main.$noinline$inlinePolymorphic(java.lang.CharSequence) instruction_simplifier$after_inlining (after)
+  /// CHECK-NOT:   InvokeVirtual method_name:java.lang.String.charAt
+
+  public static char $noinline$inlinePolymorphic(CharSequence cs) {
+    return cs.charAt(0);
+  }
+
   /// CHECK-START: char Main.$noinline$knownReceiverType() inliner (before)
   /// CHECK:       InvokeInterface method_name:java.lang.CharSequence.charAt
 
@@ -66,18 +86,26 @@ public class Main {
     ensureJitBaselineCompiled(Main.class, "$noinline$stringEquals");
     ensureJitBaselineCompiled(Main.class, "$noinline$inlineMonomorphic");
     ensureJitBaselineCompiled(Main.class, "$noinline$knownReceiverType");
+    ensureJitBaselineCompiled(Main.class, "$noinline$inlinePolymorphic");
     // Warm up inline cache.
     for (int i = 0; i < 600000; i++) {
       $noinline$inlineMonomorphic(str);
-    }
-    for (int i = 0; i < 600000; i++) {
       $noinline$stringEquals(str);
+      $noinline$inlinePolymorphic(str);
+      $noinline$inlinePolymorphic(strBuilder);
     }
     ensureJitCompiled(Main.class, "$noinline$stringEquals");
     ensureJitCompiled(Main.class, "$noinline$inlineMonomorphic");
+    ensureJitCompiled(Main.class, "$noinline$inlinePolymorphic");
     ensureJitCompiled(Main.class, "$noinline$knownReceiverType");
     if ($noinline$inlineMonomorphic(str) != 'x') {
       throw new Error("Expected x");
+    }
+    if ($noinline$inlinePolymorphic(str) != 'x') {
+      throw new Error("Expected x");
+    }
+    if ($noinline$inlinePolymorphic(strBuilder) != 'a') {
+      throw new Error("Expected a");
     }
     if ($noinline$knownReceiverType() != 'b') {
       throw new Error("Expected b");
@@ -93,6 +121,7 @@ public class Main {
   }
 
   static String str = "xyz";
+  static StringBuilder strBuilder = new StringBuilder("abc");
 
   private static native void ensureJitBaselineCompiled(Class<?> itf, String method_name);
   private static native void ensureJitCompiled(Class<?> itf, String method_name);

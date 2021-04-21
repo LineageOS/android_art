@@ -216,15 +216,15 @@ class OatWriter::OatClassHeader {
                  ClassStatus status)
       : status_(enum_cast<uint16_t>(status)),
         offset_(offset) {
-    // We just arbitrarily say that 0 methods means kOatClassNoneCompiled and that we won't use
-    // kOatClassAllCompiled unless there is at least one compiled method. This means in an
-    // interpreter only system, we can assert that all classes are kOatClassNoneCompiled.
+    // We just arbitrarily say that 0 methods means OatClassType::kNoneCompiled and that we won't
+    // use OatClassType::kAllCompiled unless there is at least one compiled method. This means in
+    // an interpreter only system, we can assert that all classes are OatClassType::kNoneCompiled.
     if (num_non_null_compiled_methods == 0) {
-      type_ = kOatClassNoneCompiled;
+      type_ = enum_cast<uint16_t>(OatClassType::kNoneCompiled);
     } else if (num_non_null_compiled_methods == num_methods) {
-      type_ = kOatClassAllCompiled;
+      type_ = enum_cast<uint16_t>(OatClassType::kAllCompiled);
     } else {
-      type_ = kOatClassSomeCompiled;
+      type_ = enum_cast<uint16_t>(OatClassType::kSomeCompiled);
     }
   }
 
@@ -235,10 +235,10 @@ class OatWriter::OatClassHeader {
   }
 
   // Data to write.
-  static_assert(enum_cast<>(ClassStatus::kLast) < (1 << 16), "class status won't fit in 16bits");
+  static_assert(sizeof(ClassStatus) <= sizeof(uint16_t), "class status won't fit in 16bits");
   uint16_t status_;
 
-  static_assert(OatClassType::kOatClassMax < (1 << 16), "oat_class type won't fit in 16bits");
+  static_assert(sizeof(OatClassType) <= sizeof(uint16_t), "oat_class type won't fit in 16bits");
   uint16_t type_;
 
   // Offset of start of OatClass from beginning of OatHeader. It is
@@ -267,17 +267,17 @@ class OatWriter::OatClass {
   // Offset from OatClass::offset_ to the OatMethodOffsets for the
   // class_def_method_index. If 0, it means the corresponding
   // CompiledMethod entry in OatClass::compiled_methods_ should be
-  // null and that the OatClass::type_ should be kOatClassBitmap.
+  // null and that the OatClass::type_ should be OatClassType::kSomeCompiled.
   dchecked_vector<uint32_t> oat_method_offsets_offsets_from_oat_class_;
 
   // Data to write.
   uint32_t method_bitmap_size_;
 
-  // bit vector indexed by ClassDef method index. When
-  // OatClassType::type_ is kOatClassBitmap, a set bit indicates the
-  // method has an OatMethodOffsets in methods_offsets_, otherwise
-  // the entry was ommited to save space. If OatClassType::type_ is
-  // not is kOatClassBitmap, the bitmap will be null.
+  // Bit vector indexed by ClassDef method index. When OatClass::type_ is
+  // OatClassType::kSomeCompiled, a set bit indicates the method has an
+  // OatMethodOffsets in methods_offsets_, otherwise
+  // the entry was omitted to save space. If OatClass::type_ is
+  // not is OatClassType::kSomeCompiled, the bitmap will be null.
   std::unique_ptr<BitVector> method_bitmap_;
 
   // OatMethodOffsets and OatMethodHeaders for each CompiledMethod
@@ -3987,7 +3987,7 @@ OatWriter::OatClass::OatClass(const dchecked_vector<CompiledMethod*>& compiled_m
 
   uint32_t oat_method_offsets_offset_from_oat_class = OatClassHeader::SizeOf();
   // We only create this instance if there are at least some compiled.
-  if (oat_class_type == kOatClassSomeCompiled) {
+  if (oat_class_type == enum_cast<uint16_t>(OatClassType::kSomeCompiled)) {
     method_bitmap_.reset(new BitVector(num_methods, false, Allocator::GetMallocAllocator()));
     method_bitmap_size_ = method_bitmap_->GetSizeOf();
     oat_method_offsets_offset_from_oat_class += sizeof(method_bitmap_size_);
@@ -4002,7 +4002,7 @@ OatWriter::OatClass::OatClass(const dchecked_vector<CompiledMethod*>& compiled_m
     if (HasCompiledCode(compiled_method)) {
       oat_method_offsets_offsets_from_oat_class_[i] = oat_method_offsets_offset_from_oat_class;
       oat_method_offsets_offset_from_oat_class += sizeof(OatMethodOffsets);
-      if (oat_class_type == kOatClassSomeCompiled) {
+      if (oat_class_type == enum_cast<uint16_t>(OatClassType::kSomeCompiled)) {
         method_bitmap_->SetBit(i);
       }
     } else {
