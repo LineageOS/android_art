@@ -63,10 +63,10 @@ class FakeOatFile;
 // save even one OatMethodOffsets struct, the more complicated encoding
 // using a bitmap pays for itself since few classes will have 160
 // methods.
-enum OatClassType {
-  kOatClassAllCompiled = 0,   // OatClass is followed by an OatMethodOffsets for each method.
-  kOatClassSomeCompiled = 1,  // A bitmap of OatMethodOffsets that are present follows the OatClass.
-  kOatClassNoneCompiled = 2,  // All methods are interpreted so no OatMethodOffsets are necessary.
+enum class OatClassType : uint8_t {
+  kAllCompiled = 0,   // OatClass is followed by an OatMethodOffsets for each method.
+  kSomeCompiled = 1,  // A bitmap of OatMethodOffsets that are present follows the OatClass.
+  kNoneCompiled = 2,  // All methods are interpreted so no OatMethodOffsets are necessary.
   kOatClassMax = 3,
 };
 
@@ -273,7 +273,7 @@ class OatFile {
     static OatClass Invalid() {
       return OatClass(/* oat_file= */ nullptr,
                       ClassStatus::kErrorUnresolved,
-                      kOatClassNoneCompiled,
+                      OatClassType::kNoneCompiled,
                       /* bitmap_size= */ 0,
                       /* bitmap_pointer= */ nullptr,
                       /* methods_pointer= */ nullptr);

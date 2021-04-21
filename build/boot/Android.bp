@@ -45,4 +45,10 @@ bootclasspath_fragment {
         "com.android.art",
         "com.android.art.debug",
     ],
+
+    hidden_api: {
+        blocked: ["hiddenapi/hiddenapi-blocked.txt"],
+        max_target_o_low_priority: ["hiddenapi/hiddenapi-max-target-o-low-priority.txt"],
+        unsupported_packages: ["hiddenapi/hiddenapi-unsupported-packages.txt"],
+    },
 }
