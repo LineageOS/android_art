@@ -201,8 +201,7 @@ art_cc_library {
         "com.android.art.debug",
     ],
     stubs: {
-        // TODO(b/143978909): Rename and move this file to this directory.
-        symbol_file: "external/libdexfile_external.map.txt",
+        symbol_file: "libdexfile.map.txt",
         versions: ["1"],
     },
 }
@@ -251,8 +250,7 @@ art_cc_library {
         "com.android.art",
     ],
     stubs: {
-        // TODO(b/143978909): Rename and move this file to this directory.
-        symbol_file: "external/libdexfile_external.map.txt",
+        symbol_file: "libdexfile.map.txt",
         versions: ["1"],
     },
 }
@@ -336,6 +334,11 @@ art_cc_test {
     test_suites: ["general-tests"],
     srcs: [
         "external/dex_file_ext_c_test.c",
+        "external/dex_file_ext_test.cc",
+    ],
+    shared_libs: [
+        "libartbase",
+        "libdexfile",
     ],
     header_libs: [
         "jni_headers",
