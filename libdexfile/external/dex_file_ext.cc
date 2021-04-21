@@ -43,37 +43,36 @@
 
 extern "C" {
 
-// Wraps DexFile to add the caching needed by the external interface. This is
-// what gets passed over as ExtDexFile*.
-struct ExtDexFile {
-  struct MethodCacheEntry {
-    uint32_t offset;  // Offset relative to the start of the dex file header.
-    uint32_t len;
-    uint32_t index;  // Method index.
-  };
+struct ADexFile_Method {
+  ADexFile* adex;
+  uint32_t index;
+  size_t offset;
+  size_t size;
+};
 
- public:
-  std::unique_ptr<const art::DexFile> dex_file_;
-  explicit ExtDexFile(std::unique_ptr<const art::DexFile>&& dex_file)
+// Opaque implementation of ADexFile for the C interface.
+struct ADexFile {
+  explicit ADexFile(std::unique_ptr<const art::DexFile> dex_file)
       : dex_file_(std::move(dex_file)) {}
 
-  bool GetMethodDefIndex(uint32_t dex_offset, uint32_t* index, uint32_t* addr, uint32_t* size) {
+  inline bool FindMethod(uint32_t dex_offset, /*out*/ ADexFile_Method* result) {
     uint32_t class_def_index;
     if (GetClassDefIndex(dex_offset, &class_def_index)) {
       art::ClassAccessor accessor(*dex_file_, class_def_index);
-
       for (const art::ClassAccessor::Method& method : accessor.GetMethods()) {
         art::CodeItemInstructionAccessor code = method.GetInstructions();
         if (!code.HasCodeItem()) {
           continue;
         }
-
-        uint32_t offset = reinterpret_cast<const uint8_t*>(code.Insns()) - dex_file_->Begin();
-        uint32_t len = code.InsnsSizeInBytes();
-        if (offset <= dex_offset && dex_offset < offset + len) {
-          *index = method.GetIndex();
-          *addr = offset;
-          *size = len;
+        size_t offset = reinterpret_cast<const uint8_t*>(code.Insns()) - dex_file_->Begin();
+        size_t size = code.InsnsSizeInBytes();
+        if (offset <= dex_offset && dex_offset < offset + size) {
+          *result = ADexFile_Method {
+            .adex = this,
+            .index = method.GetIndex(),
+            .offset = offset,
+            .size = size,
+          };
           return true;
         }
       }
@@ -81,40 +80,43 @@ struct ExtDexFile {
     return false;
   }
 
- private:
-  bool GetClassDefIndex(uint32_t dex_offset, uint32_t* class_def_index) {
+  void CreateClassCache() {
+    // Create binary search table with (end_dex_offset, class_def_index) entries.
+    // That is, we don't assume that dex code of given class is consecutive.
+    std::deque<std::pair<uint32_t, uint32_t>> cache;
+    for (art::ClassAccessor accessor : dex_file_->GetClasses()) {
+      for (const art::ClassAccessor::Method& method : accessor.GetMethods()) {
+        art::CodeItemInstructionAccessor code = method.GetInstructions();
+        if (code.HasCodeItem()) {
+          int32_t offset = reinterpret_cast<const uint8_t*>(code.Insns()) - dex_file_->Begin();
+          DCHECK_NE(offset, 0);
+          cache.emplace_back(offset + code.InsnsSizeInBytes(), accessor.GetClassDefIndex());
+        }
+      }
+    }
+    std::sort(cache.begin(), cache.end());
+
+    // If two consecutive methods belong to same class, we can merge them.
+    // This tends to reduce the number of entries (used memory) by 10x.
+    size_t num_entries = cache.size();
+    if (cache.size() > 1) {
+      for (auto it = std::next(cache.begin()); it != cache.end(); it++) {
+        if (std::prev(it)->second == it->second) {
+          std::prev(it)->first = 0;  // Clear entry with lower end_dex_offset (mark to remove).
+          num_entries--;
+        }
+      }
+    }
+
+    // The cache is immutable now. Store it as continuous vector to save space.
+    class_cache_.reserve(num_entries);
+    auto pred = [](auto it) { return it.first != 0; };  // Entries to copy (not cleared above).
+    std::copy_if(cache.begin(), cache.end(), std::back_inserter(class_cache_), pred);
+  }
+
+  inline bool GetClassDefIndex(uint32_t dex_offset, uint32_t* class_def_index) {
     if (class_cache_.empty()) {
-      // Create binary search table with (end_dex_offset, class_def_index) entries.
-      // That is, we don't assume that dex code of given class is consecutive.
-      std::deque<std::pair<uint32_t, uint32_t>> cache;
-      for (art::ClassAccessor accessor : dex_file_->GetClasses()) {
-        for (const art::ClassAccessor::Method& method : accessor.GetMethods()) {
-          art::CodeItemInstructionAccessor code = method.GetInstructions();
-          if (code.HasCodeItem()) {
-            int32_t offset = reinterpret_cast<const uint8_t*>(code.Insns()) - dex_file_->Begin();
-            DCHECK_NE(offset, 0);
-            cache.emplace_back(offset + code.InsnsSizeInBytes(), accessor.GetClassDefIndex());
-          }
-        }
-      }
-      std::sort(cache.begin(), cache.end());
-
-      // If two consecutive methods belong to same class, we can merge them.
-      // This tends to reduce the number of entries (used memory) by 10x.
-      size_t num_entries = cache.size();
-      if (cache.size() > 1) {
-        for (auto it = std::next(cache.begin()); it != cache.end(); it++) {
-          if (std::prev(it)->second == it->second) {
-            std::prev(it)->first = 0;  // Clear entry with lower end_dex_offset (mark to remove).
-            num_entries--;
-          }
-        }
-      }
-
-      // The cache is immutable now. Store it as continuous vector to save space.
-      class_cache_.reserve(num_entries);
-      auto pred = [](auto it) { return it.first != 0; };  // Entries to copy (not cleared above).
-      std::copy_if(cache.begin(), cache.end(), std::back_inserter(class_cache_), pred);
+      CreateClassCache();
     }
 
     // Binary search in the class cache. First element of the pair is the key.
@@ -127,20 +129,31 @@ struct ExtDexFile {
     return false;
   }
 
+  // The underlying ART object.
+  std::unique_ptr<const art::DexFile> dex_file_;
+
   // Binary search table with (end_dex_offset, class_def_index) entries.
   std::vector<std::pair<uint32_t, uint32_t>> class_cache_;
+
+  // Used as short lived temporary when needed. Avoids alloc/free.
+  std::string temporary_qualified_name_;
 };
 
-int ExtDexFileOpenFromMemory(const void* addr,
-                             /*inout*/ size_t* size,
-                             const char* location,
-                             /*out*/ ExtDexFile** ext_dex_file) {
-  if (*size < sizeof(art::DexFile::Header)) {
-    *size = sizeof(art::DexFile::Header);
-    return kExtDexFileNotEnoughData;
+ADexFile_Error ADexFile_create(const void* _Nonnull address,
+                               size_t size,
+                               size_t* _Nullable new_size,
+                               const char* _Nonnull location,
+                               /*out*/ ADexFile* _Nullable * _Nonnull out_dex_file) {
+  *out_dex_file = nullptr;
+
+  if (size < sizeof(art::DexFile::Header)) {
+    if (new_size != nullptr) {
+      *new_size = sizeof(art::DexFile::Header);
+    }
+    return ADEXFILE_ERROR_NOT_ENOUGH_DATA;
   }
 
-  const art::DexFile::Header* header = reinterpret_cast<const art::DexFile::Header*>(addr);
+  const art::DexFile::Header* header = reinterpret_cast<const art::DexFile::Header*>(address);
   uint32_t file_size = header->file_size_;
   if (art::CompactDexFile::IsMagicValid(header->magic_)) {
     // Compact dex files store the data section separately so that it can be shared.
@@ -149,25 +162,27 @@ int ExtDexFileOpenFromMemory(const void* addr,
     //       In practice, this should be fine, as such sharing only happens on disk.
     uint32_t computed_file_size;
     if (__builtin_add_overflow(header->data_off_, header->data_size_, &computed_file_size)) {
-      return kExtDexFileInvalidHeader;
+      return ADEXFILE_ERROR_INVALID_HEADER;
     }
     if (computed_file_size > file_size) {
       file_size = computed_file_size;
     }
   } else if (!art::StandardDexFile::IsMagicValid(header->magic_)) {
-    return kExtDexFileInvalidHeader;
+    return ADEXFILE_ERROR_INVALID_HEADER;
   }
 
-  if (*size < file_size) {
-    *size = file_size;
-    return kExtDexFileNotEnoughData;
+  if (size < file_size) {
+    if (new_size != nullptr) {
+      *new_size = file_size;
+    }
+    return ADEXFILE_ERROR_NOT_ENOUGH_DATA;
   }
 
   std::string loc_str(location);
   art::DexFileLoader loader;
   std::string error_msg;
-  std::unique_ptr<const art::DexFile> dex_file = loader.Open(static_cast<const uint8_t*>(addr),
-                                                             *size,
+  std::unique_ptr<const art::DexFile> dex_file = loader.Open(static_cast<const uint8_t*>(address),
+                                                             size,
                                                              loc_str,
                                                              header->checksum_,
                                                              /*oat_dex_file=*/nullptr,
@@ -175,78 +190,118 @@ int ExtDexFileOpenFromMemory(const void* addr,
                                                              /*verify_checksum=*/false,
                                                              &error_msg);
   if (dex_file == nullptr) {
-    LOG(ERROR) << "Can not opend dex file " << loc_str << ": " << error_msg;
-    return kExtDexFileError;
+    LOG(ERROR) << "Can not open dex file " << loc_str << ": " << error_msg;
+    return ADEXFILE_ERROR_INVALID_DEX;
   }
 
-  *ext_dex_file = new ExtDexFile(std::move(dex_file));
-  return kExtDexFileOk;
+  *out_dex_file = new ADexFile(std::move(dex_file));
+  return ADEXFILE_ERROR_OK;
 }
 
-int ExtDexFileGetMethodInfoForOffset(ExtDexFile* ext_dex_file,
-                                     uint32_t dex_offset,
-                                     uint32_t flags,
-                                     ExtDexFileMethodInfoCallback* method_info_cb,
-                                     void* user_data) {
-  if (!ext_dex_file->dex_file_->IsInDataSection(ext_dex_file->dex_file_->Begin() + dex_offset)) {
-    return false;  // The DEX offset is not within the bytecode of this dex file.
+void ADexFile_destroy(ADexFile* self) {
+  delete self;
+}
+
+size_t ADexFile_findMethodAtOffset(ADexFile* self,
+                                   size_t dex_offset,
+                                   ADexFile_MethodCallback* callback,
+                                   void* callback_data) {
+  const art::DexFile* dex_file = self->dex_file_.get();
+  if (!dex_file->IsInDataSection(dex_file->Begin() + dex_offset)) {
+    return 0;  // The DEX offset is not within the bytecode of this dex file.
   }
 
-  if (ext_dex_file->dex_file_->IsCompactDexFile()) {
+  if (dex_file->IsCompactDexFile()) {
     // The data section of compact dex files might be shared.
     // Check the subrange unique to this compact dex.
     const art::CompactDexFile::Header& cdex_header =
-        ext_dex_file->dex_file_->AsCompactDexFile()->GetHeader();
+        dex_file->AsCompactDexFile()->GetHeader();
     uint32_t begin = cdex_header.data_off_ + cdex_header.OwnedDataBegin();
     uint32_t end = cdex_header.data_off_ + cdex_header.OwnedDataEnd();
     if (dex_offset < begin || dex_offset >= end) {
-      return false;  // The DEX offset is not within the bytecode of this dex file.
+      return 0;  // The DEX offset is not within the bytecode of this dex file.
     }
   }
 
-  uint32_t method_index, addr, size;
-  if (!ext_dex_file->GetMethodDefIndex(dex_offset, &method_index, &addr, &size)) {
-    return false;
+  ADexFile_Method info;
+  if (!self->FindMethod(dex_offset, &info)) {
+    return 0;
   }
 
-  bool with_signature = flags & kExtDexFileWithSignature;
-  std::string name = ext_dex_file->dex_file_->PrettyMethod(method_index, with_signature);
-  ExtDexFileMethodInfo info {
-    .sizeof_struct = sizeof(ExtDexFileMethodInfo),
-    .addr = addr,
-    .size = size,
-    .name = name.c_str(),
-    .name_size = name.size()
-  };
-  method_info_cb(user_data, &info);
-  return true;
+  callback(callback_data, &info);
+  return 1;
 }
 
-void ExtDexFileGetAllMethodInfos(ExtDexFile* ext_dex_file,
-                                 uint32_t flags,
-                                 ExtDexFileMethodInfoCallback* method_info_cb,
-                                 void* user_data) {
-  const art::DexFile* dex_file = ext_dex_file->dex_file_.get();
-  for (art::ClassAccessor accessor : ext_dex_file->dex_file_->GetClasses()) {
+size_t ADexFile_forEachMethod(ADexFile* self,
+                              ADexFile_MethodCallback* callback,
+                              void* callback_data) {
+  size_t count = 0;
+  for (art::ClassAccessor accessor : self->dex_file_->GetClasses()) {
     for (const art::ClassAccessor::Method& method : accessor.GetMethods()) {
       art::CodeItemInstructionAccessor code = method.GetInstructions();
       if (code.HasCodeItem()) {
-        const uint8_t* insns = reinterpret_cast<const uint8_t*>(code.Insns());
-        bool with_signature = flags & kExtDexFileWithSignature;
-        std::string name = dex_file->PrettyMethod(method.GetIndex(), with_signature);
-        ExtDexFileMethodInfo info {
-          .sizeof_struct = sizeof(ExtDexFileMethodInfo),
-          .addr = static_cast<uint32_t>(insns - dex_file->Begin()),
+        size_t offset = reinterpret_cast<const uint8_t*>(code.Insns()) - self->dex_file_->Begin();
+        ADexFile_Method info {
+          .adex = self,
+          .index = method.GetIndex(),
+          .offset = offset,
           .size = code.InsnsSizeInBytes(),
-          .name = name.c_str(),
-          .name_size = name.size()
         };
-        method_info_cb(user_data, &info);
+        callback(callback_data, &info);
+        count++;
       }
     }
   }
+  return count;
 }
 
-void ExtDexFileClose(ExtDexFile* ext_dex_file) { delete (ext_dex_file); }
+size_t ADexFile_Method_getCodeOffset(const ADexFile_Method* self,
+                                     size_t* out_size) {
+  if (out_size != nullptr) {
+    *out_size = self->size;
+  }
+  return self->offset;
+}
+
+const char* ADexFile_Method_getName(const ADexFile_Method* self,
+                                    size_t* out_size) {
+  const char* name = self->adex->dex_file_->GetMethodName(self->index);
+  if (out_size != nullptr) {
+    *out_size = strlen(name);
+  }
+  return name;
+}
+
+const char* ADexFile_Method_getQualifiedName(const ADexFile_Method* self,
+                                             int with_params,
+                                             size_t* out_size) {
+  std::string& temp = self->adex->temporary_qualified_name_;
+  temp.clear();
+  self->adex->dex_file_->AppendPrettyMethod(self->index, with_params, &temp);
+  if (out_size != nullptr) {
+    *out_size = temp.size();
+  }
+  return temp.data();
+}
+
+const char* ADexFile_Method_getClassDescriptor(const ADexFile_Method* self,
+                                               size_t* out_size) {
+  const art::dex::MethodId& method_id = self->adex->dex_file_->GetMethodId(self->index);
+  const char* name = self->adex->dex_file_->GetMethodDeclaringClassDescriptor(method_id);
+  if (out_size != nullptr) {
+    *out_size = strlen(name);
+  }
+  return name;
+}
+
+const char* ADexFile_Error_toString(ADexFile_Error self) {
+  switch (self) {
+    case ADEXFILE_ERROR_OK: return "Ok";
+    case ADEXFILE_ERROR_INVALID_DEX: return "Dex file is invalid.";
+    case ADEXFILE_ERROR_NOT_ENOUGH_DATA: return "Not enough data. Incomplete dex file.";
+    case ADEXFILE_ERROR_INVALID_HEADER: return "Invalid dex file header.";
+  }
+  return nullptr;
+}
 
 }  // extern "C"
