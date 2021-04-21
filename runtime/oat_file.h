@@ -283,18 +283,15 @@ class OatFile {
     OatClass(const OatFile* oat_file,
              ClassStatus status,
              OatClassType type,
-             uint32_t bitmap_size,
+             uint32_t num_methods,
              const uint32_t* bitmap_pointer,
              const OatMethodOffsets* methods_pointer);
 
     const OatFile* const oat_file_;
-
     const ClassStatus status_;
-
     const OatClassType type_;
-
+    const uint32_t num_methods_;
     const uint32_t* const bitmap_;
-
     const OatMethodOffsets* const methods_pointer_;
 
     friend class art::OatDexFile;

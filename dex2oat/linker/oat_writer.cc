@@ -271,7 +271,15 @@ class OatWriter::OatClass {
   dchecked_vector<uint32_t> oat_method_offsets_offsets_from_oat_class_;
 
   // Data to write.
-  uint32_t method_bitmap_size_;
+
+  // Number of methods recorded in OatClass. For `OatClassType::kNoneCompiled`
+  // this shall be zero and shall not be written to the file, otherwise it
+  // shall be the number of methods in the class definition. It is used to
+  // determine the size of `BitVector` data for `OatClassType::kSomeCompiled` and
+  // the size of the `OatMethodOffsets` table for `OatClassType::kAllCompiled`.
+  // (The size of the `OatMethodOffsets` table for `OatClassType::kSomeCompiled`
+  // is determined by the number of bits set in the `BitVector` data.)
+  uint32_t num_methods_;
 
   // Bit vector indexed by ClassDef method index. When OatClass::type_ is
   // OatClassType::kSomeCompiled, a set bit indicates the method has an
@@ -466,6 +474,7 @@ OatWriter::OatWriter(const CompilerOptions& compiler_options,
     size_oat_class_offsets_(0),
     size_oat_class_type_(0),
     size_oat_class_status_(0),
+    size_oat_class_num_methods_(0),
     size_oat_class_method_bitmaps_(0),
     size_oat_class_method_offsets_(0),
     size_method_bss_mappings_(0u),
@@ -2665,6 +2674,7 @@ bool OatWriter::CheckOatSize(OutputStream* out, size_t file_offset, size_t relat
     DO_STAT(size_oat_class_offsets_);
     DO_STAT(size_oat_class_type_);
     DO_STAT(size_oat_class_status_);
+    DO_STAT(size_oat_class_num_methods_);
     DO_STAT(size_oat_class_method_bitmaps_);
     DO_STAT(size_oat_class_method_offsets_);
     DO_STAT(size_method_bss_mappings_);
@@ -3986,15 +3996,18 @@ OatWriter::OatClass::OatClass(const dchecked_vector<CompiledMethod*>& compiled_m
   method_headers_.resize(compiled_methods_with_code);
 
   uint32_t oat_method_offsets_offset_from_oat_class = OatClassHeader::SizeOf();
-  // We only create this instance if there are at least some compiled.
-  if (oat_class_type == enum_cast<uint16_t>(OatClassType::kSomeCompiled)) {
-    method_bitmap_.reset(new BitVector(num_methods, false, Allocator::GetMallocAllocator()));
-    method_bitmap_size_ = method_bitmap_->GetSizeOf();
-    oat_method_offsets_offset_from_oat_class += sizeof(method_bitmap_size_);
-    oat_method_offsets_offset_from_oat_class += method_bitmap_size_;
-  } else {
-    method_bitmap_ = nullptr;
-    method_bitmap_size_ = 0;
+  // We only write method-related data if there are at least some compiled methods.
+  num_methods_ = 0u;
+  DCHECK(method_bitmap_ == nullptr);
+  if (oat_class_type != enum_cast<uint16_t>(OatClassType::kNoneCompiled)) {
+    num_methods_ = num_methods;
+    oat_method_offsets_offset_from_oat_class += sizeof(num_methods_);
+    if (oat_class_type == enum_cast<uint16_t>(OatClassType::kSomeCompiled)) {
+      method_bitmap_.reset(new BitVector(num_methods, false, Allocator::GetMallocAllocator()));
+      uint32_t bitmap_size = BitVector::BitsToWords(num_methods) * BitVector::kWordBytes;
+      DCHECK_EQ(bitmap_size, method_bitmap_->GetSizeOf());
+      oat_method_offsets_offset_from_oat_class += bitmap_size;
+    }
   }
 
   for (size_t i = 0; i < num_methods; i++) {
@@ -4012,9 +4025,9 @@ OatWriter::OatClass::OatClass(const dchecked_vector<CompiledMethod*>& compiled_m
 }
 
 size_t OatWriter::OatClass::SizeOf() const {
-  return ((method_bitmap_size_ == 0) ? 0 : sizeof(method_bitmap_size_))
-          + method_bitmap_size_
-          + (sizeof(method_offsets_[0]) * method_offsets_.size());
+  return ((num_methods_ == 0) ? 0 : sizeof(num_methods_)) +
+         ((method_bitmap_ != nullptr) ? method_bitmap_->GetSizeOf() : 0u) +
+         (sizeof(method_offsets_[0]) * method_offsets_.size());
 }
 
 bool OatWriter::OatClassHeader::Write(OatWriter* oat_writer,
@@ -4036,18 +4049,20 @@ bool OatWriter::OatClassHeader::Write(OatWriter* oat_writer,
 }
 
 bool OatWriter::OatClass::Write(OatWriter* oat_writer, OutputStream* out) const {
-  if (method_bitmap_size_ != 0) {
-    if (!out->WriteFully(&method_bitmap_size_, sizeof(method_bitmap_size_))) {
-      PLOG(ERROR) << "Failed to write method bitmap size to " << out->GetLocation();
+  if (num_methods_ != 0u) {
+    if (!out->WriteFully(&num_methods_, sizeof(num_methods_))) {
+      PLOG(ERROR) << "Failed to write number of methods to " << out->GetLocation();
       return false;
     }
-    oat_writer->size_oat_class_method_bitmaps_ += sizeof(method_bitmap_size_);
+    oat_writer->size_oat_class_num_methods_ += sizeof(num_methods_);
+  }
 
-    if (!out->WriteFully(method_bitmap_->GetRawStorage(), method_bitmap_size_)) {
+  if (method_bitmap_ != nullptr) {
+    if (!out->WriteFully(method_bitmap_->GetRawStorage(), method_bitmap_->GetSizeOf())) {
       PLOG(ERROR) << "Failed to write method bitmap to " << out->GetLocation();
       return false;
     }
-    oat_writer->size_oat_class_method_bitmaps_ += method_bitmap_size_;
+    oat_writer->size_oat_class_method_bitmaps_ += method_bitmap_->GetSizeOf();
   }
 
   if (!out->WriteFully(method_offsets_.data(), GetMethodOffsetsRawSize())) {
