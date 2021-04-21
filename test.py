@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 #
 # Copyright 2017, The Android Open Source Project
 #
@@ -51,7 +51,7 @@ if options.run_test or options.help_runner or not options.gtest:
     run_test_args.append(arg)
 
   test_runner_cmd = [testrunner] + run_test_args
-  print test_runner_cmd
+  print(test_runner_cmd)
   if subprocess.call(test_runner_cmd) or options.help_runner:
     sys.exit(1)
 
@@ -62,9 +62,11 @@ if options.gtest or not options.run_test:
   if options.target or not options.host:
     build_target += ' test-art-target-gtest'
 
-  build_command = 'm -j' + str(options.n_threads) + ' ' + build_target
-  print build_command
+  build_command = ANDROID_BUILD_TOP + '/build/soong/soong_ui.bash --make-mode'
+  build_command += ' -j' + str(options.n_threads)
+  build_command += ' ' + build_target
+  print(build_command)
   if subprocess.call(build_command.split(), cwd=ANDROID_BUILD_TOP):
-      sys.exit(1)
+    sys.exit(1)
 
 sys.exit(0)
