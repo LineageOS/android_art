@@ -462,6 +462,13 @@ libart_static_cc_defaults {
         "libunwindstack",
         "libz",
     ],
+    target: {
+        bionic: {
+            whole_static_libs: [
+                "libasync_safe", // libunwindstack dependency on Bionic.
+            ],
+        },
+    },
 }
 
 cc_defaults {
