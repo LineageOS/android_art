@@ -21,8 +21,6 @@
 #include "entrypoints/entrypoint_utils-inl.h"
 #include "indirect_reference_table.h"
 #include "mirror/object-inl.h"
-#include "palette/palette.h"
-#include "palette/palette_hooks.h"
 #include "thread-inl.h"
 #include "verify_object.h"
 
@@ -76,10 +74,6 @@ extern uint32_t JniMethodStart(Thread* self) {
     CHECK(!native_method->IsFastNative()) << native_method->PrettyMethod();
   }
 
-  PaletteHooks* hooks = nullptr;
-  if (PaletteGetHooks(&hooks) == PALETTE_STATUS_OK) {
-    hooks->NotifyBeginJniInvocation(env);
-  }
   // Transition out of runnable.
   self->TransitionFromRunnableToSuspended(kNative);
   return saved_local_ref_cookie;
@@ -98,10 +92,6 @@ static void GoToRunnable(Thread* self) NO_THREAD_SAFETY_ANALYSIS {
   }
 
   self->TransitionFromSuspendedToRunnable();
-  PaletteHooks* hooks = nullptr;
-  if (PaletteGetHooks(&hooks) == PALETTE_STATUS_OK) {
-    hooks->NotifyEndJniInvocation(self->GetJniEnv());
-  }
 }
 
 ALWAYS_INLINE static inline void GoToRunnableFast(Thread* self) {
