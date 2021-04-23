@@ -174,8 +174,6 @@ art_module_sdk {
 art_module_exports {
     name: "art-module-host-exports",
     host_supported: true,
-    // TODO(b/173186484) - remove once art-notices-for-framework-stubs-jar has been removed.
-    device_supported: true,
 
     // Enable if SOONG_CONFIG_art_module_source_build is true.
     enabled: false,
@@ -188,14 +186,6 @@ art_module_exports {
     prebuilt_visibility: prebuilt_visibility,
 
     target: {
-        android: {
-            java_libs: [
-                // TODO(b/173186484) - embed notices in stubs and remove this.
-                // Needed for android_stubs_current et al.
-                "art-notices-for-framework-stubs-jar",
-            ],
-        },
-
         host: {
             // Set in target.host because the top level compile_multilib
             // property is fixed to "both" in the sdk/module_exports
