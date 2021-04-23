@@ -63,7 +63,7 @@ tmp_build_number=$(cat ${out_dir}/soong/build_number.txt)
 cat $out_dir/soong/soong.variables > ${tmp_soong_var}
 
 # See comment above about b/123645297 for why we cannot just do m clean. Clear
-# out all files except for intermediates and installed files.
+# out all files except for intermediates and installed files and dexpreopt.config.
 find $out_dir/ -maxdepth 1 -mindepth 1 \
                -not -name soong        \
                -not -name host         \
@@ -71,6 +71,7 @@ find $out_dir/ -maxdepth 1 -mindepth 1 \
 find $out_dir/soong/ -maxdepth 1 -mindepth 1   \
                      -not -name .intermediates \
                      -not -name host           \
+                     -not -name dexpreopt.config \
                      -not -name target | xargs -I '{}' rm -rf '{}'
 
 python3 <<END - ${tmp_soong_var} ${out_dir}/soong/soong.variables
@@ -83,8 +84,6 @@ x['CrossHost'] = 'linux_bionic'
 x['CrossHostArch'] = 'x86_64'
 if 'CrossHostSecondaryArch' in x:
   del x['CrossHostSecondaryArch']
-if 'DexpreoptGlobalConfig' in x:
-  del x['DexpreoptGlobalConfig']
 json.dump(x, open(sys.argv[2], mode='w'))
 END
 
