@@ -36,17 +36,15 @@ the module. It is also mutually exclusive with the other ones.
 2.  Set up the development environment:
 
     ```
-    lunch art_module_<arch>
-    export TARGET_BUILD_APPS=com.android.art
+    banchan com.android.art <arch>
     export SOONG_ALLOW_MISSING_DEPENDENCIES=true
     ```
 
-    For Google internal builds, specify instead the Google signed variant of the
-    product and module:
+    For Google internal builds on the internal master-art branch, specify
+    instead the Google variant of the module and product:
 
     ```
-    lunch mainline_modules_<arch>
-    export TARGET_BUILD_APPS=com.google.android.art
+    banchan com.google.android.art mainline_modules_<arch>
     export SOONG_ALLOW_MISSING_DEPENDENCIES=true
     ```
 
@@ -55,9 +53,7 @@ the module. It is also mutually exclusive with the other ones.
     usual host architectures, and 64/32-bit multilib for the 64-bit products.
 
     To build the debug variant of the module, specify `com.android.art.debug`
-    for `TARGET_BUILD_APPS` instead. It is also possible to list both.
-
-    TODO(b/179779520): Provide a better setup command.
+    instead of `com.android.art`. It is also possible to list both.
 
 3.  Build the module:
 
@@ -68,11 +64,11 @@ the module. It is also mutually exclusive with the other ones.
 4.  Install the module and reboot:
 
     ```
-    adb install out/target/product/module_<arch>/system/apex/com.android.art.apex
+    adb install out/target/product/generic_<arch>/system/apex/com.android.art.apex
     adb reboot
     ```
 
-    The name of the APEX file depends on what you put in `TARGET_BUILD_APPS`.
+    The name of the APEX file depends on what you passed to `banchan`.
 
 
 ## Building as part of the base system image
