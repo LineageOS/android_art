@@ -116,6 +116,7 @@ enum class MethodCompilationStat {
   kPartialAllocationMoved,
   kPredicatedLoadAdded,
   kPredicatedStoreAdded,
+  kDevirtualized,
   kLastStat
 };
 std::ostream& operator<<(std::ostream& os, MethodCompilationStat rhs);
