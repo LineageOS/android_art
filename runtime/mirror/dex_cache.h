@@ -132,6 +132,8 @@ using MethodTypeDexCacheType = std::atomic<MethodTypeDexCachePair>;
 // C++ mirror of java.lang.DexCache.
 class MANAGED DexCache final : public Object {
  public:
+  MIRROR_CLASS("Ljava/lang/DexCache;");
+
   // Size of java.lang.DexCache.class.
   static uint32_t ClassSize(PointerSize pointer_size);
 

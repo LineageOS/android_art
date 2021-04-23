@@ -47,6 +47,8 @@ class VarHandleTest;
 // C++ mirror of java.lang.invoke.VarHandle
 class MANAGED VarHandle : public Object {
  public:
+  MIRROR_CLASS("Ljava/lang/invoke/VarHandle;");
+
   // The maximum number of parameters a VarHandle accessor method can
   // take. The Worst case is equivalent to a compare-and-swap
   // operation on an array element which requires four parameters
@@ -207,6 +209,8 @@ class MANAGED VarHandle : public Object {
 // The corresponding managed class in libart java.lang.invoke.FieldVarHandle.
 class MANAGED FieldVarHandle : public VarHandle {
  public:
+  MIRROR_CLASS("Ljava/lang/invoke/FieldVarHandle;");
+
   bool Access(AccessMode access_mode,
               ShadowFrame* shadow_frame,
               const InstructionOperands* const operands,
@@ -250,6 +254,8 @@ class MANAGED ArrayElementVarHandle : public VarHandle {
 // The corresponding managed class in libart java.lang.invoke.ByteArrayViewVarHandle.
 class MANAGED ByteArrayViewVarHandle : public VarHandle {
  public:
+  MIRROR_CLASS("Ljava/lang/invoke/ByteArrayViewVarHandle;");
+
   bool Access(AccessMode access_mode,
               ShadowFrame* shadow_frame,
               const InstructionOperands* const operands,
@@ -275,6 +281,8 @@ class MANAGED ByteArrayViewVarHandle : public VarHandle {
 // The corresponding managed class in libart java.lang.invoke.ByteBufferViewVarHandle.
 class MANAGED ByteBufferViewVarHandle : public VarHandle {
  public:
+  MIRROR_CLASS("Ljava/lang/invoke/ByteBufferViewVarHandle;");
+
   bool Access(AccessMode access_mode,
               ShadowFrame* shadow_frame,
               const InstructionOperands* const operands,

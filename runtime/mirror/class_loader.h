@@ -35,6 +35,8 @@ class Class;
 // C++ mirror of java.lang.ClassLoader
 class MANAGED ClassLoader : public Object {
  public:
+  MIRROR_CLASS("Ljava/lang/ClassLoader;");
+
   // Size of an instance of java.lang.ClassLoader.
   static constexpr uint32_t InstanceSize() {
     return sizeof(ClassLoader);
