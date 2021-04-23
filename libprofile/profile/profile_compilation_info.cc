@@ -2143,7 +2143,7 @@ bool ProfileCompilationInfo::IsProfileFile(int fd) {
   // The files is not empty. Check if it contains the profile magic.
   size_t byte_count = sizeof(kProfileMagic);
   uint8_t buffer[sizeof(kProfileMagic)];
-  if (!android::base::ReadFully(fd, buffer, byte_count)) {
+  if (!android::base::ReadFullyAtOffset(fd, buffer, byte_count, /*offset=*/ 0)) {
     return false;
   }
 
