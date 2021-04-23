@@ -27,6 +27,8 @@ namespace mirror {
 // C++ mirror of java.lang.reflect.AccessibleObject
 class MANAGED AccessibleObject : public Object {
  public:
+  MIRROR_CLASS("Ljava/lang/reflect/AccessibleObject;");
+
   static MemberOffset FlagOffset() {
     return OFFSET_OF_OBJECT_MEMBER(AccessibleObject, flag_);
   }

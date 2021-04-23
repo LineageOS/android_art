@@ -29,6 +29,8 @@ namespace mirror {
 // C++ mirror of java.lang.StackTraceElement
 class MANAGED StackTraceElement final : public Object {
  public:
+  MIRROR_CLASS("Ljava/lang/StackTraceElement;");
+
   ObjPtr<String> GetDeclaringClass() REQUIRES_SHARED(Locks::mutator_lock_);
 
   ObjPtr<String> GetMethodName() REQUIRES_SHARED(Locks::mutator_lock_);

@@ -35,6 +35,8 @@ namespace mirror {
 // C++ mirror of java.lang.invoke.MethodHandle
 class MANAGED MethodHandle : public Object {
  public:
+  MIRROR_CLASS("Ljava/lang/invoke/MethodHandle;");
+
   // Defines the behaviour of a given method handle. The behaviour
   // of a handle of a given kind is identical to the dex bytecode behaviour
   // of the equivalent instruction.
@@ -125,6 +127,8 @@ class MANAGED MethodHandle : public Object {
 // C++ mirror of java.lang.invoke.MethodHandleImpl
 class MANAGED MethodHandleImpl : public MethodHandle {
  public:
+  MIRROR_CLASS("Ljava/lang/invoke/MethodHandleImpl;");
+
   static ObjPtr<mirror::MethodHandleImpl> Create(Thread* const self,
                                                  uintptr_t art_field_or_method,
                                                  MethodHandle::Kind kind,

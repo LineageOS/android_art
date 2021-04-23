@@ -35,6 +35,8 @@ class MethodType;
 // C++ mirror of java.lang.invoke.MethodHandles.Lookup
 class MANAGED MethodHandlesLookup : public Object {
  public:
+  MIRROR_CLASS("Ljava/lang/invoke/MethodHandles$Lookup;");
+
   static ObjPtr<mirror::MethodHandlesLookup> Create(Thread* const self, Handle<Class> lookup_class)
       REQUIRES_SHARED(Locks::mutator_lock_) REQUIRES(!Roles::uninterruptible_);
 
