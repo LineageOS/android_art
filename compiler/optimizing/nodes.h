@@ -6833,7 +6833,7 @@ class HLoadClass final : public HInstruction {
   }
 
   // Loaded class RTI is marked as valid by RTP if the klass_ is admissible.
-  void SetValidLoadedClassRTI() REQUIRES_SHARED(Locks::mutator_lock_) {
+  void SetValidLoadedClassRTI() {
     DCHECK(klass_ != nullptr);
     SetPackedFlag<kFlagValidLoadedClassRTI>(true);
   }
@@ -7696,7 +7696,7 @@ class HTypeCheckInstruction : public HVariableInputSizeInstruction {
   }
 
   // Target class RTI is marked as valid by RTP if the klass_ is admissible.
-  void SetValidTargetClassRTI() REQUIRES_SHARED(Locks::mutator_lock_) {
+  void SetValidTargetClassRTI() {
     DCHECK(klass_ != nullptr);
     SetPackedFlag<kFlagValidTargetClassRTI>(true);
   }
