@@ -21,19 +21,6 @@ package {
     default_applicable_licenses: ["art_license"],
 }
 
-boot_image {
-    name: "art-boot-image",
-    image_name: "art",
-    visibility: [
-        "//art/build/apex",
-        "//art/build/sdk",
-    ],
-    apex_available: [
-        "com.android.art",
-        "com.android.art.debug",
-    ],
-}
-
 bootclasspath_fragment {
     name: "art-bootclasspath-fragment",
     image_name: "art",
