@@ -41,6 +41,8 @@ namespace mirror {
 // C++ mirror of java.lang.ref.Reference
 class MANAGED Reference : public Object {
  public:
+  MIRROR_CLASS("Ljava/lang/ref/Reference;");
+
   // Size of java.lang.ref.Reference.class.
   static uint32_t ClassSize(PointerSize pointer_size);
 
@@ -117,6 +119,8 @@ class MANAGED Reference : public Object {
 // C++ mirror of java.lang.ref.FinalizerReference
 class MANAGED FinalizerReference : public Reference {
  public:
+  MIRROR_CLASS("Ljava/lang/ref/FinalizerReference;");
+
   static MemberOffset ZombieOffset() {
     return OFFSET_OF_OBJECT_MEMBER(FinalizerReference, zombie_);
   }

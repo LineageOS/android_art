@@ -30,6 +30,8 @@ namespace mirror {
 // C++ mirror of java.lang.invoke.MethodType
 class MANAGED MethodType : public Object {
  public:
+  MIRROR_CLASS("Ljava/lang/invoke/MethodType;");
+
   static ObjPtr<MethodType> Create(Thread* const self,
                                    Handle<Class> return_type,
                                    Handle<ObjectArray<Class>> param_types)

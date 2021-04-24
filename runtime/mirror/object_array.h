@@ -34,6 +34,8 @@ template <typename T> using HandleArrayIter = ArrayIter<T, Handle<ObjectArray<T>
 template<class T>
 class MANAGED ObjectArray: public Array {
  public:
+  MIRROR_CLASS("[Ljava/lang/Object;");
+
   // The size of Object[].class.
   static uint32_t ClassSize(PointerSize pointer_size) {
     return Array::ClassSize(pointer_size);
