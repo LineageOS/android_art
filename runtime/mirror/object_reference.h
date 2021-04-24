@@ -17,6 +17,9 @@
 #ifndef ART_RUNTIME_MIRROR_OBJECT_REFERENCE_H_
 #define ART_RUNTIME_MIRROR_OBJECT_REFERENCE_H_
 
+#include <array>
+#include <string_view>
+
 #include "base/atomic.h"
 #include "base/locks.h"  // For Locks::mutator_lock_.
 #include "heap_poisoning.h"
@@ -31,6 +34,59 @@ class Object;
 // Classes shared with the managed side of the world need to be packed so that they don't have
 // extra platform specific padding.
 #define MANAGED PACKED(4)
+#define MIRROR_CLASS(desc) \
+  static_assert(::art::mirror::IsMirroredDescriptor(desc), \
+                desc " is not a known mirror class. Please update" \
+                " IsMirroredDescriptor to include it!")
+
+constexpr bool IsMirroredDescriptor(std::string_view desc) {
+  if (desc[0] != 'L') {
+    // All primitives and arrays are mirrored
+    return true;
+  }
+#define MIRROR_DESCRIPTORS(vis)                       \
+    vis("Ljava/lang/Class;")                          \
+    vis("Ljava/lang/ClassLoader;")                    \
+    vis("Ljava/lang/ClassNotFoundException;")         \
+    vis("Ljava/lang/DexCache;")                       \
+    vis("Ljava/lang/Object;")                         \
+    vis("Ljava/lang/StackTraceElement;")              \
+    vis("Ljava/lang/String;")                         \
+    vis("Ljava/lang/Throwable;")                      \
+    vis("Ljava/lang/invoke/ArrayElementVarHandle;")   \
+    vis("Ljava/lang/invoke/ByteArrayViewVarHandle;")  \
+    vis("Ljava/lang/invoke/ByteBufferViewVarHandle;") \
+    vis("Ljava/lang/invoke/CallSite;")                \
+    vis("Ljava/lang/invoke/FieldVarHandle;")          \
+    vis("Ljava/lang/invoke/MethodHandle;")            \
+    vis("Ljava/lang/invoke/MethodHandleImpl;")        \
+    vis("Ljava/lang/invoke/MethodHandles$Lookup;")    \
+    vis("Ljava/lang/invoke/MethodType;")              \
+    vis("Ljava/lang/invoke/VarHandle;")               \
+    vis("Ljava/lang/ref/FinalizerReference;")         \
+    vis("Ljava/lang/ref/Reference;")                  \
+    vis("Ljava/lang/reflect/AccessibleObject;")       \
+    vis("Ljava/lang/reflect/Constructor;")            \
+    vis("Ljava/lang/reflect/Executable;")             \
+    vis("Ljava/lang/reflect/Field;")                  \
+    vis("Ljava/lang/reflect/Method;")                 \
+    vis("Ljava/lang/reflect/Proxy;")                  \
+    vis("Ldalvik/system/ClassExt;")                   \
+    vis("Ldalvik/system/EmulatedStackFrame;")
+  // TODO: Once we are C++ 20 we can just have a constexpr array and std::find.
+  // constexpr std::array<std::string_view, 28> kMirrorTypes{
+  //    // Fill in
+  // };
+  // return std::find(kMirrorTypes.begin(), kMirrorTypes.end(), desc) != kMirrorTypes.end();
+#define CHECK_DESCRIPTOR(descriptor)          \
+  if (std::string_view(descriptor) == desc) { \
+    return true;                              \
+  }
+  MIRROR_DESCRIPTORS(CHECK_DESCRIPTOR)
+#undef CHECK_DESCRIPTOR
+  return false;
+#undef MIRROR_DESCRIPTORS
+}
 
 template<bool kPoisonReferences, class MirrorType>
 class PtrCompression {
