@@ -66,6 +66,8 @@ RUNTIME_OPTIONS_KEY (MillisecondsToNanoseconds, \
                                           LongGCLogThreshold,             gc::Heap::kDefaultLongGCLogThreshold)
 RUNTIME_OPTIONS_KEY (MillisecondsToNanoseconds, \
                                           ThreadSuspendTimeout,           ThreadList::kDefaultThreadSuspendTimeout)
+RUNTIME_OPTIONS_KEY (bool,                MonitorTimeoutEnable,           false)
+RUNTIME_OPTIONS_KEY (int,                 MonitorTimeout,                 Monitor::kDefaultMonitorTimeoutMs)
 RUNTIME_OPTIONS_KEY (Unit,                DumpGCPerformanceOnShutdown)
 RUNTIME_OPTIONS_KEY (Unit,                DumpRegionInfoBeforeGC)
 RUNTIME_OPTIONS_KEY (Unit,                DumpRegionInfoAfterGC)
