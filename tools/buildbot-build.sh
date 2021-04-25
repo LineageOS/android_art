@@ -38,17 +38,20 @@ fi
 
 java_libraries_dir=${out_dir}/target/common/obj/JAVA_LIBRARIES
 common_targets="vogar core-tests apache-harmony-jdwp-tests-hostdex jsr166-tests libartpalette-system mockito-target"
-mode="target"
+# These build targets have different names on device and host.
+specific_targets="libjavacoretests libjdwp libwrapagentproperties libwrapagentpropertiesd"
+build_host="no"
+build_target="no"
 j_arg="-j$(nproc)"
 showcommands=
 make_command=
 
 while true; do
   if [[ "$1" == "--host" ]]; then
-    mode="host"
+    build_host="yes"
     shift
   elif [[ "$1" == "--target" ]]; then
-    mode="target"
+    build_target="yes"
     shift
   elif [[ "$1" == -j* ]]; then
     j_arg=$1
@@ -63,6 +66,12 @@ while true; do
     exit 1
   fi
 done
+
+# If neither was selected, build both by default.
+if [[ $build_host == "no" ]] && [[ $build_target == "no" ]]; then
+  build_host="yes"
+  build_target="yes"
+fi
 
 # Allow to build successfully in master-art.
 extra_args="SOONG_ALLOW_MISSING_DEPENDENCIES=true"
@@ -81,16 +90,20 @@ apexes=(
   "com.android.os.statsd"
 )
 
-if [[ $mode == "host" ]]; then
-  make_command="build/soong/soong_ui.bash --make-mode $j_arg $extra_args $showcommands build-art-host-tests $common_targets"
+make_command="build/soong/soong_ui.bash --make-mode $j_arg $extra_args $showcommands $common_targets"
+if [[ $build_host == "yes" ]]; then
+  make_command+=" build-art-host-tests"
   make_command+=" dx-tests junit-host"
-  mode_suffix="-host"
-elif [[ $mode == "target" ]]; then
+  for LIB in ${specific_targets} ; do
+    make_command+=" $LIB-host"
+  done
+fi
+if [[ $build_target == "yes" ]]; then
   if [[ -z "${ANDROID_PRODUCT_OUT}" ]]; then
     echo 'ANDROID_PRODUCT_OUT environment variable is empty; did you forget to run `lunch`?'
     exit 1
   fi
-  make_command="build/soong/soong_ui.bash --make-mode $j_arg $extra_args $showcommands build-art-target-tests $common_targets"
+  make_command+=" build-art-target-tests"
   make_command+=" libnetd_client-target toybox sh libtombstoned_client"
   make_command+=" debuggerd su gdbserver"
   # vogar requires the class files for conscrypt and ICU.
@@ -106,12 +119,8 @@ elif [[ $mode == "target" ]]; then
   make_command+=" deapexer"
   # Build/install the required APEXes.
   make_command+=" ${apexes[*]}"
+  make_command+=" ${specific_targets}"
 fi
-
-mode_specific_libraries="libjavacoretests libjdwp libwrapagentproperties libwrapagentpropertiesd"
-for LIB in ${mode_specific_libraries} ; do
-  make_command+=" $LIB${mode_suffix}"
-done
 
 echo "Do installclean"
 build/soong/soong_ui.bash --make-mode installclean
@@ -120,7 +129,7 @@ echo "Executing $make_command"
 # Disable path restrictions to enable luci builds using vpython.
 eval "$make_command"
 
-if [[ $mode == "target" ]]; then
+if [[ $build_target == "yes" ]]; then
   if [[ -z "${ANDROID_HOST_OUT}" ]]; then
     echo "ANDROID_HOST_OUT environment variable is empty; using $out_dir/host/linux-x86"
     ANDROID_HOST_OUT=$out_dir/host/linux-x86
