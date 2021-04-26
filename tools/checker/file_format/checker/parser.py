@@ -21,7 +21,7 @@ import re
 
 
 def _is_checker_line(line):
-  return line.startswith("///") or line.startswith("##")
+  return line.startswith("///") or line.startswith("##") or line.startswith(";;")
 
 
 def _extract_line(prefix, line, arch=None, debuggable=False):
@@ -30,7 +30,7 @@ def _extract_line(prefix, line, arch=None, debuggable=False):
       beginning of the line. Whitespaces are ignored.
   """
   r_ignore_whitespace = r"\s*"
-  r_comment_symbols = ["///", "##"]
+  r_comment_symbols = ["///", "##", ";;"]
   arch_specifier = "-{}".format(arch) if arch is not None else ""
   dbg_specifier = "-DEBUGGABLE" if debuggable else ""
   regex_prefix = (r_ignore_whitespace +

@@ -20,22 +20,97 @@
 #include <tuple>
 
 #include "gtest/gtest.h"
+
+#include "class_root-inl.h"
 #include "nodes.h"
 #include "optimizing/data_type.h"
 #include "optimizing_unit_test.h"
 
 namespace art {
 
-class InstructionSimplifierTest : public CommonCompilerTest, public OptimizingUnitTestHelper {
+namespace mirror {
+class ClassExt;
+class Throwable;
+}  // namespace mirror
+
+template<typename SuperClass>
+class InstructionSimplifierTestBase : public SuperClass, public OptimizingUnitTestHelper {
  public:
   void SetUp() override {
-    CommonCompilerTest::SetUp();
+    SuperClass::SetUp();
     gLogVerbosity.compiler = true;
   }
 
   void TearDown() override {
-    CommonCompilerTest::TearDown();
+    SuperClass::TearDown();
     gLogVerbosity.compiler = false;
+  }
+};
+
+class InstructionSimplifierTest : public InstructionSimplifierTestBase<CommonCompilerTest> {};
+
+// Various configs we can use for testing. Currently used in PartialComparison tests.
+enum class InstanceOfKind {
+  kSelf,
+  kUnrelatedLoaded,
+  kUnrelatedUnloaded,
+  kSupertype,
+};
+
+std::ostream& operator<<(std::ostream& os, const InstanceOfKind& comp) {
+  switch (comp) {
+    case InstanceOfKind::kSupertype:
+      return os << "kSupertype";
+    case InstanceOfKind::kSelf:
+      return os << "kSelf";
+    case InstanceOfKind::kUnrelatedLoaded:
+      return os << "kUnrelatedLoaded";
+    case InstanceOfKind::kUnrelatedUnloaded:
+      return os << "kUnrelatedUnloaded";
+  }
+}
+
+class InstanceOfInstructionSimplifierTestGroup
+    : public InstructionSimplifierTestBase<CommonCompilerTestWithParam<InstanceOfKind>> {
+ public:
+  bool GetConstantResult() const {
+    switch (GetParam()) {
+      case InstanceOfKind::kSupertype:
+      case InstanceOfKind::kSelf:
+        return true;
+      case InstanceOfKind::kUnrelatedLoaded:
+      case InstanceOfKind::kUnrelatedUnloaded:
+        return false;
+    }
+  }
+
+  std::pair<HLoadClass*, HLoadClass*> GetLoadClasses(VariableSizedHandleScope* vshs) {
+    InstanceOfKind kind = GetParam();
+    ScopedObjectAccess soa(Thread::Current());
+    // New inst always needs to have a valid rti since we dcheck that.
+    HLoadClass* new_inst = MakeClassLoad(
+        /* ti= */ std::nullopt, vshs->NewHandle<mirror::Class>(GetClassRoot<mirror::ClassExt>()));
+    new_inst->SetValidLoadedClassRTI();
+    if (kind == InstanceOfKind::kSelf) {
+      return {new_inst, new_inst};
+    }
+    if (kind == InstanceOfKind::kUnrelatedUnloaded) {
+      HLoadClass* target_class = MakeClassLoad();
+      EXPECT_FALSE(target_class->GetLoadedClassRTI().IsValid());
+      return {new_inst, target_class};
+    }
+    // Force both classes to be a real classes.
+    // For simplicity we use class-roots as the types. The new-inst will always
+    // be a ClassExt, unrelated-loaded will always be Throwable and super will
+    // always be Object
+    HLoadClass* target_class = MakeClassLoad(
+        /* ti= */ std::nullopt,
+        vshs->NewHandle<mirror::Class>(kind == InstanceOfKind::kSupertype ?
+                                           GetClassRoot<mirror::Object>() :
+                                           GetClassRoot<mirror::Throwable>()));
+    target_class->SetValidLoadedClassRTI();
+    EXPECT_TRUE(target_class->GetLoadedClassRTI().IsValid());
+    return {new_inst, target_class};
   }
 };
 
@@ -272,6 +347,7 @@ TEST_F(InstructionSimplifierTest, SimplifyPredicatedFieldGetNoNull) {
 
   HPhi* val_phi = MakePhi({c3, c10});
   HPhi* obj_phi = MakePhi({obj1, obj2});
+  obj_phi->SetCanBeNull(false);
   HInstruction* read_end = new (GetAllocator()) HPredicatedInstanceFieldGet(obj_phi,
                                                                             nullptr,
                                                                             val_phi,
@@ -306,5 +382,175 @@ TEST_F(InstructionSimplifierTest, SimplifyPredicatedFieldGetNoNull) {
   ASSERT_NE(ifget, nullptr);
   EXPECT_INS_EQ(ifget->InputAt(0), obj_phi);
 }
+
+// // ENTRY
+// obj = new Obj();
+// // Make sure this graph isn't broken
+// if (obj instanceof <other>) {
+//   // LEFT
+// } else {
+//   // RIGHT
+// }
+// EXIT
+// return obj.field
+TEST_P(InstanceOfInstructionSimplifierTestGroup, ExactClassInstanceOfOther) {
+  VariableSizedHandleScope vshs(Thread::Current());
+  InitGraph(/*handles=*/&vshs);
+
+  AdjacencyListGraph blks(SetupFromAdjacencyList("entry",
+                                                 "exit",
+                                                 {{"entry", "left"},
+                                                  {"entry", "right"},
+                                                  {"left", "breturn"},
+                                                  {"right", "breturn"},
+                                                  {"breturn", "exit"}}));
+#define GET_BLOCK(name) HBasicBlock* name = blks.Get(#name)
+  GET_BLOCK(entry);
+  GET_BLOCK(exit);
+  GET_BLOCK(breturn);
+  GET_BLOCK(left);
+  GET_BLOCK(right);
+#undef GET_BLOCK
+  EnsurePredecessorOrder(breturn, {left, right});
+  HInstruction* test_res = graph_->GetIntConstant(GetConstantResult() ? 1 : 0);
+
+  auto [new_inst_klass, target_klass] = GetLoadClasses(&vshs);
+  HInstruction* new_inst = MakeNewInstance(new_inst_klass);
+  new_inst->SetReferenceTypeInfo(
+      ReferenceTypeInfo::Create(new_inst_klass->GetClass(), /*is_exact=*/true));
+  HInstanceOf* instance_of = new (GetAllocator()) HInstanceOf(new_inst,
+                                                              target_klass,
+                                                              TypeCheckKind::kClassHierarchyCheck,
+                                                              target_klass->GetClass(),
+                                                              0u,
+                                                              GetAllocator(),
+                                                              nullptr,
+                                                              nullptr);
+  if (target_klass->GetLoadedClassRTI().IsValid()) {
+    instance_of->SetValidTargetClassRTI();
+  }
+  HInstruction* if_inst = new (GetAllocator()) HIf(instance_of);
+  entry->AddInstruction(new_inst_klass);
+  if (new_inst_klass != target_klass) {
+    entry->AddInstruction(target_klass);
+  }
+  entry->AddInstruction(new_inst);
+  entry->AddInstruction(instance_of);
+  entry->AddInstruction(if_inst);
+  ManuallyBuildEnvFor(new_inst_klass, {});
+  if (new_inst_klass != target_klass) {
+    target_klass->CopyEnvironmentFrom(new_inst_klass->GetEnvironment());
+  }
+  new_inst->CopyEnvironmentFrom(new_inst_klass->GetEnvironment());
+
+  HInstruction* goto_left = new (GetAllocator()) HGoto();
+  left->AddInstruction(goto_left);
+
+  HInstruction* goto_right = new (GetAllocator()) HGoto();
+  right->AddInstruction(goto_right);
+
+  HInstruction* read_bottom = MakeIFieldGet(new_inst, DataType::Type::kInt32, MemberOffset(32));
+  HInstruction* return_exit = new (GetAllocator()) HReturn(read_bottom);
+  breturn->AddInstruction(read_bottom);
+  breturn->AddInstruction(return_exit);
+
+  SetupExit(exit);
+
+  // PerformLSE expects this to be empty.
+  graph_->ClearDominanceInformation();
+
+  LOG(INFO) << "Pre simplification " << blks;
+  graph_->ClearDominanceInformation();
+  graph_->BuildDominatorTree();
+  InstructionSimplifier simp(graph_, /*codegen=*/nullptr);
+  simp.Run();
+
+  LOG(INFO) << "Post simplify " << blks;
+
+  if (!GetConstantResult() || GetParam() == InstanceOfKind::kSelf) {
+    EXPECT_INS_RETAINED(target_klass);
+  } else {
+    EXPECT_INS_REMOVED(target_klass);
+  }
+  EXPECT_INS_REMOVED(instance_of);
+  EXPECT_INS_EQ(if_inst->InputAt(0), test_res);
+}
+
+// // ENTRY
+// obj = new Obj();
+// (<other>)obj;
+// // Make sure this graph isn't broken
+// EXIT
+// return obj
+TEST_P(InstanceOfInstructionSimplifierTestGroup, ExactClassCheckCastOther) {
+  VariableSizedHandleScope vshs(Thread::Current());
+  InitGraph(/*handles=*/&vshs);
+
+  AdjacencyListGraph blks(SetupFromAdjacencyList("entry", "exit", {{"entry", "exit"}}));
+#define GET_BLOCK(name) HBasicBlock* name = blks.Get(#name)
+  GET_BLOCK(entry);
+  GET_BLOCK(exit);
+#undef GET_BLOCK
+
+  auto [new_inst_klass, target_klass] = GetLoadClasses(&vshs);
+  HInstruction* new_inst = MakeNewInstance(new_inst_klass);
+  new_inst->SetReferenceTypeInfo(
+      ReferenceTypeInfo::Create(new_inst_klass->GetClass(), /*is_exact=*/true));
+  HCheckCast* check_cast = new (GetAllocator()) HCheckCast(new_inst,
+                                                           target_klass,
+                                                           TypeCheckKind::kClassHierarchyCheck,
+                                                           target_klass->GetClass(),
+                                                           0u,
+                                                           GetAllocator(),
+                                                           nullptr,
+                                                           nullptr);
+  if (target_klass->GetLoadedClassRTI().IsValid()) {
+    check_cast->SetValidTargetClassRTI();
+  }
+  HInstruction* entry_return = new (GetAllocator()) HReturn(new_inst);
+  entry->AddInstruction(new_inst_klass);
+  if (new_inst_klass != target_klass) {
+    entry->AddInstruction(target_klass);
+  }
+  entry->AddInstruction(new_inst);
+  entry->AddInstruction(check_cast);
+  entry->AddInstruction(entry_return);
+  ManuallyBuildEnvFor(new_inst_klass, {});
+  if (new_inst_klass != target_klass) {
+    target_klass->CopyEnvironmentFrom(new_inst_klass->GetEnvironment());
+  }
+  new_inst->CopyEnvironmentFrom(new_inst_klass->GetEnvironment());
+
+  SetupExit(exit);
+
+  // PerformLSE expects this to be empty.
+  graph_->ClearDominanceInformation();
+
+  LOG(INFO) << "Pre simplification " << blks;
+  graph_->ClearDominanceInformation();
+  graph_->BuildDominatorTree();
+  InstructionSimplifier simp(graph_, /*codegen=*/nullptr);
+  simp.Run();
+
+  LOG(INFO) << "Post simplify " << blks;
+
+  if (!GetConstantResult() || GetParam() == InstanceOfKind::kSelf) {
+    EXPECT_INS_RETAINED(target_klass);
+  } else {
+    EXPECT_INS_REMOVED(target_klass);
+  }
+  if (GetConstantResult()) {
+    EXPECT_INS_REMOVED(check_cast);
+  } else {
+    EXPECT_INS_RETAINED(check_cast);
+  }
+}
+
+INSTANTIATE_TEST_SUITE_P(InstructionSimplifierTest,
+                         InstanceOfInstructionSimplifierTestGroup,
+                         testing::Values(InstanceOfKind::kSelf,
+                                         InstanceOfKind::kUnrelatedLoaded,
+                                         InstanceOfKind::kUnrelatedUnloaded,
+                                         InstanceOfKind::kSupertype));
 
 }  // namespace art
