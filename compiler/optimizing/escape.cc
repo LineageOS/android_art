@@ -41,6 +41,13 @@ void VisitEscapes(HInstruction* reference, EscapeVisitor& escape_visitor) {
       if (!escape_visitor(user)) {
         return;
       }
+    } else if (user->IsCheckCast() || user->IsInstanceOf()) {
+      // TODO Currently we'll just be conservative for Partial LSE and avoid
+      // optimizing check-cast things since we'd need to add blocks otherwise.
+      // Normally the simplifier should be able to just get rid of them
+      if (!escape_visitor(user)) {
+        return;
+      }
     } else if (user->IsPhi() ||
                user->IsSelect() ||
                (user->IsInvoke() && user->GetSideEffects().DoesAnyWrite()) ||
@@ -107,6 +114,9 @@ void CalculateEscape(HInstruction* reference,
     if (escape == reference || no_escape(reference, escape)) {
       // Ignore already known inherent escapes and escapes client supplied
       // analysis knows is safe. Continue on.
+      return true;
+    } else if (escape->IsInstanceOf() || escape->IsCheckCast()) {
+      // Ignore since these are not relevant for regular LSE.
       return true;
     } else if (escape->IsReturn()) {
       // value is returned but might still be singleton. Continue on.
