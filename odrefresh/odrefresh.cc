@@ -923,10 +923,10 @@ class OnDeviceRefresh final {
   static void ReportSpace() {
     uint64_t bytes;
     std::string data_dir = GetArtApexData();
-    if (GetUsedSpace(data_dir.c_str(), &bytes)) {
+    if (GetUsedSpace(data_dir, &bytes)) {
       LOG(INFO) << "Used space " << bytes << " bytes.";
     }
-    if (GetFreeSpace(data_dir.c_str(), &bytes)) {
+    if (GetFreeSpace(data_dir, &bytes)) {
       LOG(INFO) << "Available space " << bytes << " bytes.";
     }
   }
