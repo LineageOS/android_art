@@ -2348,7 +2348,8 @@ class Dex2Oat final {
     // default profile arena). However the setup logic is messy and needs
     // cleaning up before that (e.g. the oat writers are created before the
     // runtime).
-    profile_compilation_info_.reset(new ProfileCompilationInfo());
+    bool for_boot_image = IsBootImage() || IsBootImageExtension();
+    profile_compilation_info_.reset(new ProfileCompilationInfo(for_boot_image));
     // Dex2oat only uses the reference profile and that is not updated concurrently by the app or
     // other processes. So we don't need to lock (as we have to do in profman or when writing the
     // profile info).
