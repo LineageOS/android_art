@@ -126,10 +126,11 @@ int ScratchFile::GetFd() const {
 }
 
 void ScratchFile::Close() {
-  if (file_.get() != nullptr) {
+  if (file_ != nullptr) {
     if (file_->FlushCloseOrErase() != 0) {
       PLOG(WARNING) << "Error closing scratch file.";
     }
+    file_.reset();
   }
 }
 
