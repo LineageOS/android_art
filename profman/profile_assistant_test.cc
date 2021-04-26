@@ -89,7 +89,6 @@ class ProfileAssistantTest : public CommonRuntimeTest, public ProfileTestHelper 
 
     ASSERT_TRUE(info->Save(GetFd(profile)));
     ASSERT_EQ(0, profile.GetFile()->Flush());
-    ASSERT_TRUE(profile.GetFile()->ResetOffset());
   }
 
   void SetupBasicProfile(const DexFile* dex,
@@ -109,7 +108,6 @@ class ProfileAssistantTest : public CommonRuntimeTest, public ProfileTestHelper 
     }
     ASSERT_TRUE(info->Save(GetFd(profile)));
     ASSERT_EQ(0, profile.GetFile()->Flush());
-    ASSERT_TRUE(profile.GetFile()->ResetOffset());
   }
 
   // The dex1_substitute can be used to replace the default dex1 file.
@@ -155,7 +153,6 @@ class ProfileAssistantTest : public CommonRuntimeTest, public ProfileTestHelper 
 
   void CheckProfileInfo(ScratchFile& file, const ProfileCompilationInfo& info) {
     ProfileCompilationInfo file_info;
-    ASSERT_TRUE(file.GetFile()->ResetOffset());
     ASSERT_TRUE(file_info.Load(GetFd(file)));
     ASSERT_TRUE(file_info.Equals(info));
   }
@@ -215,7 +212,6 @@ class ProfileAssistantTest : public CommonRuntimeTest, public ProfileTestHelper 
     File* file = class_names_file.GetFile();
     EXPECT_TRUE(file->WriteFully(profile_file_contents.c_str(), profile_file_contents.length()));
     EXPECT_EQ(0, file->Flush());
-    EXPECT_TRUE(file->ResetOffset());
     std::string profman_cmd = GetProfmanCmd();
     std::vector<std::string> argv_str;
     argv_str.push_back(profman_cmd);
@@ -245,7 +241,6 @@ class ProfileAssistantTest : public CommonRuntimeTest, public ProfileTestHelper 
     EXPECT_EQ(ExecAndReturnCode(argv_str, &error), 0) << error;
     File* file = output_file.GetFile();
     EXPECT_EQ(0, file->Flush());
-    EXPECT_TRUE(file->ResetOffset());
     int64_t length = file->GetLength();
     std::unique_ptr<char[]> buf(new char[length]);
     EXPECT_EQ(file->Read(buf.get(), length, 0), length);
@@ -275,7 +270,6 @@ class ProfileAssistantTest : public CommonRuntimeTest, public ProfileTestHelper 
     EXPECT_TRUE(CreateProfile(input_file_contents,
                               profile_file.GetFilename(),
                               target.value_or(GetLibCoreDexFileNames()[0])));
-    profile_file.GetFile()->ResetOffset();
     EXPECT_TRUE(DumpClassesAndMethods(profile_file.GetFilename(), output_file_contents, target));
     return true;
   }
@@ -471,7 +465,6 @@ TEST_F(ProfileAssistantTest, AdviseCompilationEmptyReferences) {
             ProcessProfiles(profile_fds, reference_profile_fd));
   // The resulting compilation info must be equal to the merge of the inputs.
   ProfileCompilationInfo result;
-  ASSERT_TRUE(reference_profile.GetFile()->ResetOffset());
   ASSERT_TRUE(result.Load(reference_profile_fd));
 
   ProfileCompilationInfo expected;
@@ -502,7 +495,6 @@ TEST_F(ProfileAssistantTest, AdviseCompilationEmptyReferencesBecauseOfClasses) {
             ProcessProfiles(profile_fds, reference_profile_fd));
   // The resulting compilation info must be equal to the merge of the inputs.
   ProfileCompilationInfo result;
-  ASSERT_TRUE(reference_profile.GetFile()->ResetOffset());
   ASSERT_TRUE(result.Load(reference_profile_fd));
 
   ProfileCompilationInfo expected;
@@ -543,7 +535,6 @@ TEST_F(ProfileAssistantTest, AdviseCompilationNonEmptyReferences) {
 
   // The resulting compilation info must be equal to the merge of the inputs
   ProfileCompilationInfo result;
-  ASSERT_TRUE(reference_profile.GetFile()->ResetOffset());
   ASSERT_TRUE(result.Load(reference_profile_fd));
 
   ProfileCompilationInfo expected;
@@ -579,12 +570,10 @@ TEST_F(ProfileAssistantTest, DoNotAdviseCompilation) {
 
   // The information from profiles must remain the same.
   ProfileCompilationInfo file_info1;
-  ASSERT_TRUE(profile1.GetFile()->ResetOffset());
   ASSERT_TRUE(file_info1.Load(GetFd(profile1)));
   ASSERT_TRUE(file_info1.Equals(info1));
 
   ProfileCompilationInfo file_info2;
-  ASSERT_TRUE(profile2.GetFile()->ResetOffset());
   ASSERT_TRUE(file_info2.Load(GetFd(profile2)));
   ASSERT_TRUE(file_info2.Equals(info2));
 
@@ -715,8 +704,6 @@ TEST_F(ProfileAssistantTest, FailProcessingBecauseOfReferenceProfiles) {
                &reference_info);
 
   // We should not advise compilation.
-  ASSERT_TRUE(profile1.GetFile()->ResetOffset());
-  ASSERT_TRUE(reference_profile.GetFile()->ResetOffset());
   ASSERT_EQ(ProfileAssistant::kErrorBadProfiles,
             ProcessProfiles(profile_fds, reference_profile_fd));
 
@@ -730,7 +717,6 @@ TEST_F(ProfileAssistantTest, TestProfileGeneration) {
   GenerateTestProfile(profile.GetFilename());
 
   // Verify that the generated profile is valid and can be loaded.
-  ASSERT_TRUE(profile.GetFile()->ResetOffset());
   ProfileCompilationInfo info;
   ASSERT_TRUE(info.Load(GetFd(profile)));
 }
@@ -741,7 +727,6 @@ TEST_F(ProfileAssistantTest, TestProfileGenerationWithIndexDex) {
   GenerateTestProfileWithInputDex(profile.GetFilename());
 
   // Verify that the generated profile is valid and can be loaded.
-  ASSERT_TRUE(profile.GetFile()->ResetOffset());
   ProfileCompilationInfo info;
   ASSERT_TRUE(info.Load(GetFd(profile)));
 }
@@ -795,7 +780,6 @@ TEST_F(ProfileAssistantTest, TestProfileCreationGenerateMethods) {
                             profile_file.GetFilename(),
                             GetLibCoreDexFileNames()[0]));
   ProfileCompilationInfo info;
-  profile_file.GetFile()->ResetOffset();
   ASSERT_TRUE(info.Load(GetFd(profile_file)));
   // Verify that the profile has matching methods.
   ScopedObjectAccess soa(Thread::Current());
@@ -890,7 +874,6 @@ TEST_F(ProfileAssistantTest, TestBootImageProfile) {
       denylist_content.c_str(), denylist_content.length()));
 
   EXPECT_EQ(0, preloaded_class_denylist.GetFile()->Flush());
-  EXPECT_TRUE(preloaded_class_denylist.GetFile()->ResetOffset());
   // Expected data
   std::vector<std::string> expected_data = {
       kCleanClass,
@@ -916,8 +899,6 @@ TEST_F(ProfileAssistantTest, TestBootImageProfile) {
   // Generate the boot profile.
   ScratchFile out_profile;
   ScratchFile out_preloaded_classes;
-  ASSERT_TRUE(out_profile.GetFile()->ResetOffset());
-  ASSERT_TRUE(out_preloaded_classes.GetFile()->ResetOffset());
   std::vector<std::string> args;
   args.push_back(GetProfmanCmd());
   args.push_back("--generate-boot-image-profile");
@@ -936,7 +917,6 @@ TEST_F(ProfileAssistantTest, TestBootImageProfile) {
 
   std::string error;
   ASSERT_EQ(ExecAndReturnCode(args, &error), 0) << error;
-  ASSERT_TRUE(out_profile.GetFile()->ResetOffset());
 
   // Verify the boot profile contents.
   std::string output_profile_contents;
@@ -1010,8 +990,6 @@ TEST_F(ProfileAssistantTest, TestBootImageProfileWith2RawProfiles) {
   // Generate the boot profile.
   ScratchFile out_profile;
   ScratchFile out_preloaded_classes;
-  ASSERT_TRUE(out_profile.GetFile()->ResetOffset());
-  ASSERT_TRUE(out_preloaded_classes.GetFile()->ResetOffset());
   std::vector<std::string> args;
   args.push_back(GetProfmanCmd());
   args.push_back("--generate-boot-image-profile");
@@ -1027,7 +1005,6 @@ TEST_F(ProfileAssistantTest, TestBootImageProfileWith2RawProfiles) {
 
   std::string error;
   ASSERT_EQ(ExecAndReturnCode(args, &error), 0) << error;
-  ASSERT_TRUE(out_profile.GetFile()->ResetOffset());
 
   // Verify the boot profile contents.
   std::string output_profile_contents;
@@ -1099,7 +1076,6 @@ TEST_F(ProfileAssistantTest, TestProfileRoundTrip) {
   ASSERT_TRUE(CreateProfile(input_file_contents.str(),
                             profile_file.GetFilename(),
                             GetTestDexFileName("ProfileTestMultiDex")));
-  profile_file.GetFile()->ResetOffset();
 
   // Dump the file back into text.
   std::string text_two;
@@ -1110,7 +1086,6 @@ TEST_F(ProfileAssistantTest, TestProfileRoundTrip) {
   ScratchFile profile_two;
   ASSERT_TRUE(CreateProfile(
       text_two, profile_two.GetFilename(), GetTestDexFileName("ProfileTestMultiDex")));
-  profile_two.GetFile()->ResetOffset();
 
   // These two profiles should be bit-identical.
   // TODO We could compare the 'text_two' to the methods but since the order is
@@ -1156,13 +1131,11 @@ TEST_F(ProfileAssistantTest, TestProfileRoundTripWithAnnotations) {
   ASSERT_TRUE(CreateProfile(with_annotation_input_file_contents.str(),
                             with_annotation_profile_file.GetFilename(),
                             GetTestDexFileName("ProfileTestMultiDex")));
-  with_annotation_profile_file.GetFile()->ResetOffset();
 
   ScratchFile no_annotation_profile_file;
   ASSERT_TRUE(CreateProfile(no_annotation_input_file_contents.str(),
                             no_annotation_profile_file.GetFilename(),
                             GetTestDexFileName("ProfileTestMultiDex")));
-  with_annotation_profile_file.GetFile()->ResetOffset();
 
   // Dump the file back into text.
   std::string text_two;
@@ -1174,7 +1147,6 @@ TEST_F(ProfileAssistantTest, TestProfileRoundTripWithAnnotations) {
   ScratchFile profile_two;
   ASSERT_TRUE(CreateProfile(
       text_two, profile_two.GetFilename(), GetTestDexFileName("ProfileTestMultiDex")));
-  profile_two.GetFile()->ResetOffset();
 
   // These two profiles should be bit-identical.
   // TODO We could compare the 'text_two' to the methods but since the order is
@@ -1216,7 +1188,6 @@ TEST_F(ProfileAssistantTest, TestProfileCreateInlineCache) {
 
   // Load the profile from disk.
   ProfileCompilationInfo info;
-  profile_file.GetFile()->ResetOffset();
   ASSERT_TRUE(info.Load(GetFd(profile_file)));
 
   // Load the dex files and verify that the profile contains the expected methods info.
@@ -1476,7 +1447,6 @@ TEST_F(ProfileAssistantTest, MergeProfilesWithDifferentDexOrder) {
 
   // The resulting compilation info must be equal to the merge of the inputs.
   ProfileCompilationInfo result;
-  ASSERT_TRUE(reference_profile.GetFile()->ResetOffset());
   ASSERT_TRUE(result.Load(reference_profile_fd));
 
   ProfileCompilationInfo expected;
@@ -1505,7 +1475,6 @@ TEST_F(ProfileAssistantTest, TestProfileCreateWithSubtype) {
 
   // Load the profile from disk.
   ProfileCompilationInfo info;
-  profile_file.GetFile()->ResetOffset();
   ASSERT_TRUE(info.Load(GetFd(profile_file)));
   LOG(ERROR) << profile_file.GetFilename();
 
@@ -1602,7 +1571,6 @@ TEST_F(ProfileAssistantTest, TestProfileCreateWithInvalidData) {
 
   // Load the profile from disk.
   ProfileCompilationInfo info;
-  profile_file.GetFile()->ResetOffset();
   ASSERT_TRUE(info.Load(GetFd(profile_file)));
 
   // Load the dex files and verify that the profile contains the expected methods info.
@@ -1751,13 +1719,7 @@ TEST_F(ProfileAssistantTest, MergeProfilesWithFilter) {
   // Verify that we can load the result.
 
   ProfileCompilationInfo result;
-  ASSERT_TRUE(reference_profile.GetFile()->ResetOffset());
   ASSERT_TRUE(result.Load(reference_profile_fd));
-
-
-  ASSERT_TRUE(profile1.GetFile()->ResetOffset());
-  ASSERT_TRUE(profile2.GetFile()->ResetOffset());
-  ASSERT_TRUE(reference_profile.GetFile()->ResetOffset());
 
   // Verify that the result filtered out data not belonging to the dex file.
   // This is equivalent to checking that the result is equal to the merging of
@@ -1827,7 +1789,6 @@ TEST_F(ProfileAssistantTest, CopyAndUpdateProfileKey) {
 
   // Verify that we can load the result.
   ProfileCompilationInfo result;
-  ASSERT_TRUE(reference_profile.GetFile()->ResetOffset());
   ASSERT_TRUE(result.Load(reference_profile.GetFd()));
 
   // Verify that the renaming was done.
@@ -1871,7 +1832,6 @@ TEST_F(ProfileAssistantTest, BootImageMerge) {
   // Verify the result: it should be equal to info2 since info1 is a regular profile
   // and should be ignored.
   ProfileCompilationInfo result;
-  ASSERT_TRUE(reference_profile.GetFile()->ResetOffset());
   ASSERT_TRUE(result.Load(reference_profile.GetFd()));
   ASSERT_TRUE(result.Equals(info2));
 }
@@ -1902,7 +1862,6 @@ TEST_F(ProfileAssistantTest, ForceMerge) {
 
   // Check that the result is the aggregation.
   ProfileCompilationInfo result;
-  ASSERT_TRUE(reference_profile.GetFile()->ResetOffset());
   ASSERT_TRUE(result.Load(reference_profile.GetFd()));
   ASSERT_TRUE(info1.MergeWith(info2));
   ASSERT_TRUE(result.Equals(info1));
@@ -1928,7 +1887,6 @@ TEST_F(ProfileAssistantTest, BootImageMergeWithAnnotations) {
   AddMethod(&info, &d1, 0, Hotness::kFlagHot, psa1);
   AddMethod(&info, &d2, 0, Hotness::kFlagHot, psa2);
   info.Save(profile.GetFd());
-  profile.GetFile()->ResetOffset();
 
   // Run profman and pass the dex file with --apk-fd.
   android::base::unique_fd apk_fd(
@@ -1949,7 +1907,6 @@ TEST_F(ProfileAssistantTest, BootImageMergeWithAnnotations) {
 
   // Verify that we can load the result and that it equals to what we saved.
   ProfileCompilationInfo result;
-  ASSERT_TRUE(reference_profile.GetFile()->ResetOffset());
   ASSERT_TRUE(result.Load(reference_profile_fd));
   ASSERT_TRUE(info.Equals(result));
 }
@@ -1960,11 +1917,9 @@ TEST_F(ProfileAssistantTest, DifferentProfileVersions) {
 
   ProfileCompilationInfo info1(/*for_boot_image*/ false);
   info1.Save(profile1.GetFd());
-  profile1.GetFile()->ResetOffset();
 
   ProfileCompilationInfo info2(/*for_boot_image*/ true);
   info2.Save(profile2.GetFd());
-  profile2.GetFile()->ResetOffset();
 
   std::vector<int> profile_fds({ GetFd(profile1)});
   int reference_profile_fd = GetFd(profile2);
@@ -1974,8 +1929,6 @@ TEST_F(ProfileAssistantTest, DifferentProfileVersions) {
   // Reverse the order of the profiles to verify we get the same behaviour.
   profile_fds[0] = GetFd(profile2);
   reference_profile_fd = GetFd(profile1);
-  profile1.GetFile()->ResetOffset();
-  profile2.GetFile()->ResetOffset();
   ASSERT_EQ(ProcessProfiles(profile_fds, reference_profile_fd),
             ProfileAssistant::kErrorDifferentVersions);
 }
@@ -1990,11 +1943,9 @@ TEST_F(ProfileAssistantTest, ForceMergeIgnoreProfilesItCannotLoad) {
   // Write corrupt data in the first file.
   std::string content = "giberish";
   ASSERT_TRUE(profile1.GetFile()->WriteFully(content.c_str(), content.length()));
-  profile1.GetFile()->ResetOffset();
 
   ProfileCompilationInfo info2(/*for_boot_image*/ true);
   info2.Save(profile2.GetFd());
-  profile2.GetFile()->ResetOffset();
 
   std::vector<int> profile_fds({ GetFd(profile1)});
   int reference_profile_fd = GetFd(profile2);
@@ -2005,12 +1956,11 @@ TEST_F(ProfileAssistantTest, ForceMergeIgnoreProfilesItCannotLoad) {
             ProfileAssistant::kSuccess);
 
   ProfileCompilationInfo result;
-  ASSERT_TRUE(profile2.GetFile()->ResetOffset());
   ASSERT_TRUE(result.Load(reference_profile_fd));
   ASSERT_TRUE(info2.Equals(result));
 
   // Without force-merge we should fail.
-  ASSERT_EQ(ProcessProfiles(profile_fds, reference_profile_fd, extra_args),
+  ASSERT_EQ(ProcessProfiles(profile_fds, reference_profile_fd),
             ProfileAssistant::kErrorBadProfiles);
 }
 }  // namespace art
