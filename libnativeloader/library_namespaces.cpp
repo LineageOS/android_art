@@ -28,7 +28,6 @@
 #include <android-base/file.h>
 #include <android-base/logging.h>
 #include <android-base/macros.h>
-#include <android-base/properties.h>
 #include <android-base/result.h>
 #include <android-base/strings.h>
 #include <nativehelper/scoped_utf_chars.h>
