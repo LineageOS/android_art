@@ -207,7 +207,8 @@ class ProfileAssistantTest : public CommonRuntimeTest, public ProfileTestHelper 
 
   bool CreateProfile(const std::string& profile_file_contents,
                      const std::string& filename,
-                     const std::string& dex_location) {
+                     const std::string& dex_location,
+                     bool for_boot_image = false) {
     ScratchFile class_names_file;
     File* file = class_names_file.GetFile();
     EXPECT_TRUE(file->WriteFully(profile_file_contents.c_str(), profile_file_contents.length()));
@@ -215,6 +216,7 @@ class ProfileAssistantTest : public CommonRuntimeTest, public ProfileTestHelper 
     std::string profman_cmd = GetProfmanCmd();
     std::vector<std::string> argv_str;
     argv_str.push_back(profman_cmd);
+    argv_str.push_back(for_boot_image ? "--output-profile-type=boot" : "--output-profile-type=app");
     argv_str.push_back("--create-profile-from=" + class_names_file.GetFilename());
     argv_str.push_back("--reference-profile-file=" + filename);
     argv_str.push_back("--apk=" + dex_location);
@@ -891,10 +893,13 @@ TEST_F(ProfileAssistantTest, TestBootImageProfile) {
   std::string expected_preloaded_content = JoinProfileLines(expected_preloaded_data);
 
   ScratchFile profile;
-  EXPECT_TRUE(CreateProfile(input_file_contents, profile.GetFilename(), core_dex));
+  EXPECT_TRUE(CreateProfile(input_file_contents,
+                            profile.GetFilename(),
+                            core_dex,
+                            /*for_boot_image=*/ true));
 
-  ProfileCompilationInfo bootProfile;
-  bootProfile.Load(profile.GetFilename(), /*for_boot_image*/ true);
+  ProfileCompilationInfo bootProfile(/*for_boot_image=*/ true);
+  bootProfile.Load(profile.GetFilename(), /*clear_if_invalid=*/ true);
 
   // Generate the boot profile.
   ScratchFile out_profile;
@@ -979,8 +984,14 @@ TEST_F(ProfileAssistantTest, TestBootImageProfileWith2RawProfiles) {
 
   ScratchFile profile1;
   ScratchFile profile2;
-  EXPECT_TRUE(CreateProfile(input_file_contents1, profile1.GetFilename(), core_dex));
-  EXPECT_TRUE(CreateProfile(input_file_contents2, profile2.GetFilename(), core_dex));
+  EXPECT_TRUE(CreateProfile(input_file_contents1,
+                            profile1.GetFilename(),
+                            core_dex,
+                            /*for_boot_image=*/ true));
+  EXPECT_TRUE(CreateProfile(input_file_contents2,
+                            profile2.GetFilename(),
+                            core_dex,
+                            /*for_boot_image=*/ true));
 
   ProfileCompilationInfo boot_profile1;
   ProfileCompilationInfo boot_profile2;
