@@ -144,8 +144,8 @@ NO_RETURN static void Usage(const char *fmt, ...) {
   UsageError("");
   UsageError("  --create-profile-from=<filename>: creates a profile from a list of classes,");
   UsageError("      methods and inline caches.");
-  UsageError("  --generate-boot-android-profile: Generate a 012 version profile based on input");
-  UsageError("      profile. Requires --create-profile-from");
+  UsageError("  --output-profile-type=(app|boot|bprof): Select output profile format for");
+  UsageError("      the --create-profile-from option. Default: app.");
   UsageError("");
   UsageError("  --dex-location=<string>: location string to use with corresponding");
   UsageError("      apk-fd to find dex files");
@@ -278,6 +278,30 @@ static void ParseBoolOption(const char* raw_option,
   *out = result == android::base::ParseBoolResult::kTrue;
 }
 
+enum class OutputProfileType {
+  kApp,
+  kBoot,
+  kBprof,
+};
+
+static void ParseOutputProfileType(const char* raw_option,
+                                   std::string_view option_prefix,
+                                   OutputProfileType* out) {
+  DCHECK(EndsWith(option_prefix, "="));
+  DCHECK(StartsWith(raw_option, option_prefix)) << raw_option << " " << option_prefix;
+  const char* value_string = raw_option + option_prefix.size();
+  if (strcmp(value_string, "app") == 0) {
+    *out = OutputProfileType::kApp;
+  } else if (strcmp(value_string, "boot") == 0) {
+    *out = OutputProfileType::kBoot;
+  } else if (strcmp(value_string, "bprof") == 0) {
+    *out = OutputProfileType::kBprof;
+  } else {
+    std::string option_name(option_prefix.substr(option_prefix.size() - 1u));
+    Usage("Failed to parse %s '%s' as (app|boot|bprof)", option_name.c_str(), value_string);
+  }
+}
+
 // TODO(calin): This class has grown too much from its initial design. Split the functionality
 // into smaller, more contained pieces.
 class ProfMan final {
@@ -287,8 +311,7 @@ class ProfMan final {
       dump_only_(false),
       dump_classes_and_methods_(false),
       generate_boot_image_profile_(false),
-      generate_boot_android_profile_(false),
-      generate_boot_profile_(false),
+      output_profile_type_(OutputProfileType::kApp),
       dump_output_to_fd_(File::kInvalidFd),
       test_profile_num_dex_(kDefaultTestProfileNumDex),
       test_profile_method_percerntage_(kDefaultTestProfileMethodPercentage),
@@ -330,14 +353,12 @@ class ProfMan final {
         dump_classes_and_methods_ = true;
       } else if (StartsWith(option, "--create-profile-from=")) {
         create_profile_from_file_ = std::string(option.substr(strlen("--create-profile-from=")));
+      } else if (StartsWith(option, "--output-profile-type=")) {
+        ParseOutputProfileType(raw_option, "--output-profile-type=", &output_profile_type_);
       } else if (StartsWith(option, "--dump-output-to-fd=")) {
         ParseUintOption(raw_option, "--dump-output-to-fd=", &dump_output_to_fd_);
-      } else if (option == "--generate-boot-profile") {
-        generate_boot_profile_ = true;
       } else if (option == "--generate-boot-image-profile") {
         generate_boot_image_profile_ = true;
-      } else if (option == "--generate-boot-android-profile") {
-        generate_boot_android_profile_ = true;
       } else if (StartsWith(option, "--method-threshold=")) {
         ParseUintOption(raw_option,
                         "--method-threshold=",
@@ -1704,7 +1725,8 @@ class ProfMan final {
     OpenApkFilesFromLocations(&dex_files);
 
     // Process the lines one by one and add the successful ones to the profile.
-    ProfileCompilationInfo info(/*for_boot_image=*/ ShouldCreateBootAndroidProfile());
+    bool for_boot_image = GetOutputProfileType() == OutputProfileType::kBoot;
+    ProfileCompilationInfo info(for_boot_image);
 
     for (const auto& line : *user_lines) {
       ProcessLine(dex_files, line, &info);
@@ -1722,12 +1744,8 @@ class ProfMan final {
     return generate_boot_image_profile_;
   }
 
-  bool ShouldCreateBootAndroidProfile() const {
-    return generate_boot_android_profile_;
-  }
-
-  bool ShouldCreateBootProfile() const {
-    return generate_boot_profile_;
+  OutputProfileType GetOutputProfileType() const {
+    return output_profile_type_;
   }
 
   // Create and store a ProfileCompilationInfo for the boot image.
@@ -1894,8 +1912,7 @@ class ProfMan final {
   bool dump_only_;
   bool dump_classes_and_methods_;
   bool generate_boot_image_profile_;
-  bool generate_boot_android_profile_;
-  bool generate_boot_profile_;
+  OutputProfileType output_profile_type_;
   int dump_output_to_fd_;
   BootImageOptions boot_image_options_;
   std::string test_profile_;
@@ -1934,11 +1951,12 @@ static int profman(int argc, char** argv) {
   if (profman.ShouldOnlyDumpClassesAndMethods()) {
     return profman.DumpClassesAndMethods();
   }
-  if (profman.ShouldCreateBootProfile()) {
-    return profman.CreateBootProfile();
-  }
   if (profman.ShouldCreateProfile()) {
-    return profman.CreateProfile();
+    if (profman.GetOutputProfileType() == OutputProfileType::kBprof) {
+      return profman.CreateBootProfile();
+    } else {
+      return profman.CreateProfile();
+    }
   }
 
   if (profman.ShouldCreateBootImageProfile()) {
