@@ -84,25 +84,12 @@ art_module_sdk {
 
         android: {
             bootclasspath_fragments: [
+                // Adds the fragment and its contents to the sdk.
                 "art-bootclasspath-fragment",
             ],
 
             compat_configs: [
                 "libcore-platform-compat-config",
-            ],
-
-            // Create placeholder java_import prebuilts for the java boot libraries so that Soong
-            // can retrieve their dex implementation jars from the associated prebuilt_apex. All
-            // libraries listed in the exported_java_libs property of the ART apex (see
-            // packages/modules/ArtPrebuilt) must have a prebuilt provided by this sdk or one of
-            // the ART module_exports. Those java boot libraries which do not require a prebuilt for
-            // another reason, e.g. test, are listed here.
-            java_boot_libs: [
-                "apache-xml",
-                "bouncycastle",
-                "core-libart",
-                "core-oj",
-                "okhttp",
             ],
 
             java_header_libs: [
