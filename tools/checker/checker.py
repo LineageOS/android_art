@@ -72,7 +72,7 @@ def dump_pass(output_filename, pass_name):
 def find_checker_files(path):
   """ Returns a list of files to scan for check annotations in the given path.
       Path to a file is returned as a single-element list, directories are
-      recursively traversed and all '.java' and '.smali' files returned.
+      recursively traversed and all '.java', '.j', and '.smali' files returned.
   """
   if not path:
     Logger.fail("No source path provided")
@@ -83,7 +83,7 @@ def find_checker_files(path):
     for root, dirs, files in os.walk(path):
       for file in files:
         extension = os.path.splitext(file)[1]
-        if extension in [".java", ".smali"]:
+        if extension in [".java", ".smali", ".j"]:
           found_files.append(os.path.join(root, file))
     return found_files
   else:

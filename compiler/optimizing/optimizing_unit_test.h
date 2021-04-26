@@ -406,11 +406,12 @@ class OptimizingUnitTestHelper {
     OptimizingUnitTestHelper::ManuallyBuildEnvFor(ins, &current_locals);
   }
 
-  HLoadClass* MakeClassLoad(std::optional<dex::TypeIndex> ti = std::nullopt) {
+  HLoadClass* MakeClassLoad(std::optional<dex::TypeIndex> ti = std::nullopt,
+                            std::optional<Handle<mirror::Class>> klass = std::nullopt) {
     return new (GetAllocator()) HLoadClass(graph_->GetCurrentMethod(),
                                            ti ? *ti : dex::TypeIndex(class_idx_++),
                                            graph_->GetDexFile(),
-                                           /* klass= */ null_klass_,
+                                           /* klass= */ klass ? *klass : null_klass_,
                                            /* is_referrers_class= */ false,
                                            /* dex_pc= */ 0,
                                            /* needs_access_check= */ false);
