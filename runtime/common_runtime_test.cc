@@ -571,8 +571,9 @@ void CommonRuntimeTestImpl::VisitDexes(ArrayRef<const std::string> dexes,
 void CommonRuntimeTestImpl::GenerateProfile(ArrayRef<const std::string> dexes,
                                             File* out_file,
                                             size_t method_frequency,
-                                            size_t type_frequency) {
-  ProfileCompilationInfo profile;
+                                            size_t type_frequency,
+                                            bool for_boot_image) {
+  ProfileCompilationInfo profile(for_boot_image);
   VisitDexes(
       dexes,
       [&profile](MethodReference ref) {

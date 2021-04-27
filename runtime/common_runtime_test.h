@@ -174,7 +174,15 @@ class CommonRuntimeTestImpl : public CommonArtTestImpl {
   void GenerateProfile(ArrayRef<const std::string> dexes,
                        File* out_file,
                        size_t method_frequency = 1u,
-                       size_t type_frequency = 1u);
+                       size_t type_frequency = 1u,
+                       bool for_boot_image = false);
+  void GenerateBootProfile(ArrayRef<const std::string> dexes,
+                           File* out_file,
+                           size_t method_frequency = 1u,
+                           size_t type_frequency = 1u) {
+    return GenerateProfile(
+        dexes, out_file, method_frequency, type_frequency, /*for_boot_image=*/ true);
+  }
 
   std::unique_ptr<Runtime> runtime_;
 
