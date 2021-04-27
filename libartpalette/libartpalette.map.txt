@@ -17,7 +17,6 @@
 LIBARTPALETTE_1 {
   global:
     # --- VERSION 01 API ---
-    PaletteGetVersion; # apex
     PaletteSchedSetPriority; # apex
     PaletteSchedGetPriority; # apex
     PaletteWriteCrashThreadStacks; #apex
