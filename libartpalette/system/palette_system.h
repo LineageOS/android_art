@@ -22,8 +22,6 @@
 namespace art {
 namespace palette {
 
-static constexpr int32_t kPaletteVersion = 1;
-
 // Managed thread definitions
 static constexpr int32_t kNormalManagedThreadPriority = 5;
 static constexpr int32_t kMinManagedThreadPriority = 1;
