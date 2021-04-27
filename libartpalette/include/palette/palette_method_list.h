@@ -22,7 +22,6 @@
 
 // Methods in version 1 API
 #define PALETTE_METHOD_LIST(M)                                              \
-  M(PaletteGetVersion, /*out*/int32_t* version)                             \
   M(PaletteSchedSetPriority, int32_t tid, int32_t java_priority)            \
   M(PaletteSchedGetPriority, int32_t tid, /*out*/int32_t* java_priority)    \
   M(PaletteWriteCrashThreadStacks, const char* stacks, size_t stacks_len)   \

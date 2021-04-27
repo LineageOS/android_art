@@ -24,11 +24,6 @@
 
 #include "palette_system.h"
 
-palette_status_t PaletteGetVersion(int32_t* version) {
-  *version = art::palette::kPaletteVersion;
-  return PALETTE_STATUS_OK;
-}
-
 // Cached thread priority for testing. No thread priorities are ever affected.
 static std::mutex g_tid_priority_map_mutex;
 static std::map<int32_t, int32_t> g_tid_priority_map;
