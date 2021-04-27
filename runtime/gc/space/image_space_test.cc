@@ -79,7 +79,7 @@ TEST_F(ImageSpaceTest, StringDeduplication) {
     std::string jar_name = GetTestDexFileName(base_name);
     ArrayRef<const std::string> dex_files(&jar_name, /*size=*/ 1u);
     ScratchFile profile_file;
-    GenerateProfile(dex_files, profile_file.GetFile());
+    GenerateBootProfile(dex_files, profile_file.GetFile());
     std::vector<std::string> extra_args = {
         "--profile-file=" + profile_file.GetFilename(),
         "--runtime-arg",
