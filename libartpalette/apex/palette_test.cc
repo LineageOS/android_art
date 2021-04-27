@@ -35,13 +35,6 @@ pid_t GetTid() {
 
 class PaletteClientTest : public testing::Test {};
 
-TEST_F(PaletteClientTest, GetVersion) {
-  int32_t version = -1;
-  palette_status_t status = PaletteGetVersion(&version);
-  ASSERT_EQ(PALETTE_STATUS_OK, status);
-  ASSERT_GE(version, 1);
-}
-
 TEST_F(PaletteClientTest, SchedPriority) {
   int32_t tid = GetTid();
   int32_t saved_priority;

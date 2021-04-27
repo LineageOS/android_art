@@ -110,11 +110,6 @@ PaletteLoader::PaletteLoader() :
 
 extern "C" {
 
-palette_status_t PaletteGetVersion(/*out*/int32_t* version) {
-  PaletteGetVersionMethod m = PaletteLoader::Instance().GetPaletteGetVersionMethod();
-  return m(version);
-}
-
 palette_status_t PaletteSchedSetPriority(int32_t tid, int32_t java_priority) {
   PaletteSchedSetPriorityMethod m = PaletteLoader::Instance().GetPaletteSchedSetPriorityMethod();
   return m(tid, java_priority);
