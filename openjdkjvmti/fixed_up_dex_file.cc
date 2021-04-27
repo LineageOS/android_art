@@ -39,7 +39,6 @@
 // Runtime includes.
 #include "dex_container.h"
 #include "dex/compact_dex_level.h"
-#include "dex_to_dex_decompiler.h"
 #include "dexlayout.h"
 #include "oat_file.h"
 #include "vdex_file.h"

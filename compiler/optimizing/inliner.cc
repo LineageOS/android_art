@@ -421,7 +421,6 @@ static bool AlwaysThrows(const CompilerOptions& compiler_options, ArtMethod* met
       case Instruction::RETURN_VOID:
       case Instruction::RETURN_WIDE:
       case Instruction::RETURN_OBJECT:
-      case Instruction::RETURN_VOID_NO_BARRIER:
         return false;  // found regular control flow back
       case Instruction::THROW:
         throw_seen = true;
