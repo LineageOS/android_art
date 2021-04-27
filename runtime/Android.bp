@@ -384,6 +384,10 @@ libart_cc_defaults {
             ],
             static_libs: [
                 "libstatslog_art",
+                "libxml2",
+            ],
+            generated_sources: [
+                "apex-info-list",
             ],
         },
         android_arm: {
@@ -413,7 +417,9 @@ libart_cc_defaults {
         },
     },
     cflags: ["-DBUILDING_LIBART=1"],
-    generated_sources: ["art_operator_srcs"],
+    generated_sources: [
+        "art_operator_srcs"
+    ],
     // asm_support_gen.h (used by asm_support.h) is generated with cpp-define-generator
     generated_headers: ["cpp-define-generator-asm-support"],
     // export our headers so the libart-gtest targets can use it as well.
