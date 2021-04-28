@@ -1993,20 +1993,6 @@ bool MethodVerifier<kVerifierDebug>::CodeFlowVerifyMethod() {
   return true;
 }
 
-// Returns the index of the first final instance field of the given class, or kDexNoIndex if there
-// is no such field.
-static uint32_t GetFirstFinalInstanceFieldIndex(const DexFile& dex_file, dex::TypeIndex type_idx) {
-  const dex::ClassDef* class_def = dex_file.FindClassDef(type_idx);
-  DCHECK(class_def != nullptr);
-  ClassAccessor accessor(dex_file, *class_def);
-  for (const ClassAccessor::Field& field : accessor.GetInstanceFields()) {
-    if (field.IsFinal()) {
-      return field.GetIndex();
-    }
-  }
-  return dex::kDexNoIndex;
-}
-
 // Setup a register line for the given return instruction.
 template <bool kVerifierDebug>
 static void AdjustReturnLine(MethodVerifier<kVerifierDebug>* verifier,
@@ -2016,7 +2002,6 @@ static void AdjustReturnLine(MethodVerifier<kVerifierDebug>* verifier,
 
   switch (opcode) {
     case Instruction::RETURN_VOID:
-    case Instruction::RETURN_VOID_NO_BARRIER:
       if (verifier->IsInstanceConstructor()) {
         // Before we mark all regs as conflicts, check that we don't have an uninitialized this.
         line->CheckConstructorReturn(verifier);
@@ -3417,42 +3402,10 @@ bool MethodVerifier<kVerifierDebug>::CodeFlowVerifyInstruction(uint32_t* start_g
                                  false);
       break;
 
-    // Special instructions.
-    case Instruction::RETURN_VOID_NO_BARRIER:
-      if (IsConstructor() && !IsStatic()) {
-        const RegType& declaring_class = GetDeclaringClass();
-        if (declaring_class.IsUnresolvedReference()) {
-          // We must iterate over the fields, even if we cannot use mirror classes to do so. Do it
-          // manually over the underlying dex file.
-          uint32_t first_index = GetFirstFinalInstanceFieldIndex(*dex_file_,
-              dex_file_->GetMethodId(dex_method_idx_).class_idx_);
-          if (first_index != dex::kDexNoIndex) {
-            Fail(VERIFY_ERROR_BAD_CLASS_HARD) << "return-void-no-barrier not expected for field "
-                              << first_index;
-          }
-          break;
-        }
-        ObjPtr<mirror::Class> klass = declaring_class.GetClass();
-        for (uint32_t i = 0, num_fields = klass->NumInstanceFields(); i < num_fields; ++i) {
-          if (klass->GetInstanceField(i)->IsFinal()) {
-            Fail(VERIFY_ERROR_BAD_CLASS_HARD) << "return-void-no-barrier not expected for "
-                << klass->GetInstanceField(i)->PrettyField();
-            break;
-          }
-        }
-      }
-      // Handle this like a RETURN_VOID now. Code is duplicated to separate standard from
-      // quickened opcodes (otherwise this could be a fall-through).
-      if (!IsConstructor()) {
-        if (!GetMethodReturnType().IsConflict()) {
-          Fail(VERIFY_ERROR_BAD_CLASS_HARD) << "return-void not expected";
-        }
-      }
-      break;
-
     /* These should never appear during verification. */
     case Instruction::UNUSED_3E ... Instruction::UNUSED_43:
     case Instruction::UNUSED_E3 ... Instruction::UNUSED_F9:
+    case Instruction::UNUSED_73:
     case Instruction::UNUSED_79:
     case Instruction::UNUSED_7A:
       Fail(VERIFY_ERROR_BAD_CLASS_HARD) << "Unexpected opcode " << inst->DumpString(dex_file_);

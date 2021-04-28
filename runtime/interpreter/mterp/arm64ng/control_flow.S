@@ -141,12 +141,10 @@
 /*
  * Return a 32-bit value.
  */
-%def op_return(is_object="0", is_void="0", is_wide="0", is_no_barrier="0"):
+%def op_return(is_object="0", is_void="0", is_wide="0"):
     .if $is_void
-      .if !$is_no_barrier
       // Thread fence for constructor
       dmb ishst
-      .endif
     .else
       lsr     w2, wINST, #8               // w2<- AA
       .if $is_wide
@@ -172,16 +170,13 @@
     .cfi_restore_state
 
 %def op_return_object():
-%  op_return(is_object="1", is_void="0", is_wide="0", is_no_barrier="0")
+%  op_return(is_object="1", is_void="0", is_wide="0")
 
 %def op_return_void():
-%  op_return(is_object="0", is_void="1", is_wide="0", is_no_barrier="0")
-
-%def op_return_void_no_barrier():
-%  op_return(is_object="0", is_void="1", is_wide="0", is_no_barrier="1")
+%  op_return(is_object="0", is_void="1", is_wide="0")
 
 %def op_return_wide():
-%  op_return(is_object="0", is_void="0", is_wide="1", is_no_barrier="0")
+%  op_return(is_object="0", is_void="0", is_wide="1")
 
 %def op_throw():
   EXPORT_PC

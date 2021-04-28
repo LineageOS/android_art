@@ -1408,7 +1408,6 @@ static bool HasTrivialClinit(ObjPtr<mirror::Class> klass, PointerSize pointer_si
           // Primitive, null or j.l.String initialization is permitted.
           break;
         case Instruction::RETURN_VOID:
-        case Instruction::RETURN_VOID_NO_BARRIER:
           break;
         case Instruction::SPUT:
         case Instruction::SPUT_WIDE:
@@ -2697,7 +2696,6 @@ bool HInstructionBuilder::ProcessDexInstruction(const Instruction& instruction, 
       break;
     }
 
-    case Instruction::RETURN_VOID_NO_BARRIER:
     case Instruction::RETURN_VOID: {
       BuildReturn(instruction, DataType::Type::kVoid, dex_pc);
       break;
@@ -3561,6 +3559,7 @@ bool HInstructionBuilder::ProcessDexInstruction(const Instruction& instruction, 
     }
 
     case Instruction::UNUSED_3E ... Instruction::UNUSED_43:
+    case Instruction::UNUSED_73:
     case Instruction::UNUSED_79:
     case Instruction::UNUSED_7A:
     case Instruction::UNUSED_E3 ... Instruction::UNUSED_F9: {
