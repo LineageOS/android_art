@@ -16,16 +16,13 @@
 
 #include "odrefresh/odrefresh.h"
 
-#include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
-#include <ftw.h>
 #include <inttypes.h>
 #include <limits.h>
 #include <stdio.h>
 #include <string.h>
 #include <sys/stat.h>
-#include <sys/statvfs.h>
 #include <sysexits.h>
 #include <time.h>
 #include <unistd.h>
@@ -41,7 +38,6 @@
 #include <memory>
 #include <optional>
 #include <ostream>
-#include <queue>
 #include <sstream>
 #include <string>
 #include <string_view>
@@ -57,7 +53,6 @@
 #include "android-base/strings.h"
 #include "android/log.h"
 #include "arch/instruction_set.h"
-#include "base/bit_utils.h"
 #include "base/file_utils.h"
 #include "base/globals.h"
 #include "base/macros.h"
@@ -74,6 +69,7 @@
 
 #include "odr_artifacts.h"
 #include "odr_config.h"
+#include "odr_fs_utils.h"
 
 namespace art {
 namespace odrefresh {
@@ -147,23 +143,6 @@ static std::string GetEnvironmentVariableOrDie(const char* name) {
 
 static std::string QuotePath(std::string_view path) {
   return Concatenate({"'", path, "'"});
-}
-
-// Create all directory and all required parents.
-static WARN_UNUSED bool EnsureDirectoryExists(const std::string& absolute_path) {
-  CHECK(absolute_path.size() > 0 && absolute_path[0] == '/');
-  std::string path;
-  for (const std::string& directory : android::base::Split(absolute_path, "/")) {
-    path.append("/").append(directory);
-    if (!OS::DirectoryExists(path.c_str())) {
-      static constexpr mode_t kDirectoryMode = S_IRWXU | S_IRGRP | S_IXGRP| S_IROTH | S_IXOTH;
-      if (mkdir(path.c_str(), kDirectoryMode) != 0) {
-        PLOG(ERROR) << "Could not create directory: " << path;
-        return false;
-      }
-    }
-  }
-  return true;
 }
 
 static void EraseFiles(const std::vector<std::unique_ptr<File>>& files) {
@@ -919,41 +898,6 @@ class OnDeviceRefresh final {
     return exit_code;
   }
 
-  static bool GetFreeSpace(const char* path, uint64_t* bytes) {
-    struct statvfs sv;
-    if (statvfs(path, &sv) != 0) {
-      PLOG(ERROR) << "statvfs '" << path << "'";
-      return false;
-    }
-    *bytes = sv.f_bfree * sv.f_bsize;
-    return true;
-  }
-
-  static bool GetUsedSpace(const char* path, uint64_t* bytes) {
-    *bytes = 0;
-
-    std::queue<std::string> unvisited;
-    unvisited.push(path);
-    while (!unvisited.empty()) {
-      std::string current = unvisited.front();
-      std::unique_ptr<DIR, int (*)(DIR*)> dir(opendir(current.c_str()), closedir);
-      for (auto entity = readdir(dir.get()); entity != nullptr; entity = readdir(dir.get())) {
-        if (entity->d_name[0] == '.') {
-          continue;
-        }
-        std::string entity_name = Concatenate({current, "/", entity->d_name});
-        if (entity->d_type == DT_DIR) {
-          unvisited.push(entity_name.c_str());
-        } else if (entity->d_type == DT_REG) {
-          // RoundUp file size to number of blocks.
-          *bytes += RoundUp(OS::GetFileSizeBytes(entity_name.c_str()), 512);
-        }
-      }
-      unvisited.pop();
-    }
-    return true;
-  }
-
   static void ReportSpace() {
     uint64_t bytes;
     std::string data_dir = GetArtApexData();
@@ -965,44 +909,13 @@ class OnDeviceRefresh final {
     }
   }
 
-  // Callback for use with nftw(3) to assist with clearing files and sub-directories.
-  // This method removes files and directories below the top-level directory passed to nftw().
-  static int NftwUnlinkRemoveCallback(const char* fpath,
-                                      const struct stat* sb ATTRIBUTE_UNUSED,
-                                      int typeflag,
-                                      struct FTW* ftwbuf) {
-    switch (typeflag) {
-      case FTW_F:
-        return unlink(fpath);
-      case FTW_DP:
-        return (ftwbuf->level == 0) ? 0 : rmdir(fpath);
-      default:
-        return -1;
-    }
-  }
-
-  // Recursively remove files and directories under `top_dir`, but preserve `top_dir` itself.
-  // Returns true on success, false otherwise.
-  WARN_UNUSED bool RecursiveRemoveBelow(const char* top_dir) const {
-    if (config_.GetDryRun()) {
-      LOG(INFO) << "Files under " << QuotePath(top_dir) << " would be removed (dry-run).";
-      return true;
-    }
-
-    if (!OS::DirectoryExists(top_dir)) {
-      return true;
-    }
-
-    static constexpr int kMaxDescriptors = 4;  // Limit the need for nftw() to re-open descriptors.
-    if (nftw(top_dir, NftwUnlinkRemoveCallback, kMaxDescriptors, FTW_DEPTH | FTW_MOUNT) != 0) {
-      LOG(ERROR) << "Failed to clean-up " << QuotePath(top_dir);
-      return false;
-    }
-    return true;
-  }
-
   WARN_UNUSED bool CleanApexdataDirectory() const {
-    return RecursiveRemoveBelow(GetArtApexData().c_str());
+    const std::string& apex_data_path = GetArtApexData();
+    if (config_.GetDryRun()) {
+      LOG(INFO) << "Files under `" << QuotePath(apex_data_path) << " would be removed (dry-run).";
+      return true;
+    }
+    return CleanDirectory(apex_data_path);
   }
 
   WARN_UNUSED bool RemoveArtifacts(const OdrArtifacts& artifacts) const {
@@ -1299,7 +1212,7 @@ class OnDeviceRefresh final {
         if (!CompileBootExtensionArtifacts(
                 isa, staging_dir, &dex2oat_invocation_count, &error_msg)) {
           LOG(ERROR) << "Compilation of BCP failed: " << error_msg;
-          if (!RecursiveRemoveBelow(staging_dir)) {
+          if (!config_.GetDryRun() && !CleanDirectory(staging_dir)) {
             return ExitCode::kCleanupFailed;
           }
           return ExitCode::kCompilationFailed;
@@ -1310,7 +1223,7 @@ class OnDeviceRefresh final {
     if (force_compile || !SystemServerArtifactsExistOnData(&error_msg)) {
       if (!CompileSystemServerArtifacts(staging_dir, &dex2oat_invocation_count, &error_msg)) {
         LOG(ERROR) << "Compilation of system_server failed: " << error_msg;
-        if (!RecursiveRemoveBelow(staging_dir)) {
+        if (!config_.GetDryRun() && !CleanDirectory(staging_dir)) {
           return ExitCode::kCleanupFailed;
         }
         return ExitCode::kCompilationFailed;
