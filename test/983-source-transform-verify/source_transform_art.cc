@@ -58,8 +58,7 @@ void VerifyClassData(jint class_data_len, const unsigned char* class_data) {
       for (const DexInstructionPcPair& pair : method.GetInstructions()) {
         const Instruction& inst = pair.Inst();
         int forbidden_flags = (Instruction::kVerifyError | Instruction::kVerifyRuntimeOnly);
-        if (inst.Opcode() == Instruction::RETURN_VOID_NO_BARRIER ||
-            (inst.GetVerifyExtraFlags() & forbidden_flags) != 0) {
+        if ((inst.GetVerifyExtraFlags() & forbidden_flags) != 0) {
           LOG(FATAL) << "Unexpected instruction found in " << dex->PrettyMethod(method.GetIndex())
                      << " [Dex PC: 0x" << std::hex << pair.DexPc() << std::dec << "] : "
                      << inst.DumpString(dex.get()) << std::endl;
