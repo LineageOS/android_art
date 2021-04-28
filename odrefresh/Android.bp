@@ -134,6 +134,34 @@ art_cc_binary {
     ],
 }
 
+cc_library_static {
+    name: "libodrstatslog",
+    defaults: ["art_defaults"],
+    host_supported: true,
+    export_include_dirs: ["include"],
+
+    local_include_dirs: ["include"],
+    shared_libs: ["libartbase"],
+    target: {
+        android: {
+            generated_headers: ["statslog_odrefresh.h"],
+            generated_sources: ["statslog_odrefresh.cpp"],
+            srcs: [
+                "odr_metrics_record.cc",
+                "odr_statslog_android.cc",
+            ],
+            shared_libs: ["libstatssocket"],
+        },
+        host: {
+            srcs: ["odr_statslog_host.cc"],
+        },
+    },
+    apex_available: [
+        "com.android.art",
+        "com.android.art.debug",
+    ],
+}
+
 art_cc_test {
     name: "art_odrefresh_tests",
     defaults: [
@@ -152,6 +180,24 @@ art_cc_test {
         "odrefresh_test.cc",
     ],
     shared_libs: ["libbase"],
+}
+
+genrule {
+    name: "statslog_odrefresh.h",
+    tools: ["stats-log-api-gen"],
+    cmd: "$(location stats-log-api-gen) --header $(genDir)/statslog_odrefresh.h --module art --namespace art,metrics,statsd",
+    out: [
+        "statslog_odrefresh.h",
+    ],
+}
+
+genrule {
+    name: "statslog_odrefresh.cpp",
+    tools: ["stats-log-api-gen"],
+    cmd: "$(location stats-log-api-gen) --cpp $(genDir)/statslog_odrefresh.cpp --module art --namespace art,metrics,statsd --importHeader statslog_odrefresh.h",
+    out: [
+        "statslog_odrefresh.cpp",
+    ],
 }
 
 xsd_config {
