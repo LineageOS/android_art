@@ -142,11 +142,6 @@ class ClassTable {
 
   ClassTable();
 
-  // Used by image writer for checking.
-  bool Contains(ObjPtr<mirror::Class> klass)
-      REQUIRES(!lock_)
-      REQUIRES_SHARED(Locks::mutator_lock_);
-
   // Freeze the current class tables by allocating a new table and never updating or modifying the
   // existing table. This helps prevents dirty pages after caused by inserting after zygote fork.
   void FreezeSnapshot()
@@ -209,13 +204,8 @@ class ClassTable {
       REQUIRES_SHARED(Locks::mutator_lock_);
 
   // Return the first class that matches the descriptor of klass. Returns null if there are none.
+  // Used for tests and debug-build checks.
   ObjPtr<mirror::Class> LookupByDescriptor(ObjPtr<mirror::Class> klass)
-      REQUIRES(!lock_)
-      REQUIRES_SHARED(Locks::mutator_lock_);
-
-  // Try to insert a class and return the inserted class if successful. If another class
-  // with the same descriptor is already in the table, return the existing entry.
-  ObjPtr<mirror::Class> TryInsert(ObjPtr<mirror::Class> klass)
       REQUIRES(!lock_)
       REQUIRES_SHARED(Locks::mutator_lock_);
 
