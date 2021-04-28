@@ -1,4 +1,8 @@
-#!/bin/python3
+#!/usr/bin/env python3
+#
+# [VPYTHON:BEGIN]
+# python_version: "3.8"
+# [VPYTHON:END]
 #
 # Copyright (C) 2021 The Android Open Source Project
 #
