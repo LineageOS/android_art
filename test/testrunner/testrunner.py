@@ -75,6 +75,7 @@ import signal
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 
 import env
@@ -152,6 +153,47 @@ extra_arguments = { "host" : [], "target" : [] }
 # key: variant_type.
 # value: set of variants user wants to run of type <key>.
 _user_input_variants = collections.defaultdict(set)
+
+
+class ChildProcessTracker(object):
+  """Keeps track of forked child processes to be able to kill them."""
+
+  def __init__(self):
+    self.procs = {}             # dict from pid to subprocess.Popen object
+    self.mutex = threading.Lock()
+
+  def wait(self, proc, timeout):
+    """Waits on the given subprocess and makes it available to kill_all meanwhile.
+
+    Args:
+      proc: The subprocess.Popen object to wait on.
+      timeout: Timeout passed on to proc.communicate.
+
+    Returns: A tuple of the process stdout output and its return value.
+    """
+    with self.mutex:
+      if self.procs is not None:
+        self.procs[proc.pid] = proc
+      else:
+        os.killpg(proc.pid, signal.SIGKILL) # kill_all has already been called.
+    try:
+      output = proc.communicate(timeout=timeout)[0]
+      return_value = proc.wait()
+      return output, return_value
+    finally:
+      with self.mutex:
+        if self.procs is not None:
+          del self.procs[proc.pid]
+
+  def kill_all(self):
+    """Kills all currently running processes and any future ones."""
+    with self.mutex:
+      for pid in self.procs:
+        os.killpg(pid, signal.SIGKILL)
+      self.procs = None # Make future wait() calls kill their processes immediately.
+
+child_process_tracker = ChildProcessTracker()
+
 
 def setup_csv_result():
   """Set up the CSV output if required."""
@@ -545,15 +587,20 @@ def run_tests(tests):
         test_futures.append(
             start_combination(executor, config_tuple, options_all, ""))  # no address size
 
-      tests_done = 0
-      for test_future in concurrent.futures.as_completed(test_futures):
-        (test, status, failure_info, test_time) = test_future.result()
-        tests_done += 1
-        print_test_info(tests_done, test, status, failure_info, test_time)
-        if failure_info and not env.ART_TEST_KEEP_GOING:
-          for f in test_futures:
-            f.cancel()
-          break
+      try:
+        tests_done = 0
+        for test_future in concurrent.futures.as_completed(test_futures):
+          (test, status, failure_info, test_time) = test_future.result()
+          tests_done += 1
+          print_test_info(tests_done, test, status, failure_info, test_time)
+          if failure_info and not env.ART_TEST_KEEP_GOING:
+            for f in test_futures:
+              f.cancel()
+            break
+      except KeyboardInterrupt:
+        for f in test_futures:
+          f.cancel()
+        child_process_tracker.kill_all()
       executor.shutdown(True)
 
 @contextlib.contextmanager
@@ -620,8 +667,8 @@ def run_test(command, test, test_variant, test_name):
           universal_newlines=True,
           start_new_session=True,
         )
-      script_output = proc.communicate(timeout=timeout)[0]
-      test_passed = not proc.wait()
+      script_output, return_value = child_process_tracker.wait(proc, timeout)
+      test_passed = not return_value
       test_time_seconds = time.monotonic() - test_start_time
       test_time = datetime.timedelta(seconds=test_time_seconds)
 
