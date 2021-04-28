@@ -20,6 +20,7 @@
 #include "base/logging.h"  // FOR VLOG_IS_ON.
 #include "entrypoints/jni/jni_entrypoints.h"
 #include "entrypoints/runtime_asm_entrypoints.h"
+#include "palette/palette.h"
 #include "quick_alloc_entrypoints.h"
 #include "quick_default_externs.h"
 #include "quick_entrypoints.h"
@@ -129,6 +130,17 @@ static void DefaultInitEntryPoints(JniEntryPoints* jpoints, QuickEntryPoints* qp
   // Tiered JIT support
   qpoints->pUpdateInlineCache = art_quick_update_inline_cache;
   qpoints->pCompileOptimized = art_quick_compile_optimized;
+
+  PaletteHooks* hooks = nullptr;
+  if (PaletteGetHooks(&hooks) == PALETTE_STATUS_OK && hooks->ShouldReportJniInvocations()) {
+    qpoints->pJniMethodStart = JniMonitoredMethodStart;
+    qpoints->pJniMethodStartSynchronized = JniMonitoredMethodStartSynchronized;
+    qpoints->pJniMethodEnd = JniMonitoredMethodEnd;
+    qpoints->pJniMethodEndSynchronized = JniMonitoredMethodEndSynchronized;
+    qpoints->pJniMethodEndWithReference = JniMonitoredMethodEndWithReference;
+    qpoints->pJniMethodEndWithReferenceSynchronized =
+        JniMonitoredMethodEndWithReferenceSynchronized;
+  }
 }
 
 }  // namespace art
