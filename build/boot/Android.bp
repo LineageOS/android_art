@@ -24,6 +24,21 @@ package {
 bootclasspath_fragment {
     name: "art-bootclasspath-fragment",
     image_name: "art",
+    // Must match the ART_APEX_JARS set in build/make/core/envsetup.mk
+    contents: [
+        "core-oj",
+        "core-libart",
+        "okhttp",
+        "bouncycastle",
+        "apache-xml",
+    ],
+    // Additional properties to append when coverage is enabled, i.e. when
+    // EMMA_INSTRUMENT_FRAMEWORK=true
+    coverage: {
+        contents: [
+            "jacocoagent",
+        ],
+    },
     visibility: [
         "//art/build/apex",
         "//art/build/sdk",

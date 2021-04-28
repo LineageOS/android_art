@@ -79,6 +79,28 @@ extern mirror::Object* JniMethodEndWithReferenceSynchronized(jobject result,
                                                              jobject locked, Thread* self)
     NO_THREAD_SAFETY_ANALYSIS HOT_ATTR;
 
+// JNI entrypoints when monitoring entry/exit.
+extern uint32_t JniMonitoredMethodStart(Thread* self) NO_THREAD_SAFETY_ANALYSIS HOT_ATTR;
+extern uint32_t JniMonitoredMethodStartSynchronized(jobject to_lock, Thread* self)
+    NO_THREAD_SAFETY_ANALYSIS HOT_ATTR;
+extern void JniMonitoredMethodEnd(uint32_t saved_local_ref_cookie, Thread* self)
+    NO_THREAD_SAFETY_ANALYSIS HOT_ATTR;
+extern void JniMonitoredMethodEndSynchronized(uint32_t saved_local_ref_cookie,
+                                              jobject locked,
+                                              Thread* self)
+    NO_THREAD_SAFETY_ANALYSIS HOT_ATTR;
+extern mirror::Object* JniMonitoredMethodEndWithReference(jobject result,
+                                                          uint32_t saved_local_ref_cookie,
+                                                          Thread* self)
+    NO_THREAD_SAFETY_ANALYSIS HOT_ATTR;
+
+extern mirror::Object* JniMonitoredMethodEndWithReferenceSynchronized(
+    jobject result,
+    uint32_t saved_local_ref_cookie,
+    jobject locked, Thread* self)
+    NO_THREAD_SAFETY_ANALYSIS HOT_ATTR;
+
+
 extern "C" mirror::String* artStringBuilderAppend(uint32_t format,
                                                   const uint32_t* args,
                                                   Thread* self)
@@ -87,7 +109,6 @@ extern "C" mirror::String* artStringBuilderAppend(uint32_t format,
 extern void ReadBarrierJni(mirror::CompressedReference<mirror::Class>* handle_on_stack,
                            Thread* self)
     NO_THREAD_SAFETY_ANALYSIS HOT_ATTR;
-
 
 // Read barrier entrypoints.
 //
