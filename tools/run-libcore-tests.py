@@ -18,7 +18,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import sys, os, argparse, subprocess, shlex
+import sys, os, argparse, subprocess, shlex, re, concurrent.futures, multiprocessing
 
 def parse_args():
   parser = argparse.ArgumentParser(description="Run libcore tests using the vogar testing tool.")
@@ -26,6 +26,8 @@ def parse_args():
                       help='Specify where tests should be run.')
   parser.add_argument('--variant', choices=['X32', 'X64'],
                       help='Which dalvikvm variant to execute with.')
+  parser.add_argument('-j', '--jobs', type=int,
+                      help='Number of tests to run simultaneously.')
   parser.add_argument('--timeout', type=int,
                       help='How long to run the test before aborting (seconds).')
   parser.add_argument('--debug', action='store_true',
@@ -47,14 +49,29 @@ ART_TEST_CHROOT = os.environ.get("ART_TEST_CHROOT")
 ANDROID_PRODUCT_OUT = os.environ.get("ANDROID_PRODUCT_OUT")
 
 LIBCORE_TEST_NAMES = [
+  # Naive critical path optimization: Run the longest tests first.
+  "org.apache.harmony.tests.java.util",  # 90min under gcstress
+  "libcore.java.lang",                   # 90min under gcstress
+  "jsr166",                              # 60min under gcstress
+  "libcore.java.util",                   # 60min under gcstress
+  "libcore.java.math",                   # 50min under gcstress
+  "org.apache.harmony.crypto",           # 30min under gcstress
+  "org.apache.harmony.tests.java.io",    # 30min under gcstress
+  "org.apache.harmony.tests.java.text",  # 30min under gcstress
+  # Split highmemorytest to individual classes since it is too big.
+  "libcore.highmemorytest.java.text.DateFormatTest",
+  "libcore.highmemorytest.java.text.DecimalFormatTest",
+  "libcore.highmemorytest.java.text.SimpleDateFormatTest",
+  "libcore.highmemorytest.java.time.format.DateTimeFormatterTest",
+  "libcore.highmemorytest.java.util.CalendarTest",
+  "libcore.highmemorytest.java.util.CurrencyTest",
+  "libcore.highmemorytest.libcore.icu.LocaleDataTest",
+  # All other tests in alphabetical order.
   "libcore.android.system",
   "libcore.build",
   "libcore.dalvik.system",
   "libcore.java.awt",
-  "libcore.java.lang",
-  "libcore.java.math",
   "libcore.java.text",
-  "libcore.java.util",
   "libcore.javax.crypto",
   "libcore.javax.net",
   "libcore.javax.security",
@@ -67,26 +84,20 @@ LIBCORE_TEST_NAMES = [
   "libcore.libcore.reflect",
   "libcore.libcore.util",
   "libcore.sun.invoke",
-  "libcore.sun.net",
   "libcore.sun.misc",
+  "libcore.sun.net",
   "libcore.sun.security",
   "libcore.sun.util",
   "libcore.xml",
   "org.apache.harmony.annotation",
-  "org.apache.harmony.crypto",
   "org.apache.harmony.luni",
   "org.apache.harmony.nio",
   "org.apache.harmony.regex",
   "org.apache.harmony.testframework",
-  "org.apache.harmony.tests.java.io",
   "org.apache.harmony.tests.java.lang",
   "org.apache.harmony.tests.java.math",
-  "org.apache.harmony.tests.java.util",
-  "org.apache.harmony.tests.java.text",
   "org.apache.harmony.tests.javax.security",
   "tests.java.lang.String",
-  "jsr166",
-  "libcore.highmemorytest",
 ]
 # "org.apache.harmony.security",  # We don't have rights to revert changes in case of failures.
 
@@ -137,10 +148,10 @@ def get_test_names():
   test_names = list(LIBCORE_TEST_NAMES)
   # See b/78228743 and b/178351808.
   if args.gcstress or args.debug or args.mode == "jvm":
-    test_names.remove("libcore.highmemorytest")
+    test_names = list(t for t in test_names if not t.startswith("libcore.highmemorytest"))
   return test_names
 
-def get_vogar_command(test_names):
+def get_vogar_command(test_name):
   cmd = ["vogar"]
   if args.mode == "device":
     cmd.append("--mode=device --vm-arg -Ximage:/apex/com.android.art/javalib/boot.art")
@@ -162,10 +173,12 @@ def get_vogar_command(test_names):
 
   if args.mode == "device":
     if ART_TEST_CHROOT:
-      cmd.append(f"--chroot {ART_TEST_CHROOT} --device-dir=/tmp")
+      cmd.append(f"--chroot {ART_TEST_CHROOT} --device-dir=/tmp/vogar/test-{test_name}")
     else:
-      cmd.append("--device-dir=/data/local/tmp")
+      cmd.append("--device-dir=/data/local/tmp/vogar/test-{test_name}")
     cmd.append(f"--vm-command={ART_TEST_ANDROID_ROOT}/bin/art")
+  else:
+    cmd.append(f"--device-dir=/tmp/vogar/test-{test_name}")
 
   if args.mode != "jvm":
     cmd.append("--timeout {}".format(get_timeout_secs()))
@@ -188,8 +201,19 @@ def get_vogar_command(test_names):
 
   cmd.extend("--expectations " + f for f in get_expected_failures())
   cmd.extend("--classpath " + get_jar_filename(cp) for cp in CLASSPATH)
-  cmd.extend(test_names)
+  cmd.append(test_name)
   return cmd
+
+def get_target_cpu_count():
+  adb_command = 'adb shell cat /sys/devices/system/cpu/present'
+  with subprocess.Popen(adb_command.split(),
+                        stderr=subprocess.STDOUT,
+                        stdout=subprocess.PIPE,
+                        universal_newlines=True) as proc:
+    assert(proc.wait() == 0)  # Check the exit code.
+    match = re.match(r'\d*-(\d*)', proc.stdout.read())
+    assert(match)
+    return int(match.group(1)) + 1  # Add one to convert from "last-index" to "count"
 
 def main():
   global args
@@ -201,12 +225,36 @@ def main():
     if not os.path.exists(jar):
       raise AssertionError(f"Missing {jar}. Run buildbot-build.sh first.")
 
-  cmd = " ".join(get_vogar_command(get_test_names()))
-  print(cmd)
-  if not args.dry_run:
-    with subprocess.Popen(shlex.split(cmd)) as proc:
-      exit_code = proc.wait()
-      sys.exit(exit_code)
+  if not args.jobs:
+    args.jobs = get_target_cpu_count() if args.mode == "device" else multiprocessing.cpu_count()
+
+  def run_test(test_name):
+    cmd = " ".join(get_vogar_command(test_name))
+    if args.dry_run:
+      return test_name, cmd, "Dry-run: skipping execution", 0
+    with subprocess.Popen(shlex.split(cmd),
+                          stderr=subprocess.STDOUT,
+                          stdout=subprocess.PIPE,
+                          universal_newlines=True) as proc:
+      return test_name, cmd, proc.communicate()[0], proc.wait()
+
+  failed_regex = re.compile(r"^.* FAIL \(EXEC_FAILED\)$", re.MULTILINE)
+  failed_tests, max_exit_code = [], 0
+  with concurrent.futures.ThreadPoolExecutor(max_workers=args.jobs) as pool:
+    futures = [pool.submit(run_test, test_name) for test_name in get_test_names()]
+    print(f"Running {len(futures)} tasks on {args.jobs} core(s)...")
+    for i, future in enumerate(concurrent.futures.as_completed(futures)):
+      test_name, cmd, stdout, exit_code = future.result()
+      print(f"\n[{i+1}/{len(futures)}] {test_name} " + ("FAIL" if exit_code != 0 else "PASS"))
+      if exit_code != 0 or args.dry_run:
+        print(cmd)
+        print(stdout)
+      else:
+        print(stdout.strip().split("\n")[-1])  # Vogar final summary line.
+      failed_tests.extend(failed_regex.findall(stdout))
+      max_exit_code = max(max_exit_code, exit_code)
+  print("\n" + "\n".join(failed_tests))
+  sys.exit(max_exit_code)
 
 if __name__ == '__main__':
   main()
