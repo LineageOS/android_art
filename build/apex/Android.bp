@@ -251,6 +251,9 @@ apex_defaults {
     native_shared_libs: art_runtime_base_native_shared_libs +
         art_runtime_base_native_device_only_shared_libs +
         libcore_native_shared_libs,
+    binaries: [
+        "artd",
+    ],
     multilib: {
         both: {
             binaries: art_runtime_base_binaries_both +
@@ -270,6 +273,7 @@ apex_defaults {
     ],
     prebuilts: [
         "art-linker-config",
+        "com.android.art.artd.init.rc",
     ],
     // ART APEXes depend on bouncycastle which is disabled for PDK builds.
     // Since the dependency is disabled, ART APEXes can't be built either.
