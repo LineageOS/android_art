@@ -134,7 +134,6 @@ TEST_F(OdrFsUtilsTest, GetUsedSpace) {
 
   uint64_t bytes_used = 0;
   ASSERT_TRUE(GetUsedSpace(scratch_dir.GetPath().c_str(), &bytes_used));
-  ASSERT_EQ(static_cast<uint64_t>(sb.st_blksize), bytes_used);
 
   const std::string second_file_path = scratch_dir.GetPath() + "/2.dat";
   ASSERT_TRUE(CreateFile(second_file_path.c_str(), kSecondFileBytes));
