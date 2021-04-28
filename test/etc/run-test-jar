@@ -53,6 +53,7 @@ JIT="n"
 INVOKE_WITH=""
 IS_JVMTI_TEST="n"
 ADD_LIBDIR_ARGUMENTS="n"
+SUFFIX64=""
 ISA=x86
 LIBRARY_DIRECTORY="lib"
 TEST_DIRECTORY="nativetest"
@@ -421,6 +422,7 @@ while true; do
         shift
         break
     elif [ "x$1" = "x--64" ]; then
+        SUFFIX64="64"
         ISA="x86_64"
         GDBSERVER_DEVICE="gdbserver64"
         DALVIKVM="dalvikvm64"
@@ -631,14 +633,7 @@ if [ "$IS_JVMTI_TEST" = "y" ]; then
   if [[ "$USE_JVM" = "y" ]]; then
     FLAGS="${FLAGS} -agentpath:${ANDROID_HOST_OUT}/nativetest64/${agent}=${TEST_NAME},jvm"
   else
-    if [[ "$HOST" = "y" ]]; then
-      FLAGS="${FLAGS} -agentpath:${agent}=${TEST_NAME},art"
-    else
-      # The linker configuration used for dalvikvm(64) in the ART APEX
-      # requires us to pass the full path to the agent to the runtime when
-      # running on device.
-      FLAGS="${FLAGS} -agentpath:/data/${TEST_DIRECTORY}/art/${ISA}/${agent}=${TEST_NAME},art"
-    fi
+    FLAGS="${FLAGS} -agentpath:${agent}=${TEST_NAME},art"
   fi
 fi
 
@@ -669,14 +664,7 @@ if [[ "$JVMTI_STRESS" = "y" ]]; then
   if [[ "$USE_JVM" = "y" ]]; then
     FLAGS="${FLAGS} -agentpath:${ANDROID_HOST_OUT}/nativetest64/${agent}=${agent_args}"
   else
-    if [[ "$HOST" = "y" ]]; then
-      FLAGS="${FLAGS} -agentpath:${agent}=${agent_args}"
-    else
-      # The linker configuration used for dalvikvm(64) in the ART APEX
-      # requires us to pass the full path to the agent to the runtime when
-      # running on device.
-      FLAGS="${FLAGS} -agentpath:/data/${TEST_DIRECTORY}/art/${ISA}/${agent}=${agent_args}"
-    fi
+    FLAGS="${FLAGS} -agentpath:${agent}=${agent_args}"
   fi
 fi
 
@@ -1160,10 +1148,24 @@ if [ "$HOST" = "n" ]; then
       # installation.
       LD_LIBRARY_PATH="$ANDROID_ROOT/$LIBRARY_DIRECTORY"
     fi
-    # Needed to access libarttest(d).so and JVMTI agent libraries.
-    LD_LIBRARY_PATH="/data/$TEST_DIRECTORY/art/$ISA:$LD_LIBRARY_PATH"
-    # Needed to access the boot (core) image files.
-    LD_LIBRARY_PATH="/apex/com.android.art/javalib/$ISA:$LD_LIBRARY_PATH"
+
+    # This adds libarttest(d).so to the default linker namespace when dalvikvm
+    # is run from /apex/com.android.art/bin. Since that namespace is essentially
+    # an alias for the com_android_art namespace, that gives libarttest(d).so
+    # full access to the internal ART libraries.
+    LD_LIBRARY_PATH="/data/$TEST_DIRECTORY/com.android.art/lib${SUFFIX64}:$LD_LIBRARY_PATH"
+    if [ "$TEST_IS_NDEBUG" = "y" ]; then dlib=""; else dlib="d"; fi
+    art_test_internal_libraries=(
+      libartagent${dlib}.so
+      libarttest${dlib}.so
+      libtiagent${dlib}.so
+      libtistress${dlib}.so
+    )
+    art_test_internal_libraries="${art_test_internal_libraries[*]}"
+    NATIVELOADER_DEFAULT_NAMESPACE_LIBS="${art_test_internal_libraries// /:}"
+    dlib=
+    art_test_internal_libraries=
+
     # Needed to access the test's Odex files.
     LD_LIBRARY_PATH="$DEX_LOCATION/oat/$ISA:$LD_LIBRARY_PATH"
     # Needed to access the test's native libraries (see e.g. 674-hiddenapi,
@@ -1242,6 +1244,7 @@ if [ "$HOST" = "n" ]; then
              rm -rf ${DEX_LOCATION}/dalvik-cache/ && \
              mkdir -p ${mkdir_locations} && \
              export LD_LIBRARY_PATH=$LD_LIBRARY_PATH && \
+             export NATIVELOADER_DEFAULT_NAMESPACE_LIBS=$NATIVELOADER_DEFAULT_NAMESPACE_LIBS && \
              export PATH=$PREPEND_TARGET_PATH:\$PATH && \
              $profman_cmdline && \
              $dex2oat_cmdline && \
