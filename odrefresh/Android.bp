@@ -29,6 +29,7 @@ cc_defaults {
     defaults: ["art_defaults"],
     srcs: [
         "odrefresh.cc",
+        "odr_fs_utils.cc",
     ],
     local_include_dirs: ["include"],
     header_libs: ["dexoptanalyzer_headers"],
@@ -128,6 +129,8 @@ art_cc_test {
     header_libs: ["odrefresh_headers"],
     srcs: [
         "odr_artifacts_test.cc",
+        "odr_fs_utils.cc",
+        "odr_fs_utils_test.cc",
         "odrefresh_test.cc",
     ],
     shared_libs: [
