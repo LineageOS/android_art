@@ -433,6 +433,13 @@ known_failing_tests.extend([
   #   Int43        = i10
   #
   "639-checker-code-sinking",
+  # Fails (on aosp_cf_x86_phone-userdebug) with:
+  #
+  #   error: Statement could not be matched starting from line 12527
+  #   Main.java:24: InvokeVirtual method_name:java.lang.StringBuilder.toString intrinsic:StringBuilderToString
+  #   ISA_FEATURES = {'ssse3': True, 'sse4': False}
+  #
+  "729-checker-polymorphic-intrinsic",
 ])
 
 known_failing_tests = frozenset(known_failing_tests)
