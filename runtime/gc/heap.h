@@ -376,14 +376,13 @@ class Heap {
       REQUIRES(Locks::heap_bitmap_lock_)
       REQUIRES_SHARED(Locks::mutator_lock_);
 
-  // Initiates an explicit garbage collection. Guarantees that a GC started after this call has
-  // completed.
+  // Initiates an explicit garbage collection.
   void CollectGarbage(bool clear_soft_references, GcCause cause = kGcCauseExplicit)
       REQUIRES(!*gc_complete_lock_, !*pending_task_lock_, !process_state_update_lock_);
 
-  // Does a concurrent GC, provided the GC numbered requested_gc_num has not already been
-  // completed. Should only be called by the GC daemon thread through runtime.
-  void ConcurrentGC(Thread* self, GcCause cause, bool force_full, uint32_t requested_gc_num)
+  // Does a concurrent GC, should only be called by the GC daemon thread
+  // through runtime.
+  void ConcurrentGC(Thread* self, GcCause cause, bool force_full)
       REQUIRES(!Locks::runtime_shutdown_lock_, !*gc_complete_lock_,
                !*pending_task_lock_, !process_state_update_lock_);
 
@@ -453,8 +452,7 @@ class Heap {
   void SetIdealFootprint(size_t max_allowed_footprint);
 
   // Blocks the caller until the garbage collector becomes idle and returns the type of GC we
-  // waited for. Only waits for running collections, ignoring a requested but unstarted GC. Only
-  // heuristic, since a new GC may have started by the time we return.
+  // waited for.
   collector::GcType WaitForGcToComplete(GcCause cause, Thread* self) REQUIRES(!*gc_complete_lock_);
 
   // Update the heap's process state to a new value, may cause compaction to occur.
@@ -817,17 +815,8 @@ class Heap {
   // Request an asynchronous trim.
   void RequestTrim(Thread* self) REQUIRES(!*pending_task_lock_);
 
-  // Retrieve the current GC number, i.e. the number n such that we completed n GCs so far.
-  // Provides acquire ordering, so that if we read this first, and then check whether a GC is
-  // required, we know that the GC number read actually preceded the test.
-  uint32_t GetCurrentGcNum() {
-    return gcs_completed_.load(std::memory_order_acquire);
-  }
-
-  // Request asynchronous GC. Observed_gc_num is the value of GetCurrentGcNum() when we started to
-  // evaluate the GC triggering condition. If a GC has been completed since then, we consider our
-  // job done.
-  void RequestConcurrentGC(Thread* self, GcCause cause, bool force_full, uint32_t observed_gc_num)
+  // Request asynchronous GC.
+  void RequestConcurrentGC(Thread* self, GcCause cause, bool force_full)
       REQUIRES(!*pending_task_lock_);
 
   // Whether or not we may use a garbage collector, used so that we only create collectors we need.
@@ -1013,6 +1002,11 @@ class Heap {
   // Checks whether we should garbage collect:
   ALWAYS_INLINE bool ShouldConcurrentGCForJava(size_t new_num_bytes_allocated);
   float NativeMemoryOverTarget(size_t current_native_bytes, bool is_gc_concurrent);
+  ALWAYS_INLINE void CheckConcurrentGCForJava(Thread* self,
+                                              size_t new_num_bytes_allocated,
+                                              ObjPtr<mirror::Object>* obj)
+      REQUIRES_SHARED(Locks::mutator_lock_)
+      REQUIRES(!*pending_task_lock_, !*gc_complete_lock_);
   void CheckGCForNative(Thread* self)
       REQUIRES(!*pending_task_lock_, !*gc_complete_lock_, !process_state_update_lock_);
 
@@ -1098,25 +1092,16 @@ class Heap {
   void RequestCollectorTransition(CollectorType desired_collector_type, uint64_t delta_time)
       REQUIRES(!*pending_task_lock_);
 
-  void RequestConcurrentGCAndSaveObject(Thread* self,
-                                        bool force_full,
-                                        uint32_t observed_gc_num,
-                                        ObjPtr<mirror::Object>* obj)
+  void RequestConcurrentGCAndSaveObject(Thread* self, bool force_full, ObjPtr<mirror::Object>* obj)
       REQUIRES_SHARED(Locks::mutator_lock_)
       REQUIRES(!*pending_task_lock_);
-
-  static constexpr uint32_t GC_NUM_ANY = std::numeric_limits<uint32_t>::max();
+  bool IsGCRequestPending() const;
 
   // Sometimes CollectGarbageInternal decides to run a different Gc than you requested. Returns
-  // which type of Gc was actually run.
-  // We pass in the intended GC sequence number to ensure that multiple approximately concurrent
-  // requests result in a single GC; clearly redundant request will be pruned.  A requested_gc_num
-  // of GC_NUM_ANY indicates that we should not prune redundant requests.  (In the unlikely case
-  // that gcs_completed_ gets this big, we just accept a potential extra GC or two.)
+  // which type of Gc was actually ran.
   collector::GcType CollectGarbageInternal(collector::GcType gc_plan,
                                            GcCause gc_cause,
-                                           bool clear_soft_references,
-                                           uint32_t requested_gc_num)
+                                           bool clear_soft_references)
       REQUIRES(!*gc_complete_lock_, !Locks::heap_bitmap_lock_, !Locks::thread_suspend_count_lock_,
                !*pending_task_lock_, !process_state_update_lock_);
 
@@ -1183,6 +1168,7 @@ class Heap {
       REQUIRES_SHARED(Locks::mutator_lock_)
       REQUIRES(!*gc_complete_lock_, !*pending_task_lock_, !process_state_update_lock_);
 
+  void ClearConcurrentGCRequest();
   void ClearPendingTrim(Thread* self) REQUIRES(!*pending_task_lock_);
   void ClearPendingCollectorTransition(Thread* self) REQUIRES(!*pending_task_lock_);
 
@@ -1564,14 +1550,8 @@ class Heap {
   // Count for performed homogeneous space compaction.
   Atomic<size_t> count_performed_homogeneous_space_compaction_;
 
-  // The number of garbage collections (either young or full, not trims or the like) we have
-  // completed since heap creation. We guard against wrapping, though that's unlikely.
-  // Increment is guarded by gc_complete_lock_.
-  Atomic<uint32_t> gcs_completed_;
-
-  // The number of garbage collections we've scheduled. Normally either gcs_complete_ or
-  // gcs_complete + 1.
-  Atomic<uint32_t> gcs_requested_;
+  // Whether or not a concurrent GC is pending.
+  Atomic<bool> concurrent_gc_pending_;
 
   // Active tasks which we can modify (change target time, desired collector type, etc..).
   CollectorTransitionTask* pending_collector_transition_ GUARDED_BY(pending_task_lock_);
