@@ -2093,11 +2093,6 @@ bool ClassLinker::AddImageSpace(
   return true;
 }
 
-bool ClassLinker::ClassInClassTable(ObjPtr<mirror::Class> klass) {
-  ClassTable* const class_table = ClassTableForClassLoader(klass->GetClassLoader());
-  return class_table != nullptr && class_table->Contains(klass);
-}
-
 void ClassLinker::VisitClassRoots(RootVisitor* visitor, VisitRootFlags flags) {
   // Acquire tracing_enabled before locking class linker lock to prevent lock order violation. Since
   // enabling tracing requires the mutator lock, there are no race conditions here.

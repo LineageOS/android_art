@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016 The Android Open Source Project
+ * Copyright (C) 2021 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,23 +14,16 @@
  * limitations under the License.
  */
 
-public class Main {
-  Main() {
-  }
+#include "odr_statslog/odr_statslog.h"  // for declararation of UploadStatsIfAvailable().
 
-  public static void main(String[] args) {
-    Main m = new Main();
-    Object o = m;
-    // The call and field accesses will be quickened.
-    m.foo(m.a);
+#include <iosfwd>                       // for forward declaration of std::string.
+namespace art {
+namespace odrefresh {
 
-    // The checkcast will be quickened.
-    m.foo(((Main)o).a);
-  }
-
-  int a;
-  void foo(int a) {
-    System.out.println("In foo");
-  }
+bool UploadStatsIfAvailable(/*out*/std::string* /*error_msg*/) {
+  // No stats reported from host, report success.
+  return true;
 }
 
+}  // namespace odrefresh
+}  // namespace art

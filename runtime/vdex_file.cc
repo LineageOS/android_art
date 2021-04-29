@@ -34,7 +34,6 @@
 #include "dex/art_dex_file_loader.h"
 #include "dex/class_accessor-inl.h"
 #include "dex/dex_file_loader.h"
-#include "dex_to_dex_decompiler.h"
 #include "gc/heap.h"
 #include "gc/space/image_space.h"
 #include "mirror/class-inl.h"

@@ -65,7 +65,7 @@ constexpr bool IsInstructionReturn(Instruction::Code opcode) {
 
 constexpr bool IsInstructionInvoke(Instruction::Code opcode) {
   return Instruction::INVOKE_VIRTUAL <= opcode && opcode <= Instruction::INVOKE_INTERFACE_RANGE &&
-      opcode != Instruction::RETURN_VOID_NO_BARRIER;
+      opcode != Instruction::UNUSED_73;
 }
 
 constexpr bool IsInstructionInvokeStatic(Instruction::Code opcode) {
