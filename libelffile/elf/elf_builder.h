@@ -130,7 +130,7 @@ class ElfBuilder final {
     }
 
     // Start writing file data of this section.
-    void Start() {
+    virtual void Start() {
       CHECK(owner_->current_section_ == nullptr);
       Elf_Word align = AddSection();
       CHECK_EQ(header_.sh_offset, 0u);
@@ -139,7 +139,7 @@ class ElfBuilder final {
     }
 
     // Finish writing file data of this section.
-    void End() {
+    virtual void End() {
       CHECK(owner_->current_section_ == this);
       Elf_Word position = GetPosition();
       CHECK(header_.sh_size == 0u || header_.sh_size == position);
@@ -310,6 +310,11 @@ class ElfBuilder final {
       last_offset_ = 0;
     }
 
+    void Start() {
+      Section::Start();
+      Write("");  // ELF specification requires that the section starts with empty string.
+    }
+
     Elf_Word Write(std::string_view name) {
       if (current_offset_ == 0) {
         DCHECK(name.empty());
@@ -368,10 +373,13 @@ class ElfBuilder final {
 
     // Buffer symbol for this section.  It will be written later.
     void Add(Elf_Sym sym, const Section* section) {
-      DCHECK(section != nullptr);
-      DCHECK_LE(section->GetAddress(), sym.st_value);
-      DCHECK_LE(sym.st_value, section->GetAddress() + section->header_.sh_size);
-      sym.st_shndx = section->GetSectionIndex();
+      if (section != nullptr) {
+        DCHECK_LE(section->GetAddress(), sym.st_value);
+        DCHECK_LE(sym.st_value, section->GetAddress() + section->header_.sh_size);
+        sym.st_shndx = section->GetSectionIndex();
+      } else {
+        sym.st_shndx = SHN_UNDEF;
+      }
       syms_.push_back(sym);
     }
 
