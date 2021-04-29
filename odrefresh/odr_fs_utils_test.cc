@@ -118,7 +118,7 @@ TEST_F(OdrFsUtilsTest, EnsureDirectoryExistsSubDirs) {
   }
 }
 
-TEST_F(OdrFsUtilsTest, GetUsedSpace) {
+TEST_F(OdrFsUtilsTest, DISABLED_GetUsedSpace) {
   static constexpr size_t kFirstFileBytes = 1;
   static constexpr size_t kSecondFileBytes = 16111;
   static constexpr size_t kBytesPerBlock = 512;
