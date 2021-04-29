@@ -688,11 +688,6 @@ class ClassLinker {
     return image_pointer_size_;
   }
 
-  // Used by image writer for checking.
-  bool ClassInClassTable(ObjPtr<mirror::Class> klass)
-      REQUIRES(Locks::classlinker_classes_lock_)
-      REQUIRES_SHARED(Locks::mutator_lock_);
-
   // Clear the ArrayClass cache. This is necessary when cleaning up for the image, as the cache
   // entries are roots, but potentially not image classes.
   void DropFindArrayClassCache() REQUIRES_SHARED(Locks::mutator_lock_);

@@ -153,9 +153,6 @@
     ret
     CFI_RESTORE_STATE
 
-%def op_return_void_no_barrier():
-%  op_return_void()
-
 %def op_return_wide():
     GET_WIDE_VREG %rax, rINSTq   # eax <- vAA
     // In case we're going back to compiled code, put the
