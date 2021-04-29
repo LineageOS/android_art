@@ -174,17 +174,6 @@
     xorl    %ecx, %ecx
     jmp     MterpReturn
 
-%def op_return_void_no_barrier():
-    movl    rSELF, %eax
-    testl   $$(THREAD_SUSPEND_OR_CHECKPOINT_REQUEST), THREAD_FLAGS_OFFSET(%eax)
-    jz      1f
-    movl    %eax, OUT_ARG0(%esp)
-    call    SYMBOL(MterpSuspendCheck)
-1:
-    xorl    %eax, %eax
-    xorl    %ecx, %ecx
-    jmp     MterpReturn
-
 %def op_return_wide():
 /*
  * Return a 64-bit value.

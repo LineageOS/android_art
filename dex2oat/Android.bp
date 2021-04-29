@@ -467,7 +467,6 @@ art_cc_test {
         "dex2oat_test.cc",
         "dex2oat_vdex_test.cc",
         "dex2oat_image_test.cc",
-        "dex/dex_to_dex_decompiler_test.cc",
         "driver/compiler_driver_test.cc",
         "linker/elf_writer_test.cc",
         "linker/image_test.cc",

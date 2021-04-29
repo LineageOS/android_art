@@ -181,6 +181,13 @@ inline void ClassTable::RemoveStrongRoots(const Filter& filter) {
                       strong_roots_.end());
 }
 
+inline ObjPtr<mirror::Class> ClassTable::LookupByDescriptor(ObjPtr<mirror::Class> klass) {
+  std::string temp;
+  const char* descriptor = klass->GetDescriptor(&temp);
+  uint32_t hash = TableSlot::HashDescriptor(klass);
+  return Lookup(descriptor, hash);
+}
+
 }  // namespace art
 
 #endif  // ART_RUNTIME_CLASS_TABLE_INL_H_

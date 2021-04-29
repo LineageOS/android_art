@@ -440,11 +440,6 @@ class InstructionHandler {
     return true;
   }
 
-  HANDLER_ATTRIBUTES bool RETURN_VOID_NO_BARRIER() {
-    JValue result;
-    return HandleReturn(result);
-  }
-
   HANDLER_ATTRIBUTES bool RETURN_VOID() {
     QuasiAtomic::ThreadFenceForConstructor();
     JValue result;
@@ -1625,6 +1620,10 @@ class InstructionHandler {
   }
 
   HANDLER_ATTRIBUTES bool UNUSED_43() {
+    return HandleUnused();
+  }
+
+  HANDLER_ATTRIBUTES bool UNUSED_73() {
     return HandleUnused();
   }
 

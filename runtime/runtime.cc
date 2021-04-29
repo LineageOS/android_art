@@ -150,6 +150,7 @@
 #include "oat_file_manager.h"
 #include "oat_quick_method_header.h"
 #include "object_callbacks.h"
+#include "odr_statslog/odr_statslog.h"
 #include "parsed_options.h"
 #include "quick/quick_method_frame_info.h"
 #include "reflection.h"
@@ -1111,6 +1112,16 @@ void Runtime::InitNonZygoteOrPostFork(
       LOG(WARNING) << "Failed to load perfetto_javaheapprof: " << err;
     }
   }
+  if (Runtime::Current()->IsSystemServer()) {
+    std::string err;
+    ScopedTrace tr("odrefresh stats logging");
+    ScopedThreadSuspension sts(Thread::Current(), ThreadState::kNative);
+    // Report stats if available. This should be moved into ART Services when they are ready.
+    if (!odrefresh::UploadStatsIfAvailable(&err)) {
+      LOG(WARNING) << "Failed to upload odrefresh metrics: " << err;
+    }
+  }
+
   if (LIKELY(automatically_set_jni_ids_indirection_) && CanSetJniIdType()) {
     if (IsJavaDebuggable()) {
       SetJniIdType(JniIdType::kIndices);

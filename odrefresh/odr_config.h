@@ -36,7 +36,7 @@ enum class ZygoteKind : uint8_t {
   kZygote32_64 = 1,
   // 64-bit primary zygote, 32-bit secondary zygote.
   kZygote64_32 = 2,
-  // 64-bit praimry zygote, no secondary zygote.
+  // 64-bit primary zygote, no secondary zygote.
   kZygote64 = 3
 };
 

@@ -167,15 +167,6 @@
     mov    r1, #0
     b      MterpReturn
 
-%def op_return_void_no_barrier():
-    ldr     lr, [rSELF, #THREAD_FLAGS_OFFSET]
-    mov     r0, rSELF
-    ands    lr, #THREAD_SUSPEND_OR_CHECKPOINT_REQUEST
-    blne    MterpSuspendCheck                       @ (self)
-    mov    r0, #0
-    mov    r1, #0
-    b      MterpReturn
-
 %def op_return_wide():
     /*
      * Return a 64-bit value.
