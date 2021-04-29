@@ -42,6 +42,11 @@ namespace debug {
 // Note that ARM's Streamline requires it to match function symbol.
 constexpr bool kGenerateArmMappingSymbol = true;
 
+// Create magic symbol to let libunwindstack know that symtab is sorted by address.
+constexpr bool kGenerateSortedSymbol = true;
+constexpr const char kSortedSymbolName[] = "$android.symtab.sorted";
+constexpr size_t kSortedSymbolMinCount = 100;  // Don't bother if the table is very small (JIT).
+
 // Magic name for .symtab symbols which enumerate dex files used
 // by this ELF file (currently mmapped inside the .dex section).
 constexpr const char* kDexFileSymbolName = "$dexfile";
@@ -116,10 +121,14 @@ static void WriteDebugSymbols(ElfBuilder<ElfTypes>* builder,
   }
 
   strtab->Start();
-  strtab->Write("");  // strtab should start with empty string.
+  // Generate marker to annotate the symbol table as sorted (guaranteed by the ElfBuilder).
+  // Note that LOCAL symbols are sorted before GLOBAL ones, so don't mix the two types.
+  if (kGenerateSortedSymbol && debug_info.compiled_methods.size() >= kSortedSymbolMinCount) {
+    symtab->Add(strtab->Write(kSortedSymbolName), nullptr, 0, 0, STB_GLOBAL, STT_NOTYPE);
+  }
   // Generate ARM mapping symbols. ELF local symbols must be added first.
   if (mapping_symbol_address != std::numeric_limits<uint64_t>::max()) {
-    symtab->Add(strtab->Write("$t"), text, mapping_symbol_address, 0, STB_LOCAL, STT_NOTYPE);
+    symtab->Add(strtab->Write("$t"), text, mapping_symbol_address, 0, STB_GLOBAL, STT_NOTYPE);
   }
   // Add symbols for compiled methods.
   for (const MethodDebugInfo& info : debug_info.compiled_methods) {
