@@ -1093,7 +1093,7 @@ void Runtime::InitNonZygoteOrPostFork(
 
   ScopedObjectAccess soa(Thread::Current());
   if (IsPerfettoHprofEnabled() &&
-      (Dbg::IsJdwpAllowed() || IsProfileableFromShell() || IsJavaDebuggable() ||
+      (Dbg::IsJdwpAllowed() || IsProfileable() || IsProfileableFromShell() || IsJavaDebuggable() ||
        Runtime::Current()->IsSystemServer())) {
     std::string err;
     ScopedTrace tr("perfetto_hprof init.");
@@ -1103,7 +1103,7 @@ void Runtime::InitNonZygoteOrPostFork(
     }
   }
   if (IsPerfettoJavaHeapStackProfEnabled() &&
-      (Dbg::IsJdwpAllowed() || IsProfileableFromShell() || IsJavaDebuggable() ||
+      (Dbg::IsJdwpAllowed() || IsProfileable() || IsProfileableFromShell() || IsJavaDebuggable() ||
        Runtime::Current()->IsSystemServer())) {
     std::string err;
     ScopedTrace tr("perfetto_javaheapprof init.");

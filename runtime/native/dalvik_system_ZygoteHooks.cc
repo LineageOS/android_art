@@ -153,6 +153,7 @@ enum {
   USE_APP_IMAGE_STARTUP_CACHE         = 1 << 16,
   DEBUG_IGNORE_APP_SIGNAL_HANDLER     = 1 << 17,
   DISABLE_TEST_API_ENFORCEMENT_POLICY = 1 << 18,
+  PROFILEABLE                         = 1 << 24,
 
   // bits to shift (flags & HIDDEN_API_ENFORCEMENT_POLICY_MASK) by to get a value
   // corresponding to hiddenapi::EnforcementPolicy
@@ -245,6 +246,8 @@ static uint32_t EnableDebugFeatures(uint32_t runtime_flags) {
 
   runtime->SetProfileableFromShell((runtime_flags & PROFILE_FROM_SHELL) != 0);
   runtime_flags &= ~PROFILE_FROM_SHELL;
+  runtime->SetProfileable((runtime_flags & PROFILEABLE) != 0);
+  runtime_flags &= ~PROFILEABLE;
 
   return runtime_flags;
 }
