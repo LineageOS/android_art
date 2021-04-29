@@ -298,10 +298,53 @@ EOF
 EOF
 
   system_linker_config_pb=$linkerconfig_root/system/etc/linker.config.pb
+  # This list needs to be synced with provideLibs in system/etc/linker.config.pb
+  # in the targeted platform image.
+  # TODO(b/186649223): Create a prebuilt for it in platform-mainline-sdk.
+  system_provide_libs=(
+    heapprofd_client_api.so
+    libEGL.so
+    libGLESv1_CM.so
+    libGLESv2.so
+    libGLESv3.so
+    libOpenMAXAL.so
+    libOpenSLES.so
+    libRS.so
+    libaaudio.so
+    libadbd_auth.so
+    libadbd_fs.so
+    libamidi.so
+    libandroid.so
+    libandroid_net.so
+    libartpalette-system.so
+    libbinder_ndk.so
+    libc.so
+    libcamera2ndk.so
+    libcgrouprc.so
+    libclang_rt.asan-i686-android.so
+    libclang_rt.asan-x86_64-android.so
+    libdl.so
+    libdl_android.so
+    libft2.so
+    libincident.so
+    libjnigraphics.so
+    liblog.so
+    libm.so
+    libmediametrics.so
+    libmediandk.so
+    libnativewindow.so
+    libneuralnetworks_packageinfo.so
+    libselinux.so
+    libstdc++.so
+    libsync.so
+    libvndksupport.so
+    libvulkan.so
+    libz.so
+  )
+
   echo "Encoding linker.config.json to $system_linker_config_pb"
   $ANDROID_HOST_OUT/bin/conv_linker_config proto -s $ANDROID_BUILD_TOP/system/core/rootdir/etc/linker.config.json -o $system_linker_config_pb
-  $ANDROID_HOST_OUT/bin/conv_linker_config append -s $system_linker_config_pb -o $system_linker_config_pb --key "provideLibs" \
-    --value "libEGL.so libGLESv1_CM.so libGLESv2.so libGLESv3.so libRS.so libandroid_net.so libbinder_ndk.so libc.so libcgrouprc.so libclang_rt.asan-arm-android.so libclang_rt.asan-i686-android.so libclang_rt.asan-x86_64-android.so libdl.so libft2.so liblog.so libm.so libmediandk.so libnativewindow.so libsync.so libvndksupport.so libvulkan.so libaaudio.so libandroid.so libadbd_auth.so libadbd_fs.so libdl_android.so libincident.so libmediametrics.so libneuralnetworks_packageinfo.so libselinux.so"
+  $ANDROID_HOST_OUT/bin/conv_linker_config append -s $system_linker_config_pb -o $system_linker_config_pb --key "provideLibs" --value "${system_provide_libs[*]}"
 
   # To avoid warnings from linkerconfig when it checks following two partitions
   mkdir -p $linkerconfig_root/product
