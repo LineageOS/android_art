@@ -32,12 +32,38 @@ bootclasspath_fragment {
         "bouncycastle",
         "apache-xml",
     ],
+
+    api: {
+        stub_libs: [
+            // Stubs for the core-oj and core-libart. The other modules do not
+            // have any public API.
+            "art.module.public.api",
+        ],
+    },
+    core_platform_api: {
+        stub_libs: [
+            // Core platform stubs for all the non-coverage contents.
+            //
+            // Use the stubs java_library directly and not the java_sdk_library
+            // as the sdk already includes the stubs library and switching it
+            // over to use the java_sdk_library would involve significant
+            // refactoring of the sdk snapshot functionality.
+            "legacy.art.module.platform.api.stubs",
+        ],
+    },
+
     // Additional properties to append when coverage is enabled, i.e. when
     // EMMA_INSTRUMENT_FRAMEWORK=true
     coverage: {
         contents: [
             "jacocoagent",
         ],
+        api: {
+            stub_libs: [
+                // Stubs for the jacocoagent.
+                "jacoco-stubs",
+            ],
+        },
     },
     visibility: [
         "//art/build/apex",
