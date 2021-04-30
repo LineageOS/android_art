@@ -400,6 +400,19 @@ bool OatFileAssistant::DexChecksumUpToDate(const OatFile& file, std::string* err
   return true;
 }
 
+static bool ValidateApexVersions(const OatFile& oat_file) {
+  const char* oat_apex_versions =
+      oat_file.GetOatHeader().GetStoreValueByKey(OatHeader::kApexVersionsKey);
+  if (oat_apex_versions == nullptr) {
+    return false;
+  }
+  // Some dex files get compiled with a subset of the boot classpath (for
+  // example currently system server is compiled with DEX2OAT_BOOTCLASSPATH).
+  // For such cases, the oat apex versions will be a prefix of the runtime apex
+  // versions.
+  return android::base::StartsWith(Runtime::Current()->GetApexVersions(), oat_apex_versions);
+}
+
 OatFileAssistant::OatStatus OatFileAssistant::GivenOatFileStatus(const OatFile& file) {
   // Verify the ART_USE_READ_BARRIER state.
   // TODO: Don't fully reject files due to read barrier state. If they contain
@@ -428,6 +441,10 @@ OatFileAssistant::OatStatus OatFileAssistant::GivenOatFileStatus(const OatFile& 
   } else if (CompilerFilter::DependsOnImageChecksum(current_compiler_filter)) {
     if (!ValidateBootClassPathChecksums(file)) {
       VLOG(oat) << "Oat image checksum does not match image checksum.";
+      return kOatBootImageOutOfDate;
+    }
+    if (!ValidateApexVersions(file)) {
+      VLOG(oat) << "Apex versions do not match.";
       return kOatBootImageOutOfDate;
     }
   } else {

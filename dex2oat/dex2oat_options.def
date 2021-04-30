@@ -97,5 +97,6 @@ DEX2OAT_OPTIONS_KEY (Unit,                           CrashOnLinkageViolation)
 DEX2OAT_OPTIONS_KEY (Unit,                           CompileIndividually)
 DEX2OAT_OPTIONS_KEY (std::string,                    PublicSdk)
 DEX2OAT_OPTIONS_KEY (Unit,                           ForceAllowOjInlines)
+DEX2OAT_OPTIONS_KEY (std::string,                    ApexVersions)
 
 #undef DEX2OAT_OPTIONS_KEY
