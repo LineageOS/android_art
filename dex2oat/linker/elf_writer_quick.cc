@@ -264,6 +264,10 @@ void ElfWriterQuick<ElfTypes>::PrepareDebugInfo(const debug::DebugInfo& debug_in
 template <typename ElfTypes>
 void ElfWriterQuick<ElfTypes>::WriteDebugInfo(const debug::DebugInfo& debug_info) {
   if (compiler_options_.GetGenerateMiniDebugInfo()) {
+    // If mini-debug-info wasn't explicitly created so far, create it now (happens in tests).
+    if (debug_info_task_ == nullptr) {
+      PrepareDebugInfo(debug_info);
+    }
     // Wait for the mini-debug-info generation to finish and write it to disk.
     Thread* self = Thread::Current();
     DCHECK(debug_info_thread_pool_ != nullptr);
