@@ -949,36 +949,12 @@ void InstructionSimplifierVisitor::VisitPredicatedInstanceFieldGet(
     HPredicatedInstanceFieldGet* pred_get) {
   HInstruction* target = pred_get->GetTarget();
   HInstruction* default_val = pred_get->GetDefaultValue();
-  // TODO Technically we could end up with a case where the target isn't a phi
-  // (allowing us to eliminate the instruction and replace with either a
-  // InstanceFieldGet or the default) but due to the ordering of compilation
-  // passes this can't happen in ART.
-  if (!target->IsPhi() || !default_val->IsPhi() || default_val->GetBlock() != target->GetBlock()) {
-    // Already reduced the target or the phi selection will differ between the
-    // target and default.
+  if (target->IsNullConstant()) {
+    pred_get->ReplaceWith(default_val);
+    pred_get->GetBlock()->RemoveInstruction(pred_get);
+    RecordSimplification();
     return;
-  }
-  DCHECK_EQ(default_val->InputCount(), target->InputCount());
-  // In the same block both phis only one non-null we can remove the phi from default_val.
-  HInstruction* single_value = nullptr;
-  auto inputs = target->GetInputs();
-  for (auto [input, idx] : ZipCount(MakeIterationRange(inputs))) {
-    if (input->CanBeNull()) {
-      if (single_value == nullptr) {
-        single_value = default_val->InputAt(idx);
-      } else if (single_value != default_val->InputAt(idx) &&
-                !single_value->Equals(default_val->InputAt(idx))) {
-        // Multiple values are associated with potential nulls, can't combine.
-        return;
-      }
-    }
-  }
-  if (single_value == nullptr) {
-    // None of the inputs can be null so we can just remove the predicatedness
-    // of this instruction.
-    DCHECK(std::none_of(inputs.cbegin(), inputs.cend(), [](const HInstruction* input) {
-      return input->CanBeNull();
-    }));
+  } else if (!target->CanBeNull()) {
     HInstruction* replace_with = new (GetGraph()->GetAllocator())
         HInstanceFieldGet(pred_get->GetTarget(),
                           pred_get->GetFieldInfo().GetField(),
@@ -996,7 +972,32 @@ void InstructionSimplifierVisitor::VisitPredicatedInstanceFieldGet(
     pred_get->ReplaceWith(replace_with);
     pred_get->GetBlock()->RemoveInstruction(pred_get);
     RecordSimplification();
-  } else if (single_value->StrictlyDominates(pred_get)) {
+    return;
+  }
+  if (!target->IsPhi() || !default_val->IsPhi() || default_val->GetBlock() != target->GetBlock()) {
+    // The iget has already been reduced. We know the target or the phi
+    // selection will differ between the target and default.
+    return;
+  }
+  DCHECK_EQ(default_val->InputCount(), target->InputCount());
+  // In the same block both phis only one non-null we can remove the phi from default_val.
+  HInstruction* single_value = nullptr;
+  auto inputs = target->GetInputs();
+  for (auto [input, idx] : ZipCount(MakeIterationRange(inputs))) {
+    if (input->CanBeNull()) {
+      if (single_value == nullptr) {
+        single_value = default_val->InputAt(idx);
+      } else if (single_value != default_val->InputAt(idx) &&
+                 !single_value->Equals(default_val->InputAt(idx))) {
+        // Multiple values are associated with potential nulls, can't combine.
+        return;
+      }
+    }
+  }
+  DCHECK(single_value != nullptr) << "All target values are non-null but the phi as a whole still"
+                                  << " can be null? This should not be possible." << std::endl
+                                  << pred_get->DumpWithArgs();
+  if (single_value->StrictlyDominates(pred_get)) {
     // Combine all the maybe null values into one.
     pred_get->ReplaceInput(single_value, 0);
     RecordSimplification();
