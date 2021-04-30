@@ -416,7 +416,11 @@ Parser CreateDex2oatArgumentParser() {
           .IntoKey(M::CompileIndividually)
       .Define("--public-sdk=_")
           .WithType<std::string>()
-          .IntoKey(M::PublicSdk);;
+          .IntoKey(M::PublicSdk)
+      .Define("--apex-versions=_")
+          .WithType<std::string>()
+          .WithHelp("Versions of apexes in the boot classpath, separated by '/'")
+          .IntoKey(M::ApexVersions);
 
   AddCompilerOptionsArgumentParserOptions<Dex2oatArgumentMap>(*parser_builder);
 
