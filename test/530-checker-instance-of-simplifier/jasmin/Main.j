@@ -28,6 +28,11 @@
 ;
 ;; CHECK-START: int Main.$noinline$test(boolean) instruction_simplifier (after)
 ;; CHECK-NOT: InstanceOf
+;
+;; CHECK-START: int Main.$noinline$test(boolean) instruction_simplifier$before_codegen (after)
+;; CHECK-NOT: InstanceFieldSet
+;; CHECK-NOT: InstanceFieldGet
+;; CHECK-NOT: PredicatedInstanceFieldGet
 
 ; public static int $noinline$test(boolean escape) {
 ;   Foo f = new Foo();
