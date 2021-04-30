@@ -1073,6 +1073,7 @@ class Dex2Oat final {
     AssignTrueIfExists(args, M::CrashOnLinkageViolation, &crash_on_linkage_violation_);
     AssignTrueIfExists(args, M::ForceAllowOjInlines, &force_allow_oj_inlines_);
     AssignIfExists(args, M::PublicSdk, &public_sdk_);
+    AssignIfExists(args, M::ApexVersions, &apex_versions_argument_);
 
     AssignIfExists(args, M::Backend, &compiler_kind_);
     parser_options->requested_specific_compiler = args.Exists(M::Backend);
@@ -1601,6 +1602,11 @@ class Dex2Oat final {
         key_value_store_->Put(
             OatHeader::kBootClassPathChecksumsKey,
             gc::space::ImageSpace::GetBootClassPathChecksums(image_spaces, bcp_dex_files));
+
+        std::string versions = apex_versions_argument_.empty()
+            ? runtime->GetApexVersions()
+            : apex_versions_argument_;
+        key_value_store_->Put(OatHeader::kApexVersionsKey, versions);
       }
 
       // Open dex files for class path.
@@ -2951,6 +2957,10 @@ class Dex2Oat final {
 
   // The classpath that determines if a given symbol should be resolved at compile time or not.
   std::string public_sdk_;
+
+  // The apex versions of jars in the boot classpath. Set through command line
+  // argument.
+  std::string apex_versions_argument_;
 
   DISALLOW_IMPLICIT_CONSTRUCTORS(Dex2Oat);
 };
