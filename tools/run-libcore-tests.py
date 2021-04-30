@@ -242,18 +242,21 @@ def main():
   failed_tests, max_exit_code = [], 0
   with concurrent.futures.ThreadPoolExecutor(max_workers=args.jobs) as pool:
     futures = [pool.submit(run_test, test_name) for test_name in get_test_names()]
-    print(f"Running {len(futures)} tasks on {args.jobs} core(s)...")
+    print(f"Running {len(futures)} tasks on {args.jobs} core(s)...\n")
     for i, future in enumerate(concurrent.futures.as_completed(futures)):
       test_name, cmd, stdout, exit_code = future.result()
-      print(f"\n[{i+1}/{len(futures)}] {test_name} " + ("FAIL" if exit_code != 0 else "PASS"))
       if exit_code != 0 or args.dry_run:
         print(cmd)
-        print(stdout)
+        print(stdout.strip())
       else:
         print(stdout.strip().split("\n")[-1])  # Vogar final summary line.
-      failed_tests.extend(failed_regex.findall(stdout))
+      failed_match = failed_regex.findall(stdout)
+      failed_tests.extend(failed_match)
       max_exit_code = max(max_exit_code, exit_code)
-  print("\n" + "\n".join(failed_tests))
+      result = "PASSED" if exit_code == 0 else f"FAILED ({len(failed_match)} test(s) failed)"
+      print(f"[{i+1}/{len(futures)}] Test set {test_name} {result}\n")
+  print(f"Overall, {len(failed_tests)} test(s) failed:")
+  print("\n".join(failed_tests))
   sys.exit(max_exit_code)
 
 if __name__ == '__main__':
