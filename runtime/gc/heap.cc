@@ -366,6 +366,8 @@ Heap::Heap(size_t initial_size,
       min_interval_homogeneous_space_compaction_by_oom_(
           min_interval_homogeneous_space_compaction_by_oom),
       last_time_homogeneous_space_compaction_by_oom_(NanoTime()),
+      gcs_completed_(0u),
+      gcs_requested_(0u),
       pending_collector_transition_(nullptr),
       pending_heap_trim_(nullptr),
       use_homogeneous_space_compaction_for_oom_(use_homogeneous_space_compaction_for_oom),
@@ -1465,7 +1467,7 @@ void Heap::DoPendingCollectorTransition() {
       // Invoke CC full compaction.
       CollectGarbageInternal(collector::kGcTypeFull,
                              kGcCauseCollectorTransition,
-                             /*clear_soft_references=*/false);
+                             /*clear_soft_references=*/false, GC_NUM_ANY);
     } else {
       VLOG(gc) << "CC background compaction ignored due to jank perceptible process state";
     }
@@ -1824,6 +1826,7 @@ mirror::Object* Heap::AllocateInternalWithGc(Thread* self,
       (!instrumented && EntrypointsInstrumented())) {
     return nullptr;
   }
+  uint32_t starting_gc_num = GetCurrentGcNum();
   if (last_gc != collector::kGcTypeNone) {
     // A GC was in progress and we blocked, retry allocation now that memory has been freed.
     mirror::Object* ptr = TryToAllocate<true, false>(self, allocator, alloc_size, bytes_allocated,
@@ -1848,7 +1851,8 @@ mirror::Object* Heap::AllocateInternalWithGc(Thread* self,
   collector::GcType tried_type = next_gc_type_;
   if (last_gc < tried_type) {
     const bool gc_ran = PERFORM_SUSPENDING_OPERATION(
-        CollectGarbageInternal(tried_type, kGcCauseForAlloc, false) != collector::kGcTypeNone);
+        CollectGarbageInternal(tried_type, kGcCauseForAlloc, false, starting_gc_num + 1)
+        != collector::kGcTypeNone);
 
     if ((was_default_allocator && allocator != GetCurrentAllocator()) ||
         (!instrumented && EntrypointsInstrumented())) {
@@ -1871,8 +1875,11 @@ mirror::Object* Heap::AllocateInternalWithGc(Thread* self,
            << " allocation";
   // TODO: Run finalization, but this may cause more allocations to occur.
   // We don't need a WaitForGcToComplete here either.
+  // TODO: Should check whether another thread already just ran a GC with soft
+  // references.
   DCHECK(!gc_plan_.empty());
-  PERFORM_SUSPENDING_OPERATION(CollectGarbageInternal(gc_plan_.back(), kGcCauseForAlloc, true));
+  PERFORM_SUSPENDING_OPERATION(
+      CollectGarbageInternal(gc_plan_.back(), kGcCauseForAlloc, true, GC_NUM_ANY));
   if ((was_default_allocator && allocator != GetCurrentAllocator()) ||
       (!instrumented && EntrypointsInstrumented())) {
     return nullptr;
@@ -2028,7 +2035,7 @@ void Heap::CountInstances(const std::vector<Handle<mirror::Class>>& classes,
 void Heap::CollectGarbage(bool clear_soft_references, GcCause cause) {
   // Even if we waited for a GC we still need to do another GC since weaks allocated during the
   // last GC will not have necessarily been cleared.
-  CollectGarbageInternal(gc_plan_.back(), cause, clear_soft_references);
+  CollectGarbageInternal(gc_plan_.back(), cause, clear_soft_references, GC_NUM_ANY);
 }
 
 bool Heap::SupportHomogeneousSpaceCompactAndCollectorTransitions() const {
@@ -2295,7 +2302,7 @@ void Heap::PreZygoteFork() {
   if (!HasZygoteSpace()) {
     // We still want to GC in case there is some unreachable non moving objects that could cause a
     // suboptimal bin packing when we compact the zygote space.
-    CollectGarbageInternal(collector::kGcTypeFull, kGcCauseBackground, false);
+    CollectGarbageInternal(collector::kGcTypeFull, kGcCauseBackground, false, GC_NUM_ANY);
     // Trim the pages at the end of the non moving space. Trim while not holding zygote lock since
     // the trim process may require locking the mutator lock.
     non_moving_space_->Trim();
@@ -2552,9 +2559,17 @@ size_t Heap::GetNativeBytes() {
   // other things. It seems risky to trigger GCs as a result of such changes.
 }
 
+static inline bool GCNumberLt(uint32_t gcs_completed, uint32_t gcs_requested) {
+  uint32_t difference = gcs_requested - gcs_completed;
+  bool completed_more_than_requested = difference > 0x80000000;
+  return difference > 0 && !completed_more_than_requested;
+}
+
+
 collector::GcType Heap::CollectGarbageInternal(collector::GcType gc_type,
                                                GcCause gc_cause,
-                                               bool clear_soft_references) {
+                                               bool clear_soft_references,
+                                               uint32_t requested_gc_num) {
   Thread* self = Thread::Current();
   Runtime* runtime = Runtime::Current();
   // If the heap can't run the GC, silently fail and return that no GC was run.
@@ -2575,6 +2590,8 @@ collector::GcType Heap::CollectGarbageInternal(collector::GcType gc_type,
   if (self->IsHandlingStackOverflow()) {
     // If we are throwing a stack overflow error we probably don't have enough remaining stack
     // space to run the GC.
+    // Count this as a GC in case someone is waiting for it to complete.
+    gcs_completed_.fetch_add(1, std::memory_order_release);
     return collector::kGcTypeNone;
   }
   bool compacting_gc;
@@ -2584,16 +2601,24 @@ collector::GcType Heap::CollectGarbageInternal(collector::GcType gc_type,
     MutexLock mu(self, *gc_complete_lock_);
     // Ensure there is only one GC at a time.
     WaitForGcToCompleteLocked(gc_cause, self);
+    if (requested_gc_num != GC_NUM_ANY && !GCNumberLt(GetCurrentGcNum(), requested_gc_num)) {
+      // The appropriate GC was already triggered elsewhere.
+      return collector::kGcTypeNone;
+    }
     compacting_gc = IsMovingGc(collector_type_);
     // GC can be disabled if someone has a used GetPrimitiveArrayCritical.
     if (compacting_gc && disable_moving_gc_count_ != 0) {
       LOG(WARNING) << "Skipping GC due to disable moving GC count " << disable_moving_gc_count_;
+      // Again count this as a GC.
+      gcs_completed_.fetch_add(1, std::memory_order_release);
       return collector::kGcTypeNone;
     }
     if (gc_disabled_for_shutdown_) {
+      gcs_completed_.fetch_add(1, std::memory_order_release);
       return collector::kGcTypeNone;
     }
     collector_type_running_ = collector_type_;
+    last_gc_cause_ = gc_cause;
   }
   if (gc_cause == kGcCauseForAlloc && runtime->HasStatsEnabled()) {
     ++runtime->GetStats()->gc_for_alloc_count;
@@ -2662,6 +2687,7 @@ collector::GcType Heap::CollectGarbageInternal(collector::GcType gc_type,
   SelfDeletingTask* clear = reference_processor_->CollectClearedReferences(self);
   // Grow the heap so that we know when to perform the next GC.
   GrowForUtilization(collector, bytes_allocated_before_gc);
+  old_native_bytes_allocated_.store(GetNativeBytes());
   LogGC(gc_cause, collector);
   FinishGC(self, gc_type);
   // Actually enqueue all cleared references. Do this after the GC has officially finished since
@@ -2670,8 +2696,6 @@ collector::GcType Heap::CollectGarbageInternal(collector::GcType gc_type,
   clear->Finalize();
   // Inform DDMS that a GC completed.
   Dbg::GcDidFinish();
-
-  old_native_bytes_allocated_.store(GetNativeBytes());
 
   // Unload native libraries for class unloading. We do this after calling FinishGC to prevent
   // deadlocks in case the JNI_OnUnload function does allocations.
@@ -2738,6 +2762,9 @@ void Heap::FinishGC(Thread* self, collector::GcType gc_type) {
   // Reset.
   running_collection_is_blocking_ = false;
   thread_running_gc_ = nullptr;
+  if (gc_type != collector::kGcTypeNone) {
+    gcs_completed_.fetch_add(1, std::memory_order_release);
+  }
   // Wake anyone who may have been waiting for the GC to complete.
   gc_complete_cond_->Broadcast(self);
 }
@@ -3000,7 +3027,10 @@ void Heap::PushOnAllocationStackWithInternalGC(Thread* self, ObjPtr<mirror::Obje
     // to heap verification requiring that roots are live (either in the live bitmap or in the
     // allocation stack).
     CHECK(allocation_stack_->AtomicPushBackIgnoreGrowthLimit(obj->Ptr()));
-    CollectGarbageInternal(collector::kGcTypeSticky, kGcCauseForAlloc, false);
+    CollectGarbageInternal(collector::kGcTypeSticky,
+                           kGcCauseForAlloc,
+                           false,
+                           GetCurrentGcNum() + 1);
   } while (!allocation_stack_->AtomicPushBack(obj->Ptr()));
 }
 
@@ -3020,7 +3050,10 @@ void Heap::PushOnThreadLocalAllocationStackWithInternalGC(Thread* self,
     // allocation stack).
     CHECK(allocation_stack_->AtomicPushBackIgnoreGrowthLimit(obj->Ptr()));
     // Push into the reserve allocation stack.
-    CollectGarbageInternal(collector::kGcTypeSticky, kGcCauseForAlloc, false);
+    CollectGarbageInternal(collector::kGcTypeSticky,
+                           kGcCauseForAlloc,
+                           false,
+                           GetCurrentGcNum() + 1);
   }
   self->SetThreadLocalAllocationStack(start_address, end_address);
   // Retry on the new thread-local allocation stack.
@@ -3441,7 +3474,6 @@ collector::GcType Heap::WaitForGcToCompleteLocked(GcCause cause, Thread* self) {
     // Don't log fake "GC" types that are only used for debugger or hidden APIs. If we log these,
     // it results in log spam. kGcCauseExplicit is already logged in LogGC, so avoid it here too.
     if (cause == kGcCauseForAlloc ||
-        cause == kGcCauseForNativeAlloc ||
         cause == kGcCauseDisableMovingGc) {
       VLOG(gc) << "Starting a blocking GC " << cause;
     }
@@ -3656,25 +3688,26 @@ void Heap::AddFinalizerReference(Thread* self, ObjPtr<mirror::Object>* object) {
 
 void Heap::RequestConcurrentGCAndSaveObject(Thread* self,
                                             bool force_full,
+                                            uint32_t observed_gc_num,
                                             ObjPtr<mirror::Object>* obj) {
   StackHandleScope<1> hs(self);
   HandleWrapperObjPtr<mirror::Object> wrapper(hs.NewHandleWrapper(obj));
-  RequestConcurrentGC(self, kGcCauseBackground, force_full);
+  RequestConcurrentGC(self, kGcCauseBackground, force_full, observed_gc_num);
 }
 
 class Heap::ConcurrentGCTask : public HeapTask {
  public:
-  ConcurrentGCTask(uint64_t target_time, GcCause cause, bool force_full)
-      : HeapTask(target_time), cause_(cause), force_full_(force_full) {}
+  ConcurrentGCTask(uint64_t target_time, GcCause cause, bool force_full, uint32_t gc_num)
+      : HeapTask(target_time), cause_(cause), force_full_(force_full), my_gc_num_(gc_num) {}
   void Run(Thread* self) override {
     gc::Heap* heap = Runtime::Current()->GetHeap();
-    heap->ConcurrentGC(self, cause_, force_full_);
-    heap->ClearConcurrentGCRequest();
+    heap->ConcurrentGC(self, cause_, force_full_, my_gc_num_);
   }
 
  private:
   const GcCause cause_;
   const bool force_full_;  // If true, force full (or partial) collection.
+  const uint32_t my_gc_num_;  // Sequence number of requested GC.
 };
 
 static bool CanAddHeapTask(Thread* self) REQUIRES(!Locks::runtime_shutdown_lock_) {
@@ -3683,20 +3716,24 @@ static bool CanAddHeapTask(Thread* self) REQUIRES(!Locks::runtime_shutdown_lock_
       !self->IsHandlingStackOverflow();
 }
 
-void Heap::ClearConcurrentGCRequest() {
-  concurrent_gc_pending_.store(false, std::memory_order_relaxed);
-}
-
-void Heap::RequestConcurrentGC(Thread* self, GcCause cause, bool force_full) {
-  if (CanAddHeapTask(self) &&
-      concurrent_gc_pending_.CompareAndSetStrongSequentiallyConsistent(false, true)) {
-    task_processor_->AddTask(self, new ConcurrentGCTask(NanoTime(),  // Start straight away.
-                                                        cause,
-                                                        force_full));
+void Heap::RequestConcurrentGC(Thread* self,
+                               GcCause cause,
+                               bool force_full,
+                               uint32_t observed_gc_num) {
+  uint32_t gcs_requested = gcs_requested_.load(std::memory_order_relaxed);
+  if (!GCNumberLt(observed_gc_num, gcs_requested)) {
+    // Nobody beat us to requesting the next gc after observed_gc_num.
+    if (CanAddHeapTask(self)
+        && gcs_requested_.CompareAndSetStrongRelaxed(gcs_requested, observed_gc_num + 1)) {
+      task_processor_->AddTask(self, new ConcurrentGCTask(NanoTime(),  // Start straight away.
+                                                          cause,
+                                                          force_full,
+                                                          observed_gc_num + 1));
+    }
   }
 }
 
-void Heap::ConcurrentGC(Thread* self, GcCause cause, bool force_full) {
+void Heap::ConcurrentGC(Thread* self, GcCause cause, bool force_full, uint32_t requested_gc_num) {
   if (!Runtime::Current()->IsShuttingDown(self)) {
     // Wait for any GCs currently running to finish.
     if (WaitForGcToComplete(cause, self) == collector::kGcTypeNone) {
@@ -3707,11 +3744,18 @@ void Heap::ConcurrentGC(Thread* self, GcCause cause, bool force_full) {
       if (force_full && next_gc_type == collector::kGcTypeSticky) {
         next_gc_type = NonStickyGcType();
       }
-      if (CollectGarbageInternal(next_gc_type, cause, false) == collector::kGcTypeNone) {
+      if (CollectGarbageInternal(next_gc_type, cause, false, requested_gc_num)
+          == collector::kGcTypeNone) {
         for (collector::GcType gc_type : gc_plan_) {
           // Attempt to run the collector, if we succeed, we are done.
+          uint32_t gcs_completed = GetCurrentGcNum();
+          if (!GCNumberLt(gcs_completed, requested_gc_num)) {
+            // Somebody did it for us.
+            break;
+          }
           if (gc_type > next_gc_type &&
-              CollectGarbageInternal(gc_type, cause, false) != collector::kGcTypeNone) {
+              CollectGarbageInternal(gc_type, cause, false, requested_gc_num)
+              != collector::kGcTypeNone) {
             break;
           }
         }
@@ -3752,7 +3796,7 @@ void Heap::RequestCollectorTransition(CollectorType desired_collector_type, uint
   const uint64_t target_time = NanoTime() + delta_time;
   {
     MutexLock mu(self, *pending_task_lock_);
-    // If we have an existing collector transition, update the targe time to be the new target.
+    // If we have an existing collector transition, update the target time to be the new target.
     if (pending_collector_transition_ != nullptr) {
       task_processor_->UpdateTargetRunTime(self, pending_collector_transition_, target_time);
       return;
@@ -3856,10 +3900,6 @@ void Heap::RevokeAllThreadLocalBuffers() {
   }
 }
 
-bool Heap::IsGCRequestPending() const {
-  return concurrent_gc_pending_.load(std::memory_order_relaxed);
-}
-
 void Heap::RunFinalization(JNIEnv* env, uint64_t timeout) {
   env->CallStaticVoidMethod(WellKnownClasses::dalvik_system_VMRuntime,
                             WellKnownClasses::dalvik_system_VMRuntime_runFinalization,
@@ -3913,21 +3953,35 @@ inline float Heap::NativeMemoryOverTarget(size_t current_native_bytes, bool is_g
 
 inline void Heap::CheckGCForNative(Thread* self) {
   bool is_gc_concurrent = IsGcConcurrent();
+  uint32_t starting_gc_num = GetCurrentGcNum();
   size_t current_native_bytes = GetNativeBytes();
   float gc_urgency = NativeMemoryOverTarget(current_native_bytes, is_gc_concurrent);
   if (UNLIKELY(gc_urgency >= 1.0)) {
     if (is_gc_concurrent) {
-      RequestConcurrentGC(self, kGcCauseForNativeAlloc, /*force_full=*/true);
+      RequestConcurrentGC(self, kGcCauseForNativeAlloc, /*force_full=*/true, starting_gc_num);
       if (gc_urgency > kStopForNativeFactor
           && current_native_bytes > stop_for_native_allocs_) {
         // We're in danger of running out of memory due to rampant native allocation.
         if (VLOG_IS_ON(heap) || VLOG_IS_ON(startup)) {
           LOG(INFO) << "Stopping for native allocation, urgency: " << gc_urgency;
         }
-        WaitForGcToComplete(kGcCauseForNativeAlloc, self);
+        // Count how many times we do this, so we can warn if this becomes excessive.
+        // Stop after a while out of excessive caution.
+        static constexpr int kGcWaitIters = 20;
+        for (int i = 1; i <= kGcWaitIters; ++i) {
+          if (!GCNumberLt(GetCurrentGcNum(), gcs_requested_.load(std::memory_order_relaxed))
+              || WaitForGcToComplete(kGcCauseForNativeAlloc, self) != collector::kGcTypeNone) {
+            break;
+          }
+          if (i % 10 == 0) {
+            LOG(WARNING) << "Slept " << i << " times in native allocation, waiting for GC";
+          }
+          static constexpr int kGcWaitSleepMicros = 2000;
+          usleep(kGcWaitSleepMicros);  // Encourage our requested GC to start.
+        }
       }
     } else {
-      CollectGarbageInternal(NonStickyGcType(), kGcCauseForNativeAlloc, false);
+      CollectGarbageInternal(NonStickyGcType(), kGcCauseForNativeAlloc, false, starting_gc_num + 1);
     }
   }
 }
@@ -4372,7 +4426,7 @@ class Heap::TriggerPostForkCCGcTask : public HeapTask {
     // Trigger a GC, if not already done. The first GC after fork, whenever it
     // takes place, will adjust the thresholds to normal levels.
     if (heap->target_footprint_.load(std::memory_order_relaxed) == heap->growth_limit_) {
-      heap->RequestConcurrentGC(self, kGcCauseBackground, false);
+      heap->RequestConcurrentGC(self, kGcCauseBackground, false, heap->GetCurrentGcNum());
     }
   }
 };
