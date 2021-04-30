@@ -514,9 +514,9 @@ bool HInliner::TryInlineFromCHA(HInvoke* invoke_instruction) {
     return false;
   }
   AddCHAGuard(invoke_instruction, dex_pc, cursor, bb_cursor);
-  // Add dependency due to devirtualization. We've assumed resolved_method
-  // has single implementation.
-  outermost_graph_->AddCHASingleImplementationDependency(method);
+  // Add dependency due to devirtualization: we are assuming the resolved method
+  // has a single implementation.
+  outermost_graph_->AddCHASingleImplementationDependency(invoke_instruction->GetResolvedMethod());
   MaybeRecordStat(stats_, MethodCompilationStat::kCHAInline);
   return true;
 }
