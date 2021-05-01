@@ -1654,6 +1654,54 @@ TEST_F(OatFileAssistantTest, LoadOatNoArt) {
   EXPECT_FALSE(oat_file->IsExecutable());
 }
 
+TEST_F(OatFileAssistantTest, GetDexOptNeededWithApexVersions) {
+  std::string dex_location = GetScratchDir() + "/TestDex.jar";
+  std::string odex_location = GetOdexDir() + "/TestDex.odex";
+  Copy(GetDexSrc1(), dex_location);
+
+  // Test that using the current's runtime apex versions works.
+  {
+    std::string error_msg;
+    std::vector<std::string> args;
+    args.push_back("--dex-file=" + dex_location);
+    args.push_back("--oat-file=" + odex_location);
+    args.push_back("--apex-versions=" + Runtime::Current()->GetApexVersions());
+    ASSERT_TRUE(Dex2Oat(args, &error_msg)) << error_msg;
+
+    OatFileAssistant oat_file_assistant(
+        dex_location.c_str(), kRuntimeISA, default_context_.get(), false);
+    EXPECT_EQ(OatFileAssistant::kOatUpToDate, oat_file_assistant.OdexFileStatus());
+  }
+
+  // Test that a subset of apex versions works.
+  {
+    std::string error_msg;
+    std::vector<std::string> args;
+    args.push_back("--dex-file=" + dex_location);
+    args.push_back("--oat-file=" + odex_location);
+    args.push_back("--apex-versions=" + Runtime::Current()->GetApexVersions().substr(0, 1));
+    ASSERT_TRUE(Dex2Oat(args, &error_msg)) << error_msg;
+
+    OatFileAssistant oat_file_assistant(
+        dex_location.c_str(), kRuntimeISA, default_context_.get(), false);
+    EXPECT_EQ(OatFileAssistant::kOatUpToDate, oat_file_assistant.OdexFileStatus());
+  }
+
+  // Test that different apex versions require to recompile.
+  {
+    std::string error_msg;
+    std::vector<std::string> args;
+    args.push_back("--dex-file=" + dex_location);
+    args.push_back("--oat-file=" + odex_location);
+    args.push_back("--apex-versions=/1/2/3/4");
+    ASSERT_TRUE(Dex2Oat(args, &error_msg)) << error_msg;
+
+    OatFileAssistant oat_file_assistant(
+        dex_location.c_str(), kRuntimeISA, default_context_.get(), false);
+    EXPECT_EQ(OatFileAssistant::kDex2OatForBootImage, oat_file_assistant.OdexFileStatus());
+  }
+}
+
 // TODO: More Tests:
 //  * Test class linker falls back to unquickened dex for DexNoOat
 //  * Test class linker falls back to unquickened dex for MultiDexNoOat
