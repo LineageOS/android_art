@@ -173,6 +173,9 @@
 
 #ifdef ART_TARGET_ANDROID
 #include <android/set_abort_message.h>
+#include "com_android_apex.h"
+namespace apex = com::android::apex;
+
 #endif
 
 // Static asserts to check the values of generated assembly-support macros.
@@ -1235,6 +1238,52 @@ static inline void CreatePreAllocatedException(Thread* self,
   detailMessageField->SetObject</* kTransactionActive= */ false>(exception->Read(), message);
 }
 
+void Runtime::InitializeApexVersions() {
+  std::vector<std::string_view> bcp_apexes;
+  for (const std::string& jar : Runtime::Current()->GetBootClassPathLocations()) {
+    if (LocationIsOnApex(jar)) {
+      size_t start = jar.find('/', 1);
+      if (start == std::string::npos) {
+        continue;
+      }
+      size_t end = jar.find('/', start + 1);
+      if (end == std::string::npos) {
+        continue;
+      }
+      std::string apex = jar.substr(start + 1, end - start - 1);
+      bcp_apexes.push_back(apex);
+    }
+  }
+  std::string result;
+  static const char* kApexFileName = "/apex/apex-info-list.xml";
+  // When running on host or chroot, we just encode empty markers.
+  if (!kIsTargetBuild || !OS::FileExists(kApexFileName)) {
+    for (uint32_t i = 0; i < bcp_apexes.size(); ++i) {
+      result += '/';
+    }
+  } else {
+#ifdef ART_TARGET_ANDROID
+    auto info_list = apex::readApexInfoList(kApexFileName);
+    CHECK(info_list.has_value());
+    std::map<std::string_view, const apex::ApexInfo*> apex_infos;
+    for (const apex::ApexInfo& info : info_list->getApexInfo()) {
+      if (info.getIsActive()) {
+        apex_infos.emplace(info.getModuleName(), &info);
+      }
+    }
+    for (const std::string_view& str : bcp_apexes) {
+      auto info = apex_infos.find(str);
+      if (info == apex_infos.end() || info->second->getIsFactory()) {
+        result += '/';
+      } else {
+        android::base::StringAppendF(&result, "/%" PRIu64, info->second->getVersionCode());
+      }
+    }
+#endif
+  }
+  apex_versions_ = result;
+}
+
 bool Runtime::Init(RuntimeArgumentMap&& runtime_options_in) {
   // (b/30160149): protect subprocesses from modifications to LD_LIBRARY_PATH, etc.
   // Take a snapshot of the environment at the time the runtime was created, for use by Exec, etc.
@@ -1685,6 +1734,8 @@ bool Runtime::Init(RuntimeArgumentMap&& runtime_options_in) {
       }
     }
   }
+
+  InitializeApexVersions();
 
   CHECK(class_linker_ != nullptr);
 

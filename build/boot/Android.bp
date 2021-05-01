@@ -43,12 +43,7 @@ bootclasspath_fragment {
     core_platform_api: {
         stub_libs: [
             // Core platform stubs for all the non-coverage contents.
-            //
-            // Use the stubs java_library directly and not the java_sdk_library
-            // as the sdk already includes the stubs library and switching it
-            // over to use the java_sdk_library would involve significant
-            // refactoring of the sdk snapshot functionality.
-            "legacy.art.module.platform.api.stubs",
+            "legacy.art.module.platform.api",
         ],
     },
 

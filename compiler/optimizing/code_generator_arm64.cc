@@ -5118,7 +5118,7 @@ void CodeGeneratorARM64::EmitThunkCode(const linker::LinkerPatch& patch,
       Offset offset(ArtMethod::EntryPointFromQuickCompiledCodeOffset(
           kArm64PointerSize).Int32Value());
       assembler.JumpTo(ManagedRegister(arm64::X0), offset, ManagedRegister(arm64::IP0));
-      if (GetCompilerOptions().GenerateAnyDebugInfo()) {
+      if (debug_name != nullptr && GetCompilerOptions().GenerateAnyDebugInfo()) {
         *debug_name = "MethodCallThunk";
       }
       break;
@@ -5126,7 +5126,7 @@ void CodeGeneratorARM64::EmitThunkCode(const linker::LinkerPatch& patch,
     case linker::LinkerPatch::Type::kCallEntrypoint: {
       Offset offset(patch.EntrypointOffset());
       assembler.JumpTo(ManagedRegister(arm64::TR), offset, ManagedRegister(arm64::IP0));
-      if (GetCompilerOptions().GenerateAnyDebugInfo()) {
+      if (debug_name != nullptr && GetCompilerOptions().GenerateAnyDebugInfo()) {
         *debug_name = "EntrypointCallThunk_" + std::to_string(offset.Uint32Value());
       }
       break;
