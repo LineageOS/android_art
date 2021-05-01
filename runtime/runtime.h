@@ -995,6 +995,10 @@ class Runtime {
                                   const uint8_t* map_end,
                                   const std::string& file_name);
 
+  const std::string& GetApexVersions() const {
+    return apex_versions_;
+  }
+
  private:
   static void InitPlatformSignalHandlers();
 
@@ -1034,6 +1038,10 @@ class Runtime {
 
   ThreadPool* AcquireThreadPool() REQUIRES(!Locks::runtime_thread_pool_lock_);
   void ReleaseThreadPool() REQUIRES(!Locks::runtime_thread_pool_lock_);
+
+  // Parses /apex/apex-info-list.xml to initialize a string containing versions
+  // of boot classpath jars and encoded into .oat files.
+  void InitializeApexVersions();
 
   // A pointer to the active runtime or null.
   static Runtime* instance_;
@@ -1366,6 +1374,14 @@ class Runtime {
 
   metrics::ArtMetrics metrics_;
   std::unique_ptr<metrics::MetricsReporter> metrics_reporter_;
+
+  // Apex versions of boot classpath jars concatenated in a string. The format
+  // is of the type:
+  // '/apex1_version/apex2_version//'
+  //
+  // When the apex is the factory version, we don't encode it (for example in
+  // the third entry in the example above).
+  std::string apex_versions_;
 
   // Note: See comments on GetFaultMessage.
   friend std::string GetFaultMessageForAbortLogging();

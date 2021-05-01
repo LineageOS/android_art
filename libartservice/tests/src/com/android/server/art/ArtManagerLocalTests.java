@@ -16,19 +16,22 @@
 
 package com.android.server.art;
 
-import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
+
+import androidx.test.runner.AndroidJUnit4;
 
 import com.android.server.art.ArtManagerLocal;
 
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.Test;
+import junit.framework.TestCase;
 
-public class ArtManagerLocalTests {
+public class ArtManagerLocalTests extends TestCase {
     private ArtManagerLocal mArtManagerLocal;
 
-    @Before
     public void setup() {
         mArtManagerLocal = new ArtManagerLocal();
+    }
+
+    public void testScaffolding() {
+        assertTrue(true);
     }
 }
