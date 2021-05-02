@@ -42,6 +42,7 @@ common_targets="vogar core-tests apache-harmony-jdwp-tests-hostdex jsr166-tests 
 specific_targets="libjavacoretests libjdwp libwrapagentproperties libwrapagentpropertiesd"
 build_host="no"
 build_target="no"
+installclean="yes"
 j_arg="-j$(nproc)"
 showcommands=
 make_command=
@@ -52,6 +53,9 @@ while true; do
     shift
   elif [[ "$1" == "--target" ]]; then
     build_target="yes"
+    shift
+  elif [[ "$1" == "--no-installclean" ]]; then
+    installclean="no"
     shift
   elif [[ "$1" == -j* ]]; then
     j_arg=$1
@@ -122,8 +126,10 @@ if [[ $build_target == "yes" ]]; then
   make_command+=" ${specific_targets}"
 fi
 
-echo "Do installclean"
-build/soong/soong_ui.bash --make-mode installclean
+if [[ $installclean == "yes" ]]; then
+  echo "Perform installclean"
+  ANDROID_QUIET_BUILD=true build/soong/soong_ui.bash --make-mode $extra_args installclean
+fi
 
 echo "Executing $make_command"
 # Disable path restrictions to enable luci builds using vpython.
