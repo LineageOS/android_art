@@ -146,23 +146,18 @@ extern "C" JNIEXPORT jboolean JNICALL Java_Main_compiledWithOptimizing(JNIEnv* e
   constexpr const char* kCompilerFilter = "--compiler-filter=";
   const char* filter = strstr(cmd_line, kCompilerFilter);
   if (filter != nullptr) {
-    // If it's set, make sure it's not interpret-only|verify-none|verify-at-runtime.
-    // Note: The space filter might have an impact on the test, but ignore that for now.
     filter += strlen(kCompilerFilter);
-    constexpr const char* kInterpretOnly = "interpret-only";
-    constexpr const char* kVerifyNone = "verify-none";
-    constexpr const char* kVerifyAtRuntime = "verify-at-runtime";
-    constexpr const char* kQuicken = "quicken";
-    constexpr const char* kExtract = "extract";
-    if (strncmp(filter, kInterpretOnly, strlen(kInterpretOnly)) == 0 ||
-        strncmp(filter, kVerifyNone, strlen(kVerifyNone)) == 0 ||
-        strncmp(filter, kVerifyAtRuntime, strlen(kVerifyAtRuntime)) == 0 ||
-        strncmp(filter, kExtract, strlen(kExtract)) == 0 ||
-        strncmp(filter, kQuicken, strlen(kQuicken)) == 0) {
+    const char* end = strchr(filter, ' ');
+    std::string string_filter(filter, (end == nullptr) ? strlen(filter) : end - filter);
+    CompilerFilter::Filter compiler_filter;
+    if (CompilerFilter::ParseCompilerFilter(string_filter.c_str(), &compiler_filter)) {
+      return CompilerFilter::IsAotCompilationEnabled(compiler_filter) ? JNI_TRUE : JNI_FALSE;
+    } else {
       return JNI_FALSE;
     }
   }
 
+  // No filter passed, assume default has AOT.
   return JNI_TRUE;
 }
 
