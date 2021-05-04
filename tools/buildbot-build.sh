@@ -42,7 +42,7 @@ common_targets="vogar core-tests apache-harmony-jdwp-tests-hostdex jsr166-tests 
 specific_targets="libjavacoretests libjdwp libwrapagentproperties libwrapagentpropertiesd"
 build_host="no"
 build_target="no"
-installclean="yes"
+installclean="no"
 j_arg="-j$(nproc)"
 showcommands=
 make_command=
@@ -54,8 +54,8 @@ while true; do
   elif [[ "$1" == "--target" ]]; then
     build_target="yes"
     shift
-  elif [[ "$1" == "--no-installclean" ]]; then
-    installclean="no"
+  elif [[ "$1" == "--installclean" ]]; then
+    installclean="yes"
     shift
   elif [[ "$1" == -j* ]]; then
     j_arg=$1
@@ -129,6 +129,10 @@ fi
 if [[ $installclean == "yes" ]]; then
   echo "Perform installclean"
   ANDROID_QUIET_BUILD=true build/soong/soong_ui.bash --make-mode $extra_args installclean
+else
+  echo "WARNING: Missing --installclean argument to buildbot-build.sh"
+  echo "WARNING: This is usually ok, but may cause rare odd failures."
+  echo ""
 fi
 
 echo "Executing $make_command"
