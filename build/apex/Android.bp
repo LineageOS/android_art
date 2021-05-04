@@ -284,6 +284,9 @@ apex_defaults {
         },
     },
     min_sdk_version: "S",
+    // Indicates that pre-installed version of this apex can be compressed.
+    // Whether it actually will be compressed is controlled on per-device basis.
+    compressible: true,
 }
 
 // Default values shared by (device) Debug and Testing ART APEXes.
