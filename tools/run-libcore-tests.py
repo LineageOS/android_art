@@ -238,7 +238,7 @@ def main():
                           universal_newlines=True) as proc:
       return test_name, cmd, proc.communicate()[0], proc.wait()
 
-  failed_regex = re.compile(r"^.* FAIL \(EXEC_FAILED\)$", re.MULTILINE)
+  failed_regex = re.compile(r"^.* FAIL \((?:EXEC_FAILED|ERROR)\)$", re.MULTILINE)
   failed_tests, max_exit_code = [], 0
   with concurrent.futures.ThreadPoolExecutor(max_workers=args.jobs) as pool:
     futures = [pool.submit(run_test, test_name) for test_name in get_test_names()]
