@@ -35,6 +35,8 @@ art_cc_defaults {
                 "com.android.art.debug",
             ],
         },
+        // The following set of relative_install_paths installs the library in a
+        // location that will be available as java.library.path in run tests.
         android_arm: {
             relative_install_path: "art/arm",
         },
@@ -59,6 +61,32 @@ art_cc_defaults {
     apex_available: [
         "com.android.art.debug",
     ],
+}
+
+// Variant of art_test_defaults that installs the library in a location which
+// will be added to the default namespace, and hence also the com_android_art
+// namespace. That allows the library to have shared_libs dependencies on all
+// ART internal libraries.
+//
+// Currently this only works for run tests where run-test-jar sets
+// LD_LIBRARY_PATH and NATIVELOADER_DEFAULT_NAMESPACE_LIBS.
+art_cc_defaults {
+    name: "art_test_internal_library_defaults",
+    defaults: ["art_test_defaults"],
+    target: {
+        android_arm: {
+            relative_install_path: "com.android.art/lib",
+        },
+        android_arm64: {
+            relative_install_path: "com.android.art/lib64",
+        },
+        android_x86: {
+            relative_install_path: "com.android.art/lib",
+        },
+        android_x86_64: {
+            relative_install_path: "com.android.art/lib64",
+        },
+    },
 }
 
 art_cc_defaults {
@@ -314,7 +342,7 @@ art_cc_test_library {
 cc_defaults {
     name: "libartagent-defaults",
     defaults: [
-        "art_test_defaults",
+        "art_test_internal_library_defaults",
         "art_defaults",
     ],
     shared_libs: [
@@ -354,7 +382,7 @@ art_cc_test_library {
 art_cc_defaults {
     name: "libtiagent-base-defaults",
     defaults: [
-        "art_test_defaults",
+        "art_test_internal_library_defaults",
         "art_defaults",
         // Not derived from libartagent-defaults for NDK.
     ],
@@ -619,7 +647,7 @@ art_cc_test_library {
 cc_defaults {
     name: "libarttest-defaults",
     defaults: [
-        "art_test_defaults",
+        "art_test_internal_library_defaults",
         "art_defaults",
     ],
     srcs: [
