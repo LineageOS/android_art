@@ -208,7 +208,6 @@ TEST_F(ProfileCompilationInfoTest, SaveArtMethods) {
 
   // Check that what we saved is in the profile (methods form Main and Second).
   ProfileCompilationInfo info2;
-  ASSERT_TRUE(profile.GetFile()->ResetOffset());
   ASSERT_TRUE(info2.Load(GetFd(profile)));
   ASSERT_EQ(info2.GetNumberOfMethods(), main_methods.size() + second_methods.size());
   {
