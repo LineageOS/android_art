@@ -1,6 +1,9 @@
 {
   "name": "com.android.art",
   "version": 1,
+  "provideNativeLibs": [
+    "libjdwp.so"
+  ],
   "requireNativeLibs": [
     "libicu.so",
     "libicuuc.so",
