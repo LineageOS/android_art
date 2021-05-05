@@ -118,7 +118,7 @@ TEST_F(OdrFsUtilsTest, EnsureDirectoryExistsSubDirs) {
   }
 }
 
-TEST_F(OdrFsUtilsTest, DISABLED_GetUsedSpace) {
+TEST_F(OdrFsUtilsTest, GetUsedSpace) {
   static constexpr size_t kFirstFileBytes = 1;
   static constexpr size_t kSecondFileBytes = 16111;
   static constexpr size_t kBytesPerBlock = 512;
@@ -148,7 +148,8 @@ TEST_F(OdrFsUtilsTest, DISABLED_GetUsedSpace) {
   for (size_t i = 1; i < 32768; i *= 17) {
     const std::string path = android::base::StringPrintf("%s/%zu", sub_dir_path.c_str(), i);
     ASSERT_TRUE(CreateFile(path.c_str(), i));
-    expected_bytes_used += RoundUp(i, sb.st_blocks * kBytesPerBlock);
+    ASSERT_EQ(0, stat(path.c_str(), &sb));
+    expected_bytes_used += sb.st_blocks * kBytesPerBlock;
     ASSERT_TRUE(GetUsedSpace(scratch_dir.GetPath().c_str(), &bytes_used));
     ASSERT_EQ(expected_bytes_used, bytes_used);
   }
