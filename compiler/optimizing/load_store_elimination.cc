@@ -664,6 +664,16 @@ class LSEVisitor final : private HGraphDelegateVisitor {
             ? Replacement(value)
             : Value::ForLoopPhiPlaceholder(value.GetPhiPlaceholder());
       }
+      if (value.IsInstruction() && value.GetInstruction()->IsInstanceFieldGet()) {
+        DCHECK_LT(static_cast<size_t>(value.GetInstruction()->GetId()),
+                  substitute_instructions_for_loads_.size());
+        HInstruction* substitute =
+            substitute_instructions_for_loads_[value.GetInstruction()->GetId()];
+        if (substitute != nullptr) {
+          DCHECK(substitute->IsPredicatedInstanceFieldGet());
+          return Value::ForInstruction(substitute);
+        }
+      }
     }
     if (value.NeedsPhi() && phi_placeholder_replacements_[PhiPlaceholderIndex(value)].IsValid()) {
       return Replacement(value);
@@ -3188,6 +3198,8 @@ class PartialLoadStoreEliminationHelper {
             // Reference info is the same
             new_fget->SetReferenceTypeInfo(ins->GetReferenceTypeInfo());
           }
+          DCHECK(helper_->lse_->substitute_instructions_for_loads_[ins->GetId()] == nullptr);
+          helper_->lse_->substitute_instructions_for_loads_[ins->GetId()] = new_fget;
           ins->ReplaceWith(new_fget);
           ins->ReplaceEnvUsesDominatedBy(ins, new_fget);
           CHECK(ins->GetEnvUses().empty() && ins->GetUses().empty())
@@ -3544,7 +3556,6 @@ class PartialLoadStoreEliminationHelper {
   size_t first_materialization_block_id_;
 
   friend void LSEVisitor::MovePartialEscapes();
-  friend class HeapReferenceData;
 };
 
 // Work around c++ type checking annoyances with not being able to forward-declare inner types.
