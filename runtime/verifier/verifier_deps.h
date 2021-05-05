@@ -124,8 +124,16 @@ class VerifierDeps {
     return GetDexFileDeps(dex_file)->verified_classes_;
   }
 
+  // Whether this `verifier_deps` has recorded that the given class is verified.
+  bool HasRecordedVerifiedStatus(const DexFile& dex_file, const dex::ClassDef& class_def)
+      REQUIRES(!Locks::verifier_deps_lock_);
+
   bool OutputOnly() const {
     return output_only_;
+  }
+
+  bool ContainsDexFile(const DexFile& dex_file) const {
+    return GetDexFileDeps(dex_file) != nullptr;
   }
 
   // Parses raw VerifierDeps data to extract bitvectors of which class def indices
