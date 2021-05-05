@@ -527,7 +527,6 @@ PRIVATE_ART_APEX_DEPENDENCY_LIBS := \
   lib/libprofile.so \
   lib/libsigchain.so \
   lib/libunwindstack.so \
-  lib/libvixl.so \
   lib/libziparchive.so \
   lib64/libadbconnection.so \
   lib64/libandroidio.so \
@@ -560,7 +559,6 @@ PRIVATE_ART_APEX_DEPENDENCY_LIBS := \
   lib64/libprofile.so \
   lib64/libsigchain.so \
   lib64/libunwindstack.so \
-  lib64/libvixl.so \
   lib64/libziparchive.so \
 
 PRIVATE_RUNTIME_APEX_DEPENDENCY_FILES := \
