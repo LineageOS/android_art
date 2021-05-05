@@ -148,6 +148,7 @@
 #include "transaction.h"
 #include "vdex_file.h"
 #include "verifier/class_verifier.h"
+#include "verifier/verifier_deps.h"
 #include "well_known_classes.h"
 
 #include "interpreter/interpreter_mterp_impl.h"
@@ -4560,6 +4561,22 @@ verifier::FailureKind ClassLinker::VerifyClass(Thread* self,
     // Don't attempt to re-verify if already verified.
     if (klass->IsVerified()) {
       EnsureSkipAccessChecksMethods(klass, image_pointer_size_);
+      if (verifier_deps != nullptr &&
+          verifier_deps->ContainsDexFile(klass->GetDexFile()) &&
+          !verifier_deps->HasRecordedVerifiedStatus(klass->GetDexFile(), *klass->GetClassDef()) &&
+          !Runtime::Current()->IsAotCompiler()) {
+        // If the klass is verified, but `verifier_deps` did not record it, this
+        // means we are running background verification of a secondary dex file.
+        // Re-run the verifier to populate `verifier_deps`.
+        // No need to run the verification when running on the AOT Compiler, as
+        // the driver handles those multithreaded cases already.
+        std::string error_msg;
+        verifier::FailureKind failure =
+            PerformClassVerification(self, verifier_deps, klass, log_level, &error_msg);
+        // We could have soft failures, so just check that we don't have a hard
+        // failure.
+        DCHECK_NE(failure, verifier::FailureKind::kHardFailure) << error_msg;
+      }
       return verifier::FailureKind::kNoFailure;
     }
 

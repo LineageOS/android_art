@@ -308,6 +308,13 @@ void VerifierDeps::RecordClassVerified(const DexFile& dex_file, const dex::Class
   dex_deps->verified_classes_[dex_file.GetIndexForClassDef(class_def)] = true;
 }
 
+bool VerifierDeps::HasRecordedVerifiedStatus(const DexFile& dex_file,
+                                             const dex::ClassDef& class_def) {
+  DexFileDeps* dex_deps = GetDexFileDeps(dex_file);
+  DCHECK_EQ(dex_deps->verified_classes_.size(), dex_file.NumClassDefs());
+  return dex_deps->verified_classes_[dex_file.GetIndexForClassDef(class_def)];
+}
+
 void VerifierDeps::MaybeRecordAssignability(VerifierDeps* verifier_deps,
                                             const DexFile& dex_file,
                                             const dex::ClassDef& class_def,
