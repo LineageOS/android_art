@@ -51,6 +51,13 @@ fi
 
 seconds_per_hour=3600
 
+# b/187295147 : Disable live-lock kill daemon.
+# It can confuse long running processes for issues and kill them.
+# This usually manifests as temporarily lost adb connection.
+echo -e "${green}Killing llkd, seen killing adb${nc}"
+adb shell setprop ctl.stop llkd-0
+adb shell setprop ctl.stop llkd-1
+
 # Kill logd first, so that when we set the adb buffer size later in this file,
 # it is brought up again.
 echo -e "${green}Killing logd, seen leaking on fugu/N${nc}"
