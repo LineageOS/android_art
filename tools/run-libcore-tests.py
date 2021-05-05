@@ -136,7 +136,7 @@ def get_expected_failures():
       failures.append("art/tools/libcore_gcstress_failures.txt")
     if args.gcstress and args.debug:
       failures.append("art/tools/libcore_gcstress_debug_failures.txt")
-    if args.debug and not args.gcstress:
+    if args.debug and not args.gcstress and args.getrandom:
       failures.append("art/tools/libcore_debug_failures.txt")
     if not args.getrandom:
       failures.append("art/tools/libcore_fugu_failures.txt")
