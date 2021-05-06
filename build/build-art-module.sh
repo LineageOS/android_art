@@ -122,5 +122,6 @@ if [ ${#MODULE_SDKS_AND_EXPORTS[*]} -gt 0 ]; then
     ${MODULE_SDKS_AND_EXPORTS[*]}
 
   rm -rf ${DIST_DIR}/mainline-sdks
-  echo_and_run cp -r ${OUT_DIR}/soong/mainline-sdks ${DIST_DIR}
+  mkdir -p ${DIST_DIR}
+  echo_and_run cp -r ${OUT_DIR}/soong/mainline-sdks ${DIST_DIR}/
 fi

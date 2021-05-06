@@ -305,7 +305,7 @@ Result<NativeLoaderNamespace*> LibraryNamespaces::Create(JNIEnv* env, uint32_t t
     return system_ns.error();
   }
 
-  auto linked = app_ns->Link(*system_ns, system_exposed_libraries);
+  auto linked = app_ns->Link(&system_ns.value(), system_exposed_libraries);
   if (!linked.ok()) {
     return linked.error();
   }
@@ -314,7 +314,7 @@ Result<NativeLoaderNamespace*> LibraryNamespaces::Create(JNIEnv* env, uint32_t t
     auto ns = NativeLoaderNamespace::GetExportedNamespace(apex_ns_name, is_bridged);
     // Even if APEX namespace is visible, it may not be available to bridged.
     if (ns.ok()) {
-      linked = app_ns->Link(*ns, public_libs);
+      linked = app_ns->Link(&ns.value(), public_libs);
       if (!linked.ok()) {
         return linked.error();
       }
@@ -325,7 +325,7 @@ Result<NativeLoaderNamespace*> LibraryNamespaces::Create(JNIEnv* env, uint32_t t
   if (unbundled_app_origin == APK_ORIGIN_VENDOR && !vndksp_libraries_vendor().empty()) {
     auto vndk_ns = NativeLoaderNamespace::GetExportedNamespace(kVndkNamespaceName, is_bridged);
     if (vndk_ns.ok()) {
-      linked = app_ns->Link(*vndk_ns, vndksp_libraries_vendor());
+      linked = app_ns->Link(&vndk_ns.value(), vndksp_libraries_vendor());
       if (!linked.ok()) {
         return linked.error();
       }
@@ -336,7 +336,7 @@ Result<NativeLoaderNamespace*> LibraryNamespaces::Create(JNIEnv* env, uint32_t t
   if (unbundled_app_origin == APK_ORIGIN_PRODUCT && !vndksp_libraries_product().empty()) {
     auto vndk_ns = NativeLoaderNamespace::GetExportedNamespace(kVndkProductNamespaceName, is_bridged);
     if (vndk_ns.ok()) {
-      linked = app_ns->Link(*vndk_ns, vndksp_libraries_product());
+      linked = app_ns->Link(&vndk_ns.value(), vndksp_libraries_product());
       if (!linked.ok()) {
         return linked.error();
       }
@@ -349,7 +349,7 @@ Result<NativeLoaderNamespace*> LibraryNamespaces::Create(JNIEnv* env, uint32_t t
     if (jni_libs != "") {
       auto apex_ns = NativeLoaderNamespace::GetExportedNamespace(*apex_ns_name, is_bridged);
       if (apex_ns.ok()) {
-        linked = app_ns->Link(*apex_ns, jni_libs);
+        linked = app_ns->Link(&apex_ns.value(), jni_libs);
         if (!linked.ok()) {
           return linked.error();
         }
@@ -364,7 +364,7 @@ Result<NativeLoaderNamespace*> LibraryNamespaces::Create(JNIEnv* env, uint32_t t
     // when vendor_ns is not configured, link to the system namespace
     auto target_ns = vendor_ns.ok() ? vendor_ns : system_ns;
     if (target_ns.ok()) {
-      linked = app_ns->Link(*target_ns, vendor_libs);
+      linked = app_ns->Link(&target_ns.value(), vendor_libs);
       if (!linked.ok()) {
         return linked.error();
       }

@@ -318,9 +318,9 @@ std::vector<std::unique_ptr<const DexFile>> OatFileManager::OpenDexFilesFromOat(
         DCHECK(dex_files.empty());
 
         if (oat_file->RequiresImage()) {
-          VLOG(oat) << "Loading "
-                    << oat_file->GetLocation()
-                    << "non-executable as it requires an image which we failed to load";
+          LOG(WARNING) << "Loading "
+                       << oat_file->GetLocation()
+                       << "non-executable as it requires an image which we failed to load";
           // file as non-executable.
           OatFileAssistant nonexecutable_oat_file_assistant(dex_location,
                                                             kRuntimeISA,
@@ -328,13 +328,21 @@ std::vector<std::unique_ptr<const DexFile>> OatFileManager::OpenDexFilesFromOat(
                                                             /*load_executable=*/false,
                                                             only_use_system_oat_files_);
           oat_file.reset(nonexecutable_oat_file_assistant.GetBestOatFile().release());
+
+          // The file could be deleted concurrently (for example background
+          // dexopt, or secondary oat file being deleted by the app).
+          if (oat_file == nullptr) {
+            LOG(WARNING) << "Failed to reload oat file non-executable " << dex_location;
+          }
         }
 
-        dex_files = oat_file_assistant.LoadDexFiles(*oat_file.get(), dex_location);
+        if (oat_file != nullptr) {
+          dex_files = oat_file_assistant.LoadDexFiles(*oat_file.get(), dex_location);
 
-        // Register for tracking.
-        for (const auto& dex_file : dex_files) {
-          dex::tracking::RegisterDexFile(dex_file.get());
+          // Register for tracking.
+          for (const auto& dex_file : dex_files) {
+            dex::tracking::RegisterDexFile(dex_file.get());
+          }
         }
       }
       if (dex_files.empty()) {
@@ -347,8 +355,10 @@ std::vector<std::unique_ptr<const DexFile>> OatFileManager::OpenDexFilesFromOat(
          }
       }
 
-      VLOG(class_linker) << "Registering " << oat_file->GetLocation();
-      *out_oat_file = RegisterOatFile(std::move(oat_file));
+      if (oat_file != nullptr) {
+        VLOG(class_linker) << "Registering " << oat_file->GetLocation();
+        *out_oat_file = RegisterOatFile(std::move(oat_file));
+      }
     } else {
       // oat_file == nullptr
       // Verify if any of the dex files being loaded is already in the class path.
