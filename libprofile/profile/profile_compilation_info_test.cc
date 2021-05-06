@@ -138,9 +138,8 @@ class ProfileCompilationInfoTest : public CommonArtTest, public ProfileTestHelpe
     ASSERT_EQ(0, profile.GetFile()->Flush());
 
     // Prepare the profile content for zipping.
-    ASSERT_TRUE(profile.GetFile()->ResetOffset());
     std::vector<uint8_t> data(profile.GetFile()->GetLength());
-    ASSERT_TRUE(profile.GetFile()->ReadFully(data.data(), data.size()));
+    ASSERT_TRUE(profile.GetFile()->PreadFully(data.data(), data.size(), /*offset=*/ 0));
 
     // Zip the profile content.
     ScratchFile zip;
@@ -155,7 +154,6 @@ class ProfileCompilationInfoTest : public CommonArtTest, public ProfileTestHelpe
 
     // Verify loading from the zip archive.
     ProfileCompilationInfo loaded_info;
-    ASSERT_TRUE(zip.GetFile()->ResetOffset());
     ASSERT_EQ(should_succeed, loaded_info.Load(zip.GetFile()->GetPath(), false));
     if (should_succeed) {
       if (should_succeed_with_empty_profile) {
@@ -211,8 +209,6 @@ class ProfileCompilationInfoTest : public CommonArtTest, public ProfileTestHelpe
 
     ASSERT_TRUE(boot_profile.Save(GetFd(boot_file)));
     ASSERT_TRUE(reg_profile.Save(GetFd(reg_file)));
-    ASSERT_TRUE(boot_file.GetFile()->ResetOffset());
-    ASSERT_TRUE(reg_file.GetFile()->ResetOffset());
 
     ProfileCompilationInfo loaded_boot;
     ProfileCompilationInfo loaded_reg;
@@ -263,7 +259,6 @@ TEST_F(ProfileCompilationInfoTest, SaveFd) {
 
   // Check that we get back what we saved.
   ProfileCompilationInfo loaded_info;
-  ASSERT_TRUE(profile.GetFile()->ResetOffset());
   ASSERT_TRUE(loaded_info.Load(GetFd(profile)));
   ASSERT_TRUE(loaded_info.Equals(saved_info));
 
@@ -279,7 +274,6 @@ TEST_F(ProfileCompilationInfoTest, SaveFd) {
 
   // Check that we get back everything we saved.
   ProfileCompilationInfo loaded_info2;
-  ASSERT_TRUE(profile.GetFile()->ResetOffset());
   ASSERT_TRUE(loaded_info2.Load(GetFd(profile)));
   ASSERT_TRUE(loaded_info2.Equals(saved_info));
 }
@@ -317,7 +311,6 @@ TEST_F(ProfileCompilationInfoTest, MergeFdFail) {
 
   ASSERT_TRUE(info1.Save(profile.GetFd()));
   ASSERT_EQ(0, profile.GetFile()->Flush());
-  ASSERT_TRUE(profile.GetFile()->ResetOffset());
 
   ASSERT_FALSE(info2.Load(profile.GetFd()));
 }
@@ -348,7 +341,6 @@ TEST_F(ProfileCompilationInfoTest, SaveMaxMethods) {
 
   // Check that we get back what we saved.
   ProfileCompilationInfo loaded_info;
-  ASSERT_TRUE(profile.GetFile()->ResetOffset());
   ASSERT_TRUE(loaded_info.Load(GetFd(profile)));
   ASSERT_TRUE(loaded_info.Equals(saved_info));
 }
@@ -362,7 +354,6 @@ TEST_F(ProfileCompilationInfoTest, SaveEmpty) {
 
   // Check that we get back what we saved.
   ProfileCompilationInfo loaded_info;
-  ASSERT_TRUE(profile.GetFile()->ResetOffset());
   ASSERT_TRUE(loaded_info.Load(GetFd(profile)));
   ASSERT_TRUE(loaded_info.Equals(saved_info));
 }
@@ -373,7 +364,6 @@ TEST_F(ProfileCompilationInfoTest, LoadEmpty) {
   ProfileCompilationInfo empty_info;
 
   ProfileCompilationInfo loaded_info;
-  ASSERT_TRUE(profile.GetFile()->ResetOffset());
   ASSERT_TRUE(loaded_info.Load(GetFd(profile)));
   ASSERT_TRUE(loaded_info.Equals(empty_info));
 }
@@ -383,7 +373,6 @@ TEST_F(ProfileCompilationInfoTest, BadMagic) {
   uint8_t buffer[] = { 1, 2, 3, 4 };
   ASSERT_TRUE(profile.GetFile()->WriteFully(buffer, sizeof(buffer)));
   ProfileCompilationInfo loaded_info;
-  ASSERT_TRUE(profile.GetFile()->ResetOffset());
   ASSERT_FALSE(loaded_info.Load(GetFd(profile)));
 }
 
@@ -397,7 +386,6 @@ TEST_F(ProfileCompilationInfoTest, BadVersion) {
   ASSERT_EQ(0, profile.GetFile()->Flush());
 
   ProfileCompilationInfo loaded_info;
-  ASSERT_TRUE(profile.GetFile()->ResetOffset());
   ASSERT_FALSE(loaded_info.Load(GetFd(profile)));
 }
 
@@ -413,7 +401,6 @@ TEST_F(ProfileCompilationInfoTest, Incomplete) {
   ASSERT_EQ(0, profile.GetFile()->Flush());
 
   ProfileCompilationInfo loaded_info;
-  ASSERT_TRUE(profile.GetFile()->ResetOffset());
   ASSERT_FALSE(loaded_info.Load(GetFd(profile)));
 }
 
@@ -434,7 +421,6 @@ TEST_F(ProfileCompilationInfoTest, TooLongDexLocation) {
   ASSERT_EQ(0, profile.GetFile()->Flush());
 
   ProfileCompilationInfo loaded_info;
-  ASSERT_TRUE(profile.GetFile()->ResetOffset());
   ASSERT_FALSE(loaded_info.Load(GetFd(profile)));
 }
 
@@ -454,7 +440,6 @@ TEST_F(ProfileCompilationInfoTest, UnexpectedContent) {
 
   // Check that we fail because of unexpected data at the end of the file.
   ProfileCompilationInfo loaded_info;
-  ASSERT_TRUE(profile.GetFile()->ResetOffset());
   ASSERT_FALSE(loaded_info.Load(GetFd(profile)));
 }
 
@@ -478,7 +463,6 @@ TEST_F(ProfileCompilationInfoTest, SaveInlineCaches) {
 
   // Check that we get back what we saved.
   ProfileCompilationInfo loaded_info;
-  ASSERT_TRUE(profile.GetFile()->ResetOffset());
   ASSERT_TRUE(loaded_info.Load(GetFd(profile)));
 
   ASSERT_TRUE(loaded_info.Equals(saved_info));
@@ -523,7 +507,6 @@ TEST_F(ProfileCompilationInfoTest, MegamorphicInlineCaches) {
 
   // Check that we get back what we saved.
   ProfileCompilationInfo loaded_info;
-  ASSERT_TRUE(extra_profile.GetFile()->ResetOffset());
   ASSERT_TRUE(loaded_info.Load(GetFd(extra_profile)));
 
   ASSERT_TRUE(loaded_info.Equals(saved_info));
@@ -573,7 +556,6 @@ TEST_F(ProfileCompilationInfoTest, MissingTypesInlineCaches) {
 
   // Check that we get back what we saved.
   ProfileCompilationInfo loaded_info;
-  ASSERT_TRUE(extra_profile.GetFile()->ResetOffset());
   ASSERT_TRUE(loaded_info.Load(GetFd(extra_profile)));
 
   ASSERT_TRUE(loaded_info.Equals(saved_info));
@@ -742,7 +724,6 @@ TEST_F(ProfileCompilationInfoTest, SampledMethodsTest) {
   ScratchFile profile;
   ASSERT_TRUE(test_info.Save(GetFd(profile)));
   ASSERT_EQ(0, profile.GetFile()->Flush());
-  ASSERT_TRUE(profile.GetFile()->ResetOffset());
 
   // Load the profile and make sure we can read the data and it matches what we expect.
   ProfileCompilationInfo loaded_info;
@@ -837,9 +818,8 @@ TEST_F(ProfileCompilationInfoTest, LoadFromZipFailBadProfile) {
   ASSERT_EQ(0, profile.GetFile()->Flush());
 
   // Prepare the profile content for zipping.
-  ASSERT_TRUE(profile.GetFile()->ResetOffset());
   std::vector<uint8_t> data(profile.GetFile()->GetLength());
-  ASSERT_TRUE(profile.GetFile()->ReadFully(data.data(), data.size()));
+  ASSERT_TRUE(profile.GetFile()->PreadFully(data.data(), data.size(), /*offset=*/ 0));
 
   // Zip the profile content.
   ScratchFile zip;
@@ -854,7 +834,6 @@ TEST_F(ProfileCompilationInfoTest, LoadFromZipFailBadProfile) {
 
   // Check that we failed to load.
   ProfileCompilationInfo loaded_info;
-  ASSERT_TRUE(zip.GetFile()->ResetOffset());
   ASSERT_FALSE(loaded_info.Load(GetFd(zip)));
 }
 
@@ -977,7 +956,6 @@ TEST_F(ProfileCompilationInfoTest, FilteredLoading) {
 
   // Check that we get back what we saved.
   ProfileCompilationInfo loaded_info;
-  ASSERT_TRUE(profile.GetFile()->ResetOffset());
 
   // Filter out dex locations. Keep only dex_location1 and dex_location3.
   ProfileCompilationInfo::ProfileLoadFilterFn filter_fn =
@@ -1067,7 +1045,6 @@ TEST_F(ProfileCompilationInfoTest, FilteredLoadingRemoveAll) {
 
   // Check that we get back what we saved.
   ProfileCompilationInfo loaded_info;
-  ASSERT_TRUE(profile.GetFile()->ResetOffset());
 
   // Remove all elements.
   ProfileCompilationInfo::ProfileLoadFilterFn filter_fn =
@@ -1098,7 +1075,6 @@ TEST_F(ProfileCompilationInfoTest, FilteredLoadingKeepAll) {
 
   // Check that we get back what we saved.
   ProfileCompilationInfo loaded_info;
-  ASSERT_TRUE(profile.GetFile()->ResetOffset());
 
   // Keep all elements.
   ProfileCompilationInfo::ProfileLoadFilterFn filter_fn =
@@ -1152,7 +1128,6 @@ TEST_F(ProfileCompilationInfoTest, FilteredLoadingWithClasses) {
 
   // Filter out dex locations: keep only `dex2_1000->GetLocation()`.
   ProfileCompilationInfo loaded_info;
-  ASSERT_TRUE(profile.GetFile()->ResetOffset());
   ProfileCompilationInfo::ProfileLoadFilterFn filter_fn =
       [dex2_1000](const std::string& dex_location, uint32_t checksum) -> bool {
           return dex_location == dex2_1000->GetLocation() &&
@@ -1194,7 +1169,6 @@ TEST_F(ProfileCompilationInfoTest, ClearDataAndSave) {
 
   // Check that we get back what we saved.
   ProfileCompilationInfo loaded_info;
-  ASSERT_TRUE(profile.GetFile()->ResetOffset());
   ASSERT_TRUE(loaded_info.Load(GetFd(profile)));
   ASSERT_TRUE(loaded_info.Equals(info));
 }
@@ -1245,7 +1219,6 @@ TEST_F(ProfileCompilationInfoTest, AllMethodFlags) {
   ScratchFile profile;
   ASSERT_TRUE(info.Save(GetFd(profile)));
   ASSERT_EQ(0, profile.GetFile()->Flush());
-  ASSERT_TRUE(profile.GetFile()->ResetOffset());
 
   // Load the profile and make sure we can read the data and it matches what we expect.
   ProfileCompilationInfo loaded_info;
@@ -1274,7 +1247,6 @@ TEST_F(ProfileCompilationInfoTest, AllMethodFlagsOnOneMethod) {
   ScratchFile profile;
   ASSERT_TRUE(info.Save(GetFd(profile)));
   ASSERT_EQ(0, profile.GetFile()->Flush());
-  ASSERT_TRUE(profile.GetFile()->ResetOffset());
 
   // Load the profile and make sure we can read the data and it matches what we expect.
   ProfileCompilationInfo loaded_info;
@@ -1344,7 +1316,6 @@ TEST_F(ProfileCompilationInfoTest, MethodFlagsMerge) {
   ScratchFile profile;
   ASSERT_TRUE(info1.Save(GetFd(profile)));
   ASSERT_EQ(0, profile.GetFile()->Flush());
-  ASSERT_TRUE(profile.GetFile()->ResetOffset());
 
   // Load the profile and make sure we can read the data and it matches what we expect.
   ProfileCompilationInfo loaded_info;
@@ -1483,7 +1454,6 @@ TEST_F(ProfileCompilationInfoTest, AddAnnotationsToMethods) {
 
   // Check that we get back what we saved.
   ProfileCompilationInfo loaded_info;
-  ASSERT_TRUE(profile.GetFile()->ResetOffset());
   ASSERT_TRUE(loaded_info.Load(GetFd(profile)));
   ASSERT_TRUE(loaded_info.Equals(info));
 
@@ -1542,7 +1512,6 @@ TEST_F(ProfileCompilationInfoTest, AddAnnotationsToClasses) {
 
   // Check that we get back what we saved.
   ProfileCompilationInfo loaded_info;
-  ASSERT_TRUE(profile.GetFile()->ResetOffset());
   ASSERT_TRUE(loaded_info.Load(GetFd(profile)));
   ASSERT_TRUE(loaded_info.Equals(info));
 
