@@ -150,11 +150,9 @@ extern "C" JNIEXPORT jboolean JNICALL Java_Main_compiledWithOptimizing(JNIEnv* e
     const char* end = strchr(filter, ' ');
     std::string string_filter(filter, (end == nullptr) ? strlen(filter) : end - filter);
     CompilerFilter::Filter compiler_filter;
-    if (CompilerFilter::ParseCompilerFilter(string_filter.c_str(), &compiler_filter)) {
-      return CompilerFilter::IsAotCompilationEnabled(compiler_filter) ? JNI_TRUE : JNI_FALSE;
-    } else {
-      return JNI_FALSE;
-    }
+    bool success = CompilerFilter::ParseCompilerFilter(string_filter.c_str(), &compiler_filter);
+    CHECK(success);
+    return CompilerFilter::IsAotCompilationEnabled(compiler_filter) ? JNI_TRUE : JNI_FALSE;
   }
 
   // No filter passed, assume default has AOT.
