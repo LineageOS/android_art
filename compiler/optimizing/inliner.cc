@@ -1240,32 +1240,22 @@ void HInliner::MaybeRunReferenceTypePropagation(HInstruction* replacement,
 bool HInliner::TryDevirtualize(HInvoke* invoke_instruction,
                                ArtMethod* method,
                                HInvoke** replacement) {
-  DCHECK(!method->IsProxyMethod());
   DCHECK(invoke_instruction != *replacement);
-  if (!invoke_instruction->IsInvokeInterface()) {
-    // TODO: Consider sharpening an invoke virtual once it is not dependent on the
-    // compiler driver.
+  if (!invoke_instruction->IsInvokeInterface() && !invoke_instruction->IsInvokeVirtual()) {
     return false;
   }
-  // Devirtualization by exact type uses a method in the vtable, so we should
-  // not see a default non-copied method.
-  DCHECK(!method->IsDefault() || method->IsCopied());
-  // Turn an invoke-interface into an invoke-virtual. An invoke-virtual is always
-  // better than an invoke-interface because:
-  // 1) In the best case, the interface call has one more indirection (to fetch the IMT).
-  // 2) We will not go to the conflict trampoline with an invoke-virtual.
-  // TODO: Consider sharpening once it is not dependent on the compiler driver.
 
-  if (kIsDebugBuild && method->IsDefaultConflicting()) {
-    ReferenceTypeInfo receiver_type = invoke_instruction->InputAt(0)->GetReferenceTypeInfo();
-    // Devirtualization by exact type uses a method in the vtable,
-    // so it's OK to change this invoke into a HInvokeVirtual.
-    ObjPtr<mirror::Class> receiver_class = receiver_type.GetTypeHandle().Get();
-    CHECK(!receiver_class->IsInterface());
-    PointerSize pointer_size = Runtime::Current()->GetClassLinker()->GetImagePointerSize();
-    CHECK(method == receiver_class->GetVTableEntry(method->GetMethodIndex(), pointer_size));
+  // Don't bother trying to call directly a default conflict method. It
+  // doesn't have a proper MethodReference, but also `GetCanonicalMethod`
+  // will return an actual default implementation.
+  if (method->IsDefaultConflicting()) {
+    return false;
   }
-
+  DCHECK(!method->IsProxyMethod());
+  ClassLinker* cl = Runtime::Current()->GetClassLinker();
+  PointerSize pointer_size = cl->GetImagePointerSize();
+  // The sharpening logic assumes the caller isn't passing a copied method.
+  method = method->GetCanonicalMethod(pointer_size);
   uint32_t dex_method_index = FindMethodIndexIn(
       method,
       *invoke_instruction->GetMethodReference().dex_file,
@@ -1273,18 +1263,31 @@ bool HInliner::TryDevirtualize(HInvoke* invoke_instruction,
   if (dex_method_index == dex::kDexNoIndex) {
     return false;
   }
-  HInvokeVirtual* new_invoke = new (graph_->GetAllocator()) HInvokeVirtual(
+  HInvokeStaticOrDirect::DispatchInfo dispatch_info =
+      HSharpening::SharpenLoadMethod(method,
+                                     /* has_method_id= */ true,
+                                     /* for_interface_call= */ false,
+                                     codegen_);
+  DCHECK_NE(dispatch_info.code_ptr_location, CodePtrLocation::kCallCriticalNative);
+  HInvokeStaticOrDirect* new_invoke = new (graph_->GetAllocator()) HInvokeStaticOrDirect(
       graph_->GetAllocator(),
       invoke_instruction->GetNumberOfArguments(),
       invoke_instruction->GetType(),
       invoke_instruction->GetDexPc(),
       MethodReference(invoke_instruction->GetMethodReference().dex_file, dex_method_index),
       method,
+      dispatch_info,
+      kDirect,
       MethodReference(method->GetDexFile(), method->GetDexMethodIndex()),
-      method->GetMethodIndex());
+      HInvokeStaticOrDirect::ClinitCheckRequirement::kNone);
   HInputsRef inputs = invoke_instruction->GetInputs();
+  DCHECK_EQ(inputs.size(), invoke_instruction->GetNumberOfArguments());
   for (size_t index = 0; index != inputs.size(); ++index) {
     new_invoke->SetArgumentAt(index, inputs[index]);
+  }
+  if (HInvokeStaticOrDirect::NeedsCurrentMethodInput(dispatch_info)) {
+    new_invoke->SetRawInputAt(new_invoke->GetCurrentMethodIndexUnchecked(),
+                              graph_->GetCurrentMethod());
   }
   invoke_instruction->GetBlock()->InsertInstructionBefore(new_invoke, invoke_instruction);
   new_invoke->CopyEnvironmentFrom(invoke_instruction->GetEnvironment());
