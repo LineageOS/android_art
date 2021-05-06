@@ -1108,12 +1108,8 @@ void Runtime::InitNonZygoteOrPostFork(
   if (IsPerfettoJavaHeapStackProfEnabled() &&
       (Dbg::IsJdwpAllowed() || IsProfileable() || IsProfileableFromShell() || IsJavaDebuggable() ||
        Runtime::Current()->IsSystemServer())) {
-    std::string err;
+    // Marker used for dev tracing similar to above markers.
     ScopedTrace tr("perfetto_javaheapprof init.");
-    ScopedThreadSuspension sts(Thread::Current(), ThreadState::kNative);
-    if (!EnsurePerfettoJavaHeapProfPlugin(&err)) {
-      LOG(WARNING) << "Failed to load perfetto_javaheapprof: " << err;
-    }
   }
   if (Runtime::Current()->IsSystemServer()) {
     std::string err;
@@ -1902,14 +1898,6 @@ bool Runtime::Init(RuntimeArgumentMap&& runtime_options_in) {
     // subsequent dlopens for the library no-ops.
     dlopen(plugin_name, RTLD_NOW | RTLD_LOCAL);
   }
-  if (IsZygote() && IsPerfettoJavaHeapStackProfEnabled()) {
-    // There is no debug build of heapprofd_client_api.so currently.
-    // Add debug build .so when available.
-    constexpr const char* jhp_plugin_name = "heapprofd_client_api.so";
-    // Load eagerly in Zygote to improve app startup times. This will make
-    // subsequent dlopens for the library no-ops.
-    dlopen(jhp_plugin_name, RTLD_NOW | RTLD_LOCAL);
-  }
 
   VLOG(startup) << "Runtime::Init exiting";
 
@@ -1952,13 +1940,6 @@ bool Runtime::EnsurePerfettoPlugin(std::string* error_msg) {
   constexpr const char* plugin_name = kIsDebugBuild ?
     "libperfetto_hprofd.so" : "libperfetto_hprof.so";
   return EnsurePluginLoaded(plugin_name, error_msg);
-}
-
-bool Runtime::EnsurePerfettoJavaHeapProfPlugin(std::string* error_msg) {
-  // There is no debug build of heapprofd_client_api.so currently.
-  // Add debug build .so when available.
-  constexpr const char* jhp_plugin_name = "heapprofd_client_api.so";
-  return EnsurePluginLoaded(jhp_plugin_name, error_msg);
 }
 
 static bool EnsureJvmtiPlugin(Runtime* runtime,
