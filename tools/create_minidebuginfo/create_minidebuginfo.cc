@@ -36,6 +36,8 @@ namespace art {
 
 static constexpr size_t kBlockSize = 32 * KB;
 
+constexpr const char kSortedSymbolName[] = "$android.symtab.sorted";
+
 template<typename ElfTypes>
 static void WriteMinidebugInfo(const std::vector<uint8_t>& input, std::vector<uint8_t>* output) {
   using Elf_Addr = typename ElfTypes::Addr;
@@ -62,7 +64,6 @@ static void WriteMinidebugInfo(const std::vector<uint8_t>& input, std::vector<ui
   auto* symtab = builder->GetSymTab();
   strtab->Start();
   {
-    strtab->Write("");  // strtab should start with empty string.
     std::multimap<std::string_view, Elf_Sym> syms;
     reader.VisitFunctionSymbols([&](Elf_Sym sym, const char* name) {
       // Exclude non-function or empty symbols.
@@ -77,6 +78,9 @@ static void WriteMinidebugInfo(const std::vector<uint8_t>& input, std::vector<ui
         syms.erase(it);
       }
     });
+    if (!syms.empty()) {
+      symtab->Add(strtab->Write(kSortedSymbolName), nullptr, 0, 0, STB_GLOBAL, STT_NOTYPE);
+    }
     for (auto& entry : syms) {
       std::string_view name = entry.first;
       const Elf_Sym& sym = entry.second;
