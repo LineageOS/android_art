@@ -55,7 +55,11 @@ struct NativeLoaderNamespace {
   std::string name() const { return name_; }
   bool IsBridged() const { return raw_.index() == 1; }
 
-  Result<void> Link(const NativeLoaderNamespace& target, const std::string& shared_libs) const;
+  // Creates a link from this namespace to target for the ":"-separated list of
+  // libraries in shared_libs. If target is nullptr it creates a link to the
+  // default namespace.
+  Result<void> Link(const NativeLoaderNamespace* target, const std::string& shared_libs) const;
+
   Result<void*> Load(const char* lib_name) const;
 
   static Result<NativeLoaderNamespace> GetExportedNamespace(const std::string& name,

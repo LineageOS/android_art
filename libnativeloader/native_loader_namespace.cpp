@@ -139,18 +139,20 @@ Result<NativeLoaderNamespace> NativeLoaderNamespace::Create(
                 is_bridged ? "bridged" : "native", name, search_paths, permitted_paths);
 }
 
-Result<void> NativeLoaderNamespace::Link(const NativeLoaderNamespace& target,
+Result<void> NativeLoaderNamespace::Link(const NativeLoaderNamespace* target,
                                          const std::string& shared_libs) const {
   LOG_ALWAYS_FATAL_IF(shared_libs.empty(), "empty share lib when linking %s to %s",
-                      this->name().c_str(), target.name().c_str());
+                      this->name().c_str(), target == nullptr ? "default" : target->name().c_str());
   if (!IsBridged()) {
-    if (android_link_namespaces(this->ToRawAndroidNamespace(), target.ToRawAndroidNamespace(),
+    if (android_link_namespaces(this->ToRawAndroidNamespace(),
+                                target == nullptr ? nullptr : target->ToRawAndroidNamespace(),
                                 shared_libs.c_str())) {
       return {};
     }
   } else {
     if (NativeBridgeLinkNamespaces(this->ToRawNativeBridgeNamespace(),
-                                   target.ToRawNativeBridgeNamespace(), shared_libs.c_str())) {
+                                   target == nullptr ? nullptr : target->ToRawNativeBridgeNamespace(),
+                                   shared_libs.c_str())) {
       return {};
     }
   }
