@@ -302,6 +302,10 @@ void MaybeUpdateBssMethodEntry(ArtMethod* callee, MethodReference callee_referen
                 oat_file->GetBssMethods().data() + oat_file->GetBssMethods().size());
       std::atomic<ArtMethod*>* atomic_entry =
           reinterpret_cast<std::atomic<ArtMethod*>*>(method_entry);
+      if (kIsDebugBuild) {
+        ArtMethod* existing = atomic_entry->load(std::memory_order_acquire);
+        CHECK(existing->IsRuntimeMethod() || existing == callee);
+      }
       static_assert(sizeof(*method_entry) == sizeof(*atomic_entry), "Size check.");
       atomic_entry->store(callee, std::memory_order_release);
     }
