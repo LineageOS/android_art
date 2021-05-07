@@ -12,9 +12,6 @@ package {
 cc_defaults {
     name: "libnativeloader-defaults",
     defaults: ["art_defaults"],
-    cppflags: [
-        "-fvisibility=hidden",
-    ],
     header_libs: ["libnativeloader-headers"],
     export_header_lib_headers: ["libnativeloader-headers"],
 }
@@ -121,30 +118,32 @@ cc_library_headers {
 
 art_cc_test {
     name: "libnativeloader_test",
+    defaults: ["art_test_defaults"],
+    host_supported: false,
+
     srcs: [
         "native_loader_test.cpp",
-        "native_loader.cpp",
-        "library_namespaces.cpp",
-        "native_loader_namespace.cpp",
-        "public_libraries.cpp",
     ],
     cflags: ["-DANDROID"],
-    static_libs: [
-        "libbase",
-        "liblog",
-        "libgmock",
-        "PlatformProperties",
+
+    // The test mocks libdl_android and libnativebridge symbols, so export them
+    // to override the ones loaded from their libs.
+    ldflags: [
+        "-Wl,--export-dynamic-symbol=android_*",
+        "-Wl,--export-dynamic-symbol=NativeBridge*",
     ],
+
     header_libs: [
         "libnativebridge-headers",
         "libnativehelper_header_only",
-        "libnativeloader-headers",
     ],
-    // native_loader_test.cpp mocks libdl APIs so system_shared_libs
-    // are used to include C libraries without libdl.
-    system_shared_libs: [
-        "libc",
-        "libm",
+    static_libs: [
+        "libgmock",
     ],
+    shared_libs: [
+        "libbase",
+        "libnativeloader",
+    ],
+
     test_suites: ["device-tests"],
 }
