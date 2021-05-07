@@ -209,10 +209,11 @@ public class Main {
   /// CHECK:      {{d\d+}}            InvokeVirtual
 
   /// CHECK-START: double Main.getDoubleFromParam(Second) inliner (after)
-  /// CHECK:      {{d\d+}}            InvokeVirtual
+  /// CHECK:      {{d\d+}}            InvokeStaticOrDirect
 
   /// CHECK-START: double Main.getDoubleFromParam(Second) inliner (after)
   /// CHECK-NOT:                      InstanceFieldGet
+  /// CHECK-NOT:                      InvokeVirtual
 
   public static double getDoubleFromParam(Second s) {
     return s.getInstanceDoubleFieldFromParam(s);
@@ -222,11 +223,12 @@ public class Main {
   /// CHECK:      {{i\d+}}            InvokeVirtual
 
   /// CHECK-START: int Main.getStaticInt(Second) inliner (after)
-  /// CHECK:      {{i\d+}}            InvokeVirtual
+  /// CHECK:      {{i\d+}}            InvokeStaticOrDirect
 
   /// CHECK-START: int Main.getStaticInt(Second) inliner (after)
   /// CHECK-NOT:                      InstanceFieldGet
   /// CHECK-NOT:                      StaticFieldGet
+  /// CHECK-NOT:                      InvokeVirtual
 
   public static int getStaticInt(Second s) {
     return s.getStaticIntField();
@@ -287,10 +289,11 @@ public class Main {
   /// CHECK:                          InvokeVirtual
 
   /// CHECK-START: long Main.setLongThroughParam(Second, long) inliner (after)
-  /// CHECK:                          InvokeVirtual
+  /// CHECK:                          InvokeStaticOrDirect
 
   /// CHECK-START: long Main.setLongThroughParam(Second, long) inliner (after)
   /// CHECK-NOT:                      InstanceFieldSet
+  /// CHECK-NOT:                      InvokeVirtual
 
   public static long setLongThroughParam(Second s, long value) {
     s.setInstanceLongFieldThroughParam(s, value);
@@ -301,11 +304,12 @@ public class Main {
   /// CHECK:                          InvokeVirtual
 
   /// CHECK-START: float Main.setStaticFloat(Second, float) inliner (after)
-  /// CHECK:                          InvokeVirtual
+  /// CHECK:                          InvokeStaticOrDirect
 
   /// CHECK-START: float Main.setStaticFloat(Second, float) inliner (after)
   /// CHECK-NOT:                      InstanceFieldSet
   /// CHECK-NOT:                      StaticFieldSet
+  /// CHECK-NOT:                      InvokeVirtual
 
   public static float setStaticFloat(Second s, float value) {
     s.setStaticFloatField(value);
