@@ -113,7 +113,7 @@ if [[ "$has_timeout" = "no" ]]; then
   if [[ "$has_verbose" = "yes" || "$has_gcstress" = "yes" ]]; then
     # Extra time if verbose or gcstress is set since those can be
     # quite heavy.
-    args+=(200000)
+    args+=(300000)
   else
     args+=(20000)
   fi
