@@ -92,7 +92,7 @@ public class Main implements Itf, Itf2 {
       $noinline$doCallDefaultConflictItf3();
       throw new Error("Expected IncompatibleClassChangeError");
     } catch (Exception e) {
-      throw new Error("Unexpected exception");
+      throw new Error("Unexpected exception " + e);
     } catch (IncompatibleClassChangeError e) {
       // Expected.
     }
