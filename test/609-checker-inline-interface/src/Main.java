@@ -32,7 +32,7 @@ public final class Main implements Interface {
       // Expected
     }
     try {
-      testInterfaceToDirectCall();
+      testInterfaceToVirtualCall();
     } catch (Error e) {
       // Expected.
     }
@@ -53,19 +53,19 @@ public final class Main implements Interface {
     methodWithInvokeInterface(itf);
   }
 
-  /// CHECK-START: void Main.testInterfaceToDirectCall() inliner (before)
+  /// CHECK-START: void Main.testInterfaceToVirtualCall() inliner (before)
   /// CHECK:                          InvokeStaticOrDirect method_name:Main.methodWithInvokeInterface
 
-  /// CHECK-START: void Main.testInterfaceToDirectCall() inliner (before)
+  /// CHECK-START: void Main.testInterfaceToVirtualCall() inliner (before)
   /// CHECK-NOT:                      InvokeInterface
 
-  /// CHECK-START: void Main.testInterfaceToDirectCall() inliner (after)
-  /// CHECK:                          InvokeStaticOrDirect method_name:Main.doCall
+  /// CHECK-START: void Main.testInterfaceToVirtualCall() inliner (after)
+  /// CHECK:                          InvokeVirtual method_name:Main.doCall
 
-  /// CHECK-START: void Main.testInterfaceToDirectCall() inliner (after)
-  /// CHECK-NOT:                      InvokeVirtual
+  /// CHECK-START: void Main.testInterfaceToVirtualCall() inliner (after)
+  /// CHECK-NOT:                      InvokeStaticOrDirect
   /// CHECK-NOT:                      InvokeInterface
-  public static void testInterfaceToDirectCall() {
+  public static void testInterfaceToVirtualCall() {
     methodWithInvokeInterface(m);
   }
 
