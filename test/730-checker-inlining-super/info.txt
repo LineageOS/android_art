@@ -1,2 +1,0 @@
-Test that an invoke-virtual devirtualized by the compiler uses the right bss
-slot at runtime.
