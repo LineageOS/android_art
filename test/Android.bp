@@ -726,6 +726,7 @@ cc_defaults {
         "2033-shutdown-mechanics/native_shutdown.cc",
         "2036-jni-filechannel/jni_filechannel.cc",
         "2037-thread-name-inherit/thread_name_inherit.cc",
+        "2040-huge-native-alloc/huge_native_buf.cc",
         "common/runtime_state.cc",
         "common/stack_inspect.cc",
     ],
