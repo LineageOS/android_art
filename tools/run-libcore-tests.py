@@ -226,7 +226,13 @@ def main():
       raise AssertionError(f"Missing {jar}. Run buildbot-build.sh first.")
 
   if not args.jobs:
-    args.jobs = get_target_cpu_count() if args.mode == "device" else multiprocessing.cpu_count()
+    if args.mode == "device":
+      args.jobs = get_target_cpu_count()
+    else:
+      args.jobs = multiprocessing.cpu_count()
+      if args.gcstress:
+        # TODO: Investigate and fix the underlying issues.
+        args.jobs = args.jobs // 2
 
   def run_test(test_name):
     cmd = " ".join(get_vogar_command(test_name))
