@@ -154,10 +154,12 @@ RUNTIME_OPTIONS_KEY (CompilerCallbacks*,  CompilerCallbacksPtr)  // TODO: make u
 RUNTIME_OPTIONS_KEY (bool (*)(),          HookIsSensitiveThread)
 RUNTIME_OPTIONS_KEY (int32_t (*)(FILE* stream, const char* format, va_list ap), \
                                           HookVfprintf,                   vfprintf)
-// Use _exit instead of exit so that we won't get DCHECK failures in global data
-// destructors. b/28106055.
+// Use `quick_exit` instead of `exit` so that we won't get DCHECK failures
+// in global data destructors (see b/28106055); but still have functions
+// registered with `at_quick_exit` (for instance LLVM's code coverage profile
+// dumping routine) be called before exiting.
 RUNTIME_OPTIONS_KEY (void (*)(int32_t status), \
-                                          HookExit,                       _exit)
+                                          HookExit,                       quick_exit)
                                                                           // We don't call abort(3) by default; see
                                                                           // Runtime::Abort.
 RUNTIME_OPTIONS_KEY (void (*)(),          HookAbort,                      nullptr)
