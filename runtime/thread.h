@@ -1883,7 +1883,8 @@ class Thread {
 
   // Custom TLS field that can be used by plugins or the runtime. Should not be accessed directly by
   // compiled code or entrypoints.
-  SafeMap<std::string, std::unique_ptr<TLSData>> custom_tls_ GUARDED_BY(Locks::custom_tls_lock_);
+  SafeMap<std::string, std::unique_ptr<TLSData>, std::less<>> custom_tls_
+      GUARDED_BY(Locks::custom_tls_lock_);
 
 #ifndef __BIONIC__
   __attribute__((tls_model("initial-exec")))

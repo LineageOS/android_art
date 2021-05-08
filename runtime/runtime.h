@@ -132,7 +132,6 @@ class Runtime {
 
   bool EnsurePluginLoaded(const char* plugin_name, std::string* error_msg);
   bool EnsurePerfettoPlugin(std::string* error_msg);
-  bool EnsurePerfettoJavaHeapProfPlugin(std::string* error_msg);
 
   // IsAotCompiler for compilers that don't have a running runtime. Only dex2oat currently.
   bool IsAotCompiler() const {
