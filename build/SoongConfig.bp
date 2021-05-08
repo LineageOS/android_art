@@ -23,7 +23,10 @@ soong_config_module_type {
     module_type: "cc_defaults",
     config_namespace: "art_module",
     bool_variables: ["source_build"],
-    properties: ["enabled"],
+    properties: [
+        "enabled",
+        "target.android.test_for",
+    ],
 }
 
 soong_config_module_type {

@@ -25,16 +25,29 @@ package {
     default_applicable_licenses: ["art_license"],
 }
 
-art_cc_defaults {
+soong_config_module_type_import {
+    from: "art/build/SoongConfig.bp",
+    module_types: [
+        "art_module_cc_defaults",
+    ],
+}
+
+art_module_cc_defaults {
     name: "art_test_defaults",
     host_supported: true,
-    target: {
-        android: {
-            test_for: [
-                "com.android.art",
-                "com.android.art.debug",
-            ],
+    soong_config_variables: {
+        source_build: {
+            target: {
+                android: {
+                    test_for: [
+                        "com.android.art",
+                        "com.android.art.debug",
+                    ],
+                },
+            },
         },
+    },
+    target: {
         // The following set of relative_install_paths installs the library in a
         // location that will be available as java.library.path in run tests.
         android_arm: {
@@ -713,6 +726,7 @@ cc_defaults {
         "2033-shutdown-mechanics/native_shutdown.cc",
         "2036-jni-filechannel/jni_filechannel.cc",
         "2037-thread-name-inherit/thread_name_inherit.cc",
+        "2040-huge-native-alloc/huge_native_buf.cc",
         "common/runtime_state.cc",
         "common/stack_inspect.cc",
     ],
