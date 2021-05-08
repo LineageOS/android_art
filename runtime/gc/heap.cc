@@ -3965,20 +3965,7 @@ inline void Heap::CheckGCForNative(Thread* self) {
         if (VLOG_IS_ON(heap) || VLOG_IS_ON(startup)) {
           LOG(INFO) << "Stopping for native allocation, urgency: " << gc_urgency;
         }
-        // Count how many times we do this, so we can warn if this becomes excessive.
-        // Stop after a while out of excessive caution.
-        static constexpr int kGcWaitIters = 20;
-        for (int i = 1; i <= kGcWaitIters; ++i) {
-          if (!GCNumberLt(GetCurrentGcNum(), gcs_requested_.load(std::memory_order_relaxed))
-              || WaitForGcToComplete(kGcCauseForNativeAlloc, self) != collector::kGcTypeNone) {
-            break;
-          }
-          if (i % 10 == 0) {
-            LOG(WARNING) << "Slept " << i << " times in native allocation, waiting for GC";
-          }
-          static constexpr int kGcWaitSleepMicros = 2000;
-          usleep(kGcWaitSleepMicros);  // Encourage our requested GC to start.
-        }
+        WaitForGcToComplete(kGcCauseForNativeAlloc, self);
       }
     } else {
       CollectGarbageInternal(NonStickyGcType(), kGcCauseForNativeAlloc, false, starting_gc_num + 1);
