@@ -14,31 +14,25 @@
  * limitations under the License.
  */
 
-class SuperClass {
-  public int doInvoke() {
-    synchronized (this) {
-      return 42;
-    }
-  }
+#include "base/utils.h"
+#include "jni.h"
+#include <stddef.h>
+
+namespace art {
+
+static constexpr size_t HUGE_SIZE = 10'000'000;
+
+extern "C" JNIEXPORT jobject JNICALL Java_Main_getHugeNativeBuffer(
+    JNIEnv* env, jclass klass ATTRIBUTE_UNUSED) {
+  char* buffer = new char[HUGE_SIZE];
+  return env->NewDirectByteBuffer(buffer, HUGE_SIZE);
 }
 
-public class Main extends SuperClass {
-
-  public static void main(String[] args) {
-    Main m = new Main();
-    int value = doInvokeTypedSuperClass(m);
-    if (value != 43) {
-      throw new Error("Expected 43, got " + value);
-    }
-  }
-
-  public static int doInvokeTypedSuperClass(SuperClass sc) {
-    return sc.doInvoke();
-  }
-
-  public int doInvoke() {
-    synchronized (this) {
-      return super.doInvoke() + 1;
-    }
-  }
+extern "C" JNIEXPORT void JNICALL Java_Main_deleteHugeNativeBuffer(
+    JNIEnv* env, jclass klass ATTRIBUTE_UNUSED, jobject jbuffer) {
+  delete [] static_cast<char*>(env->GetDirectBufferAddress(jbuffer));
 }
+
+}  // namespace art
+
+

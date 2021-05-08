@@ -122,16 +122,18 @@ void LibraryNamespaces::Initialize() {
     return;
   }
 
-  // android_init_namespaces() expects all the public libraries
-  // to be loaded so that they can be found by soname alone.
+  // Load the preloadable public libraries. Since libnativeloader is in the
+  // com_android_art namespace, use OpenSystemLibrary rather than dlopen to
+  // ensure the libraries are loaded in the system namespace.
   //
   // TODO(dimitry): this is a bit misleading since we do not know
   // if the vendor public library is going to be opened from /vendor/lib
   // we might as well end up loading them from /system/lib or /product/lib
   // For now we rely on CTS test to catch things like this but
   // it should probably be addressed in the future.
-  for (const auto& soname : android::base::Split(preloadable_public_libraries(), ":")) {
-    LOG_ALWAYS_FATAL_IF(dlopen(soname.c_str(), RTLD_NOW | RTLD_NODELETE) == nullptr,
+  for (const std::string& soname : android::base::Split(preloadable_public_libraries(), ":")) {
+    void* handle = OpenSystemLibrary(soname.c_str(), RTLD_NOW | RTLD_NODELETE);
+    LOG_ALWAYS_FATAL_IF(handle == nullptr,
                         "Error preloading public library %s: %s", soname.c_str(), dlerror());
   }
 }

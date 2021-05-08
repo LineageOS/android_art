@@ -114,7 +114,6 @@ known_failing_tests = [
   "177-visibly-initialized-deadlock",
   "178-app-image-native-method",
   "179-nonvirtual-jni",
-  "450-checker-types",
   "1900-track-alloc",
   "1901-get-bytecodes",
   "1902-suspend",
