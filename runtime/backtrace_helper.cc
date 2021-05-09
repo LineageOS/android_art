@@ -53,7 +53,7 @@ struct UnwindHelper : public TLSData {
 
   explicit UnwindHelper(size_t max_depth)
       : arch_(unwindstack::Regs::CurrentArch()),
-        memory_(unwindstack::Memory::CreateProcessMemory(getpid())),
+        memory_(unwindstack::Memory::CreateProcessMemoryThreadCached(getpid())),
         jit_(unwindstack::CreateJitDebug(arch_, memory_)),
         dex_(unwindstack::CreateDexFiles(arch_, memory_)),
         unwinder_(max_depth, &maps_, memory_) {

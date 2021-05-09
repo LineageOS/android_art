@@ -31,10 +31,6 @@
 #include <android-base/macros.h>
 #include <log/log.h>
 
-#ifdef ART_TARGET_ANDROID
-#include "nativeloader/dlext_namespaces.h"
-#endif
-
 namespace android {
 
 #ifdef __APPLE__
@@ -43,28 +39,6 @@ void UNUSED(const T&) {}
 #endif
 
 extern "C" {
-
-void* OpenSystemLibrary(const char* path, int flags) {
-#ifdef ART_TARGET_ANDROID
-  // The system namespace is called "default" for binaries in /system and
-  // "system" for those in the Runtime APEX. Try "system" first since
-  // "default" always exists.
-  // TODO(b/185587109): Get rid of this error prone logic.
-  android_namespace_t* system_ns = android_get_exported_namespace("system");
-  if (system_ns == nullptr) {
-    system_ns = android_get_exported_namespace("default");
-    LOG_ALWAYS_FATAL_IF(system_ns == nullptr,
-                        "Failed to get system namespace for loading %s", path);
-  }
-  const android_dlextinfo dlextinfo = {
-      .flags = ANDROID_DLEXT_USE_NAMESPACE,
-      .library_namespace = system_ns,
-  };
-  return android_dlopen_ext(path, flags, &dlextinfo);
-#else
-  return dlopen(path, flags);
-#endif
-}
 
 // Environment values required by the apps running with native bridge.
 struct NativeBridgeRuntimeValues {
@@ -249,12 +223,8 @@ bool LoadNativeBridge(const char* nb_library_filename,
     if (!NativeBridgeNameAcceptable(nb_library_filename)) {
       CloseNativeBridge(true);
     } else {
-      // Try to open the library. We assume this library is provided by the
-      // platform rather than the ART APEX itself, so use the system namespace
-      // to avoid requiring a static linker config link to it from the
-      // com_android_art namespace.
-      void* handle = OpenSystemLibrary(nb_library_filename, RTLD_LAZY);
-
+      // Try to open the library.
+      void* handle = dlopen(nb_library_filename, RTLD_LAZY);
       if (handle != nullptr) {
         callbacks = reinterpret_cast<NativeBridgeCallbacks*>(dlsym(handle,
                                                                    kNativeBridgeInterfaceSymbol));
