@@ -1,2 +1,0 @@
-Check that we properly trigger world stop collections after a lot of native
-allocation.
