@@ -29,11 +29,6 @@ namespace android {
 extern "C" {
 #endif  // __cplusplus
 
-// Loads a shared library from the system linker namespace, suitable for
-// platform libraries in /system/lib(64). If linker namespaces don't exist (i.e.
-// on host), this simply calls dlopen().
-void* OpenSystemLibrary(const char* path, int flags);
-
 struct NativeBridgeRuntimeCallbacks;
 struct NativeBridgeRuntimeValues;
 
