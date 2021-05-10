@@ -57,10 +57,20 @@ art_cc_defaults {
 art_cc_library {
     name: "libart-disassembler",
     defaults: ["libart-disassembler-defaults"],
-    shared_libs: [
-        // For disassembler_arm*.
-        "libvixl",
-    ],
+    codegen: {
+        arm: {
+            static_libs: [
+                // For disassembler_arm*.
+                "libvixl",
+            ],
+        },
+        arm64: {
+            static_libs: [
+                // For disassembler_arm*.
+                "libvixl",
+            ],
+        },
+    },
     apex_available: [
         "com.android.art",
         "com.android.art.debug",
@@ -81,10 +91,20 @@ art_cc_library {
         "art_debug_defaults",
         "libart-disassembler-defaults",
     ],
-    shared_libs: [
-        // For disassembler_arm*.
-        "libvixld",
-    ],
+    codegen: {
+        arm: {
+            static_libs: [
+                // For disassembler_arm*.
+                "libvixld",
+            ],
+        },
+        arm64: {
+            static_libs: [
+                // For disassembler_arm*.
+                "libvixld",
+            ],
+        },
+    },
 
     apex_available: [
         "com.android.art",
