@@ -610,7 +610,7 @@ class OnDeviceRefresh final {
       return cleanup_system_server_return(ExitCode::kCompilationRequired);
     }
 
-    // Cache info looks  good, check all compilation artifacts exist.
+    // Cache info looks good, check all compilation artifacts exist.
     auto cleanup_boot_extensions_return = [this](ExitCode exit_code, InstructionSet isa) {
       return RemoveBootExtensionArtifactsFromData(isa) ? exit_code : ExitCode::kCleanupFailed;
     };
@@ -920,17 +920,6 @@ class OnDeviceRefresh final {
     return exit_code;
   }
 
-  static void ReportSpace() {
-    uint64_t bytes;
-    std::string data_dir = GetArtApexData();
-    if (GetUsedSpace(data_dir, &bytes)) {
-      LOG(INFO) << "Used space " << bytes << " bytes.";
-    }
-    if (GetFreeSpace(data_dir, &bytes)) {
-      LOG(INFO) << "Available space " << bytes << " bytes.";
-    }
-  }
-
   WARN_UNUSED bool CleanApexdataDirectory() const {
     const std::string& apex_data_path = GetArtApexData();
     if (config_.GetDryRun()) {
@@ -1214,16 +1203,39 @@ class OnDeviceRefresh final {
   void ReportNextBootAnimationProgress(uint32_t current_compilation) const {
     uint32_t number_of_compilations =
         config_.GetBootExtensionIsas().size() + systemserver_compilable_jars_.size();
-    // We arbitrarly show progress until 90%, expecting that our compilations
+    // We arbitrarily show progress until 90%, expecting that our compilations
     // take a large chunk of boot time.
     uint32_t value = (90 * current_compilation) / number_of_compilations;
     android::base::SetProperty("service.bootanim.progress", std::to_string(value));
   }
 
+  WARN_UNUSED bool CheckCompilationSpace() const {
+    // Check the available storage space against an arbitrary threshold because dex2oat does not
+    // report when it runs out of storage space and we do not want to completely fill
+    // the users data partition.
+    //
+    // We do not have a good way of pre-computing the required space for a compilation step, but
+    // typically observe 16MB as the largest size of an AOT artifact. Since there are three
+    // AOT artifacts per compilation step - an image file, executable file, and a verification
+    // data file - the threshold is three times 16MB.
+    static constexpr uint64_t kMinimumSpaceForCompilation = 3 * 16 * 1024 * 1024;
+
+    uint64_t bytes_available;
+    const std::string& art_apex_data_path = GetArtApexData();
+    if (!GetFreeSpace(art_apex_data_path.c_str(), &bytes_available)) {
+      return false;
+    }
+
+    if (bytes_available < kMinimumSpaceForCompilation) {
+      LOG(WARNING) << "Low space for " << QuotePath(art_apex_data_path) << " (" << bytes_available
+                   << " bytes)";
+      return false;
+    }
+
+    return true;
+  }
 
   WARN_UNUSED ExitCode Compile(OdrMetrics& metrics, bool force_compile) const {
-    ReportSpace();  // TODO(oth): Factor available space into compilation logic.
-
     const char* staging_dir = nullptr;
     metrics.SetStage(OdrMetrics::Stage::kPreparation);
     // Clean-up existing files.
@@ -1259,6 +1271,13 @@ class OnDeviceRefresh final {
         if (!RemoveBootExtensionArtifactsFromData(isa)) {
             return ExitCode::kCleanupFailed;
         }
+
+        if (!CheckCompilationSpace()) {
+          metrics.SetStatus(OdrMetrics::Status::kNoSpace);
+          // Return kOkay so odsign will keep and sign whatever we have been able to compile.
+          return ExitCode::kOkay;
+        }
+
         if (!CompileBootExtensionArtifacts(
                 isa, staging_dir, metrics, &dex2oat_invocation_count, &error_msg)) {
           LOG(ERROR) << "Compilation of BCP failed: " << error_msg;
@@ -1272,6 +1291,13 @@ class OnDeviceRefresh final {
 
     if (force_compile || !SystemServerArtifactsExistOnData(&error_msg)) {
       metrics.SetStage(OdrMetrics::Stage::kSystemServerClasspath);
+
+      if (!CheckCompilationSpace()) {
+        metrics.SetStatus(OdrMetrics::Status::kNoSpace);
+        // Return kOkay so odsign will keep and sign whatever we have been able to compile.
+        return ExitCode::kOkay;
+      }
+
       if (!CompileSystemServerArtifacts(
               staging_dir, metrics, &dex2oat_invocation_count, &error_msg)) {
         LOG(ERROR) << "Compilation of system_server failed: " << error_msg;
