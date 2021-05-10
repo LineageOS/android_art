@@ -417,20 +417,7 @@ class HeapLocationCollector : public HGraphVisitor {
     }
   }
 
- private:
-  // An allocation cannot alias with a name which already exists at the point
-  // of the allocation, such as a parameter or a load happening before the allocation.
-  bool MayAliasWithPreexistenceChecking(ReferenceInfo* ref_info1, ReferenceInfo* ref_info2) const {
-    if (ref_info1->GetReference()->IsNewInstance() || ref_info1->GetReference()->IsNewArray()) {
-      // Any reference that can alias with the allocation must appear after it in the block/in
-      // the block's successors. In reverse post order, those instructions will be visited after
-      // the allocation.
-      return ref_info2->GetPosition() >= ref_info1->GetPosition();
-    }
-    return true;
-  }
-
-  bool CanReferencesAlias(ReferenceInfo* ref_info1, ReferenceInfo* ref_info2) const {
+  static bool CanReferencesAlias(ReferenceInfo* ref_info1, ReferenceInfo* ref_info2) {
     if (ref_info1 == ref_info2) {
       return true;
     } else if (ref_info1->IsSingleton()) {
@@ -440,6 +427,19 @@ class HeapLocationCollector : public HGraphVisitor {
     } else if (!MayAliasWithPreexistenceChecking(ref_info1, ref_info2) ||
         !MayAliasWithPreexistenceChecking(ref_info2, ref_info1)) {
       return false;
+    }
+    return true;
+  }
+
+ private:
+  // An allocation cannot alias with a name which already exists at the point
+  // of the allocation, such as a parameter or a load happening before the allocation.
+  static bool MayAliasWithPreexistenceChecking(ReferenceInfo* ref_info1, ReferenceInfo* ref_info2) {
+    if (ref_info1->GetReference()->IsNewInstance() || ref_info1->GetReference()->IsNewArray()) {
+      // Any reference that can alias with the allocation must appear after it in the block/in
+      // the block's successors. In reverse post order, those instructions will be visited after
+      // the allocation.
+      return ref_info2->GetPosition() >= ref_info1->GetPosition();
     }
     return true;
   }
