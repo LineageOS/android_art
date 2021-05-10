@@ -1157,7 +1157,14 @@ class OnDeviceRefresh final {
       args.emplace_back("--oat-location=" + artifacts.OatPath());
 
       if (!config_.GetUpdatableBcpPackagesFile().empty()) {
-        args.emplace_back("--updatable-bcp-packages-file=" + config_.GetUpdatableBcpPackagesFile());
+        const std::string& bcp_packages = config_.GetUpdatableBcpPackagesFile();
+        if (!OS::FileExists(bcp_packages.c_str())) {
+          *error_msg = "Cannot compile system_server JARs: missing " + QuotePath(bcp_packages);
+          metrics.SetStatus(OdrMetrics::Status::kIoError);
+          EraseFiles(staging_files);
+          return false;
+        }
+        args.emplace_back("--updatable-bcp-packages-file=" + bcp_packages);
       }
 
       args.emplace_back("--runtime-arg");
