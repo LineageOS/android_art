@@ -314,13 +314,18 @@ def setup_test_env():
     _user_input_variants['address_sizes_target']['target'] = _user_input_variants['address_sizes']
 
   global n_thread
-  if n_thread == 0:
-    if 'target' in _user_input_variants['target']:
+  if 'target' in _user_input_variants['target']:
+    device_name = get_device_name()
+    if n_thread == 0:
       # Use only half of the cores since fully loading the device tends to lead to timeouts.
       n_thread = get_target_cpu_count() // 2
-    else:
+      if device_name == 'fugu':
+        n_thread = 1
+  else:
+    device_name = "host"
+    if n_thread == 0:
       n_thread = get_host_cpu_count()
-    print_text("Concurrency: " + str(n_thread) + "\n")
+  print_text("Concurrency: {} ({})\n".format(n_thread, device_name))
 
   global extra_arguments
   for target in _user_input_variants['target']:
