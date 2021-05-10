@@ -54,6 +54,8 @@ art_cc_library {
     shared_libs: [
         "libart",
         "libartbase",
+    ],
+    static_libs: [
         "libvixl",
     ],
 }
@@ -67,6 +69,8 @@ art_cc_library {
     shared_libs: [
         "libartd",
         "libartbased",
+    ],
+    static_libs: [
         "libvixld",
     ],
 }
