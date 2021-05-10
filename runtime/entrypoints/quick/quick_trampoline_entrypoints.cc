@@ -1357,7 +1357,7 @@ extern "C" const void* artQuickResolutionTrampoline(
       // odd situation where the ArtMethod being executed is unrelated to the
       // receiver of the method.
       called = called->GetCanonicalMethod();
-      if (invoke_type == kSuper) {
+      if (invoke_type == kSuper || invoke_type == kInterface || invoke_type == kVirtual) {
         if (called->GetDexFile() == called_method.dex_file) {
           called_method.index = called->GetDexMethodIndex();
         } else {
