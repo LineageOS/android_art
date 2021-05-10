@@ -52,9 +52,6 @@ cc_defaults {
             // Use the 32-bit version of odrefresh on devices.
             compile_multilib: "prefer32",
         },
-        linux: {
-            enabled: true,
-        },
         host: {
             shared_libs: [
                 // Both these libraries for libxml2 on host for code derived from apex-info-list.

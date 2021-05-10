@@ -19,10 +19,4 @@ LOCAL_PATH := $(call my-dir)
 # --- dexfuzz script with core image dependencies ----------------
 .PHONY: fuzzer
 
-# We cannot depend on host core image files from prebuilts.
-# TODO(b/172480617): Remove this when ART sources are no longer in platform manifests.
-ifeq (true,$(SOONG_CONFIG_art_module_source_build))
-
 fuzzer: dexfuzz-script $(HOST_CORE_IMG_OUTS)
-
-endif

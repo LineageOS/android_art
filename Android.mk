@@ -18,6 +18,8 @@ LOCAL_PATH := $(call my-dir)
 
 art_path := $(LOCAL_PATH)
 
+include $(art_path)/tools/veridex/Android.mk
+
 ########################################################################
 # clean-oat rules
 #
@@ -54,12 +56,64 @@ endif
 include $(art_path)/build/Android.cpplint.mk
 
 ########################################################################
+# The art-tools package depends on helpers and tools that are useful for developers. Similar
+# dependencies exist for the APEX builds for these tools (see build/apex/Android.bp).
+
+ifneq ($(HOST_OS),darwin)
+include $(CLEAR_VARS)
+LOCAL_MODULE := art-tools
+LOCAL_LICENSE_KINDS := SPDX-license-identifier-Apache-2.0 SPDX-license-identifier-BSD SPDX-license-identifier-GPL-2.0
+LOCAL_LICENSE_CONDITIONS := notice restricted
+LOCAL_NOTICE_FILE := $(LOCAL_PATH)/NOTICE
+LOCAL_IS_HOST_MODULE := true
+
+ifeq (true,$(my_art_module_source_build))
+
+LOCAL_REQUIRED_MODULES := \
+    ahat \
+    dexdump \
+    hprof-conv \
+
+# A subset of the tools are disabled when HOST_PREFER_32_BIT is defined as make reports that
+# they are not supported on host (b/129323791). This is likely due to art_apex disabling host
+# APEX builds when HOST_PREFER_32_BIT is set (b/120617876).
+ifneq ($(HOST_PREFER_32_BIT),true)
+LOCAL_REQUIRED_MODULES += \
+    dexdiag \
+    dexlist \
+    oatdump \
+
+endif
+
+else
+
+# The developer tools available as prebuilts.
+LOCAL_REQUIRED_MODULES := \
+    dexdump \
+    oatdump \
+
+endif # ifeq (true,$(my_art_module_source_build))
+
+include $(BUILD_PHONY_PACKAGE)
+endif # HOST_OS != darwin
+
+
+########################################################################
+# Everything below is only available in ART source builds
+# (SOONG_CONFIG_art_module_source_build=true).
+########################################################################
+
+# TODO(b/172480617): Clean up the platform dependencies on everything above and
+# remove this condition.
+ifeq (true,$(my_art_module_source_build))
+
+
+########################################################################
 # product rules
 
 include $(art_path)/oatdump/Android.mk
 include $(art_path)/tools/ahat/Android.mk
 include $(art_path)/tools/dexfuzz/Android.mk
-include $(art_path)/tools/veridex/Android.mk
 
 ART_HOST_DEPENDENCIES := \
   $(ART_HOST_EXECUTABLES) \
@@ -111,8 +165,6 @@ test-art-run-test:
 
 ########################################################################
 # host test rules
-
-ifeq (true,$(my_art_module_source_build))
 
 test-art: test-art-host
 test-art-gtest: test-art-host-gtest
@@ -206,8 +258,6 @@ endif
 .PHONY: test-art-host-dexdump
 test-art-host-dexdump: $(addprefix $(HOST_OUT_EXECUTABLES)/, dexdump dexlist)
 	ANDROID_HOST_OUT=$(realpath $(HOST_OUT)) art/test/dexdump/run-all-tests
-
-endif # ifeq (true,$(my_art_module_source_build))
 
 ########################################################################
 # target test rules
@@ -400,35 +450,6 @@ art_module_debug_lib :=
 
 include $(BUILD_PHONY_PACKAGE)
 
-# The art-tools package depends on helpers and tools that are useful for developers. Similar
-# dependencies exist for the APEX builds for these tools (see build/apex/Android.bp).
-
-ifneq ($(HOST_OS),darwin)
-include $(CLEAR_VARS)
-LOCAL_MODULE := art-tools
-LOCAL_LICENSE_KINDS := SPDX-license-identifier-Apache-2.0 SPDX-license-identifier-BSD SPDX-license-identifier-GPL-2.0
-LOCAL_LICENSE_CONDITIONS := notice restricted
-LOCAL_NOTICE_FILE := $(LOCAL_PATH)/NOTICE
-LOCAL_IS_HOST_MODULE := true
-LOCAL_REQUIRED_MODULES := \
-    ahat \
-    dexdump \
-    hprof-conv \
-
-# A subset of the tools are disabled when HOST_PREFER_32_BIT is defined as make reports that
-# they are not supported on host (b/129323791). This is likely due to art_apex disabling host
-# APEX builds when HOST_PREFER_32_BIT is set (b/120617876).
-ifneq ($(HOST_PREFER_32_BIT),true)
-LOCAL_REQUIRED_MODULES += \
-    dexdiag \
-    dexlist \
-    oatdump \
-
-endif
-
-include $(BUILD_PHONY_PACKAGE)
-endif # HOST_OS != darwin
-
 ####################################################################################################
 # Fake packages to ensure generation of libopenjdkd when one builds with mm/mmm/mmma.
 #
@@ -458,8 +479,6 @@ endif # HOST_OS != darwin
 # "m build-art" for quick minimal build
 .PHONY: build-art
 
-ifeq (true,$(my_art_module_source_build))
-
 build-art: build-art-host
 
 # For host, we extract the ICU data from the apex and install it to HOST_OUT/I18N_APEX.
@@ -479,8 +498,6 @@ $(HOST_TZDATA_DATA): $(TARGET_OUT)/apex/$(TZDATA_APEX).apex $(HOST_OUT)/bin/deap
 
 .PHONY: build-art-host
 build-art-host:   $(HOST_OUT_EXECUTABLES)/art $(ART_HOST_DEPENDENCIES) $(HOST_CORE_IMG_OUTS) $(HOST_I18N_DATA) $(HOST_TZDATA_DATA)
-
-endif # ifeq (true,$(my_art_module_source_build))
 
 build-art: build-art-target
 
@@ -709,16 +726,12 @@ build-art-target-golem: $(RELEASE_ART_APEX) com.android.runtime $(CONSCRYPT_APEX
 ########################################################################
 # Phony target for building what go/lem requires on host.
 
-ifeq (true,$(my_art_module_source_build))
-
 .PHONY: build-art-host-golem
 # Also include libartbenchmark, we always include it when running golem.
 ART_HOST_SHARED_LIBRARY_BENCHMARK := $(ART_HOST_OUT_SHARED_LIBRARIES)/libartbenchmark.so
 build-art-host-golem: build-art-host \
                       $(ART_HOST_SHARED_LIBRARY_BENCHMARK) \
                       $(HOST_OUT_EXECUTABLES)/dex2oat_wrapper
-
-endif # ifeq (true,$(my_art_module_source_build))
 
 ########################################################################
 # Phony target for building what go/lem requires for syncing /system to target.
@@ -729,12 +742,8 @@ build-art-unbundled-golem: art-runtime linker oatdump $(art_apex_jars) conscrypt
 ########################################################################
 # Rules for building all dependencies for tests.
 
-ifeq (true,$(my_art_module_source_build))
-
 .PHONY: build-art-host-tests
 build-art-host-tests:   build-art-host $(TEST_ART_RUN_TEST_DEPENDENCIES) $(ART_TEST_HOST_RUN_TEST_DEPENDENCIES) $(ART_TEST_HOST_GTEST_DEPENDENCIES) | $(TEST_ART_RUN_TEST_ORDERONLY_DEPENDENCIES)
-
-endif # ifeq (true,$(my_art_module_source_build))
 
 .PHONY: build-art-target-tests
 build-art-target-tests:   build-art-target $(TEST_ART_RUN_TEST_DEPENDENCIES) $(ART_TEST_TARGET_RUN_TEST_DEPENDENCIES) $(ART_TEST_TARGET_GTEST_DEPENDENCIES) | $(TEST_ART_RUN_TEST_ORDERONLY_DEPENDENCIES)
@@ -902,3 +911,5 @@ public_sdk_stubs: $(STUB_ZIP_FILES)
 
 MIN_SDK_VERSION :=
 SDK_VERSIONS :=
+
+endif # ifeq (true,$(my_art_module_source_build))
