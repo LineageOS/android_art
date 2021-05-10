@@ -349,7 +349,7 @@ DEFINE_FUNCTION_CUSTOM_CFA art_quick_throw_null_pointer_exception_from_signal, 2
     PUSH eax                                              // pass arg1
     call SYMBOL(artThrowNullPointerExceptionFromSignal)   // (addr, self)
     UNREACHABLE
-END_FUNCTION art_quick_throw_null_pointer_exception
+END_FUNCTION art_quick_throw_null_pointer_exception_from_signal
 
     /*
      * Called by managed code to create and deliver an ArithmeticException.
