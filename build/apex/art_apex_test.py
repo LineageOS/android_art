@@ -588,7 +588,6 @@ class ReleaseChecker:
     self._checker.check_native_library('libnpt')
     self._checker.check_native_library('libunwindstack')
     self._checker.check_native_library('libziparchive')
-    self._checker.check_optional_native_library('libvixl')  # Only on ARM/ARM64
 
     # Allow extra dependencies that appear in ASAN builds.
     self._checker.check_optional_native_library('libclang_rt.asan*')
@@ -723,7 +722,6 @@ class DebugTargetChecker:
     # double_loadable:true, cf. go/double_loadable). Also, like in the release
     # package we need to look out for dependencies that should go through
     # exported library stubs (until b/128708192 is fixed).
-    self._checker.check_optional_native_library('libvixld')  # Only on ARM/ARM64
     self._checker.check_prefer64_library('libmeminfo')
     self._checker.check_prefer64_library('libprocinfo')
 
