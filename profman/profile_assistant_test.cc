@@ -50,13 +50,13 @@ class ProfileAssistantTest : public CommonRuntimeTest, public ProfileTestHelper 
   void PostRuntimeCreate() override {
     allocator_.reset(new ArenaAllocator(Runtime::Current()->GetArenaPool()));
 
-    dex1 = BuildDex("location1", /* checksum= */ 1, "LUnique1;", /* num_method_ids= */ 10001);
-    dex2 = BuildDex("location2", /* checksum= */ 2, "LUnique2;", /* num_method_ids= */ 10002);
-    dex3 = BuildDex("location3", /* checksum= */ 3, "LUnique3;", /* num_method_ids= */ 10003);
-    dex4 = BuildDex("location4", /* checksum= */ 4, "LUnique4;", /* num_method_ids= */ 10004);
+    dex1 = BuildDex("location1", /*checksum=*/ 1, "LUnique1;", /*num_method_ids=*/ 10001);
+    dex2 = BuildDex("location2", /*checksum=*/ 2, "LUnique2;", /*num_method_ids=*/ 10002);
+    dex3 = BuildDex("location3", /*checksum=*/ 3, "LUnique3;", /*num_method_ids=*/ 10003);
+    dex4 = BuildDex("location4", /*checksum=*/ 4, "LUnique4;", /*num_method_ids=*/ 10004);
 
     dex1_checksum_missmatch =
-        BuildDex("location1", /* checksum= */ 12, "LUnique1;", /* num_method_ids= */ 10001);
+        BuildDex("location1", /*checksum=*/ 12, "LUnique1;", /*num_method_ids=*/ 10001);
   }
 
  protected:
@@ -785,7 +785,7 @@ TEST_F(ProfileAssistantTest, TestProfileCreationGenerateMethods) {
   ASSERT_TRUE(info.Load(GetFd(profile_file)));
   // Verify that the profile has matching methods.
   ScopedObjectAccess soa(Thread::Current());
-  ObjPtr<mirror::Class> klass = GetClass(soa, /* class_loader= */ nullptr, "Ljava/lang/Math;");
+  ObjPtr<mirror::Class> klass = GetClass(soa, /*class_loader=*/ nullptr, "Ljava/lang/Math;");
   ASSERT_TRUE(klass != nullptr);
   size_t method_count = 0;
   for (ArtMethod& method : klass->GetMethods(kRuntimePointerSize)) {
@@ -995,8 +995,8 @@ TEST_F(ProfileAssistantTest, TestBootImageProfileWith2RawProfiles) {
 
   ProfileCompilationInfo boot_profile1;
   ProfileCompilationInfo boot_profile2;
-  boot_profile1.Load(profile1.GetFilename(), /*for_boot_image*/ true);
-  boot_profile2.Load(profile2.GetFilename(), /*for_boot_image*/ true);
+  boot_profile1.Load(profile1.GetFilename(), /*for_boot_image=*/ true);
+  boot_profile2.Load(profile2.GetFilename(), /*for_boot_image=*/ true);
 
   // Generate the boot profile.
   ScratchFile out_profile;
@@ -1891,7 +1891,7 @@ TEST_F(ProfileAssistantTest, BootImageMergeWithAnnotations) {
   const DexFile& d1 = *dex_files[0];
   const DexFile& d2 = *dex_files[1];
   // The new profile info will contain the methods with indices 0-100.
-  ProfileCompilationInfo info(/*for_boot_image*/ true);
+  ProfileCompilationInfo info(/*for_boot_image=*/ true);
   ProfileCompilationInfo::ProfileSampleAnnotation psa1("package1");
   ProfileCompilationInfo::ProfileSampleAnnotation psa2("package2");
 
@@ -1926,10 +1926,10 @@ TEST_F(ProfileAssistantTest, DifferentProfileVersions) {
   ScratchFile profile1;
   ScratchFile profile2;
 
-  ProfileCompilationInfo info1(/*for_boot_image*/ false);
+  ProfileCompilationInfo info1(/*for_boot_image=*/ false);
   info1.Save(profile1.GetFd());
 
-  ProfileCompilationInfo info2(/*for_boot_image*/ true);
+  ProfileCompilationInfo info2(/*for_boot_image=*/ true);
   info2.Save(profile2.GetFd());
 
   std::vector<int> profile_fds({ GetFd(profile1)});
@@ -1955,7 +1955,7 @@ TEST_F(ProfileAssistantTest, ForceMergeIgnoreProfilesItCannotLoad) {
   std::string content = "giberish";
   ASSERT_TRUE(profile1.GetFile()->WriteFully(content.c_str(), content.length()));
 
-  ProfileCompilationInfo info2(/*for_boot_image*/ true);
+  ProfileCompilationInfo info2(/*for_boot_image=*/ true);
   info2.Save(profile2.GetFd());
 
   std::vector<int> profile_fds({ GetFd(profile1)});
