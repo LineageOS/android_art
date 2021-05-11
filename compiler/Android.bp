@@ -210,37 +210,15 @@ art_cc_library {
     codegen: {
         arm: {
             // VIXL assembly support for ARM targets.
-            static: {
-                whole_static_libs: [
-                    "libvixl",
-                ],
-            },
-            shared: {
-                shared_libs: [
-                    "libvixl",
-                ],
-                // Export vixl headers as they are included in this library's exported headers.
-                export_shared_lib_headers: [
-                    "libvixl",
-                ],
-            },
+            static_libs: [
+                "libvixl",
+            ],
         },
         arm64: {
             // VIXL assembly support for ARM64 targets.
-            static: {
-                whole_static_libs: [
-                    "libvixl",
-                ],
-            },
-            shared: {
-                shared_libs: [
-                    "libvixl",
-                ],
-                // Export vixl headers as they are included in this library's exported headers.
-                export_shared_lib_headers: [
-                    "libvixl",
-                ],
-            },
+            static_libs: [
+                "libvixl",
+            ],
         },
     },
     shared_libs: [
@@ -292,37 +270,23 @@ art_cc_library {
     codegen: {
         arm: {
             // VIXL assembly support for ARM targets.
-            static: {
-                whole_static_libs: [
-                    "libvixld",
-                ],
-            },
-            shared: {
-                shared_libs: [
-                    "libvixld",
-                ],
-                // Export vixl headers as they are included in this library's exported headers.
-                export_shared_lib_headers: [
-                    "libvixld",
-                ],
-            },
+            static_libs: [
+                "libvixld",
+            ],
+            // Export vixl headers as they are included in this library's headers used by tests.
+            export_static_lib_headers: [
+                "libvixld",
+            ],
         },
         arm64: {
             // VIXL assembly support for ARM64 targets.
-            static: {
-                whole_static_libs: [
-                    "libvixld",
-                ],
-            },
-            shared: {
-                shared_libs: [
-                    "libvixld",
-                ],
-                // Export vixl headers as they are included in this library's exported headers.
-                export_shared_lib_headers: [
-                    "libvixld",
-                ],
-            },
+            static_libs: [
+                "libvixld",
+            ],
+            // Export vixl headers as they are included in this library's headers used by tests.
+            export_static_lib_headers: [
+                "libvixld",
+            ],
         },
     },
     shared_libs: [
@@ -474,10 +438,12 @@ art_cc_test {
         "libprofiled",
         "libartd-compiler",
         "libartd-simulator-container",
-        "libvixld",
 
         "libbacktrace",
         "libnativeloader",
+    ],
+    static_libs: [
+        "libvixld",
     ],
 
     target: {
@@ -514,6 +480,8 @@ art_cc_test {
     },
     shared_libs: [
         "libartd-compiler",
+    ],
+    static_libs: [
         "libvixld",
     ],
 }

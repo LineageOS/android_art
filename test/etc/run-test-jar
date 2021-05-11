@@ -1234,7 +1234,6 @@ if [ "$HOST" = "n" ]; then
     cmdline="cd $DEX_LOCATION && \
              export ASAN_OPTIONS=$RUN_TEST_ASAN_OPTIONS && \
              export ANDROID_DATA=$DEX_LOCATION && \
-             export ANDROID_ADDITIONAL_PUBLIC_LIBRARIES=$PUBLIC_LIBS && \
              export DEX_LOCATION=$DEX_LOCATION && \
              export ANDROID_ROOT=$ANDROID_ROOT && \
              export ANDROID_I18N_ROOT=$ANDROID_I18N_ROOT && \
