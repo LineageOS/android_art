@@ -25,6 +25,7 @@ package {
 
 art_cc_defaults {
     name: "libelffile-defaults",
+    defaults: ["art_defaults"],
     host_supported: true,
     export_include_dirs: ["."],
     srcs: [
@@ -43,7 +44,6 @@ art_cc_defaults {
 art_cc_library_static {
     name: "libelffile",
     defaults: [
-        "art_defaults",
         "libelffile-defaults",
     ],
     shared_libs: [
