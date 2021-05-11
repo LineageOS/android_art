@@ -102,6 +102,13 @@ func codegen(ctx android.LoadHookContext, c *codegenProperties, t moduleType) {
 			}
 		}
 
+		type libraryProps struct {
+			Target struct {
+				Android *CodegenLibraryArchProperties
+				Host    *CodegenLibraryArchProperties
+			}
+		}
+
 		type sharedLibraryProps struct {
 			Target struct {
 				Android *CodegenLibraryArchSharedProperties
@@ -119,20 +126,24 @@ func codegen(ctx android.LoadHookContext, c *codegenProperties, t moduleType) {
 		arch := getCodegenArchProperties(archName)
 
 		cp := &commonProps{}
+		lp := &libraryProps{}
 		sharedLP := &sharedLibraryProps{}
 		staticLP := &staticLibraryProps{}
 		if host {
 			cp.Target.Host = &arch.CodegenCommonArchProperties
+			lp.Target.Host = &arch.CodegenLibraryArchProperties
 			sharedLP.Target.Host = &arch.CodegenLibraryArchSharedProperties
 			staticLP.Target.Host = &arch.CodegenLibraryArchStaticProperties
 		} else {
 			cp.Target.Android = &arch.CodegenCommonArchProperties
+			lp.Target.Android = &arch.CodegenLibraryArchProperties
 			sharedLP.Target.Android = &arch.CodegenLibraryArchSharedProperties
 			staticLP.Target.Android = &arch.CodegenLibraryArchStaticProperties
 		}
 
 		ctx.AppendProperties(cp)
 		if t.library {
+			ctx.AppendProperties(lp)
 			if t.static {
 				ctx.AppendProperties(staticLP)
 			}
@@ -167,6 +178,11 @@ type CodegenCommonArchProperties struct {
 	Cppflags []string
 }
 
+type CodegenLibraryArchProperties struct {
+	Static_libs               []string
+	Export_static_lib_headers []string
+}
+
 type CodegenLibraryArchStaticProperties struct {
 	Static struct {
 		Whole_static_libs []string
@@ -182,6 +198,7 @@ type CodegenLibraryArchSharedProperties struct {
 type codegenArchProperties struct {
 	CodegenSourceArchProperties
 	CodegenCommonArchProperties
+	CodegenLibraryArchProperties
 	CodegenLibraryArchStaticProperties
 	CodegenLibraryArchSharedProperties
 }

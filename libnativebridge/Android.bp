@@ -10,9 +10,6 @@ package {
 cc_defaults {
     name: "libnativebridge-defaults",
     defaults: ["art_defaults"],
-    cppflags: [
-        "-fvisibility=protected",
-    ],
     header_libs: [
         "jni_headers",
         "libnativebridge-headers",
@@ -64,10 +61,10 @@ art_cc_library {
 
     target: {
         android: {
-            version_script: "libnativebridge.map.txt",
-        },
-        linux: {
-            version_script: "libnativebridge.map.txt",
+            header_libs: [
+                "libnativeloader-headers", // For dlext_namespaces.h
+            ],
+            shared_libs: ["libdl_android"],
         },
     },
 
