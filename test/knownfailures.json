@@ -1190,8 +1190,7 @@
                   "2033-shutdown-mechanics",
                   "2035-structural-native-method",
                   "2036-structural-subclass-shadow",
-                  "2038-hiddenapi-jvmti-ext",
-                  "2040-huge-native-alloc"],
+                  "2038-hiddenapi-jvmti-ext"],
         "variant": "jvm",
         "description": ["Doesn't run on RI."]
     },

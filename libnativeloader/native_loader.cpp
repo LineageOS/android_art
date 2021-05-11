@@ -254,7 +254,11 @@ void* OpenNativeLibrary(JNIEnv* env, int32_t target_sdk_version, const char* pat
       }
     }
 
-    void* handle = dlopen(path, RTLD_NOW);
+    // Fall back to the system namespace. This happens for preloaded JNI
+    // libraries in the zygote.
+    // TODO(b/185833744): Investigate if this should fall back to the app main
+    // namespace (aka anonymous namespace) instead.
+    void* handle = OpenSystemLibrary(path, RTLD_NOW);
     if (handle == nullptr) {
       *error_msg = strdup(dlerror());
     }
