@@ -283,14 +283,5 @@
           "libcore.javax.net.ssl.DefaultHostnameVerifierTest#testSubjectWithWildAltNamesCert",
           "libcore.javax.net.ssl.DefaultHostnameVerifierTest#testWildAltNameOnlyCert"],
   bug: 166619732
-},
-{
-  description: "Flakey tests",
-  result: EXEC_FAILED,
-  names: ["libcore.libcore.util.NativeAllocationRegistryTest#testNativeAllocationMallocNoSharedRegistry",
-          "libcore.libcore.util.NativeAllocationRegistryTest#testNativeAllocationMallocSharedRegistry",
-          "libcore.libcore.util.NativeAllocationRegistryTest#testNativeAllocationNonmallocNoSharedRegistry",
-          "libcore.libcore.util.NativeAllocationRegistryTest#testNativeAllocationNonmallocSharedRegistry"],
-  bug: 160885166
 }
 ]
