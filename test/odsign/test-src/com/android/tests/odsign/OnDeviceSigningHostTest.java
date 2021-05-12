@@ -49,9 +49,11 @@ public class OnDeviceSigningHostTest extends BaseHostJUnit4Test {
     @Before
     public void setUp() throws Exception {
         assumeTrue("Updating APEX is not supported", mInstallUtils.isApexUpdateSupported());
+        installPackage(TEST_APP_APK);
+        mInstallUtils.installApexes(APEX_FILENAME);
+        reboot();
     }
 
-    @Before // Generally not needed, but local test devices are sometimes in a "bad" start state.
     @After
     public void cleanup() throws Exception {
         ApexInfo apex = mInstallUtils.getApexInfo(mInstallUtils.getTestFile(APEX_FILENAME));
@@ -61,12 +63,17 @@ public class OnDeviceSigningHostTest extends BaseHostJUnit4Test {
 
     @Test
     public void verifyArtUpgradeSignsFiles() throws Exception {
-        installPackage(TEST_APP_APK);
-        mInstallUtils.installApexes(APEX_FILENAME);
-        reboot();
         DeviceTestRunOptions options = new DeviceTestRunOptions(TEST_APP_PACKAGE_NAME);
         options.setTestClassName(TEST_APP_PACKAGE_NAME + ".ArtifactsSignedTest");
         options.setTestMethodName("testArtArtifactsHaveFsverity");
+        runDeviceTests(options);
+    }
+
+    @Test
+    public void verifyArtUpgradeGeneratesRequiredArtifacts() throws Exception {
+        DeviceTestRunOptions options = new DeviceTestRunOptions(TEST_APP_PACKAGE_NAME);
+        options.setTestClassName(TEST_APP_PACKAGE_NAME + ".ArtifactsSignedTest");
+        options.setTestMethodName("testGeneratesRequiredArtArtifacts");
         runDeviceTests(options);
     }
 
