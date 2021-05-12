@@ -140,9 +140,6 @@ art_module_sdk {
                 "libnativehelper_compat_libc++",
                 "libnativeloader_lazy",
             ],
-            native_static_libs: [
-                "libctstiagent",
-            ],
         },
 
         linux_bionic: {
@@ -261,5 +258,8 @@ art_module_exports {
 
     native_shared_libs: [
         "libjavacoretests",
+    ],
+    native_static_libs: [
+        "libctstiagent",
     ],
 }
