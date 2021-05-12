@@ -1127,7 +1127,12 @@ class OatDumper {
       vios->Stream() << "DEX CODE:\n";
       ScopedIndentation indent2(vios);
       if (code_item_accessor.HasCodeItem()) {
+        uint32_t max_pc = code_item_accessor.InsnsSizeInCodeUnits();
         for (const DexInstructionPcPair& inst : code_item_accessor) {
+          if (inst.DexPc() + inst->SizeInCodeUnits() > max_pc) {
+            LOG(WARNING) << "GLITCH: run-away instruction at idx=0x" << std::hex << inst.DexPc();
+            break;
+          }
           vios->Stream() << StringPrintf("0x%04x: ", inst.DexPc()) << inst->DumpHexLE(5)
                          << StringPrintf("\t| %s\n", inst->DumpString(&dex_file).c_str());
         }

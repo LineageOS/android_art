@@ -152,20 +152,6 @@ bool ShouldSampleSmapsEntry(const perfetto::profiling::SmapsEntry& e) {
   return false;
 }
 
-bool CanConnectToSocket(const char* name) {
-  struct sockaddr_un addr = {};
-  addr.sun_family = AF_UNIX;
-  strncpy(addr.sun_path, name, sizeof(addr.sun_path) - 1);
-  int fd = socket(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0);
-  if (fd == -1) {
-    PLOG(ERROR) << "failed to create socket";
-    return false;
-  }
-  bool connected = connect(fd, reinterpret_cast<struct sockaddr*>(&addr), sizeof(addr)) == 0;
-  close(fd);
-  return connected;
-}
-
 constexpr size_t kMaxCmdlineSize = 512;
 
 class JavaHprofDataSource : public perfetto::DataSource<JavaHprofDataSource> {
@@ -187,12 +173,6 @@ class JavaHprofDataSource : public perfetto::DataSource<JavaHprofDataSource> {
     std::unique_ptr<perfetto::protos::pbzero::JavaHprofConfig::Decoder> cfg(
         new perfetto::protos::pbzero::JavaHprofConfig::Decoder(
           args.config->java_hprof_config_raw()));
-
-    if (args.config->enable_extra_guardrails() && !CanConnectToSocket("/dev/socket/heapprofd")) {
-      LOG(ERROR) << "rejecting extra guardrails";
-      enabled_ = false;
-      return;
-    }
 
     dump_smaps_ = cfg->dump_smaps();
     for (auto it = cfg->ignored_types(); it; ++it) {

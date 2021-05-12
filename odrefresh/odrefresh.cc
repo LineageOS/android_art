@@ -1229,7 +1229,7 @@ class OnDeviceRefresh final {
 
     uint64_t bytes_available;
     const std::string& art_apex_data_path = GetArtApexData();
-    if (!GetFreeSpace(art_apex_data_path.c_str(), &bytes_available)) {
+    if (!GetFreeSpace(art_apex_data_path, &bytes_available)) {
       return false;
     }
 
