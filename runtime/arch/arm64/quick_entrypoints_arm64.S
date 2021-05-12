@@ -1874,6 +1874,7 @@ ENTRY art_quick_generic_jni_trampoline
 
     // Tear down the alloca.
     mov sp, x28
+    .cfi_remember_state
     .cfi_def_cfa_register sp
 
     // Tear down the callee-save frame.
@@ -1884,14 +1885,20 @@ ENTRY art_quick_generic_jni_trampoline
     fmov d0, x0
     ret
 
+    // Undo the unwinding information from above since it doesn't apply below.
+    .cfi_restore_state
+    .cfi_def_cfa x28, FRAME_SIZE_SAVE_REFS_AND_ARGS
 .Lexception_in_native:
     // Move to x1 then sp to please assembler.
     ldr x1, [xSELF, # THREAD_TOP_QUICK_FRAME_OFFSET]
     add sp, x1, #-1  // Remove the GenericJNI tag.
-    .cfi_def_cfa_register sp
+    bl art_deliver_pending_exception
+END art_quick_generic_jni_trampoline
+
+ENTRY art_deliver_pending_exception
     # This will create a new save-all frame, required by the runtime.
     DELIVER_PENDING_EXCEPTION
-END art_quick_generic_jni_trampoline
+END art_deliver_pending_exception
 
 /*
  * Called to bridge from the quick to interpreter ABI. On entry the arguments match those

@@ -1826,8 +1826,8 @@ DEFINE_FUNCTION art_quick_generic_jni_trampoline
 
     // Tear down the alloca.
     movl %ebp, %esp
+    CFI_REMEMBER_STATE
     CFI_DEF_CFA_REGISTER(esp)
-
 
     // Tear down the callee-save frame.
     // Remove space for FPR args and EAX
@@ -1846,15 +1846,20 @@ DEFINE_FUNCTION art_quick_generic_jni_trampoline
     movd %edx, %xmm1
     punpckldq %xmm1, %xmm0
     ret
+
+    // Undo the unwinding information from above since it doesn't apply below.
+    CFI_RESTORE_STATE_AND_DEF_CFA(ebp, 64)
 .Lexception_in_native:
     pushl %fs:THREAD_TOP_QUICK_FRAME_OFFSET
     addl LITERAL(-1), (%esp)  // Remove the GenericJNI tag.
     movl (%esp), %esp
-    // Do a call to push a new save-all frame required by the runtime.
-    call .Lexception_call
-.Lexception_call:
-    DELIVER_PENDING_EXCEPTION
+    call art_deliver_pending_exception
 END_FUNCTION art_quick_generic_jni_trampoline
+
+DEFINE_FUNCTION art_deliver_pending_exception
+    // This will create a new save-all frame, required by the runtime.
+    DELIVER_PENDING_EXCEPTION
+END_FUNCTION art_deliver_pending_exception
 
 DEFINE_FUNCTION art_quick_to_interpreter_bridge
     SETUP_SAVE_REFS_AND_ARGS_FRAME  ebx, ebx  // save frame
