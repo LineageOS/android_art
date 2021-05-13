@@ -32,6 +32,7 @@
           "libcore.java.math.BigIntegerTest#test_Constructor_IILjava_util_Random",
           "libcore.java.math.BigIntegerTest#test_probablePrime",
           "libcore.java.text.SimpleDateFormatTest#testLocales",
+          "libcore.java.util.stream.CollectorsTest#counting_largeStream",
           "org.apache.harmony.tests.java.lang.ref.ReferenceQueueTest#test_remove",
           "org.apache.harmony.tests.java.lang.String2Test#test_getBytes",
           "org.apache.harmony.tests.java.math.BigIntegerConstructorsTest#testConstructorPrime",
