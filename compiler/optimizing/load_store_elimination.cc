@@ -929,6 +929,8 @@ class LSEVisitor final : private HGraphDelegateVisitor {
     kPartialElimination,
   };
 
+  bool MayAliasOnBackEdge(HBasicBlock* loop_header, size_t idx1, size_t idx2) const;
+
   bool TryReplacingLoopPhiPlaceholderWithDefault(
       PhiPlaceholder phi_placeholder,
       DataType::Type type,
@@ -1848,6 +1850,34 @@ void LSEVisitor::VisitBasicBlock(HBasicBlock* block) {
   HGraphVisitor::VisitBasicBlock(block);
 }
 
+bool LSEVisitor::MayAliasOnBackEdge(HBasicBlock* loop_header, size_t idx1, size_t idx2) const {
+  DCHECK_NE(idx1, idx2);
+  DCHECK(loop_header->IsLoopHeader());
+  if (heap_location_collector_.MayAlias(idx1, idx2)) {
+    return true;
+  }
+  // For array locations with index defined inside the loop, include
+  // all other locations in the array, even those that LSA declares
+  // non-aliasing, such as `a[i]` and `a[i + 1]`, as they may actually
+  // refer to the same locations for different iterations. (LSA's
+  // `ComputeMayAlias()` does not consider different loop iterations.)
+  HeapLocation* loc1 = heap_location_collector_.GetHeapLocation(idx1);
+  HeapLocation* loc2 = heap_location_collector_.GetHeapLocation(idx2);
+  if (loc1->IsArray() &&
+      loc2->IsArray() &&
+      HeapLocationCollector::CanReferencesAlias(loc1->GetReferenceInfo(),
+                                                loc2->GetReferenceInfo())) {
+    HLoopInformation* loop_info = loop_header->GetLoopInformation();
+    if (loop_info->Contains(*loc1->GetIndex()->GetBlock()) ||
+        loop_info->Contains(*loc2->GetIndex()->GetBlock())) {
+      // Consider the locations aliasing. Do not optimize the case where both indexes
+      // are loop invariants defined inside the loop, rely on LICM to pull them out.
+      return true;
+    }
+  }
+  return false;
+}
+
 bool LSEVisitor::TryReplacingLoopPhiPlaceholderWithDefault(
     PhiPlaceholder phi_placeholder,
     DataType::Type type,
@@ -1972,6 +2002,12 @@ bool LSEVisitor::TryReplacingLoopPhiPlaceholderWithSingleInput(
         replacement = value.GetInstruction();
       }
     }
+    // While `TryReplacingLoopPhiPlaceholderWithDefault()` has special treatment
+    // for back-edges, it is not needed here. When looking for a single input
+    // instruction coming from before the loop, the array index must also be
+    // defined before the loop and the aliasing analysis done by LSA is sufficient.
+    // Any writes of a different value with an index that is not loop invariant
+    // would invalidate the heap location in `VisitSetLocation()`.
   }
 
   // Record replacement and report success.
@@ -2033,6 +2069,7 @@ std::optional<LSEVisitor::PhiPlaceholder> LSEVisitor::FindLoopPhisToMaterialize(
       // default values or Phis, i.e. for vector loads, as we can only replace the Phi
       // placeholder with a single instruction defined before the loop.
       if (!can_use_default_or_phi) {
+        DCHECK(index != nullptr);  // Vector operations are array operations.
         if (TryReplacingLoopPhiPlaceholderWithSingleInput(current_phi_placeholder,
                                                           phi_placeholders_to_materialize)) {
           continue;
@@ -2042,10 +2079,25 @@ std::optional<LSEVisitor::PhiPlaceholder> LSEVisitor::FindLoopPhisToMaterialize(
       }
     }
     for (HBasicBlock* predecessor : current_block->GetPredecessors()) {
-      Value value = ReplacementOrValue(heap_values_for_[predecessor->GetBlockId()][idx].value);
+      ScopedArenaVector<ValueRecord>& heap_values = heap_values_for_[predecessor->GetBlockId()];
+      Value value = ReplacementOrValue(heap_values[idx].value);
       if (value.IsUnknown()) {
         // We cannot create a Phi for this loop Phi placeholder.
         return current_phi_placeholder;  // Report the loop Phi placeholder.
+      }
+      // For arrays, the location may have been clobbered by writes to other locations
+      // in a loop that LSA does not consider aliasing, such as `a[i]` and `a[i + 1]`.
+      if (current_block->IsLoopHeader() &&
+          predecessor != current_block->GetLoopInformation()->GetPreHeader() &&
+          heap_location_collector_.GetHeapLocation(idx)->GetIndex() != nullptr) {
+        for (size_t i = 0, size = heap_values.size(); i != size; ++i) {
+          if (i != idx &&
+              !heap_values[i].stored_by.IsUnknown() &&
+              MayAliasOnBackEdge(current_block, idx, i)) {
+            // We cannot create a Phi for this loop Phi placeholder.
+            return current_phi_placeholder;
+          }
+        }
       }
       if (value.NeedsLoopPhi()) {
         // Visit the predecessor Phi placeholder if it's not visited yet.
@@ -2574,7 +2626,6 @@ void LSEVisitor::SearchPhiPlaceholdersForKeptStores() {
       ScopedArenaVector<ValueRecord>& heap_values = heap_values_for_[predecessor->GetBlockId()];
       // For loop back-edges we must also preserve all stores to locations that
       // may alias with the location `idx`.
-      // TODO: Review whether we need to keep stores to aliased locations from pre-header.
       // TODO: Add tests cases around this.
       bool is_back_edge =
           block->IsLoopHeader() && predecessor != block->GetLoopInformation()->GetPreHeader();
@@ -2582,31 +2633,7 @@ void LSEVisitor::SearchPhiPlaceholdersForKeptStores() {
       size_t end = is_back_edge ? heap_values.size() : idx + 1u;
       for (size_t i = start; i != end; ++i) {
         Value stored_by = heap_values[i].stored_by;
-        auto may_alias = [this, block, idx](size_t i) {
-            DCHECK_NE(i, idx);
-            DCHECK(block->IsLoopHeader());
-            if (heap_location_collector_.MayAlias(i, idx)) {
-              return true;
-            }
-            // For array locations with index defined inside the loop, include
-            // all other locations in the array, even those that LSA declares
-            // non-aliasing, such as `a[i]` and `a[i + 1]`, as they may actually
-            // refer to the same locations for different iterations. (LSA's
-            // `ComputeMayAlias()` does not consider different loop iterations.)
-            HeapLocation* heap_loc = heap_location_collector_.GetHeapLocation(idx);
-            HeapLocation* other_loc = heap_location_collector_.GetHeapLocation(i);
-            if (heap_loc->IsArray() &&
-                other_loc->IsArray() &&
-                heap_loc->GetReferenceInfo() == other_loc->GetReferenceInfo() &&
-                block->GetLoopInformation()->Contains(*heap_loc->GetIndex()->GetBlock())) {
-              // If one location has index defined inside and the other index defined outside
-              // of the loop, LSA considers them aliasing and we take an early return above.
-              DCHECK(block->GetLoopInformation()->Contains(*other_loc->GetIndex()->GetBlock()));
-              return true;
-            }
-            return false;
-        };
-        if (!stored_by.IsUnknown() && (i == idx || may_alias(i))) {
+        if (!stored_by.IsUnknown() && (i == idx || MayAliasOnBackEdge(block, idx, i))) {
           if (stored_by.NeedsPhi()) {
             size_t phi_placeholder_index = PhiPlaceholderIndex(stored_by);
             if (is_partial_kept_merged_unknown) {
