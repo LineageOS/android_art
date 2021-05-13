@@ -180,10 +180,13 @@ art_module_exports {
                 "okhttp-norepackage",
             ],
             native_binaries: [
-                "hiddenapi",
                 "dex2oat",
                 "dex2oatd",
+                "dexdump",
+                "hiddenapi",
+                "oatdump",
                 "profman",
+                "veridex",
             ],
             native_libs: [
                 "libartpalette", // libdexfile dependency
