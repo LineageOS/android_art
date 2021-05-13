@@ -1498,6 +1498,7 @@ ENTRY art_quick_generic_jni_trampoline
 
     // Tear down the alloca.
     mov sp, r10
+    .cfi_remember_state
     .cfi_def_cfa_register sp
 
     // Tear down the callee-save frame. Skip arg registers.
@@ -1509,18 +1510,21 @@ ENTRY art_quick_generic_jni_trampoline
     // store into fpr, for when it's a fpr return...
     vmov d0, r0, r1
     bx lr      // ret
-    // Undo the unwinding information from above since it doesn't apply below.
-    .cfi_def_cfa_register r10
-    .cfi_adjust_cfa_offset FRAME_SIZE_SAVE_REFS_AND_ARGS-FRAME_SIZE_SAVE_REFS_ONLY
 
+    // Undo the unwinding information from above since it doesn't apply below.
+    .cfi_restore_state
+    .cfi_def_cfa r10, FRAME_SIZE_SAVE_REFS_AND_ARGS
 .Lexception_in_native:
     ldr ip, [rSELF, #THREAD_TOP_QUICK_FRAME_OFFSET]
     add ip, ip, #-1  // Remove the GenericJNI tag. ADD/SUB writing directly to SP is UNPREDICTABLE.
     mov sp, ip
-    .cfi_def_cfa_register sp
+    bl art_deliver_pending_exception
+END art_quick_generic_jni_trampoline
+
+ENTRY art_deliver_pending_exception
     # This will create a new save-all frame, required by the runtime.
     DELIVER_PENDING_EXCEPTION
-END art_quick_generic_jni_trampoline
+END art_deliver_pending_exception
 
     .extern artQuickToInterpreterBridge
 ENTRY art_quick_to_interpreter_bridge
