@@ -656,9 +656,10 @@ class HGraphVisualizerPrinter : public HGraphDelegateVisitor {
     } else {
       StartAttributeStream("dex_pc") << "n/a";
     }
+    HBasicBlock* block = instruction->GetBlock();
     if (IsPass(kDebugDumpName)) {
       // Include block name for logcat use.
-      StartAttributeStream("block") << namer_.GetName(instruction->GetBlock());
+      StartAttributeStream("block") << namer_.GetName(block);
     }
     instruction->Accept(this);
     if (instruction->HasEnvironment()) {
@@ -710,7 +711,7 @@ class HGraphVisualizerPrinter : public HGraphDelegateVisitor {
       }
     }
 
-    HLoopInformation* loop_info = instruction->GetBlock()->GetLoopInformation();
+    HLoopInformation* loop_info = (block != nullptr) ? block->GetLoopInformation() : nullptr;
     if (loop_info == nullptr) {
       StartAttributeStream("loop") << "none";
     } else {
