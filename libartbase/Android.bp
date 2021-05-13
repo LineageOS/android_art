@@ -120,7 +120,6 @@ cc_defaults {
         },
     },
     generated_sources: ["art_libartbase_operator_srcs"],
-    cflags: ["-DBUILDING_LIBART=1"],
 
     export_include_dirs: ["."],
 }
