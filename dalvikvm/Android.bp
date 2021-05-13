@@ -25,15 +25,11 @@ package {
 
 art_cc_binary {
     name: "dalvikvm",
+    defaults: ["art_defaults"],
     host_supported: true,
     compile_multilib: "both",
 
     srcs: ["dalvikvm.cc"],
-    cflags: [
-        "-Wall",
-        "-Werror",
-        "-Wextra",
-    ],
     shared_libs: [
         "libnativehelper",
     ],
@@ -52,9 +48,6 @@ art_cc_binary {
             // really be in shared_libs.
             whole_static_libs: ["libsigchain"],
         },
-        darwin: {
-            enabled: false,
-        },
     },
 
     multilib: {
@@ -72,5 +65,4 @@ art_cc_binary {
         "com.android.art",
         "com.android.art.debug",
     ],
-    min_sdk_version: "S",
 }
