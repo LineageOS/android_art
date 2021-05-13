@@ -29,7 +29,6 @@
 
 #include <android-base/file.h>
 #include <android-base/macros.h>
-#include <android-base/properties.h>
 #include <android-base/strings.h>
 #include <android-base/thread_annotations.h>
 #include <nativebridge/native_bridge.h>
@@ -48,12 +47,11 @@ namespace {
 #if defined(ART_TARGET_ANDROID)
 
 // NATIVELOADER_DEFAULT_NAMESPACE_LIBS is an environment variable that can be
-// used when ro.debuggable is true to list extra libraries (separated by ":")
-// that libnativeloader will load from the default namespace. The libraries
-// must be listed without paths, and then LD_LIBRARY_PATH is typically set to the
-// directories to load them from. The libraries will be available in all
-// classloader namespaces, and also in the fallback namespace used when no
-// classloader is given.
+// used to list extra libraries (separated by ":") that libnativeloader will
+// load from the default namespace. The libraries must be listed without paths,
+// and then LD_LIBRARY_PATH is typically set to the directories to load them
+// from. The libraries will be available in all classloader namespaces, and also
+// in the fallback namespace used when no classloader is given.
 //
 // kNativeloaderExtraLibs is the name of that fallback namespace.
 //
@@ -63,11 +61,6 @@ namespace {
 // (com_android_art) for all libraries, which means this can be used to load
 // test libraries that depend on ART internal libraries.
 constexpr const char* kNativeloaderExtraLibs = "nativeloader-extra-libs";
-
-bool Debuggable() {
-  static bool debuggable = android::base::GetBoolProperty("ro.debuggable", false);
-  return debuggable;
-}
 
 using android::nativeloader::LibraryNamespaces;
 
@@ -124,11 +117,8 @@ Result<NativeLoaderNamespace*> GetNativeloaderExtraLibsNamespace() REQUIRES(g_na
 
 // If the given path matches a library in NATIVELOADER_DEFAULT_NAMESPACE_LIBS
 // then load it in the nativeloader-extra-libs namespace, otherwise return
-// nullptr without error. This is only enabled if the ro.debuggable is true.
+// nullptr without error.
 Result<void*> TryLoadNativeloaderExtraLib(const char* path) {
-  if (!Debuggable()) {
-    return nullptr;
-  }
   const char* links = getenv("NATIVELOADER_DEFAULT_NAMESPACE_LIBS");
   if (links == nullptr || *links == 0) {
     return nullptr;
@@ -166,11 +156,9 @@ Result<NativeLoaderNamespace*> CreateClassLoaderNamespaceLocked(JNIEnv* env,
   if (!ns.ok()) {
     return ns;
   }
-  if (Debuggable()) {
-    Result<void> linked = CreateNativeloaderDefaultNamespaceLibsLink(*ns.value());
-    if (!linked.ok()) {
-      return linked.error();
-    }
+  Result<void> linked = CreateNativeloaderDefaultNamespaceLibsLink(*ns.value());
+  if (!linked.ok()) {
+    return linked.error();
   }
   return ns;
 }
@@ -190,7 +178,7 @@ void ResetNativeLoader() {
 #if defined(ART_TARGET_ANDROID)
   std::lock_guard<std::mutex> guard(g_namespaces_mutex);
   g_namespaces->Reset();
-  delete(g_nativeloader_extra_libs_namespace);
+  delete g_nativeloader_extra_libs_namespace;
   g_nativeloader_extra_libs_namespace = nullptr;
 #endif
 }
