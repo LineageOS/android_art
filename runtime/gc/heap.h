@@ -850,6 +850,9 @@ class Heap {
   uint64_t GetBlockingGcTime() const;
   void DumpGcCountRateHistogram(std::ostream& os) const REQUIRES(!*gc_complete_lock_);
   void DumpBlockingGcCountRateHistogram(std::ostream& os) const REQUIRES(!*gc_complete_lock_);
+  uint64_t GetTotalTimeWaitingForGC() const {
+    return total_wait_time_;
+  }
 
   // Perfetto Art Heap Profiler Support.
   HeapSampler& GetHeapSampler() {
