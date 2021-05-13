@@ -1172,14 +1172,6 @@ if [ "$HOST" = "n" ]; then
     # which generates `libhiddenapitest_*.so` libraries in `$DEX_LOCATION`).
     LD_LIBRARY_PATH="$DEX_LOCATION:$LD_LIBRARY_PATH"
 
-    # System libraries needed by libarttestd.so
-    PUBLIC_LIBS=libc++.so:libbacktrace.so:libbase.so:libnativehelper.so
-    if [ "$TEST_IS_NDEBUG" = "y" ]; then
-      PUBLIC_LIBS=$PUBLIC_LIBS:libart.so:libdexfile.so:libprofile.so:libartbase.so
-    else
-      PUBLIC_LIBS=$PUBLIC_LIBS:libartd.so:libdexfiled.so:libprofiled.so:libartbased.so
-    fi
-
     # Prepend directories to the path on device.
     PREPEND_TARGET_PATH=$ANDROID_ART_BIN_DIR
     if [ "$ANDROID_ROOT" != "/system" ]; then
