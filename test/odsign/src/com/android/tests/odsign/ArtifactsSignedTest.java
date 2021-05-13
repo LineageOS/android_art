@@ -30,6 +30,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -37,6 +38,20 @@ public class ArtifactsSignedTest {
     private static final String TAG = "VerifyArtArtifactsSignedTest";
     private static final String ARTIFACTS_DIR = "/data/misc/apexdata/com.android.art/dalvik-cache";
     private static final String FS_VERITY_PROC_PATH = "/proc/sys/fs/verity";
+
+    // Note that some of these files may exist multiple times - for different architectures
+    // Verifying that they are generated for the correct architectures is currently out of
+    // scope for this test.
+    private static final String[] REQUIRED_ARTIFACT_NAMES = {
+        "boot-framework.art",
+        "boot-framework.oat",
+        "boot-framework.vdex",
+        "system@framework@services.jar@classes.vdex",
+        "system@framework@services.jar@classes.odex",
+        "system@framework@services.jar@classes.art",
+    };
+
+    private static final ArrayList<String> mFoundArtifactNames = new ArrayList<>();
 
     static {
         System.loadLibrary("OdsignTestAppJni");
@@ -60,7 +75,27 @@ public class ArtifactsSignedTest {
                 assertTrue(file.getPath() + " is not in fs-verity",
                         hasFsverityNative(file.getPath()));
                 Log.i(TAG, file.getPath() + " is in fs-verity");
+                mFoundArtifactNames.add(file.getName());
             }
+        }
+        for (String artifact : REQUIRED_ARTIFACT_NAMES) {
+            assertTrue("Missing artifact " + artifact, mFoundArtifactNames.contains(artifact));
+        }
+    }
+
+    @Test
+    public void testGeneratesRequiredArtArtifacts() throws Exception {
+        List<File> files = Files.walk(Paths.get(ARTIFACTS_DIR), Integer.MAX_VALUE).
+            map(Path::toFile)
+            .collect(Collectors.toList());
+
+        for (File file : files) {
+            if (file.isFile()) {
+                mFoundArtifactNames.add(file.getName());
+            }
+        }
+        for (String artifact : REQUIRED_ARTIFACT_NAMES) {
+            assertTrue("Missing artifact " + artifact, mFoundArtifactNames.contains(artifact));
         }
     }
 }
