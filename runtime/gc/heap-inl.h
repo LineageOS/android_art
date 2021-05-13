@@ -66,7 +66,7 @@ inline mirror::Object* Heap::AllocObjectWithAllocator(Thread* self,
     self->PoisonObjectPointers();
   }
   auto pre_object_allocated = [&]() REQUIRES_SHARED(Locks::mutator_lock_)
-      REQUIRES(!Roles::uninterruptible_) {
+      REQUIRES(!Roles::uninterruptible_ /* only suspends if kInstrumented */) {
     if constexpr (kInstrumented) {
       AllocationListener* l = alloc_listener_.load(std::memory_order_seq_cst);
       if (UNLIKELY(l != nullptr) && UNLIKELY(l->HasPreAlloc())) {
@@ -88,14 +88,13 @@ inline mirror::Object* Heap::AllocObjectWithAllocator(Thread* self,
     // non-TLAB object allocations. Only set for non-thread-local allocation,
     size_t bytes_tl_bulk_allocated = 0u;
     // Do the initial pre-alloc
+    // TODO: Consider what happens if the allocator is switched while suspended here.
     pre_object_allocated();
-    ScopedAssertNoThreadSuspension ants("Called PreObjectAllocated, no suspend until alloc");
 
     // Need to check that we aren't the large object allocator since the large object allocation
     // code path includes this function. If we didn't check we would have an infinite loop.
     if (kCheckLargeObject && UNLIKELY(ShouldAllocLargeObject(klass, byte_count))) {
       // AllocLargeObject can suspend and will recall PreObjectAllocated if needed.
-      ScopedAllowThreadSuspension ats;
       obj = AllocLargeObject<kInstrumented, PreFenceVisitor>(self, &klass, byte_count,
                                                              pre_fence_visitor);
       if (obj != nullptr) {
@@ -107,8 +106,12 @@ inline mirror::Object* Heap::AllocObjectWithAllocator(Thread* self,
       // If the large object allocation failed, try to use the normal spaces (main space,
       // non moving space). This can happen if there is significant virtual address space
       // fragmentation.
-      pre_object_allocated();
+      // kInstrumented may be out of date, so recurse without large object checking, rather than
+      // continue.
+      return AllocObjectWithAllocator</*kInstrumented=*/ true, /*kCheckLargeObject=*/ false>
+          (self, klass, byte_count, GetUpdatedAllocator(allocator), pre_fence_visitor);
     }
+    ScopedAssertNoThreadSuspension ants("Called PreObjectAllocated, no suspend until alloc");
     if (IsTLABAllocator(allocator)) {
       byte_count = RoundUp(byte_count, space::BumpPointerSpace::kAlignment);
     }
@@ -140,9 +143,9 @@ inline mirror::Object* Heap::AllocObjectWithAllocator(Thread* self,
       obj = TryToAllocate<kInstrumented, false>(self, allocator, byte_count, &bytes_allocated,
                                                 &usable_size, &bytes_tl_bulk_allocated);
       if (UNLIKELY(obj == nullptr)) {
-        // AllocateInternalWithGc can cause thread suspension, if someone instruments the
-        // entrypoints or changes the allocator in a suspend point here, we need to retry the
-        // allocation. It will send the pre-alloc event again.
+        // AllocateInternalWithGc internally re-allows, and can cause, thread suspension, if
+        // someone instruments the entrypoints or changes the allocator in a suspend point here,
+        // we need to retry the allocation. It will send the pre-alloc event again.
         obj = AllocateInternalWithGc(self,
                                      allocator,
                                      kInstrumented,
@@ -159,13 +162,15 @@ inline mirror::Object* Heap::AllocObjectWithAllocator(Thread* self,
             ScopedAllowThreadSuspension ats;
             // AllocObject will pick up the new allocator type, and instrumented as true is the safe
             // default.
-            return AllocObject</*kInstrumented=*/true>(self,
-                                                       klass,
-                                                       byte_count,
-                                                       pre_fence_visitor);
+            return AllocObjectWithAllocator</*kInstrumented=*/true>(self,
+                                                                    klass,
+                                                                    byte_count,
+                                                                    GetUpdatedAllocator(allocator),
+                                                                    pre_fence_visitor);
           }
           return nullptr;
         }
+        // Non-null result implies neither instrumentation nor allocator changed.
       }
       DCHECK_GT(bytes_allocated, 0u);
       DCHECK_GT(usable_size, 0u);
