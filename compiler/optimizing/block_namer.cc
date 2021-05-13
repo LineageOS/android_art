@@ -21,7 +21,13 @@
 namespace art {
 
 std::ostream& BlockNamer::PrintName(std::ostream& os, HBasicBlock* blk) const {
-  return os << "B" << blk->GetBlockId();
+  os << "B";
+  if (blk != nullptr) {
+    os << blk->GetBlockId();
+  } else {
+    os << "<none>";
+  }
+  return os;
 }
 
 }  // namespace art

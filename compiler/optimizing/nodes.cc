@@ -27,6 +27,7 @@
 #include "base/bit_vector.h"
 #include "base/iteration_range.h"
 #include "base/logging.h"
+#include "base/malloc_arena_pool.h"
 #include "base/scoped_arena_allocator.h"
 #include "base/scoped_arena_containers.h"
 #include "base/stl_util.h"
@@ -1314,14 +1315,25 @@ void HEnvironment::ReplaceInput(HInstruction* replacement, size_t index) {
 }
 
 std::ostream& HInstruction::Dump(std::ostream& os, bool dump_args) {
-  HGraph* graph = GetBlock()->GetGraph();
+  // Note: Handle the case where the instruction has been removed from
+  // the graph to support debugging output for failed gtests.
+  HGraph* graph = (GetBlock() != nullptr) ? GetBlock()->GetGraph() : nullptr;
   HGraphVisualizer::DumpInstruction(&os, graph, this);
   if (dump_args) {
     // Allocate memory from local ScopedArenaAllocator.
-    ScopedArenaAllocator allocator(graph->GetArenaStack());
+    std::optional<MallocArenaPool> local_arena_pool;
+    std::optional<ArenaStack> local_arena_stack;
+    if (UNLIKELY(graph == nullptr)) {
+      local_arena_pool.emplace();
+      local_arena_stack.emplace(&local_arena_pool.value());
+    }
+    ScopedArenaAllocator allocator(
+        graph != nullptr ? graph->GetArenaStack() : &local_arena_stack.value());
     // Instructions that we already visited. We print each instruction only once.
-    ArenaBitVector visited(
-        &allocator, graph->GetCurrentInstructionId(), /* expandable= */ false, kArenaAllocMisc);
+    ArenaBitVector visited(&allocator,
+                           (graph != nullptr) ? graph->GetCurrentInstructionId() : 0u,
+                           /* expandable= */ (graph == nullptr),
+                           kArenaAllocMisc);
     visited.ClearAllBits();
     visited.SetBit(GetId());
     // Keep a queue of instructions with their indentations.
