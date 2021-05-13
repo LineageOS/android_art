@@ -49,8 +49,8 @@ namespace {
 
 // NATIVELOADER_DEFAULT_NAMESPACE_LIBS is an environment variable that can be
 // used when ro.debuggable is true to list extra libraries (separated by ":")
-// that libnativeloader will load from the default namespace. The libraries must
-// be listed without paths, and then LD_LIBRARY_PATH is typically set to the
+// that libnativeloader will load from the default namespace. The libraries
+// must be listed without paths, and then LD_LIBRARY_PATH is typically set to the
 // directories to load them from. The libraries will be available in all
 // classloader namespaces, and also in the fallback namespace used when no
 // classloader is given.
