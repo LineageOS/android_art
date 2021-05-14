@@ -1402,6 +1402,7 @@
                   "817-hiddenapi",
                   "900-hello-plugin"],
         "variant": "target",
-        "description": ["TODO(b/186654484): Disabled after the switch to avoid allow_all_shared_libs from the ART namespace to system."]
+        "bug": "b/186654484",
+        "description": ["Disabled after the switch to avoid allow_all_shared_libs from the ART namespace to system."]
     }
 ]

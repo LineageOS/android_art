@@ -287,6 +287,11 @@ class Heap {
     return current_non_moving_allocator_;
   }
 
+  AllocatorType GetUpdatedAllocator(AllocatorType old_allocator) {
+    return (old_allocator == kAllocatorTypeNonMoving) ?
+        GetCurrentNonMovingAllocator() : GetCurrentAllocator();
+  }
+
   // Visit all of the live objects in the heap.
   template <typename Visitor>
   ALWAYS_INLINE void VisitObjects(Visitor&& visitor)
@@ -845,6 +850,9 @@ class Heap {
   uint64_t GetBlockingGcTime() const;
   void DumpGcCountRateHistogram(std::ostream& os) const REQUIRES(!*gc_complete_lock_);
   void DumpBlockingGcCountRateHistogram(std::ostream& os) const REQUIRES(!*gc_complete_lock_);
+  uint64_t GetTotalTimeWaitingForGC() const {
+    return total_wait_time_;
+  }
 
   // Perfetto Art Heap Profiler Support.
   HeapSampler& GetHeapSampler() {
@@ -1030,8 +1038,10 @@ class Heap {
       REQUIRES(!*gc_complete_lock_, !*pending_task_lock_,
                !*backtrace_lock_, !process_state_update_lock_);
 
-  // Handles Allocate()'s slow allocation path with GC involved after
-  // an initial allocation attempt failed.
+  // Handles Allocate()'s slow allocation path with GC involved after an initial allocation
+  // attempt failed.
+  // Called with thread suspension disallowed, but re-enables it, and may suspend, internally.
+  // Returns null if instrumentation or the allocator changed.
   mirror::Object* AllocateInternalWithGc(Thread* self,
                                          AllocatorType allocator,
                                          bool instrumented,

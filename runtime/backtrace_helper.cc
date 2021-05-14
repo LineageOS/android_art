@@ -66,7 +66,7 @@ struct UnwindHelper : public TLSData {
   }
 
   // Reparse process mmaps to detect newly loaded libraries.
-  bool Reparse() { return maps_.Reparse(); }
+  bool Reparse(bool* any_changed) { return maps_.Reparse(any_changed); }
 
   static UnwindHelper* Get(Thread* self, size_t max_depth) {
     UnwindHelper* tls = reinterpret_cast<UnwindHelper*>(self->GetCustomTLS(kTlsKey));
@@ -91,18 +91,20 @@ struct UnwindHelper : public TLSData {
 void BacktraceCollector::Collect() {
   unwindstack::Unwinder* unwinder = UnwindHelper::Get(Thread::Current(), max_depth_)->Unwinder();
   if (!CollectImpl(unwinder)) {
-    // Reparse process mmaps to detect newly loaded libraries and retry.
-    UnwindHelper::Get(Thread::Current(), max_depth_)->Reparse();
-    if (!CollectImpl(unwinder)) {
+    // Reparse process mmaps to detect newly loaded libraries and retry,
+    // but only if any maps changed (we don't want to hide racy failures).
+    bool any_changed;
+    UnwindHelper::Get(Thread::Current(), max_depth_)->Reparse(&any_changed);
+    if (!any_changed || !CollectImpl(unwinder)) {
       if (kStrictUnwindChecks) {
-        LOG(ERROR) << "Failed to unwind stack:";
         std::vector<unwindstack::FrameData>& frames = unwinder->frames();
+        LOG(ERROR) << "Failed to unwind stack (error " << unwinder->LastErrorCodeString() << "):";
         for (auto it = frames.begin(); it != frames.end(); it++) {
           if (it == frames.begin() || std::prev(it)->map_name != it->map_name) {
-            LOG(ERROR) << "  map_name  " << it->map_name.c_str();
+            LOG(ERROR) << " in " << it->map_name.c_str();
           }
-          LOG(ERROR) << "  " << std::setw(8) << std::setfill('0') << std::hex <<
-            it->rel_pc << "  " << it->function_name.c_str();
+          LOG(ERROR) << " pc " << std::setw(8) << std::setfill('0') << std::hex <<
+            it->rel_pc << " " << it->function_name.c_str();
         }
         LOG(FATAL);
       }
@@ -123,30 +125,28 @@ bool BacktraceCollector::CollectImpl(unwindstack::Unwinder* unwinder) {
       out_frames_[num_frames_++] = static_cast<uintptr_t>(it->pc);
 
       // Expected early end: Instrumentation breaks unwinding (b/138296821).
-      size_t align = GetInstructionSetAlignment(kRuntimeISA);
-      if (RoundUp(it->pc, align) == reinterpret_cast<uintptr_t>(GetQuickInstrumentationExitPc())) {
+      // Inexact compare because the unwinder does not give us exact return address,
+      // but rather it tries to guess the address of the preceding call instruction.
+      size_t exit_pc = reinterpret_cast<size_t>(GetQuickInstrumentationExitPc());
+      if (exit_pc - 4 <= it->pc && it->pc <= exit_pc) {
         return true;
       }
 
       if (kStrictUnwindChecks) {
         if (it->function_name.empty()) {
           return false;
-        } else if (it->function_name == "main" || it->function_name == "start_thread") {
+        }
+        if (it->function_name == "main" ||
+            it->function_name == "start_thread" ||
+            it->function_name == "__start_thread") {
           return true;
         }
       }
     }
   }
 
-  if (unwinder->LastErrorCode() == unwindstack::ERROR_INVALID_MAP) {
-    return false;
-  }
-  if (kStrictUnwindChecks) {
-    // We have not found "main". That is ok if we stopped the backtrace early.
-    return unwinder->NumFrames() == max_depth_;
-  }
-
-  return true;
+  unwindstack::ErrorCode error = unwinder->LastErrorCode();
+  return error == unwindstack::ERROR_NONE || error == unwindstack::ERROR_MAX_FRAMES_EXCEEDED;
 }
 
 #else

@@ -1623,6 +1623,7 @@ DEFINE_FUNCTION art_quick_generic_jni_trampoline
 
     // Tear down the alloca.
     movq %rbp, %rsp
+    CFI_REMEMBER_STATE
     CFI_DEF_CFA_REGISTER(rsp)
 
     // Tear down the callee-save frame.
@@ -1657,16 +1658,20 @@ DEFINE_FUNCTION art_quick_generic_jni_trampoline
     // store into fpr, for when it's a fpr return...
     movq %rax, %xmm0
     ret
+
+    // Undo the unwinding information from above since it doesn't apply below.
+    CFI_RESTORE_STATE_AND_DEF_CFA(rbp, 208)
 .Lexception_in_native:
     pushq %gs:THREAD_TOP_QUICK_FRAME_OFFSET
     addq LITERAL(-1), (%rsp)  // Remove the GenericJNI tag.
     movq (%rsp), %rsp
-    CFI_DEF_CFA_REGISTER(rsp)
-    // Do a call to push a new save-all frame required by the runtime.
-    call .Lexception_call
-.Lexception_call:
-    DELIVER_PENDING_EXCEPTION
+    call art_deliver_pending_exception
 END_FUNCTION art_quick_generic_jni_trampoline
+
+DEFINE_FUNCTION art_deliver_pending_exception
+    // This will create a new save-all frame, required by the runtime.
+    DELIVER_PENDING_EXCEPTION
+END_FUNCTION art_deliver_pending_exception
 
     /*
      * Called to bridge from the quick to interpreter ABI. On entry the arguments match those
