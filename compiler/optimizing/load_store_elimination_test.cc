@@ -1679,6 +1679,196 @@ TEST_F(LoadStoreEliminationTest, ArrayMergeDefault) {
   EXPECT_INS_REMOVED(alloc_w);
 }
 
+// Regression test for b/187487955.
+// We previusly failed to consider aliasing between an array location
+// with index `idx` defined in the loop (such as a loop Phi) and another
+// array location with index `idx + constant`. This could have led to
+// replacing the load with, for example, the default value 0.
+TEST_F(LoadStoreEliminationTest, ArrayLoopAliasing1) {
+  VariableSizedHandleScope vshs(Thread::Current());
+  CreateGraph(&vshs);
+  AdjacencyListGraph blocks(graph_,
+                            GetAllocator(),
+                            "entry",
+                            "exit",
+                            { { "entry", "preheader" },
+                              { "preheader", "loop" },
+                              { "loop", "body" },
+                              { "body", "loop" },
+                              { "loop", "ret" },
+                              { "ret", "exit" } });
+#define GET_BLOCK(name) HBasicBlock* name = blocks.Get(#name)
+  GET_BLOCK(entry);
+  GET_BLOCK(preheader);
+  GET_BLOCK(loop);
+  GET_BLOCK(body);
+  GET_BLOCK(ret);
+  GET_BLOCK(exit);
+#undef GET_BLOCK
+  HInstruction* n = MakeParam(DataType::Type::kInt32);
+  HInstruction* c0 = graph_->GetIntConstant(0);
+  HInstruction* c1 = graph_->GetIntConstant(1);
+
+  // entry
+  HInstruction* cls = MakeClassLoad();
+  HInstruction* array = new (GetAllocator()) HNewArray(
+      cls, n, /*dex_pc=*/ 0u, DataType::SizeShift(DataType::Type::kInt32));
+  HInstruction* entry_goto = new (GetAllocator()) HGoto();
+  entry->AddInstruction(cls);
+  entry->AddInstruction(array);
+  entry->AddInstruction(entry_goto);
+  ManuallyBuildEnvFor(cls, {});
+  ManuallyBuildEnvFor(array, {});
+
+  HInstruction* preheader_goto = new (GetAllocator()) HGoto();
+  preheader->AddInstruction(preheader_goto);
+
+  // loop
+  HPhi* i_phi = new (GetAllocator()) HPhi(GetAllocator(), 0, 0, DataType::Type::kInt32);
+  HInstruction* loop_suspend_check = new (GetAllocator()) HSuspendCheck();
+  HInstruction* loop_cond = new (GetAllocator()) HLessThan(i_phi, n);
+  HIf* loop_if = new (GetAllocator()) HIf(loop_cond);
+  loop->AddPhi(i_phi);
+  loop->AddInstruction(loop_suspend_check);
+  loop->AddInstruction(loop_cond);
+  loop->AddInstruction(loop_if);
+  CHECK(loop_if->IfTrueSuccessor() == body);
+  ManuallyBuildEnvFor(loop_suspend_check, {});
+
+  // body
+  HInstruction* body_set =
+      new (GetAllocator()) HArraySet(array, i_phi, i_phi, DataType::Type::kInt32, /*dex_pc=*/ 0u);
+  HInstruction* body_add = new (GetAllocator()) HAdd(DataType::Type::kInt32, i_phi, c1);
+  HInstruction* body_goto = new (GetAllocator()) HGoto();
+  body->AddInstruction(body_set);
+  body->AddInstruction(body_add);
+  body->AddInstruction(body_goto);
+
+  // i_phi inputs
+  i_phi->AddInput(c0);
+  i_phi->AddInput(body_add);
+
+  // ret
+  HInstruction* ret_sub = new (GetAllocator()) HSub(DataType::Type::kInt32, i_phi, c1);
+  HInstruction* ret_get =
+      new (GetAllocator()) HArrayGet(array, ret_sub, DataType::Type::kInt32, /*dex_pc=*/ 0);
+  HInstruction* ret_return = new (GetAllocator()) HReturn(ret_get);
+  ret->AddInstruction(ret_sub);
+  ret->AddInstruction(ret_get);
+  ret->AddInstruction(ret_return);
+
+  // exit
+  SetupExit(exit);
+
+  graph_->ClearDominanceInformation();
+  graph_->ClearLoopInformation();
+  PerformLSE();
+
+  EXPECT_INS_RETAINED(cls);
+  EXPECT_INS_RETAINED(array);
+  EXPECT_INS_RETAINED(body_set);
+  EXPECT_INS_RETAINED(ret_get);
+}
+
+// Regression test for b/187487955.
+// Similar to the `ArrayLoopAliasing1` test above but with additional load
+// that marks a loop Phi placeholder as kept which used to trigger a DCHECK().
+// There is also an LSE run-test for this but it relies on BCE eliminating
+// BoundsCheck instructions and adds extra code in loop body to avoid
+// loop unrolling. This gtest does not need to jump through those hoops
+// as we do not unnecessarily run those optimization passes.
+TEST_F(LoadStoreEliminationTest, ArrayLoopAliasing2) {
+  VariableSizedHandleScope vshs(Thread::Current());
+  CreateGraph(&vshs);
+  AdjacencyListGraph blocks(graph_,
+                            GetAllocator(),
+                            "entry",
+                            "exit",
+                            { { "entry", "preheader" },
+                              { "preheader", "loop" },
+                              { "loop", "body" },
+                              { "body", "loop" },
+                              { "loop", "ret" },
+                              { "ret", "exit" } });
+#define GET_BLOCK(name) HBasicBlock* name = blocks.Get(#name)
+  GET_BLOCK(entry);
+  GET_BLOCK(preheader);
+  GET_BLOCK(loop);
+  GET_BLOCK(body);
+  GET_BLOCK(ret);
+  GET_BLOCK(exit);
+#undef GET_BLOCK
+  HInstruction* n = MakeParam(DataType::Type::kInt32);
+  HInstruction* c0 = graph_->GetIntConstant(0);
+  HInstruction* c1 = graph_->GetIntConstant(1);
+
+  // entry
+  HInstruction* cls = MakeClassLoad();
+  HInstruction* array = new (GetAllocator()) HNewArray(
+      cls, n, /*dex_pc=*/ 0u, DataType::SizeShift(DataType::Type::kInt32));
+  HInstruction* entry_goto = new (GetAllocator()) HGoto();
+  entry->AddInstruction(cls);
+  entry->AddInstruction(array);
+  entry->AddInstruction(entry_goto);
+  ManuallyBuildEnvFor(cls, {});
+  ManuallyBuildEnvFor(array, {});
+
+  HInstruction* preheader_goto = new (GetAllocator()) HGoto();
+  preheader->AddInstruction(preheader_goto);
+
+  // loop
+  HPhi* i_phi = new (GetAllocator()) HPhi(GetAllocator(), 0, 0, DataType::Type::kInt32);
+  HInstruction* loop_suspend_check = new (GetAllocator()) HSuspendCheck();
+  HInstruction* loop_cond = new (GetAllocator()) HLessThan(i_phi, n);
+  HIf* loop_if = new (GetAllocator()) HIf(loop_cond);
+  loop->AddPhi(i_phi);
+  loop->AddInstruction(loop_suspend_check);
+  loop->AddInstruction(loop_cond);
+  loop->AddInstruction(loop_if);
+  CHECK(loop_if->IfTrueSuccessor() == body);
+  ManuallyBuildEnvFor(loop_suspend_check, {});
+
+  // body
+  HInstruction* body_set =
+      new (GetAllocator()) HArraySet(array, i_phi, i_phi, DataType::Type::kInt32, /*dex_pc=*/ 0u);
+  HInstruction* body_add = new (GetAllocator()) HAdd(DataType::Type::kInt32, i_phi, c1);
+  HInstruction* body_goto = new (GetAllocator()) HGoto();
+  body->AddInstruction(body_set);
+  body->AddInstruction(body_add);
+  body->AddInstruction(body_goto);
+
+  // i_phi inputs
+  i_phi->AddInput(c0);
+  i_phi->AddInput(body_add);
+
+  // ret
+  HInstruction* ret_sub = new (GetAllocator()) HSub(DataType::Type::kInt32, i_phi, c1);
+  HInstruction* ret_get1 =
+      new (GetAllocator()) HArrayGet(array, ret_sub, DataType::Type::kInt32, /*dex_pc=*/ 0);
+  HInstruction* ret_get2 =
+      new (GetAllocator()) HArrayGet(array, i_phi, DataType::Type::kInt32, /*dex_pc=*/ 0);
+  HInstruction* ret_add = new (GetAllocator()) HAdd(DataType::Type::kInt32, ret_get1, ret_get2);
+  HInstruction* ret_return = new (GetAllocator()) HReturn(ret_add);
+  ret->AddInstruction(ret_sub);
+  ret->AddInstruction(ret_get1);
+  ret->AddInstruction(ret_get2);
+  ret->AddInstruction(ret_add);
+  ret->AddInstruction(ret_return);
+
+  // exit
+  SetupExit(exit);
+
+  graph_->ClearDominanceInformation();
+  graph_->ClearLoopInformation();
+  PerformLSE();
+
+  EXPECT_INS_RETAINED(cls);
+  EXPECT_INS_RETAINED(array);
+  EXPECT_INS_RETAINED(body_set);
+  EXPECT_INS_RETAINED(ret_get1);
+  EXPECT_INS_RETAINED(ret_get2);
+}
+
 // // ENTRY
 // obj = new Obj();
 // // ALL should be kept
