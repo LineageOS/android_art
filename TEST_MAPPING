@@ -530,9 +530,6 @@
       "name": "art-run-test-449-checker-bce-rem[com.google.android.art.apex]"
     },
     {
-      "name": "art-run-test-450-checker-types[com.google.android.art.apex]"
-    },
-    {
       "name": "art-run-test-451-regression-add-float[com.google.android.art.apex]"
     },
     {
@@ -1385,9 +1382,6 @@
     },
     {
       "name": "art-run-test-449-checker-bce-rem"
-    },
-    {
-      "name": "art-run-test-450-checker-types"
     },
     {
       "name": "art-run-test-451-regression-add-float"
