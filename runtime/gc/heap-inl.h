@@ -287,9 +287,11 @@ inline mirror::Object* Heap::AllocLargeObject(Thread* self,
   // Save and restore the class in case it moves.
   StackHandleScope<1> hs(self);
   auto klass_wrapper = hs.NewHandleWrapper(klass);
-  return AllocObjectWithAllocator<kInstrumented, false, PreFenceVisitor>(self, *klass, byte_count,
-                                                                         kAllocatorTypeLOS,
-                                                                         pre_fence_visitor);
+  mirror::Object* obj = AllocObjectWithAllocator<kInstrumented, false, PreFenceVisitor>
+                        (self, *klass, byte_count, kAllocatorTypeLOS, pre_fence_visitor);
+  // Java Heap Profiler check and sample allocation.
+  JHPCheckNonTlabSampleAllocation(self, obj, byte_count);
+  return obj;
 }
 
 template <const bool kInstrumented, const bool kGrow>
