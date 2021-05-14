@@ -72,11 +72,8 @@ art_module_sdk {
                 "libsigchain",
             ],
 
-            native_libs: [
-                "libdexfile_support",
-            ],
-
             native_static_libs: [
+                "libdexfile_support",
                 "libdexfile_static",
                 "libnativehelper_lazy",
             ],
