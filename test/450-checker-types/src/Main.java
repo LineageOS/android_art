@@ -686,7 +686,7 @@ public class Main {
   /// CHECK-DAG:     <<Null:l\d+>>  NullConstant
   /// CHECK-DAG:     <<Phi:l\d+>>   Phi [<<Arg>>,<<Null>>] klass:SubclassA
   /// CHECK-DAG:     <<NCPhi:l\d+>> NullCheck [<<Phi>>]
-  /// CHECK-DAG:                    InvokeVirtual [<<NCPhi>>] method_name:java.lang.Object.hashCode
+  /// CHECK-DAG:                    InvokeStaticOrDirect [<<NCPhi>>] method_name:java.lang.Object.hashCode
 
   public void testThisArgumentMoreSpecific(boolean cond) {
     // Inlining method from Super will build it with `this` typed as Super.
