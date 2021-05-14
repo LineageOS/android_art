@@ -259,11 +259,14 @@ class Heap {
                !*backtrace_lock_,
                !process_state_update_lock_,
                !Roles::uninterruptible_) {
-    return AllocObjectWithAllocator<kInstrumented>(self,
-                                                   klass,
-                                                   num_bytes,
-                                                   GetCurrentNonMovingAllocator(),
-                                                   pre_fence_visitor);
+    mirror::Object* obj = AllocObjectWithAllocator<kInstrumented>(self,
+                                                                  klass,
+                                                                  num_bytes,
+                                                                  GetCurrentNonMovingAllocator(),
+                                                                  pre_fence_visitor);
+    // Java Heap Profiler check and sample allocation.
+    JHPCheckNonTlabSampleAllocation(self, obj, num_bytes);
+    return obj;
   }
 
   template <bool kInstrumented = true, bool kCheckLargeObject = true, typename PreFenceVisitor>
@@ -863,6 +866,8 @@ class Heap {
   int CheckPerfettoJHPEnabled();
   // In NonTlab case: Check whether we should report a sample allocation and if so report it.
   // Also update state (bytes_until_sample).
+  // By calling JHPCheckNonTlabSampleAllocation from different functions for Large allocations and
+  // non-moving allocations we are able to use the stack to identify these allocations separately.
   void JHPCheckNonTlabSampleAllocation(Thread* self,
                                        mirror::Object* ret,
                                        size_t alloc_size);
