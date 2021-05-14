@@ -31,6 +31,7 @@
 // dlopen_ext support from bionic.
 #ifdef ART_TARGET_ANDROID
 #include "android/dlext.h"
+#include "nativeloader/dlext_namespaces.h"
 #endif
 
 #include <android-base/logging.h>
@@ -1138,6 +1139,26 @@ bool DlOpenOatFile::Load(const std::string& elf_filename,
   return success;
 }
 
+#ifdef ART_TARGET_ANDROID
+static struct android_namespace_t* GetSystemLinkerNamespace() {
+  static struct android_namespace_t* system_ns = []() {
+    // The system namespace is called "default" for binaries in /system and
+    // "system" for those in the ART APEX. Try "system" first since "default"
+    // always exists.
+    // TODO(b/185587109): Get rid of this error prone logic.
+    struct android_namespace_t* ns = android_get_exported_namespace("system");
+    if (ns == nullptr) {
+      ns = android_get_exported_namespace("default");
+      if (ns == nullptr) {
+        LOG(FATAL) << "Failed to get system namespace for loading OAT files";
+      }
+    }
+    return ns;
+  }();
+  return system_ns;
+}
+#endif  // ART_TARGET_ANDROID
+
 bool DlOpenOatFile::Dlopen(const std::string& elf_filename,
                            /*inout*/MemMap* reservation,
                            /*out*/std::string* error_msg) {
@@ -1167,6 +1188,19 @@ bool DlOpenOatFile::Dlopen(const std::string& elf_filename,
       extinfo.reserved_addr = reservation->Begin();
       extinfo.reserved_size = reservation->Size();
     }
+
+    if (strncmp(kAndroidArtApexDefaultPath,
+                absolute_path.get(),
+                sizeof(kAndroidArtApexDefaultPath) - 1) != 0 ||
+        absolute_path.get()[sizeof(kAndroidArtApexDefaultPath) - 1] != '/') {
+      // Use the system namespace for OAT files outside the ART APEX. Search
+      // paths and links don't matter here, but permitted paths do, and the
+      // system namespace is configured to allow loading from all appropriate
+      // locations.
+      extinfo.flags |= ANDROID_DLEXT_USE_NAMESPACE;
+      extinfo.library_namespace = GetSystemLinkerNamespace();
+    }
+
     dlopen_handle_ = android_dlopen_ext(absolute_path.get(), RTLD_NOW, &extinfo);
     if (reservation != nullptr && dlopen_handle_ != nullptr) {
       // Find used pages from the reservation.
