@@ -1404,5 +1404,18 @@
         "variant": "target",
         "bug": "b/186654484",
         "description": ["Disabled after the switch to avoid allow_all_shared_libs from the ART namespace to system."]
+    },
+    {
+        "tests": ["2001-virtual-structural-multithread"],
+        "env_vars": {"SANITIZE_HOST": "address"},
+        "bug": "b/176786675",
+        "description": ["Out of memory"]
+    },
+    {
+        "tests": ["2001-virtual-structural-multithread"],
+        "env_vars": {"ART_HEAP_POISONING": "true"},
+        "variant": "host",
+        "bug": "b/176786675",
+        "description": ["Out of memory"]
     }
 ]
