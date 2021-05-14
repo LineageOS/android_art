@@ -375,6 +375,9 @@ libart_cc_defaults {
                 "thread_android.cc",
                 "metrics/statsd.cc",
             ],
+            header_libs: [
+                "libnativeloader-headers", // For dlext_namespaces.h
+            ],
             shared_libs: [
                 "libdl_android",
                 "libicu",
@@ -417,7 +420,7 @@ libart_cc_defaults {
         },
     },
     generated_sources: [
-        "art_operator_srcs"
+        "art_operator_srcs",
     ],
     // asm_support_gen.h (used by asm_support.h) is generated with cpp-define-generator
     generated_headers: ["cpp-define-generator-asm-support"],
