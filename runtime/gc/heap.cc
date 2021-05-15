@@ -4146,11 +4146,11 @@ int Heap::CheckPerfettoJHPEnabled() {
   return GetHeapSampler().IsEnabled();
 }
 
-void Heap::JHPCheckNonTlabSampleAllocation(Thread* self, mirror::Object* ret, size_t alloc_size) {
+void Heap::JHPCheckNonTlabSampleAllocation(Thread* self, mirror::Object* obj, size_t alloc_size) {
   bool take_sample = false;
   size_t bytes_until_sample = 0;
   HeapSampler& prof_heap_sampler = GetHeapSampler();
-  if (ret != nullptr && prof_heap_sampler.IsEnabled()) {
+  if (obj != nullptr && prof_heap_sampler.IsEnabled()) {
     // An allocation occurred, sample it, even if non-Tlab.
     // In case take_sample is already set from the previous GetSampleOffset
     // because we tried the Tlab allocation first, we will not use this value.
@@ -4163,9 +4163,9 @@ void Heap::JHPCheckNonTlabSampleAllocation(Thread* self, mirror::Object* ret, si
                                       &bytes_until_sample);
     prof_heap_sampler.SetBytesUntilSample(bytes_until_sample);
     if (take_sample) {
-      prof_heap_sampler.ReportSample(ret, alloc_size);
+      prof_heap_sampler.ReportSample(obj, alloc_size);
     }
-    VLOG(heap) << "JHP:NonTlab:AllocNonvirtual";
+    VLOG(heap) << "JHP:NonTlab Non-moving or Large Allocation";
   }
 }
 

@@ -86,9 +86,6 @@ TEST_F(OatDumpTest, TestSymbolizeStatic) {
 }
 
 TEST_F(OatDumpTest, TestExportDex) {
-  TEST_DISABLED_FOR_ARM_AND_ARM64();
-  // Test is failing on target, b/77469384.
-  TEST_DISABLED_FOR_TARGET();
   std::string error_msg;
   ASSERT_TRUE(GenerateAppOdexFile(Flavor::kDynamic, {"--runtime-arg", "-Xmx64M"}));
   ASSERT_TRUE(Exec(Flavor::kDynamic, kModeOat, {"--export-dex-to=" + tmp_dir_}, kListOnly));
