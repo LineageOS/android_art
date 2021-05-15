@@ -2528,18 +2528,16 @@ void OatWriter::WriteVerifierDeps(verifier::VerifierDeps* verifier_deps,
 
   TimingLogger::ScopedTiming split("VDEX verifier deps", timings_);
 
-  size_t initial_offset = vdex_size_;
-  size_t start_offset = RoundUp(initial_offset, 4u);
-
-  vdex_size_ = start_offset;
-  vdex_verifier_deps_offset_ = vdex_size_;
-  size_verifier_deps_alignment_ = start_offset - initial_offset;
-  buffer->resize(buffer->size() + size_verifier_deps_alignment_, 0u);
-
-  size_t old_buffer_size = buffer->size();
+  DCHECK(buffer->empty());
   verifier_deps->Encode(*dex_files_, buffer);
+  size_verifier_deps_ = buffer->size();
 
-  size_verifier_deps_ = buffer->size() - old_buffer_size;
+  // Verifier deps data should be 4 byte aligned.
+  size_verifier_deps_alignment_ = RoundUp(vdex_size_, 4u) - vdex_size_;
+  buffer->insert(buffer->begin(), size_verifier_deps_alignment_, 0u);
+
+  vdex_size_ += size_verifier_deps_alignment_;
+  vdex_verifier_deps_offset_ = vdex_size_;
   vdex_size_ += size_verifier_deps_;
 }
 

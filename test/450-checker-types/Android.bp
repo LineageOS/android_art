@@ -15,7 +15,7 @@ package {
 java_test {
     name: "art-run-test-450-checker-types",
     defaults: ["art-run-test-defaults"],
-    test_config_template: ":art-run-test-target-template",
+    test_config_template: ":art-run-test-target-no-test-suite-tag-template",
     srcs: ["src/**/*.java"],
     data: [
         ":art-run-test-450-checker-types-expected-stdout",

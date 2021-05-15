@@ -46,7 +46,7 @@ namespace art {
 
 // Strict integrity check of the backtrace:
 // All methods must have a name, all the way to "main".
-static constexpr bool kStrictUnwindChecks = false;
+static constexpr bool kStrictUnwindChecks = true;
 
 struct UnwindHelper : public TLSData {
   static constexpr const char* kTlsKey = "UnwindHelper::kTlsKey";

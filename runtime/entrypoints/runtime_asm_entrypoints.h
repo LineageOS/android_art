@@ -19,16 +19,13 @@
 
 #include "deoptimization_kind.h"
 
+#include "base/macros.h"
 #include "jni.h"
 
-namespace art {
+namespace art HIDDEN {
 
 class ArtMethod;
 class Thread;
-
-#ifndef BUILDING_LIBART
-#error "File and symbols only for use within libart."
-#endif
 
 extern "C" void* art_jni_dlsym_lookup_stub(JNIEnv*, jobject);
 static inline const void* GetJniDlsymLookupStub() {
