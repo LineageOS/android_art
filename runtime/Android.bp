@@ -416,7 +416,6 @@ libart_cc_defaults {
             ],
         },
     },
-    cflags: ["-DBUILDING_LIBART=1"],
     generated_sources: [
         "art_operator_srcs"
     ],
