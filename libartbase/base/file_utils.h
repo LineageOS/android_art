@@ -28,12 +28,12 @@
 
 namespace art {
 
-static constexpr const char* kAndroidArtApexDefaultPath = "/apex/com.android.art";
-static constexpr const char* kArtApexDataDefaultPath = "/data/misc/apexdata/com.android.art";
-static constexpr const char* kAndroidConscryptApexDefaultPath = "/apex/com.android.conscrypt";
-static constexpr const char* kAndroidI18nApexDefaultPath = "/apex/com.android.i18n";
+static constexpr const char kAndroidArtApexDefaultPath[] = "/apex/com.android.art";
+static constexpr const char kArtApexDataDefaultPath[] = "/data/misc/apexdata/com.android.art";
+static constexpr const char kAndroidConscryptApexDefaultPath[] = "/apex/com.android.conscrypt";
+static constexpr const char kAndroidI18nApexDefaultPath[] = "/apex/com.android.i18n";
 
-static constexpr const char* kArtImageExtension = "art";
+static constexpr const char kArtImageExtension[] = "art";
 
 // These methods return the Android Root, which is the historical location of
 // the Android "system" directory, containing the built Android artifacts. On
