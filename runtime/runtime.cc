@@ -1418,9 +1418,13 @@ bool Runtime::Init(RuntimeArgumentMap&& runtime_options_in) {
 
   monitor_timeout_enable_ = runtime_options.GetOrDefault(Opt::MonitorTimeoutEnable);
   int monitor_timeout_ms = runtime_options.GetOrDefault(Opt::MonitorTimeout);
-  if (monitor_timeout_ms < Monitor::kMonitorTimeoutMinMs ||
-      monitor_timeout_ms >= Monitor::kMonitorTimeoutMaxMs) {
-    LOG(ERROR) << "Improper monitor timeout could cause crash!";
+  if (monitor_timeout_ms < Monitor::kMonitorTimeoutMinMs) {
+    LOG(WARNING) << "Monitor timeout too short: Increasing";
+    monitor_timeout_ms = Monitor::kMonitorTimeoutMinMs;
+  }
+  if (monitor_timeout_ms >= Monitor::kMonitorTimeoutMaxMs) {
+    LOG(WARNING) << "Monitor timeout too long: Decreasing";
+    monitor_timeout_ms = Monitor::kMonitorTimeoutMaxMs - 1;
   }
   monitor_timeout_ns_ = MsToNs(monitor_timeout_ms);
 
