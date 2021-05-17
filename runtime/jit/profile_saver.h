@@ -141,6 +141,12 @@ class ProfileSaver {
   // to just a few hundreds entries in the ProfileCompilationInfo objects.
   SafeMap<std::string, ProfileCompilationInfo*> profile_cache_ GUARDED_BY(Locks::profiler_lock_);
 
+  // Whether or not this is the first ever profile save.
+  // Note this is an approximation and is not 100% precise. It relies on checking
+  // whether or not the profiles are empty which is not a precise indication
+  // of being the first save (they could have been cleared in the meantime).
+  bool IsFirstSave() REQUIRES(!Locks::profiler_lock_);
+
   // Save period condition support.
   Mutex wait_lock_ DEFAULT_MUTEX_ACQUIRED_AFTER;
   ConditionVariable period_condition_ GUARDED_BY(wait_lock_);

@@ -20,6 +20,7 @@
 #include <sys/resource.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <unistd.h>
 
 #include "android-base/strings.h"
 
@@ -179,7 +180,11 @@ void ProfileSaver::Run() {
       // We might have been woken up by a huge number of notifications to guarantee saving.
       // If we didn't meet the minimum saving period go back to sleep (only if missed by
       // a reasonable margin).
-      uint64_t min_save_period_ns = MsToNs(options_.GetMinSavePeriodMs());
+      bool check_for_first_save = options_.GetMinFirstSaveMs() !=
+          ProfileSaverOptions::kMinFirstSaveMsNotSet;
+      uint64_t min_save_period_ns = MsToNs(check_for_first_save && IsFirstSave()
+          ? options_.GetMinFirstSaveMs()
+          : options_.GetMinSavePeriodMs());
       while (min_save_period_ns * 0.9 > sleep_time) {
         {
           MutexLock mu(self, wait_lock_);
@@ -212,6 +217,48 @@ void ProfileSaver::Run() {
     }
     total_ns_of_work_ += NanoTime() - start_work;
   }
+}
+
+// TODO(b/185979271): include reference profiles in the test.
+// The current profiles are cleared after bg-dexopt so this test will currently
+// return True after every bg-dexopt call.
+bool ProfileSaver::IsFirstSave() {
+  // Resolve any new registered locations.
+  ResolveTrackedLocations();
+  Thread* self = Thread::Current();
+  SafeMap<std::string, std::set<std::string>> tracked_locations;
+  {
+    // Make a copy so that we don't hold the lock while doing I/O.
+    MutexLock mu(self, *Locks::profiler_lock_);
+    tracked_locations = tracked_dex_base_locations_;
+  }
+
+  for (const auto& it : tracked_locations) {
+    if (ShuttingDown(self)) {
+      return false;
+    }
+    const std::set<std::string>& locations = it.second;
+
+    // Check if any profile is non empty. If so, then this is not the first save.
+    for (const auto& location : locations) {
+      struct stat stat_buffer;
+      if (stat(location.c_str(), &stat_buffer) != 0) {
+        if (VLOG_IS_ON(profiler)) {
+          PLOG(WARNING) << "Failed to stat profile location for IsFirstUse: " << location;
+        }
+        continue;
+      }
+      if (stat_buffer.st_size > 0) {
+        return false;
+      } else {
+        VLOG(profiler) << "Profile location is empty: " << location;
+      }
+    }
+  }
+
+  // All locations are empty. Assume this is the first use.
+  VLOG(profiler) << "All profile locations are empty. This is considered to be first save";
+  return true;
 }
 
 void ProfileSaver::NotifyJitActivity() {
