@@ -136,8 +136,6 @@ ART_TEST_MODULES := \
     art_imgdiag_tests \
     art_libartbase_tests \
     art_libartpalette_tests \
-    art_libartservice_tests \
-    art_libarttools_tests \
     art_libdexfile_external_tests \
     art_libdexfile_support_static_tests \
     art_libdexfile_support_tests \
