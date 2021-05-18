@@ -656,13 +656,19 @@ class LSEVisitor final : private HGraphDelegateVisitor {
 
   Value ReplacementOrValue(Value value) const {
     if (current_phase_ == Phase::kPartialElimination) {
+      // In this phase we are materializing the default values which are used
+      // only if the partial singleton did not escape, so we can replace
+      // a partial unknown with the prior value.
       if (value.IsPartialUnknown()) {
         value = value.GetPriorValue().ToValue();
       }
-      if (value.IsMergedUnknown()) {
-        return phi_placeholder_replacements_[PhiPlaceholderIndex(value)].IsValid()
-            ? Replacement(value)
-            : Value::ForLoopPhiPlaceholder(value.GetPhiPlaceholder());
+      if ((value.IsMergedUnknown() || value.NeedsPhi()) &&
+          phi_placeholder_replacements_[PhiPlaceholderIndex(value)].IsValid()) {
+        value = phi_placeholder_replacements_[PhiPlaceholderIndex(value)];
+        DCHECK(!value.IsMergedUnknown());
+        DCHECK(!value.NeedsPhi());
+      } else if (value.IsMergedUnknown()) {
+        return Value::ForLoopPhiPlaceholder(value.GetPhiPlaceholder());
       }
       if (value.IsInstruction() && value.GetInstruction()->IsInstanceFieldGet()) {
         DCHECK_LT(static_cast<size_t>(value.GetInstruction()->GetId()),
@@ -674,6 +680,9 @@ class LSEVisitor final : private HGraphDelegateVisitor {
           return Value::ForInstruction(substitute);
         }
       }
+      DCHECK(!value.IsInstruction() ||
+             FindSubstitute(value.GetInstruction()) == value.GetInstruction());
+      return value;
     }
     if (value.NeedsPhi() && phi_placeholder_replacements_[PhiPlaceholderIndex(value)].IsValid()) {
       return Replacement(value);
@@ -735,7 +744,8 @@ class LSEVisitor final : private HGraphDelegateVisitor {
   HInstruction* FindSubstitute(HInstruction* instruction) const {
     size_t id = static_cast<size_t>(instruction->GetId());
     if (id >= substitute_instructions_for_loads_.size()) {
-      DCHECK(!IsLoad(instruction));  // New Phi (may not be in the graph yet) or default value.
+      // New Phi (may not be in the graph yet), default value or PredicatedInstanceFieldGet.
+      DCHECK(!IsLoad(instruction) || instruction->IsPredicatedInstanceFieldGet());
       return instruction;
     }
     HInstruction* substitute = substitute_instructions_for_loads_[id];
@@ -1267,7 +1277,7 @@ class LSEVisitor final : private HGraphDelegateVisitor {
   ScopedArenaHashMap<HInstruction*, StoreRecord> store_records_;
 
   // Replacements for Phi placeholders.
-  // The unknown heap value is used to mark Phi placeholders that cannot be replaced.
+  // The invalid heap value is used to mark Phi placeholders that cannot be replaced.
   ScopedArenaVector<Value> phi_placeholder_replacements_;
 
   // Merged-unknowns that must have their predecessor values kept to ensure
@@ -3225,6 +3235,13 @@ class PartialLoadStoreEliminationHelper {
             // Reference info is the same
             new_fget->SetReferenceTypeInfo(ins->GetReferenceTypeInfo());
           }
+          // In this phase, substitute instructions are used only for the predicated get
+          // default values which are used only if the partial singleton did not escape,
+          // so the out value of the `new_fget` for the relevant cases is the same as
+          // the default value.
+          // TODO: Use the default value for materializing default values used by
+          // other predicated loads to avoid some unnecessary Phis. (This shall
+          // complicate the search for replacement in `ReplacementOrValue()`.)
           DCHECK(helper_->lse_->substitute_instructions_for_loads_[ins->GetId()] == nullptr);
           helper_->lse_->substitute_instructions_for_loads_[ins->GetId()] = new_fget;
           ins->ReplaceWith(new_fget);
