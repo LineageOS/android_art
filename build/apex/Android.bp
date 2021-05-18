@@ -62,16 +62,12 @@ art_runtime_base_native_shared_libs = [
     // dependencies work with APEX libraries.
     "libart",
     "libart-compiler",
-    "libartservice",
     "libdt_fd_forward",
     "libdt_socket",
     "libjdwp",
     "libnpt",
     "libopenjdkjvm",
     "libopenjdkjvmti",
-    // TODO(chriswailes): Make libarttools a dependency for another target
-    // when such a target exists
-    "libarttools",
 ]
 
 art_runtime_base_native_device_only_shared_libs = [
@@ -243,7 +239,6 @@ apex_defaults {
     compile_multilib: "both",
     manifest: "manifest-art.json",
     bootclasspath_fragments: ["art-bootclasspath-fragment"],
-    systemserverclasspath_fragments: ["art-systemserverclasspath-fragment"],
     compat_configs: ["libcore-platform-compat-config"],
     java_libs: libcore_java_libs,
     native_shared_libs: art_runtime_base_native_shared_libs +
