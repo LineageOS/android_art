@@ -45,17 +45,3 @@ cc_library {
     ],
     export_shared_lib_headers: ["libbase"],
 }
-
-art_cc_test {
-    name: "art_libarttools_tests",
-    defaults: [
-        "art_gtest_defaults",
-    ],
-    srcs: [
-        "tools/tools_test.cc",
-    ],
-    shared_libs: [
-        "libbase",
-        "libarttools",
-    ],
-}
