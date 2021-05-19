@@ -260,6 +260,19 @@ art_module_art_global_defaults {
     min_sdk_version: "S",
 }
 
+// Used to generate binaries that can be backed by transparent hugepages.
+cc_defaults {
+    name: "art_hugepage_defaults",
+    arch: {
+        arm64: {
+            ldflags: ["-z max-page-size=0x200000"],
+        },
+        x86_64: {
+            ldflags: ["-z max-page-size=0x200000"],
+        },
+    },
+}
+
 cc_defaults {
     name: "art_pgo_defaults",
     visibility: ["//art:__subpackages__"],

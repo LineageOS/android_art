@@ -206,6 +206,7 @@ art_cc_library {
     defaults: [
         "libart-compiler-defaults",
         "dex2oat-pgo-defaults",
+        "art_hugepage_defaults",
     ],
     codegen: {
         arm: {
