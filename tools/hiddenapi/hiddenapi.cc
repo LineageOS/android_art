@@ -82,6 +82,11 @@ NO_RETURN static void Usage(const char* fmt, ...) {
   UsageError("    --api-flags=<filename>:");
   UsageError("        CSV file with signatures of methods/fields and their respective flags");
   UsageError("");
+  UsageError("    --max-hiddenapi-level=<max-target-*>:");
+  UsageError("        the maximum hidden api level for APIs. If an API was originally restricted");
+  UsageError("        to a newer sdk, turn it into a regular unsupported API instead.");
+  UsageError("        instead. The full list of valid values is in hiddenapi_flags.h");
+  UsageError("");
   UsageError("    --no-force-assign-all:");
   UsageError("        Disable check that all dex entries have been assigned a flag");
   UsageError("");
@@ -908,6 +913,8 @@ class HiddenApi final {
             api_flags_path_ = std::string(option.substr(strlen("--api-flags=")));
           } else if (option == "--no-force-assign-all") {
             force_assign_all_ = false;
+          } else if (StartsWith(option, "--max-hiddenapi-level=")) {
+            max_hiddenapi_level_ = std::string(option.substr(strlen("--max-hiddenapi-level=")));
           } else {
             Usage("Unknown argument '%s'", raw_option);
           }
@@ -1022,12 +1029,23 @@ class HiddenApi final {
 
       const std::string& signature = values[0];
 
+      // Skip signature
+      std::vector<std::string>::iterator apiListBegin = values.begin() + 1;
+      std::vector<std::string>::iterator apiListEnd = values.end();
+      if (!max_hiddenapi_level_.empty()) {
+          auto clamp_fn = [this](const std::string& apiListName) {
+              return ApiList::CoerceAtMost(apiListName,
+                                           max_hiddenapi_level_);
+          };
+          std::transform(apiListBegin, apiListEnd, apiListBegin, clamp_fn);
+      }
+
       CHECK(api_flag_map.find(signature) == api_flag_map.end()) << path << ":" << line_number
           << ": Duplicate entry: " << signature << kErrorHelp;
 
       ApiList membership;
 
-      bool success = ApiList::FromNames(values.begin() + 1, values.end(), &membership);
+      bool success = ApiList::FromNames(apiListBegin, apiListEnd, &membership);
       CHECK(success) << path << ":" << line_number
           << ": Some flags were not recognized: " << line << kErrorHelp;
       CHECK(membership.IsValid()) << path << ":" << line_number
@@ -1156,6 +1174,9 @@ class HiddenApi final {
   // Path to CSV file containing the list of API members and their flags.
   // This could be both an input and output path.
   std::string api_flags_path_;
+
+  // Override limit for sdk-max-* hidden APIs.
+  std::string max_hiddenapi_level_;
 };
 
 }  // namespace hiddenapi
