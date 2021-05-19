@@ -60,6 +60,10 @@ art_cc_binary {
         darwin: {
             enabled: true,
         },
+        windows: {
+            // dexdump is provided in the Windows SDK.
+            enabled: true,
+        },
     },
     apex_available: [
         "com.android.art",
