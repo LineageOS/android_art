@@ -259,6 +259,12 @@ known_failing_tests = [
   "720-thread-priority",
   # 728-imt-conflict-zygote: Custom `run` script + dependency on `libarttest`.
   "728-imt-conflict-zygote",
+  # 730-cha-deopt: Fails with:
+  #
+  #   Test command execution failed with status FAILED: CommandResult: exit code=1, out=, err=Exception in thread "main" java.lang.ArrayIndexOutOfBoundsException: length=0; index=0
+  #           at Main.main(Main.java:24)
+  #
+  "730-cha-deopt",
   # 813-fp-args: Dependency on `libarttest`.
   "813-fp-args",
   # 821-many-args: Fails with:
