@@ -42,6 +42,7 @@
 #include "thread_list.h"
 #include "verifier/method_verifier.h"
 #include "well_known_classes.h"
+#include <android-base/properties.h>
 
 static_assert(ART_USE_FUTEXES);
 
@@ -116,6 +117,11 @@ Monitor::Monitor(Thread* self, Thread* owner, ObjPtr<mirror::Object> obj, int32_
   // with the owner unlocking the thin-lock.
   CHECK(owner == nullptr || owner == self || owner->IsSuspended());
   // The identity hash code is set for the life time of the monitor.
+
+  bool monitor_timeout_enabled = Runtime::Current()->IsMonitorTimeoutEnabled();
+  if (monitor_timeout_enabled) {
+    MaybeEnableTimeout();
+  }
 }
 
 Monitor::Monitor(Thread* self,
@@ -144,6 +150,11 @@ Monitor::Monitor(Thread* self,
   // with the owner unlocking the thin-lock.
   CHECK(owner == nullptr || owner == self || owner->IsSuspended());
   // The identity hash code is set for the life time of the monitor.
+
+  bool monitor_timeout_enabled = Runtime::Current()->IsMonitorTimeoutEnabled();
+  if (monitor_timeout_enabled) {
+    MaybeEnableTimeout();
+  }
 }
 
 int32_t Monitor::GetHashCode() {
@@ -1708,6 +1719,15 @@ MonitorInfo::MonitorInfo(ObjPtr<mirror::Object> obj) : owner_(nullptr), entry_co
       }
       break;
     }
+  }
+}
+
+void Monitor::MaybeEnableTimeout() {
+  std::string current_package = Runtime::Current()->GetProcessPackageName();
+  bool enabled_for_app = android::base::GetBoolProperty("debug.art.monitor.app", false);
+  if (current_package == "android" || enabled_for_app) {
+    monitor_lock_.setEnableMonitorTimeout();
+    monitor_lock_.setMonitorId(monitor_id_);
   }
 }
 
