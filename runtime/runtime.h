@@ -1005,6 +1005,17 @@ class Runtime {
     return apex_versions_;
   }
 
+  // Trigger a flag reload from system properties or device congfigs.
+  //
+  // Should only be called from runtime init and zygote post fork as
+  // we don't want to change the runtime config midway during execution.
+  //
+  // The caller argument should be the name of the function making this call
+  // and will be used to enforce the appropriate names.
+  //
+  // See Flags::ReloadAllFlags as well.
+  static void ReloadAllFlags(const std::string& caller);
+
  private:
   static void InitPlatformSignalHandlers();
 
