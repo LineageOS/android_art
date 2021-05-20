@@ -383,6 +383,13 @@ std::unique_ptr<RuntimeParser> ParsedOptions::MakeParser(bool ignore_unrecognize
       .Define("-XX:ThreadSuspendTimeout=_")  // in ms
           .WithType<MillisecondsToNanoseconds>()  // store as ns
           .IntoKey(M::ThreadSuspendTimeout)
+      .Define("-XX:MonitorTimeoutEnable=_")
+          .WithType<bool>()
+          .WithValueMap({{"false", false}, {"true", true}})
+          .IntoKey(M::MonitorTimeoutEnable)
+      .Define("-XX:MonitorTimeout=_")  // in ms
+          .WithType<int>()
+          .IntoKey(M::MonitorTimeout)
       .Define("-XX:GlobalRefAllocStackTraceLimit=_")  // Number of free slots to enable tracing.
           .WithType<unsigned int>()
           .IntoKey(M::GlobalRefAllocStackTraceLimit)
