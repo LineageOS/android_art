@@ -38,9 +38,28 @@ python_binary_host {
     },
 }
 
+soong_config_module_type_import {
+    from: "art/build/SoongConfig.bp",
+    module_types: [
+        "art_module_sh_binary",
+    ],
+}
+
 // Copy the art shell script to the host and target's bin directory
-sh_binary {
+art_module_sh_binary {
     name: "art-script",
+
+    // Disable this script in prebuilt mode since it depends on dalvikvm which
+    // isn't a prebuilt.
+    // TODO(b/172480617): Clean up when sources are gone from the platform tree
+    // and we no longer need to support sources present when prebuilts are used.
+    enabled: false,
+    soong_config_variables: {
+        source_build: {
+            enabled: true,
+        },
+    },
+
     host_supported: true,
     src: "art",
     filename_from_src: true,
@@ -55,6 +74,13 @@ sh_binary {
             ],
         },
         darwin: {
+            enabled: false,
+        },
+        windows: {
+            // When the module is enabled globally in the soong_config_variables
+            // stanza above, it gets enabled on windows too. Hence we need to
+            // disable it explicitly.
+            // TODO(b/172480617): Clean up with that.
             enabled: false,
         },
     },

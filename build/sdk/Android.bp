@@ -263,6 +263,9 @@ art_module_exports {
         "libjavacoretests",
     ],
     native_static_libs: [
-        "libctstiagent",
+        // TODO(b/187288515): Providing this as a prebuilt introduces an issue
+        // with sdk_version propagation. Temporarily use the source library
+        // instead.
+        //"libctstiagent",
     ],
 }

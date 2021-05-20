@@ -63,10 +63,29 @@ art_clang_tidy_disabled = [
     "-modernize-pass-by-value",
 ]
 
-art_global_defaults {
+soong_config_module_type_import {
+    from: "art/build/SoongConfig.bp",
+    module_types: [
+        "art_module_art_global_defaults",
+        "art_module_cc_defaults",
+        "art_module_java_defaults",
+    ],
+}
+
+art_module_art_global_defaults {
     // Additional flags are computed by art.go
 
     name: "art_defaults",
+
+    // Disable all ART Soong modules by default when ART prebuilts are in use.
+    // TODO(b/172480617): Clean up when sources are gone from the platform tree
+    // and we no longer need to support sources present when prebuilts are used.
+    enabled: false,
+    soong_config_variables: {
+        source_build: {
+            enabled: true,
+        },
+    },
 
     // This is the default visibility for the //art package, but we repeat it
     // here so that it gets merged with other visibility rules in modules
@@ -180,6 +199,13 @@ art_global_defaults {
         darwin: {
             enabled: false,
         },
+        windows: {
+            // When the module is enabled globally in the soong_config_variables
+            // stanza above, it may get enabled on windows too for some module
+            // types. Hence we need to disable it explicitly.
+            // TODO(b/172480617): Clean up with that.
+            enabled: false,
+        },
         host: {
             cflags: [
                 // Bug: 15446488. We don't omit the frame pointer to work around
@@ -290,14 +316,6 @@ art_debug_defaults {
     min_sdk_version: "S",
 }
 
-soong_config_module_type_import {
-    from: "art/build/SoongConfig.bp",
-    module_types: [
-        "art_module_cc_defaults",
-        "art_module_java_defaults",
-    ],
-}
-
 // Use this to enable a cc_* module only when building ART from sources.
 // TODO(b/172480617): Clean up when sources are gone from the platform tree and
 // we no longer need to support sources present when prebuilts are used.
@@ -305,6 +323,7 @@ art_module_cc_defaults {
     name: "art_module_source_build_defaults",
     defaults_visibility: [
         "//art:__subpackages__",
+        "//libcore:__subpackages__",
         "//libnativehelper:__subpackages__",
     ],
 
@@ -330,6 +349,7 @@ art_module_java_defaults {
     name: "art_module_source_build_java_defaults",
     defaults_visibility: [
         "//art:__subpackages__",
+        "//libcore:__subpackages__",
         "//libnativehelper:__subpackages__",
     ],
 

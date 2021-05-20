@@ -46,7 +46,6 @@ art_cc_binary {
         // Use static libs on host: required for Windows build and
         // static_sdk_tools build.
         host: {
-            enabled: true,
             stl: "libc++_static",
             static_libs: [
                 "libdexfile",
