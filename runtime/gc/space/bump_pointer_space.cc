@@ -220,12 +220,16 @@ bool BumpPointerSpace::AllocNewTlab(Thread* self, size_t bytes) {
   return true;
 }
 
-void BumpPointerSpace::LogFragmentationAllocFailure(std::ostream& os,
-                                                    size_t /* failed_alloc_bytes */) {
+bool BumpPointerSpace::LogFragmentationAllocFailure(std::ostream& os,
+                                                    size_t failed_alloc_bytes) {
   size_t max_contiguous_allocation = Limit() - End();
-  os << "; failed due to fragmentation (largest possible contiguous allocation "
-     <<  max_contiguous_allocation << " bytes)";
+  if (failed_alloc_bytes > max_contiguous_allocation) {
+    os << "; failed due to fragmentation (largest possible contiguous allocation "
+       <<  max_contiguous_allocation << " bytes)";
+    return true;
+  }
   // Caller's job to print failed_alloc_bytes.
+  return false;
 }
 
 size_t BumpPointerSpace::AllocationSizeNonvirtual(mirror::Object* obj, size_t* usable_size) {
