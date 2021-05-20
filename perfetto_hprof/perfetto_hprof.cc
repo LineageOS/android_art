@@ -41,7 +41,6 @@
 #include "gc/scoped_gc_critical_section.h"
 #include "mirror/object-refvisitor-inl.h"
 #include "nativehelper/scoped_local_ref.h"
-#include "perfetto/profiling/normalize.h"
 #include "perfetto/profiling/parse_smaps.h"
 #include "perfetto/trace/interned_data/interned_data.pbzero.h"
 #include "perfetto/trace/profiling/heap_graph.pbzero.h"
@@ -152,8 +151,6 @@ bool ShouldSampleSmapsEntry(const perfetto::profiling::SmapsEntry& e) {
   return false;
 }
 
-constexpr size_t kMaxCmdlineSize = 512;
-
 class JavaHprofDataSource : public perfetto::DataSource<JavaHprofDataSource> {
  public:
   constexpr static perfetto::BufferExhaustedPolicy kBufferExhaustedPolicy =
@@ -179,52 +176,9 @@ class JavaHprofDataSource : public perfetto::DataSource<JavaHprofDataSource> {
       std::string name = (*it).ToStdString();
       ignored_types_.emplace_back(std::move(name));
     }
-
-    uint64_t self_pid = static_cast<uint64_t>(getpid());
-    for (auto pid_it = cfg->pid(); pid_it; ++pid_it) {
-      if (*pid_it == self_pid) {
-        enabled_ = true;
-        return;
-      }
-    }
-
-    if (cfg->has_process_cmdline()) {
-      int fd = open("/proc/self/cmdline", O_RDONLY | O_CLOEXEC);
-      if (fd == -1) {
-        PLOG(ERROR) << "failed to open /proc/self/cmdline";
-        return;
-      }
-      char cmdline[kMaxCmdlineSize];
-      ssize_t rd = read(fd, cmdline, sizeof(cmdline) - 1);
-      if (rd == -1) {
-        PLOG(ERROR) << "failed to read /proc/self/cmdline";
-      }
-      close(fd);
-      if (rd == -1) {
-        return;
-      }
-      cmdline[rd] = '\0';
-      char* cmdline_ptr = cmdline;
-      ssize_t sz = perfetto::profiling::NormalizeCmdLine(&cmdline_ptr, static_cast<size_t>(rd + 1));
-      if (sz == -1) {
-        PLOG(ERROR) << "failed to normalize cmdline";
-      }
-      for (auto it = cfg->process_cmdline(); it; ++it) {
-        std::string other = (*it).ToStdString();
-        // Append \0 to make this a C string.
-        other.resize(other.size() + 1);
-        char* other_ptr = &(other[0]);
-        ssize_t other_sz = perfetto::profiling::NormalizeCmdLine(&other_ptr, other.size());
-        if (other_sz == -1) {
-          PLOG(ERROR) << "failed to normalize other cmdline";
-          continue;
-        }
-        if (sz == other_sz && strncmp(cmdline_ptr, other_ptr, static_cast<size_t>(sz)) == 0) {
-          enabled_ = true;
-          return;
-        }
-      }
-    }
+    // This tracing session ID matches the requesting tracing session ID, so we know heapprofd
+    // has verified it targets this process.
+    enabled_ = true;
   }
 
   bool dump_smaps() { return dump_smaps_; }

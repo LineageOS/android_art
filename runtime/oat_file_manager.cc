@@ -347,7 +347,7 @@ std::vector<std::unique_ptr<const DexFile>> OatFileManager::OpenDexFilesFromOat(
       }
       if (dex_files.empty()) {
         ScopedTrace failed_to_open_dex_files("FailedToOpenDexFilesFromOat");
-        error_msgs->push_back("Failed to open dex files from " + oat_file->GetLocation());
+        error_msgs->push_back("Failed to open dex files from " + odex_location);
       } else {
         // Opened dex files from an oat file, madvise them to their loaded state.
          for (const std::unique_ptr<const DexFile>& dex_file : dex_files) {

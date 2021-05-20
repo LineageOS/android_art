@@ -118,15 +118,6 @@ bool ThreadList::Contains(Thread* thread) {
   return find(list_.begin(), list_.end(), thread) != list_.end();
 }
 
-bool ThreadList::Contains(pid_t tid) {
-  for (const auto& thread : list_) {
-    if (thread->GetTid() == tid) {
-      return true;
-    }
-  }
-  return false;
-}
-
 pid_t ThreadList::GetLockOwner() {
   return Locks::thread_list_lock_->GetExclusiveOwnerTid();
 }
@@ -179,12 +170,12 @@ void ThreadList::DumpUnattachedThreads(std::ostream& os, bool dump_native_stack)
     char* end;
     pid_t tid = strtol(e->d_name, &end, 10);
     if (!*end) {
-      bool contains;
+      Thread* thread;
       {
         MutexLock mu(self, *Locks::thread_list_lock_);
-        contains = Contains(tid);
+        thread = FindThreadByTid(tid);
       }
-      if (!contains) {
+      if (thread != nullptr) {
         DumpUnattachedThread(os, tid, dump_native_stack);
       }
     }
@@ -1104,6 +1095,15 @@ Thread* ThreadList::SuspendThreadByThreadId(uint32_t thread_id,
 Thread* ThreadList::FindThreadByThreadId(uint32_t thread_id) {
   for (const auto& thread : list_) {
     if (thread->GetThreadId() == thread_id) {
+      return thread;
+    }
+  }
+  return nullptr;
+}
+
+Thread* ThreadList::FindThreadByTid(int tid) {
+  for (const auto& thread : list_) {
+    if (thread->GetTid() == tid) {
       return thread;
     }
   }

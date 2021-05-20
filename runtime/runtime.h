@@ -981,6 +981,13 @@ class Runtime {
     return perfetto_javaheapprof_enabled_;
   }
 
+  bool IsMonitorTimeoutEnabled() const {
+    return monitor_timeout_enable_;
+  }
+
+  uint64_t GetMonitorTimeoutNs() const {
+    return monitor_timeout_ns_;
+  }
   // Return true if we should load oat files as executable or not.
   bool GetOatFilesExecutable() const;
 
@@ -1238,6 +1245,9 @@ class Runtime {
 
   // Whether Java code needs to be debuggable.
   bool is_java_debuggable_;
+
+  bool monitor_timeout_enable_;
+  uint64_t monitor_timeout_ns_;
 
   // Whether or not this application can be profiled by the shell user,
   // even when running on a device that is running in user mode.
