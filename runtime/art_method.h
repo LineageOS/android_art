@@ -361,11 +361,9 @@ class ArtMethod final {
   }
 
   bool PreviouslyWarm() const {
-    if (IsIntrinsic()) {
-      // kAccPreviouslyWarm overlaps with kAccIntrinsicBits.
-      return true;
-    }
-    return (GetAccessFlags() & kAccPreviouslyWarm) != 0;
+    // kAccPreviouslyWarm overlaps with kAccIntrinsicBits. Return true for intrinsics.
+    constexpr uint32_t mask = kAccPreviouslyWarm | kAccIntrinsic;
+    return (GetAccessFlags() & mask) != 0u;
   }
 
   void SetPreviouslyWarm() REQUIRES_SHARED(Locks::mutator_lock_) {
@@ -706,9 +704,9 @@ class ArtMethod final {
   void CopyFrom(ArtMethod* src, PointerSize image_pointer_size)
       REQUIRES_SHARED(Locks::mutator_lock_);
 
-  ALWAYS_INLINE void SetCounter(uint16_t hotness_count) REQUIRES_SHARED(Locks::mutator_lock_);
+  ALWAYS_INLINE void SetCounter(uint16_t hotness_count);
 
-  ALWAYS_INLINE uint16_t GetCounter() REQUIRES_SHARED(Locks::mutator_lock_);
+  ALWAYS_INLINE uint16_t GetCounter();
 
   ALWAYS_INLINE static constexpr uint16_t MaxCounter() {
     return std::numeric_limits<decltype(hotness_count_)>::max();

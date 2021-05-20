@@ -54,6 +54,10 @@ class ProfileSaver {
   static void NotifyStartupCompleted() REQUIRES(!Locks::profiler_lock_, !instance_->wait_lock_);
 
  private:
+  // Helper classes for collecting classes and methods.
+  class GetClassesAndMethodsHelper;
+  class ScopedDefaultPriority;
+
   ProfileSaver(const ProfileSaverOptions& options,
                const std::string& output_filename,
                jit::JitCodeCache* jit_code_cache,
@@ -101,6 +105,9 @@ class ProfileSaver {
   // Get the profile metadata that should be associated with the profile session during the current
   // profile saver session.
   ProfileCompilationInfo::ProfileSampleAnnotation GetProfileSampleAnnotation();
+
+  // Get extra global flags if necessary (e.g. the running architecture), otherwise 0.
+  static uint32_t GetExtraMethodHotnessFlags(const ProfileSaverOptions& options);
 
   // Extends the given set of flags with global flags if necessary (e.g. the running architecture).
   ProfileCompilationInfo::MethodHotness::Flag AnnotateSampleFlags(uint32_t flags);

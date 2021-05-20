@@ -295,6 +295,20 @@ class ProfileCompilationInfo {
 
   ~ProfileCompilationInfo();
 
+  // Returns the maximum value for the profile index.
+  static constexpr ProfileIndexType MaxProfileIndex() {
+    return std::numeric_limits<ProfileIndexType>::max();
+  }
+
+  // Find or add a tracked dex file. Returns `MaxProfileIndex()` on failure, whether due to
+  // checksum/num_type_ids/num_method_ids mismatch or reaching the maximum number of dex files.
+  ProfileIndexType FindOrAddDexFile(
+      const DexFile& dex_file,
+      const ProfileSampleAnnotation& annotation = ProfileSampleAnnotation::kNone) {
+    DexFileData* data = GetOrAddDexFileData(&dex_file, annotation);
+    return (data != nullptr) ? data->profile_index : MaxProfileIndex();
+  }
+
   // Add the given methods to the current profile object.
   //
   // Note: if an annotation is provided, the methods/classes will be associated with the group
@@ -315,10 +329,32 @@ class ProfileCompilationInfo {
   // Add a class with the specified `type_index` to the profile. The `type_index`
   // can be either a normal index for a `TypeId` in the dex file, or an artificial
   // type index created by `FindOrCreateTypeIndex()`.
+  void AddClass(ProfileIndexType profile_index, dex::TypeIndex type_index) {
+    DCHECK_LT(profile_index, info_.size());
+    DexFileData* const data = info_[profile_index].get();
+    DCHECK(type_index.IsValid());
+    DCHECK(type_index.index_ <= data->num_type_ids ||
+           type_index.index_ - data->num_type_ids < extra_descriptors_.size());
+    data->class_set.insert(type_index);
+  }
+
+  // Add a class with the specified `type_index` to the profile. The `type_index`
+  // can be either a normal index for a `TypeId` in the dex file, or an artificial
+  // type index created by `FindOrCreateTypeIndex()`.
   // Returns `true` on success, `false` on failure.
   bool AddClass(const DexFile& dex_file,
                 dex::TypeIndex type_index,
-                const ProfileSampleAnnotation& annotation = ProfileSampleAnnotation::kNone);
+                const ProfileSampleAnnotation& annotation = ProfileSampleAnnotation::kNone) {
+    DCHECK(type_index.IsValid());
+    DCHECK(type_index.index_ <= dex_file.NumTypeIds() ||
+           type_index.index_ - dex_file.NumTypeIds() < extra_descriptors_.size());
+    DexFileData* const data = GetOrAddDexFileData(&dex_file, annotation);
+    if (data == nullptr) {  // Checksum/num_type_ids/num_method_ids mismatch or too many dex files.
+      return false;
+    }
+    data->class_set.insert(type_index);
+    return true;
+  }
 
   // Add a class with the specified `descriptor` to the profile.
   // Returns `true` on success, `false` on failure.
@@ -352,6 +388,13 @@ class ProfileCompilationInfo {
     }
     data->class_set.insert(index_begin, index_end);
     return true;
+  }
+
+  void AddMethod(ProfileIndexType profile_index, uint32_t method_index, MethodHotness::Flag flags) {
+    DCHECK_LT(profile_index, info_.size());
+    DexFileData* const data = info_[profile_index].get();
+    DCHECK_LT(method_index, data->num_method_ids);
+    data->AddMethod(flags, method_index);
   }
 
   // Add a method to the profile using its online representation (containing runtime structures).
@@ -905,11 +948,6 @@ class ProfileCompilationInfo {
   // Migrates the annotation from an augmented key to a base key.
   static std::string MigrateAnnotationInfo(const std::string& base_key,
                                            const std::string& augmented_key);
-
-  // Returns the maximum value for the profile index.
-  static constexpr ProfileIndexType MaxProfileIndex() {
-    return std::numeric_limits<ProfileIndexType>::max();
-  }
 
   friend class ProfileCompilationInfoTest;
   friend class CompilerDriverProfileTest;
