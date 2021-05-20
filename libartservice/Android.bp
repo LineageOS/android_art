@@ -136,6 +136,8 @@ java_sdk_library {
 
     // This cannot be accessed by apps using <uses-library> in their manifest.
     shared_library: false,
+    // TODO(b/188773212): force dex compilation for inclusion in bootclasspath_fragment.
+    compile_dex: true,
 
     srcs: [
         "service/java/com/android/server/art/ArtManagerLocal.java",
