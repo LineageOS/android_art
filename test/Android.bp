@@ -560,6 +560,14 @@ art_cc_test_library {
 cc_library_static {
     name: "libctstiagent",
     defaults: ["libtiagent-base-defaults"],
+
+    // TODO(b/187288515): Providing this as a prebuilt introduces an issue with
+    // sdk_version propagation. Temporarily use the source library instead,
+    // which means we need to override the logic inherited from art_defaults and
+    // art_test_internal_library_defaults that disables sources when not
+    // building ART from sources.
+    enabled: true,
+
     visibility: [
         "//cts/hostsidetests/jvmti:__subpackages__",
     ],

@@ -929,7 +929,7 @@ class RosAlloc {
   void Verify() REQUIRES(Locks::mutator_lock_, !Locks::thread_list_lock_, !bulk_free_lock_,
                          !lock_);
 
-  void LogFragmentationAllocFailure(std::ostream& os, size_t failed_alloc_bytes)
+  bool LogFragmentationAllocFailure(std::ostream& os, size_t failed_alloc_bytes)
       REQUIRES(!bulk_free_lock_, !lock_);
 
   void DumpStats(std::ostream& os)

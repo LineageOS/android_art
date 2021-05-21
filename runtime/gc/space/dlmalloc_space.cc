@@ -359,8 +359,8 @@ static void MSpaceChunkCallback(void* start, void* end, size_t used_bytes, void*
   }
 }
 
-void DlMallocSpace::LogFragmentationAllocFailure(std::ostream& os,
-                                                 size_t failed_alloc_bytes ATTRIBUTE_UNUSED) {
+bool DlMallocSpace::LogFragmentationAllocFailure(std::ostream& os,
+                                                 size_t failed_alloc_bytes) {
   Thread* const self = Thread::Current();
   size_t max_contiguous_allocation = 0;
   // To allow the Walk/InspectAll() to exclusively-lock the mutator
@@ -369,8 +369,12 @@ void DlMallocSpace::LogFragmentationAllocFailure(std::ostream& os,
   Locks::mutator_lock_->AssertSharedHeld(self);
   ScopedThreadSuspension sts(self, kSuspended);
   Walk(MSpaceChunkCallback, &max_contiguous_allocation);
-  os << "; failed due to fragmentation (largest possible contiguous allocation "
-     <<  max_contiguous_allocation << " bytes)";
+  if (failed_alloc_bytes > max_contiguous_allocation) {
+    os << "; failed due to fragmentation (largest possible contiguous allocation "
+       <<  max_contiguous_allocation << " bytes)";
+    return true;
+  }
+  return false;
 }
 
 }  // namespace space

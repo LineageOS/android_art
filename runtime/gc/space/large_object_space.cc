@@ -641,9 +641,10 @@ collector::ObjectBytePair LargeObjectSpace::Sweep(bool swap_bitmaps) {
   return scc.freed;
 }
 
-void LargeObjectSpace::LogFragmentationAllocFailure(std::ostream& /*os*/,
+bool LargeObjectSpace::LogFragmentationAllocFailure(std::ostream& /*os*/,
                                                     size_t /*failed_alloc_bytes*/) {
   UNIMPLEMENTED(FATAL);
+  UNREACHABLE();
 }
 
 std::pair<uint8_t*, uint8_t*> LargeObjectMapSpace::GetBeginEndAtomic() const {

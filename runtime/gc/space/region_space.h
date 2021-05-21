@@ -227,7 +227,7 @@ class RegionSpace final : public ContinuousMemMapAllocSpace {
   accounting::ContinuousSpaceBitmap::SweepCallback* GetSweepCallback() override {
     return nullptr;
   }
-  void LogFragmentationAllocFailure(std::ostream& os, size_t failed_alloc_bytes) override
+  bool LogFragmentationAllocFailure(std::ostream& os, size_t failed_alloc_bytes) override
       REQUIRES_SHARED(Locks::mutator_lock_) REQUIRES(!region_lock_);
 
   // Object alignment within the space.
