@@ -81,11 +81,8 @@ class ThreadList {
 
   // Suspend a thread using a peer, typically used by the debugger. Returns the thread on success,
   // else null. The peer is used to identify the thread to avoid races with the thread terminating.
-  // If the thread should be suspended then value of request_suspension should be true otherwise
-  // the routine will wait for a previous suspend request. If the suspension times out then *timeout
-  // is set to true.
+  // If the suspension times out then *timeout is set to true.
   Thread* SuspendThreadByPeer(jobject peer,
-                              bool request_suspension,
                               SuspendReason reason,
                               bool* timed_out)
       REQUIRES(!Locks::mutator_lock_,
