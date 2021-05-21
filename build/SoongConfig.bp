@@ -11,6 +11,14 @@ soong_config_bool_variable {
 }
 
 soong_config_module_type {
+    name: "art_module_art_global_defaults",
+    module_type: "art_global_defaults",
+    config_namespace: "art_module",
+    bool_variables: ["source_build"],
+    properties: ["enabled"],
+}
+
+soong_config_module_type {
     name: "art_module_apex_defaults",
     module_type: "apex_defaults",
     config_namespace: "art_module",
@@ -27,6 +35,14 @@ soong_config_module_type {
         "enabled",
         "target.android.test_for",
     ],
+}
+
+soong_config_module_type {
+    name: "art_module_cc_genrule",
+    module_type: "cc_genrule",
+    config_namespace: "art_module",
+    bool_variables: ["source_build"],
+    properties: ["enabled"],
 }
 
 soong_config_module_type {
@@ -56,6 +72,14 @@ soong_config_module_type {
 soong_config_module_type {
     name: "art_module_sdk",
     module_type: "sdk",
+    config_namespace: "art_module",
+    bool_variables: ["source_build"],
+    properties: ["enabled"],
+}
+
+soong_config_module_type {
+    name: "art_module_sh_binary",
+    module_type: "sh_binary",
     config_namespace: "art_module",
     bool_variables: ["source_build"],
     properties: ["enabled"],

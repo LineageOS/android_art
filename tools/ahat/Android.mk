@@ -22,7 +22,6 @@ include art/build/Android.common_path.mk
 # doesn't run on darwin. Only build and run the tests for linux.
 # There are also issues with running under instrumentation.
 ifeq ($(HOST_OS),linux)
-ifeq (true,$(my_art_module_source_build))
 ifneq ($(EMMA_INSTRUMENT),true)
 
 # Determine the location of the test-dump.jar, test-dump.hprof, and proguard
@@ -123,7 +122,6 @@ include $(BUILD_HOST_JAVA_LIBRARY)
 AHAT_TEST_JAR := $(LOCAL_BUILT_MODULE)
 
 endif # EMMA_INSTRUMENT
-endif # my_art_module_source_build
 endif # linux
 
 # Clean up local variables.

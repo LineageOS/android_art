@@ -843,6 +843,9 @@
     },
     {
       "name": "art-run-test-573-checker-checkcast-regression[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-576-polymorphic-inlining[com.google.android.art.apex]"
     }
   ],
   "presubmit": [
@@ -1955,6 +1958,9 @@
     },
     {
       "name": "art-run-test-726-array-store"
+    },
+    {
+      "name": "art-run-test-730-checker-inlining-super"
     },
     {
       "name": "art-run-test-805-TooDeepClassInstanceOf"

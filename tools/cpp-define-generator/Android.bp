@@ -55,9 +55,28 @@ cc_object {
     ],
 }
 
+soong_config_module_type_import {
+    from: "art/build/SoongConfig.bp",
+    module_types: [
+        "art_module_cc_genrule",
+    ],
+}
+
 // This extracts the compile-time constants from asm_defines.s and creates the header.
-cc_genrule {
+art_module_cc_genrule {
     name: "cpp-define-generator-asm-support",
+
+    // :asm_defines.s is only available when building ART from source, so do the
+    // same here.
+    // TODO(b/172480617): Clean up when sources are gone from the platform tree
+    // and we no longer need to support sources present when prebuilts are used.
+    enabled: false,
+    soong_config_variables: {
+        source_build: {
+            enabled: true,
+        },
+    },
+
     host_supported: true,
     device_supported: true,
     srcs: [":asm_defines.s"],
@@ -66,6 +85,13 @@ cc_genrule {
     cmd: "$(location make_header.py) \"$(in)\" > \"$(out)\"",
     target: {
         darwin: {
+            enabled: false,
+        },
+        windows: {
+            // When the module is enabled globally in the soong_config_variables
+            // stanza above, it gets enabled on windows too. Hence we need to
+            // disable it explicitly.
+            // TODO(b/172480617): Clean up with that.
             enabled: false,
         },
     },

@@ -722,8 +722,8 @@ void RegionSpace::PoisonDeadObjectsInUnevacuatedRegion(Region* r) {
   }
 }
 
-void RegionSpace::LogFragmentationAllocFailure(std::ostream& os,
-                                               size_t /* failed_alloc_bytes */) {
+bool RegionSpace::LogFragmentationAllocFailure(std::ostream& os,
+                                               size_t failed_alloc_bytes) {
   size_t max_contiguous_allocation = 0;
   MutexLock mu(Thread::Current(), region_lock_);
 
@@ -759,12 +759,15 @@ void RegionSpace::LogFragmentationAllocFailure(std::ostream& os,
 
   max_contiguous_allocation = std::min(max_contiguous_allocation,
                                        regions_free_for_alloc * kRegionSize);
-
-  os << "; failed due to fragmentation (largest possible contiguous allocation "
-     <<  max_contiguous_allocation << " bytes). Number of "
-     << PrettySize(kRegionSize)
-     << " sized free regions are: " << regions_free_for_alloc;
+  if (failed_alloc_bytes > max_contiguous_allocation) {
+    os << "; failed due to fragmentation (largest possible contiguous allocation "
+       <<  max_contiguous_allocation << " bytes). Number of "
+       << PrettySize(kRegionSize)
+       << " sized free regions are: " << regions_free_for_alloc;
+    return true;
+  }
   // Caller's job to print failed_alloc_bytes.
+  return false;
 }
 
 void RegionSpace::Clear() {

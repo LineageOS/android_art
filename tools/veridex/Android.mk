@@ -14,6 +14,8 @@
 # limitations under the License.
 #
 
+# TODO(b/172480617): Clean up the platform dependencies on this.
+
 LOCAL_PATH := $(call my-dir)
 
 # The veridex tool takes stub dex files as input, so we generate both the system and oahl

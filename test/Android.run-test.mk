@@ -94,13 +94,11 @@ ART_TEST_HOST_RUN_TEST_DEPENDENCIES += \
 
 endif
 
-ifeq (true,$(my_art_module_source_build))
-  test-art-host-run-test-dependencies : \
-	$(ART_TEST_HOST_RUN_TEST_DEPENDENCIES) $(TEST_ART_RUN_TEST_DEPENDENCIES) \
-	$(HOST_BOOT_IMAGE_JARS) $(HOST_BOOT_IMAGE) $(2ND_HOST_BOOT_IMAGE)
-  .PHONY: test-art-host-run-test-dependencies
-  test-art-run-test-dependencies : test-art-host-run-test-dependencies
-endif
+test-art-host-run-test-dependencies : \
+      $(ART_TEST_HOST_RUN_TEST_DEPENDENCIES) $(TEST_ART_RUN_TEST_DEPENDENCIES) \
+      $(HOST_BOOT_IMAGE_JARS) $(HOST_BOOT_IMAGE) $(2ND_HOST_BOOT_IMAGE)
+.PHONY: test-art-host-run-test-dependencies
+test-art-run-test-dependencies : test-art-host-run-test-dependencies
 
 test-art-target-run-test-dependencies :
 .PHONY: test-art-target-run-test-dependencies
@@ -123,10 +121,7 @@ define define-test-art-host-or-target-run-test-group
 endef  # define-test-art-host-or-target-run-test-group
 
 $(eval $(call define-test-art-host-or-target-run-test-group,target))
-
-ifeq (true,$(my_art_module_source_build))
-  $(eval $(call define-test-art-host-or-target-run-test-group,host))
-endif
+$(eval $(call define-test-art-host-or-target-run-test-group,host))
 
 define-test-art-host-or-target-run-test-group :=
 LOCAL_PATH :=
