@@ -149,8 +149,10 @@ size_t SideEffectDependencyAnalysis::MemoryDependencyAnalysis::FieldAccessHeapLo
   DCHECK(GetFieldInfo(instr) != nullptr);
   DCHECK(heap_location_collector_ != nullptr);
 
-  size_t heap_loc = heap_location_collector_->GetFieldHeapLocation(instr->InputAt(0),
-                                                                   GetFieldInfo(instr));
+  HInstruction* ref = instr->IsPredicatedInstanceFieldGet()
+      ? instr->AsPredicatedInstanceFieldGet()->GetTarget()
+      : instr->InputAt(0);
+  size_t heap_loc = heap_location_collector_->GetFieldHeapLocation(ref, GetFieldInfo(instr));
   // This field access should be analyzed and added to HeapLocationCollector before.
   DCHECK(heap_loc != HeapLocationCollector::kHeapLocationNotFound);
 

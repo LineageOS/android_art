@@ -2143,8 +2143,7 @@ bool LSEVisitor::MaterializeLoopPhis(ArrayRef<const size_t> phi_placeholder_inde
     size_t idx = phi_placeholder.GetHeapLocation();
     for (HBasicBlock* predecessor : block->GetPredecessors()) {
       Value value = ReplacementOrValue(heap_values_for_[predecessor->GetBlockId()][idx].value);
-      if (value.NeedsNonLoopPhi() ||
-          (current_phase_ == Phase::kPartialElimination && value.IsMergedUnknown())) {
+      if (value.NeedsNonLoopPhi()) {
         DCHECK(current_phase_ == Phase::kLoadElimination ||
                current_phase_ == Phase::kPartialElimination)
             << current_phase_;
