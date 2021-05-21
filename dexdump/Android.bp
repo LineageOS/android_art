@@ -46,7 +46,6 @@ art_cc_binary {
         // Use static libs on host: required for Windows build and
         // static_sdk_tools build.
         host: {
-            enabled: true,
             stl: "libc++_static",
             static_libs: [
                 "libdexfile",
@@ -59,6 +58,10 @@ art_cc_binary {
             ],
         },
         darwin: {
+            enabled: true,
+        },
+        windows: {
+            // dexdump is provided in the Windows SDK.
             enabled: true,
         },
     },
