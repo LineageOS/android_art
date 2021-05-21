@@ -31,12 +31,12 @@ art_cc_binary {
 
     srcs: ["dalvikvm.cc"],
     shared_libs: [
+        "liblog",
         "libnativehelper",
     ],
     target: {
         android: {
             shared_libs: [
-                "liblog",
                 "libsigchain",
             ],
         },
