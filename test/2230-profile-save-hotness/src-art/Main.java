@@ -38,7 +38,12 @@ public class Main {
     try {
       file = createTempFile();
       String codePath = System.getenv("DEX_LOCATION") + "/2230-profile-save-hotness.jar";
-      VMRuntime.registerAppInfo(file.getPath(), new String[] {codePath});
+      VMRuntime.registerAppInfo(
+          "test.app",
+          file.getPath(),
+          file.getPath(),
+          new String[] {codePath},
+          VMRuntime.CODE_PATH_TYPE_PRIMARY_APK);
 
       // Test that the profile saves an app method with a profiling info.
       $noinline$hotnessCountWithLoop(10000);

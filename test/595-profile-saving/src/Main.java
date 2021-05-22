@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 import java.io.File;
 import java.io.IOException;
 import java.lang.reflect.Method;
@@ -27,8 +28,11 @@ public class Main {
       file = createTempFile();
       // String codePath = getDexBaseLocation();
       String codePath = System.getenv("DEX_LOCATION") + "/595-profile-saving.jar";
-      VMRuntime.registerAppInfo(file.getPath(),
-                                new String[] {codePath});
+      VMRuntime.registerAppInfo("test.app",
+                                file.getPath(),
+                                file.getPath(),
+                                new String[] {codePath},
+                                VMRuntime.CODE_PATH_TYPE_PRIMARY_APK);
 
       // Test that the profile saves an app method with a profiling info.
       Method appMethod = Main.class.getDeclaredMethod("testAddMethodToProfile",
@@ -91,20 +95,32 @@ public class Main {
   }
 
   private static class VMRuntime {
+    public static final int CODE_PATH_TYPE_PRIMARY_APK = 1;
     private static final Method registerAppInfoMethod;
+
     static {
       try {
         Class<? extends Object> c = Class.forName("dalvik.system.VMRuntime");
         registerAppInfoMethod = c.getDeclaredMethod("registerAppInfo",
-            String.class, String[].class);
+            String.class, String.class, String.class, String[].class, int.class);
       } catch (Exception e) {
         throw new RuntimeException(e);
       }
     }
 
-    public static void registerAppInfo(String profile, String[] codePaths)
-        throws Exception {
-      registerAppInfoMethod.invoke(null, profile, codePaths);
+    public static void registerAppInfo(
+        String packageName,
+        String curProfile,
+        String refProfile,
+        String[] codePaths,
+        int codePathsType) throws Exception {
+      registerAppInfoMethod.invoke(
+          null,
+          packageName,
+          curProfile,
+          refProfile,
+          codePaths,
+          codePathsType);
     }
   }
 }
