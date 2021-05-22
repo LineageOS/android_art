@@ -172,11 +172,6 @@ libcore_java_libs = [
     "apache-xml",
 ]
 
-// ART Java libraries
-art_java_libs = [
-    "service-art",
-]
-
 // Native libraries that support the core Java libraries.
 //
 // Note: ART on-device chroot-based testing and benchmarking is not yet using
@@ -248,8 +243,9 @@ apex_defaults {
     compile_multilib: "both",
     manifest: "manifest-art.json",
     bootclasspath_fragments: ["art-bootclasspath-fragment"],
+    systemserverclasspath_fragments: ["art-systemserverclasspath-fragment"],
     compat_configs: ["libcore-platform-compat-config"],
-    java_libs: libcore_java_libs + art_java_libs,
+    java_libs: libcore_java_libs,
     native_shared_libs: art_runtime_base_native_shared_libs +
         art_runtime_base_native_device_only_shared_libs +
         libcore_native_shared_libs,
@@ -395,7 +391,7 @@ art_apex_test_host {
     device_supported: false,
     manifest: "manifest-art.json",
     updatable: false,
-    java_libs: libcore_java_libs + art_java_libs,
+    java_libs: libcore_java_libs,
     ignore_system_library_special_case: true,
     native_shared_libs: art_runtime_base_native_shared_libs +
         art_runtime_debug_native_shared_libs +
