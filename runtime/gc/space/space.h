@@ -243,7 +243,10 @@ class AllocSpace {
   // from Heap::num_bytes_allocated_ or zero if unnecessary.
   virtual size_t RevokeAllThreadLocalBuffers() = 0;
 
-  virtual void LogFragmentationAllocFailure(std::ostream& os, size_t failed_alloc_bytes) = 0;
+  // Compute largest free contiguous chunk of memory available in the space and
+  // log it if it's smaller than failed_alloc_bytes and return true.
+  // Otherwise leave os untouched and return false.
+  virtual bool LogFragmentationAllocFailure(std::ostream& os, size_t failed_alloc_bytes) = 0;
 
  protected:
   struct SweepCallbackContext {

@@ -216,6 +216,10 @@ static_assert(CompilationReasonFromName(CompilationReasonName(CompilationReason:
 static_assert(
     CompilationReasonFromName(CompilationReasonName(CompilationReason::kInstallWithDexMetadata)) ==
     CompilationReason::kInstallWithDexMetadata);
+static_assert(CompilationReasonFromName(CompilationReasonName(CompilationReason::kPrebuilt)) ==
+              CompilationReason::kPrebuilt);
+static_assert(CompilationReasonFromName(CompilationReasonName(CompilationReason::kCmdLine)) ==
+              CompilationReason::kCmdLine);
 
 }  // namespace metrics
 }  // namespace art

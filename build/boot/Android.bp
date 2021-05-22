@@ -21,6 +21,7 @@ package {
     default_applicable_licenses: ["art_license"],
 }
 
+// Encapsulate the contributions made by the com.android.art to the bootclasspath.
 bootclasspath_fragment {
     name: "art-bootclasspath-fragment",
     image_name: "art",
@@ -74,4 +75,14 @@ bootclasspath_fragment {
         max_target_o_low_priority: ["hiddenapi/hiddenapi-max-target-o-low-priority.txt"],
         unsupported_packages: ["hiddenapi/hiddenapi-unsupported-packages.txt"],
     },
+}
+
+// Encapsulate the contributions made by the com.android.art to the systemserverclasspath.
+systemserverclasspath_fragment {
+    name: "art-systemserverclasspath-fragment",
+    contents: ["service-art"],
+    apex_available: [
+        "com.android.art",
+        "com.android.art.debug",
+    ],
 }

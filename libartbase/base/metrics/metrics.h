@@ -96,6 +96,8 @@ enum class CompilationReason {
   kInactive,
   kShared,
   kInstallWithDexMetadata,
+  kPrebuilt,
+  kCmdLine
 };
 
 constexpr const char* CompilationReasonName(CompilationReason reason) {
@@ -132,6 +134,10 @@ constexpr const char* CompilationReasonName(CompilationReason reason) {
       return "shared";
     case CompilationReason::kInstallWithDexMetadata:
       return "install-with-dex-metadata";
+    case CompilationReason::kPrebuilt:
+      return "prebuilt";
+    case CompilationReason::kCmdLine:
+      return "cmdline";
   }
 }
 
@@ -181,6 +187,12 @@ constexpr CompilationReason CompilationReasonFromName(std::string_view name) {
   }
   if (name == "install-with-dex-metadata") {
     return CompilationReason::kInstallWithDexMetadata;
+  }
+  if (name == "prebuilt") {
+    return CompilationReason::kPrebuilt;
+  }
+  if (name == "cmdline") {
+    return CompilationReason::kCmdLine;
   }
   return CompilationReason::kError;
 }

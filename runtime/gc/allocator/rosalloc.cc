@@ -2069,7 +2069,7 @@ size_t RosAlloc::ReleasePageRange(uint8_t* start, uint8_t* end) {
   return reclaimed_bytes;
 }
 
-void RosAlloc::LogFragmentationAllocFailure(std::ostream& os, size_t failed_alloc_bytes) {
+bool RosAlloc::LogFragmentationAllocFailure(std::ostream& os, size_t failed_alloc_bytes) {
   Thread* self = Thread::Current();
   size_t largest_continuous_free_pages = 0;
   WriterMutexLock wmu(self, bulk_free_lock_);
@@ -2098,7 +2098,9 @@ void RosAlloc::LogFragmentationAllocFailure(std::ostream& os, size_t failed_allo
        << ", space footprint " << footprint_ << " bytes"
        << ", space max capacity " << max_capacity_ << " bytes"
        << ")" << std::endl;
+    return true;
   }
+  return false;
 }
 
 void RosAlloc::DumpStats(std::ostream& os) {

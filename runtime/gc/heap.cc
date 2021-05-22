@@ -171,6 +171,10 @@ static constexpr size_t kVerifyObjectAllocationStackSize = 16 * KB /
 static constexpr size_t kDefaultAllocationStackSize = 8 * MB /
     sizeof(mirror::HeapReference<mirror::Object>);
 
+// After a GC (due to allocation failure) we should retrieve at least this
+// fraction of the current max heap size. Otherwise throw OOME.
+static constexpr double kMinFreeHeapAfterGcForAlloc = 0.01;
+
 // For deterministic compilation, we need the heap to be at a well-known address.
 static constexpr uint32_t kAllocSpaceBeginForDeterministicAoT = 0x40000000;
 // Dump the rosalloc stats on SIGQUIT.
@@ -1446,7 +1450,16 @@ void Heap::ThrowOutOfMemoryError(Thread* self, size_t byte_count, AllocatorType 
       CHECK(space != nullptr) << "allocator_type:" << allocator_type
                               << " byte_count:" << byte_count
                               << " total_bytes_free:" << total_bytes_free;
-      space->LogFragmentationAllocFailure(oss, byte_count);
+      // LogFragmentationAllocFailure returns true if byte_count is greater than
+      // the largest free contiguous chunk in the space. Return value false
+      // means that we are throwing OOME because the amount of free heap after
+      // GC is less than kMinFreeHeapAfterGcForAlloc in proportion of the heap-size.
+      // Log an appropriate message in that case.
+      if (!space->LogFragmentationAllocFailure(oss, byte_count)) {
+        oss << "; giving up on allocation because <"
+            << kMinFreeHeapAfterGcForAlloc * 100
+            << "% of heap free after GC.";
+      }
     }
   }
   self->ThrowOutOfMemoryError(oss.str().c_str());
@@ -1788,9 +1801,6 @@ mirror::Object* Heap::AllocateInternalWithGc(Thread* self,
                                              size_t* usable_size,
                                              size_t* bytes_tl_bulk_allocated,
                                              ObjPtr<mirror::Class>* klass) {
-  // After a GC (due to allocation failure) we should retrieve at least this
-  // fraction of the current max heap size. Otherwise throw OOME.
-  constexpr double kMinFreeHeapAfterGcForAlloc = 0.01;
   bool was_default_allocator = allocator == GetCurrentAllocator();
   // Make sure there is no pending exception since we may need to throw an OOME.
   self->AssertNoPendingException();
