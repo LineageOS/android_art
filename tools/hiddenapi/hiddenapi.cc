@@ -86,6 +86,10 @@ NO_RETURN static void Usage(const char* fmt, ...) {
   UsageError("        Disable check that all dex entries have been assigned a flag");
   UsageError("");
   UsageError("  Command \"list\": dump lists of public and private API");
+  UsageError("    --dependency-stub-dex=<filename>: dex file containing API stubs provided");
+  UsageError("      by other parts of the bootclasspath. These are used to resolve");
+  UsageError("      dependencies in dex files specified in --boot-dex but do not appear in");
+  UsageError("      the output");
   UsageError("    --boot-dex=<filename>: dex file which belongs to boot class path");
   UsageError("    --public-stub-classpath=<filenames>:");
   UsageError("    --system-stub-classpath=<filenames>:");
@@ -913,7 +917,12 @@ class HiddenApi final {
         for (int i = 1; i < argc; ++i) {
           const char* raw_option = argv[i];
           const std::string_view option(raw_option);
-          if (StartsWith(option, "--boot-dex=")) {
+          if (StartsWith(option, "--dependency-stub-dex=")) {
+            const std::string path(std::string(option.substr(strlen("--dependency-stub-dex="))));
+            dependency_stub_dex_paths_.push_back(path);
+            // Add path to the boot dex path to resolve dependencies.
+            boot_dex_paths_.push_back(path);
+          } else if (StartsWith(option, "--boot-dex=")) {
             boot_dex_paths_.push_back(std::string(option.substr(strlen("--boot-dex="))));
           } else if (StartsWith(option, "--public-stub-classpath=")) {
             stub_classpaths_.push_back(std::make_pair(
@@ -1031,6 +1040,10 @@ class HiddenApi final {
     return api_flag_map;
   }
 
+  // A special flag added to the set of flags in boot_members to indicate that
+  // it should be excluded from the output.
+  static constexpr std::string_view kExcludeFromOutput{"exclude-from-output"};
+
   void ListApi() {
     if (boot_dex_paths_.empty()) {
       Usage("No boot DEX files specified");
@@ -1056,6 +1069,16 @@ class HiddenApi final {
     // Mark all boot dex members private.
     boot_classpath.ForEachDexMember([&](const DexMember& boot_member) {
       boot_members[boot_member.GetApiEntry()] = {};
+    });
+
+    // Open all dependency API stub dex files.
+    ClassPath dependency_classpath(dependency_stub_dex_paths_,
+                                   /* open_writable= */ false,
+                                   /* ignore_empty= */ false);
+
+    // Mark all dependency API stub dex members as coming from the dependency.
+    dependency_classpath.ForEachDexMember([&](const DexMember& boot_member) {
+      boot_members[boot_member.GetApiEntry()] = {kExcludeFromOutput};
     });
 
     // Resolve each SDK dex member against the framework and mark it white.
@@ -1097,9 +1120,14 @@ class HiddenApi final {
     // Write into public/private API files.
     std::ofstream file_flags(api_flags_path_.c_str());
     for (const auto& entry : boot_members) {
-      if (entry.second.empty()) {
+      std::set<std::string_view> flags = entry.second;
+      if (flags.empty()) {
+        // There are no flags so it cannot be from the dependency stub API dex
+        // files so just output the signature.
         file_flags << entry.first << std::endl;
-      } else {
+      } else if (flags.find(kExcludeFromOutput) == flags.end()) {
+        // The entry has flags and is not from the dependency stub API dex so
+        // output it.
         file_flags << entry.first << ",";
         file_flags << android::base::Join(entry.second, ",") << std::endl;
       }
@@ -1113,6 +1141,10 @@ class HiddenApi final {
 
   // Paths to DEX files which should be processed.
   std::vector<std::string> boot_dex_paths_;
+
+  // Paths to DEX files containing API stubs provided by other parts of the
+  // boot class path which the DEX files in boot_dex_paths depend.
+  std::vector<std::string> dependency_stub_dex_paths_;
 
   // Output paths where modified DEX files should be written.
   std::vector<std::string> output_dex_paths_;
