@@ -560,7 +560,7 @@ class HeapLocationCollector : public HGraphVisitor {
   }
 
   void VisitPredicatedInstanceFieldGet(HPredicatedInstanceFieldGet* instruction) override {
-    VisitFieldAccess(instruction->InputAt(0), instruction->GetFieldInfo());
+    VisitFieldAccess(instruction->GetTarget(), instruction->GetFieldInfo());
     CreateReferenceInfoForReferenceType(instruction);
   }
   void VisitInstanceFieldGet(HInstanceFieldGet* instruction) override {
