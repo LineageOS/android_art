@@ -846,6 +846,288 @@
     },
     {
       "name": "art-run-test-576-polymorphic-inlining[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-577-checker-fp2int[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-578-bce-visit[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-578-polymorphic-inlining[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-579-inline-infinite[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-580-checker-round[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-580-crc32[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-581-rtp[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-582-checker-bce-length[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-584-checker-div-bool[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-589-super-imt[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-590-checker-arr-set-null-regression[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-591-checker-regression-dead-loop[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-593-checker-long-2-float-regression[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-594-checker-array-alias[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-594-load-string-regression[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-603-checker-instanceof[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-605-new-string-from-bytes[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-607-daemon-stress[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-609-checker-inline-interface[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-609-checker-x86-bounds-check[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-610-arraycopy[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-611-checker-simplify-if[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-614-checker-dump-constant-location[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-615-checker-arm64-store-zero[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-617-clinit-oome[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-618-checker-induction[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-619-checker-current-method[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-620-checker-bce-intrinsics[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-622-checker-bce-regressions[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-625-checker-licm-regressions[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-627-checker-unroll[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-628-vdex[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-631-checker-get-class[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-632-checker-char-at-bounds[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-635-checker-arm64-volatile-load-cc[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-636-arm64-veneer-pool[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-637-checker-throw-inline[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-640-checker-boolean-simd[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-640-checker-integer-valueof[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-640-checker-simd[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-641-checker-arraycopy[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-641-iterations[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-643-checker-bogus-ic[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-645-checker-abs-simd[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-646-checker-arraycopy-large-cst-pos[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-646-checker-long-const-to-int[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-646-checker-simd-hadd[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-650-checker-inline-access-thunks[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-654-checker-periodic[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-655-checker-simd-arm-opt[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-656-checker-simd-opt[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-657-branches[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-658-fp-read-barrier[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-660-checker-sad[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-660-checker-simd-sad[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-661-checker-simd-reduc[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-662-regression-alias[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-665-checker-simd-zero[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-666-dex-cache-itf[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-667-checker-simd-alignment[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-667-out-of-bounds[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-669-checker-break[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-671-npe-field-opts[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-672-checker-throw-method[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-673-checker-throw-vmethod[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-674-HelloWorld-Dm[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-676-proxy-jit-at-first-use[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-677-fsi2[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-680-sink-regression[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-684-checker-simd-dotprod[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-684-select-condition[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-689-multi-catch[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-694-clinit-jit[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-695-simplify-throws[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-696-loop[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-697-checker-string-append[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-698-selects[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-700-LoadArgRegs[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-703-floating-point-div[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-704-multiply-accumulate[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-705-register-conflict[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-711-checker-type-conversion[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-718-zipfile-finalizer[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-721-osr[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-726-array-store[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-730-checker-inlining-super[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-805-TooDeepClassInstanceOf[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-806-TooWideClassInstanceOf[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-812-recursive-default[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-814-large-field-offsets[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-815-invokeinterface-default[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-818-clinit-nterp[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-821-madvise-willneed[com.google.android.art.apex]"
+    },
+    {
+      "name": "art-run-test-963-default-range-smali[com.google.android.art.apex]"
     }
   ],
   "presubmit": [
