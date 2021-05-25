@@ -8228,7 +8228,7 @@ class UsesOrderDependentTestGroup
 // no_escape()  // If `obj` escaped, the field value can change. (Avoid non-partial LSE.)
 // b = obj.foo;
 // return a + b;
-TEST_P(UsesOrderDependentTestGroup, RecordPredicatedReplacements) {
+TEST_P(UsesOrderDependentTestGroup, RecordPredicatedReplacements1) {
   VariableSizedHandleScope vshs(Thread::Current());
   CreateGraph(&vshs);
   AdjacencyListGraph blks(SetupFromAdjacencyList("entry",
@@ -8371,8 +8371,388 @@ TEST_P(UsesOrderDependentTestGroup, RecordPredicatedReplacements) {
   ASSERT_INS_EQ(other_input, replacement_middle_read);
 }
 
+// Regression test for a bad DCHECK() found while trying to write a test for b/188188275.
+// // ENTRY
+// obj = new Obj();
+// obj.foo = 11;
+// if (param1) {
+//   // LEFT1
+//   escape(obj);
+// } else {
+//   // RIGHT1
+// }
+// // MIDDLE
+// a = obj.foo;
+// if (param2) {
+//   // LEFT2
+//   no_escape();
+// } else {
+//   // RIGHT2
+// }
+// // BRETURN
+// b = obj.foo;
+// return a + b;
+TEST_P(UsesOrderDependentTestGroup, RecordPredicatedReplacements2) {
+  VariableSizedHandleScope vshs(Thread::Current());
+  CreateGraph(&vshs);
+  AdjacencyListGraph blks(SetupFromAdjacencyList("entry",
+                                                 "exit",
+                                                 {{"entry", "left1"},
+                                                  {"entry", "right1"},
+                                                  {"left1", "middle"},
+                                                  {"right1", "middle"},
+                                                  {"middle", "left2"},
+                                                  {"middle", "right2"},
+                                                  {"left2", "breturn"},
+                                                  {"right2", "breturn"},
+                                                  {"breturn", "exit"}}));
+#define GET_BLOCK(name) HBasicBlock* name = blks.Get(#name)
+  GET_BLOCK(entry);
+  GET_BLOCK(left1);
+  GET_BLOCK(right1);
+  GET_BLOCK(middle);
+  GET_BLOCK(left2);
+  GET_BLOCK(right2);
+  GET_BLOCK(breturn);
+  GET_BLOCK(exit);
+#undef GET_BLOCK
+  EnsurePredecessorOrder(middle, {left1, right1});
+  EnsurePredecessorOrder(breturn, {left2, right2});
+  HInstruction* c0 = graph_->GetIntConstant(0);
+  HInstruction* cnull = graph_->GetNullConstant();
+  HInstruction* c11 = graph_->GetIntConstant(11);
+  HInstruction* param1 = MakeParam(DataType::Type::kBool);
+  HInstruction* param2 = MakeParam(DataType::Type::kBool);
+
+  HInstruction* suspend = new (GetAllocator()) HSuspendCheck();
+  HInstruction* cls = MakeClassLoad();
+  HInstruction* new_inst = MakeNewInstance(cls);
+  HInstruction* entry_write = MakeIFieldSet(new_inst, c11, MemberOffset(32));
+  HInstruction* entry_if = new (GetAllocator()) HIf(param1);
+  entry->AddInstruction(suspend);
+  entry->AddInstruction(cls);
+  entry->AddInstruction(new_inst);
+  entry->AddInstruction(entry_write);
+  entry->AddInstruction(entry_if);
+  ManuallyBuildEnvFor(suspend, {});
+  ManuallyBuildEnvFor(cls, {});
+  ManuallyBuildEnvFor(new_inst, {});
+
+  HInstruction* left1_call = MakeInvoke(DataType::Type::kVoid, { new_inst });
+  HInstruction* left1_goto = new (GetAllocator()) HGoto();
+  left1->AddInstruction(left1_call);
+  left1->AddInstruction(left1_goto);
+  ManuallyBuildEnvFor(left1_call, {});
+
+  HInstruction* right1_goto = new (GetAllocator()) HGoto();
+  right1->AddInstruction(right1_goto);
+
+  HInstruction* middle_read = MakeIFieldGet(new_inst, DataType::Type::kInt32, MemberOffset(32));
+  HInstruction* middle_if = new (GetAllocator()) HIf(param2);
+  if (GetParam() == UsesOrder::kDefaultOrder) {
+    middle->AddInstruction(middle_read);
+  }
+  middle->AddInstruction(middle_if);
+
+  HInstruction* left2_call = MakeInvoke(DataType::Type::kVoid, {});
+  HInstruction* left2_goto = new (GetAllocator()) HGoto();
+  left2->AddInstruction(left2_call);
+  left2->AddInstruction(left2_goto);
+  ManuallyBuildEnvFor(left2_call, {});
+
+  HInstruction* right2_goto = new (GetAllocator()) HGoto();
+  right2->AddInstruction(right2_goto);
+
+  HInstruction* breturn_read = MakeIFieldGet(new_inst, DataType::Type::kInt32, MemberOffset(32));
+  HInstruction* breturn_add =
+      new (GetAllocator()) HAdd(DataType::Type::kInt32, middle_read, breturn_read);
+  HInstruction* breturn_return = new (GetAllocator()) HReturn(breturn_add);
+  breturn->AddInstruction(breturn_read);
+  breturn->AddInstruction(breturn_add);
+  breturn->AddInstruction(breturn_return);
+
+  if (GetParam() == UsesOrder::kReverseOrder) {
+    // Insert `middle_read` in the same position as for the `kDefaultOrder` case.
+    // The only difference is the order of entries in `new_inst->GetUses()` which
+    // is used by `HeapReferenceData::CollectReplacements()` and defines the order
+    // of instructions to process for `HeapReferenceData::PredicateInstructions()`.
+    middle->InsertInstructionBefore(middle_read, middle_if);
+  }
+
+  SetupExit(exit);
+
+  // PerformLSE expects this to be empty.
+  graph_->ClearDominanceInformation();
+  LOG(INFO) << "Pre LSE " << blks;
+  PerformLSE();
+  LOG(INFO) << "Post LSE " << blks;
+
+  EXPECT_INS_RETAINED(cls);
+  EXPECT_INS_REMOVED(new_inst);
+  HNewInstance* replacement_new_inst = FindSingleInstruction<HNewInstance>(graph_);
+  ASSERT_NE(replacement_new_inst, nullptr);
+  EXPECT_INS_REMOVED(entry_write);
+  HInstanceFieldSet* replacement_write = FindSingleInstruction<HInstanceFieldSet>(graph_);
+  ASSERT_NE(replacement_write, nullptr);
+  ASSERT_FALSE(replacement_write->GetIsPredicatedSet());
+  ASSERT_INS_EQ(replacement_write->InputAt(0), replacement_new_inst);
+  ASSERT_INS_EQ(replacement_write->InputAt(1), c11);
+
+  EXPECT_INS_RETAINED(left1_call);
+
+  EXPECT_INS_REMOVED(middle_read);
+  HPredicatedInstanceFieldGet* replacement_middle_read =
+      FindSingleInstruction<HPredicatedInstanceFieldGet>(graph_, middle);
+  ASSERT_NE(replacement_middle_read, nullptr);
+  ASSERT_TRUE(replacement_middle_read->GetTarget()->IsPhi());
+  ASSERT_EQ(2u, replacement_middle_read->GetTarget()->AsPhi()->InputCount());
+  ASSERT_INS_EQ(replacement_middle_read->GetTarget()->AsPhi()->InputAt(0), replacement_new_inst);
+  ASSERT_INS_EQ(replacement_middle_read->GetTarget()->AsPhi()->InputAt(1), cnull);
+  ASSERT_TRUE(replacement_middle_read->GetDefaultValue()->IsPhi());
+  ASSERT_EQ(2u, replacement_middle_read->GetDefaultValue()->AsPhi()->InputCount());
+  ASSERT_INS_EQ(replacement_middle_read->GetDefaultValue()->AsPhi()->InputAt(0), c0);
+  ASSERT_INS_EQ(replacement_middle_read->GetDefaultValue()->AsPhi()->InputAt(1), c11);
+
+  EXPECT_INS_RETAINED(left2_call);
+
+  EXPECT_INS_REMOVED(breturn_read);
+  HPredicatedInstanceFieldGet* replacement_breturn_read =
+      FindSingleInstruction<HPredicatedInstanceFieldGet>(graph_, breturn);
+  ASSERT_NE(replacement_breturn_read, nullptr);
+  ASSERT_INS_EQ(replacement_breturn_read->GetTarget(), replacement_middle_read->GetTarget());
+  ASSERT_INS_EQ(replacement_breturn_read->GetDefaultValue(), replacement_middle_read);
+}
+
 INSTANTIATE_TEST_SUITE_P(LoadStoreEliminationTest,
                          UsesOrderDependentTestGroup,
                          testing::Values(UsesOrder::kDefaultOrder, UsesOrder::kReverseOrder));
+
+// The parameter is the number of times we call `std::next_permutation` (from 0 to 5)
+// so that we test all 6 permutation of three items.
+class UsesOrderDependentTestGroupForThreeItems
+    : public LoadStoreEliminationTestBase<CommonCompilerTestWithParam<size_t>> {};
+
+// Make sure that after we record replacements by predicated loads, we correctly
+// use that predicated load for Phi placeholders that were previously marked as
+// replaced by the now removed unpredicated load. (The fix for bug 183897743 was
+// not good enough.) Bug: 188188275
+// // ENTRY
+// obj = new Obj();
+// obj.foo = 11;
+// if (param1) {
+//   // LEFT1
+//   escape(obj);
+// } else {
+//   // RIGHT1
+// }
+// // MIDDLE1
+// a = obj.foo;
+// if (param2) {
+//   // LEFT2
+//   no_escape1();
+// } else {
+//   // RIGHT2
+// }
+// // MIDDLE2
+// if (param3) {
+//   // LEFT3
+//   x = obj.foo;
+//   no_escape2();
+// } else {
+//   // RIGHT3
+//   x = 0;
+// }
+// // BRETURN
+// b = obj.foo;
+// return a + b + x;
+TEST_P(UsesOrderDependentTestGroupForThreeItems, RecordPredicatedReplacements3) {
+  VariableSizedHandleScope vshs(Thread::Current());
+  CreateGraph(&vshs);
+  AdjacencyListGraph blks(SetupFromAdjacencyList("entry",
+                                                 "exit",
+                                                 {{"entry", "left1"},
+                                                  {"entry", "right1"},
+                                                  {"left1", "middle1"},
+                                                  {"right1", "middle1"},
+                                                  {"middle1", "left2"},
+                                                  {"middle1", "right2"},
+                                                  {"left2", "middle2"},
+                                                  {"right2", "middle2"},
+                                                  {"middle2", "left3"},
+                                                  {"middle2", "right3"},
+                                                  {"left3", "breturn"},
+                                                  {"right3", "breturn"},
+                                                  {"breturn", "exit"}}));
+#define GET_BLOCK(name) HBasicBlock* name = blks.Get(#name)
+  GET_BLOCK(entry);
+  GET_BLOCK(left1);
+  GET_BLOCK(right1);
+  GET_BLOCK(middle1);
+  GET_BLOCK(left2);
+  GET_BLOCK(right2);
+  GET_BLOCK(middle2);
+  GET_BLOCK(left3);
+  GET_BLOCK(right3);
+  GET_BLOCK(breturn);
+  GET_BLOCK(exit);
+#undef GET_BLOCK
+  EnsurePredecessorOrder(middle1, {left1, right1});
+  EnsurePredecessorOrder(middle2, {left2, right2});
+  EnsurePredecessorOrder(breturn, {left3, right3});
+  HInstruction* c0 = graph_->GetIntConstant(0);
+  HInstruction* cnull = graph_->GetNullConstant();
+  HInstruction* c11 = graph_->GetIntConstant(11);
+  HInstruction* param1 = MakeParam(DataType::Type::kBool);
+  HInstruction* param2 = MakeParam(DataType::Type::kBool);
+  HInstruction* param3 = MakeParam(DataType::Type::kBool);
+
+  HInstruction* suspend = new (GetAllocator()) HSuspendCheck();
+  HInstruction* cls = MakeClassLoad();
+  HInstruction* new_inst = MakeNewInstance(cls);
+  HInstruction* entry_write = MakeIFieldSet(new_inst, c11, MemberOffset(32));
+  HInstruction* entry_if = new (GetAllocator()) HIf(param1);
+  entry->AddInstruction(suspend);
+  entry->AddInstruction(cls);
+  entry->AddInstruction(new_inst);
+  entry->AddInstruction(entry_write);
+  entry->AddInstruction(entry_if);
+  ManuallyBuildEnvFor(suspend, {});
+  ManuallyBuildEnvFor(cls, {});
+  ManuallyBuildEnvFor(new_inst, {});
+
+  HInstruction* left1_call = MakeInvoke(DataType::Type::kVoid, { new_inst });
+  HInstruction* left1_goto = new (GetAllocator()) HGoto();
+  left1->AddInstruction(left1_call);
+  left1->AddInstruction(left1_goto);
+  ManuallyBuildEnvFor(left1_call, {});
+
+  HInstruction* right1_goto = new (GetAllocator()) HGoto();
+  right1->AddInstruction(right1_goto);
+
+  HInstruction* middle1_read = MakeIFieldGet(new_inst, DataType::Type::kInt32, MemberOffset(32));
+  HInstruction* middle1_if = new (GetAllocator()) HIf(param2);
+  // Delay inserting `middle1_read`, do that later with ordering based on `GetParam()`.
+  middle1->AddInstruction(middle1_if);
+
+  HInstruction* left2_call = MakeInvoke(DataType::Type::kVoid, {});
+  HInstruction* left2_goto = new (GetAllocator()) HGoto();
+  left2->AddInstruction(left2_call);
+  left2->AddInstruction(left2_goto);
+  ManuallyBuildEnvFor(left2_call, {});
+
+  HInstruction* right2_goto = new (GetAllocator()) HGoto();
+  right2->AddInstruction(right2_goto);
+
+  HInstruction* middle2_if = new (GetAllocator()) HIf(param3);
+  middle2->AddInstruction(middle2_if);
+
+  HInstruction* left3_read = MakeIFieldGet(new_inst, DataType::Type::kInt32, MemberOffset(32));
+  HInstruction* left3_call = MakeInvoke(DataType::Type::kVoid, {});
+  HInstruction* left3_goto = new (GetAllocator()) HGoto();
+  // Delay inserting `left3_read`, do that later with ordering based on `GetParam()`.
+  left3->AddInstruction(left3_call);
+  left3->AddInstruction(left3_goto);
+  ManuallyBuildEnvFor(left3_call, {});
+
+  HInstruction* right3_goto = new (GetAllocator()) HGoto();
+  right3->AddInstruction(right3_goto);
+
+  HPhi* breturn_phi = MakePhi({left3_read, c0});
+  HInstruction* breturn_read = MakeIFieldGet(new_inst, DataType::Type::kInt32, MemberOffset(32));
+  HInstruction* breturn_add1 =
+      new (GetAllocator()) HAdd(DataType::Type::kInt32, middle1_read, breturn_read);
+  HInstruction* breturn_add2 =
+      new (GetAllocator()) HAdd(DataType::Type::kInt32, breturn_add1, breturn_phi);
+  HInstruction* breturn_return = new (GetAllocator()) HReturn(breturn_add2);
+  breturn->AddPhi(breturn_phi);
+  // Delay inserting `breturn_read`, do that later with ordering based on `GetParam()`.
+  breturn->AddInstruction(breturn_add1);
+  breturn->AddInstruction(breturn_add2);
+  breturn->AddInstruction(breturn_return);
+
+  // Insert reads in the same positions but in different insertion orders.
+  // The only difference is the order of entries in `new_inst->GetUses()` which
+  // is used by `HeapReferenceData::CollectReplacements()` and defines the order
+  // of instructions to process for `HeapReferenceData::PredicateInstructions()`.
+  std::tuple<size_t, HInstruction*, HInstruction*> read_insertions[] = {
+      { 0u, middle1_read, middle1_if },
+      { 1u, left3_read, left3_call },
+      { 2u, breturn_read, breturn_add1 },
+  };
+  for (size_t i = 0, num = GetParam(); i != num; ++i) {
+    std::next_permutation(read_insertions, read_insertions + std::size(read_insertions));
+  }
+  for (auto [order, read, cursor] : read_insertions) {
+    cursor->GetBlock()->InsertInstructionBefore(read, cursor);
+  }
+
+  SetupExit(exit);
+
+  // PerformLSE expects this to be empty.
+  graph_->ClearDominanceInformation();
+  LOG(INFO) << "Pre LSE " << blks;
+  PerformLSE();
+  LOG(INFO) << "Post LSE " << blks;
+
+  EXPECT_INS_RETAINED(cls);
+  EXPECT_INS_REMOVED(new_inst);
+  HNewInstance* replacement_new_inst = FindSingleInstruction<HNewInstance>(graph_);
+  ASSERT_NE(replacement_new_inst, nullptr);
+  EXPECT_INS_REMOVED(entry_write);
+  HInstanceFieldSet* replacement_write = FindSingleInstruction<HInstanceFieldSet>(graph_);
+  ASSERT_NE(replacement_write, nullptr);
+  ASSERT_FALSE(replacement_write->GetIsPredicatedSet());
+  ASSERT_INS_EQ(replacement_write->InputAt(0), replacement_new_inst);
+  ASSERT_INS_EQ(replacement_write->InputAt(1), c11);
+
+  EXPECT_INS_RETAINED(left1_call);
+
+  EXPECT_INS_REMOVED(middle1_read);
+  HPredicatedInstanceFieldGet* replacement_middle1_read =
+      FindSingleInstruction<HPredicatedInstanceFieldGet>(graph_, middle1);
+  ASSERT_NE(replacement_middle1_read, nullptr);
+  ASSERT_TRUE(replacement_middle1_read->GetTarget()->IsPhi());
+  ASSERT_EQ(2u, replacement_middle1_read->GetTarget()->AsPhi()->InputCount());
+  ASSERT_INS_EQ(replacement_middle1_read->GetTarget()->AsPhi()->InputAt(0), replacement_new_inst);
+  ASSERT_INS_EQ(replacement_middle1_read->GetTarget()->AsPhi()->InputAt(1), cnull);
+  ASSERT_TRUE(replacement_middle1_read->GetDefaultValue()->IsPhi());
+  ASSERT_EQ(2u, replacement_middle1_read->GetDefaultValue()->AsPhi()->InputCount());
+  ASSERT_INS_EQ(replacement_middle1_read->GetDefaultValue()->AsPhi()->InputAt(0), c0);
+  ASSERT_INS_EQ(replacement_middle1_read->GetDefaultValue()->AsPhi()->InputAt(1), c11);
+
+  EXPECT_INS_RETAINED(left2_call);
+
+  EXPECT_INS_REMOVED(left3_read);
+  HPredicatedInstanceFieldGet* replacement_left3_read =
+      FindSingleInstruction<HPredicatedInstanceFieldGet>(graph_, left3);
+  ASSERT_NE(replacement_left3_read, nullptr);
+  ASSERT_TRUE(replacement_left3_read->GetTarget()->IsPhi());
+  ASSERT_INS_EQ(replacement_left3_read->GetTarget(), replacement_middle1_read->GetTarget());
+  ASSERT_INS_EQ(replacement_left3_read->GetDefaultValue(), replacement_middle1_read);
+  EXPECT_INS_RETAINED(left3_call);
+
+  EXPECT_INS_RETAINED(breturn_phi);
+  EXPECT_INS_REMOVED(breturn_read);
+  HPredicatedInstanceFieldGet* replacement_breturn_read =
+      FindSingleInstruction<HPredicatedInstanceFieldGet>(graph_, breturn);
+  ASSERT_NE(replacement_breturn_read, nullptr);
+  ASSERT_INS_EQ(replacement_breturn_read->GetTarget(), replacement_middle1_read->GetTarget());
+  ASSERT_EQ(2u, replacement_breturn_read->GetDefaultValue()->AsPhi()->InputCount());
+  ASSERT_INS_EQ(replacement_breturn_read->GetDefaultValue()->AsPhi()->InputAt(0),
+                replacement_left3_read);
+  ASSERT_INS_EQ(replacement_breturn_read->GetDefaultValue()->AsPhi()->InputAt(1),
+                replacement_middle1_read);
+  EXPECT_INS_RETAINED(breturn_add1);
+  ASSERT_INS_EQ(breturn_add1->InputAt(0), replacement_middle1_read);
+  ASSERT_INS_EQ(breturn_add1->InputAt(1), replacement_breturn_read);
+  EXPECT_INS_RETAINED(breturn_add2);
+  ASSERT_INS_EQ(breturn_add2->InputAt(0), breturn_add1);
+  ASSERT_INS_EQ(breturn_add2->InputAt(1), breturn_phi);
+  EXPECT_INS_RETAINED(breturn_return);
+}
+
+INSTANTIATE_TEST_SUITE_P(LoadStoreEliminationTest,
+                         UsesOrderDependentTestGroupForThreeItems,
+                         testing::Values(0u, 1u, 2u, 3u, 4u, 5u));
 
 }  // namespace art

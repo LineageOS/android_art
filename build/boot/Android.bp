@@ -76,13 +76,3 @@ bootclasspath_fragment {
         unsupported_packages: ["hiddenapi/hiddenapi-unsupported-packages.txt"],
     },
 }
-
-// Encapsulate the contributions made by the com.android.art to the systemserverclasspath.
-systemserverclasspath_fragment {
-    name: "art-systemserverclasspath-fragment",
-    contents: ["service-art"],
-    apex_available: [
-        "com.android.art",
-        "com.android.art.debug",
-    ],
-}
