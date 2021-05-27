@@ -33,11 +33,11 @@
 
 namespace art {
 
-static void DdmVmInternal_enableRecentAllocations(JNIEnv*, jclass, jboolean enable) {
+static void DdmVmInternal_setRecentAllocationsTrackingEnabled(JNIEnv*, jclass, jboolean enable) {
   Dbg::SetAllocTrackingEnabled(enable);
 }
 
-static void DdmVmInternal_threadNotify(JNIEnv*, jclass, jboolean enable) {
+static void DdmVmInternal_setThreadNotifyEnabled(JNIEnv*, jclass, jboolean enable) {
   Dbg::DdmSetThreadNotification(enable);
 }
 
@@ -210,8 +210,8 @@ static jbyteArray DdmVmInternal_getThreadStats(JNIEnv* env, jclass) {
 }
 
 static JNINativeMethod gMethods[] = {
-  NATIVE_METHOD(DdmVmInternal, enableRecentAllocations, "(Z)V"),
-  NATIVE_METHOD(DdmVmInternal, threadNotify, "(Z)V"),
+  NATIVE_METHOD(DdmVmInternal, setRecentAllocationsTrackingEnabled, "(Z)V"),
+  NATIVE_METHOD(DdmVmInternal, setThreadNotifyEnabled, "(Z)V"),
   NATIVE_METHOD(DdmVmInternal, getStackTraceById, "(I)[Ljava/lang/StackTraceElement;"),
   NATIVE_METHOD(DdmVmInternal, getThreadStats, "()[B"),
 };

@@ -507,7 +507,12 @@ void GraphChecker::VisitInstruction(HInstruction* instruction) {
     }
   }
 
-  if (instruction->CanThrowIntoCatchBlock()) {
+  if (instruction->CanThrow() && !instruction->HasEnvironment()) {
+    AddError(StringPrintf("Throwing instruction %s:%d in block %d does not have an environment.",
+                          instruction->DebugName(),
+                          instruction->GetId(),
+                          current_block_->GetBlockId()));
+  } else if (instruction->CanThrowIntoCatchBlock()) {
     // Find the top-level environment. This corresponds to the environment of
     // the catch block since we do not inline methods with try/catch.
     HEnvironment* environment = instruction->GetEnvironment();
