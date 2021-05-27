@@ -27,6 +27,7 @@ constexpr const char* kCodeCache = "./code_cache";
 constexpr const char* kCodeCacheStatFail = "./code_cache/temp";
 constexpr const char* kNativeBridgeLibrary2 = "libnativebridge2-test-case.so";
 constexpr const char* kNativeBridgeLibrary3 = "libnativebridge3-test-case.so";
+constexpr const char* kNativeBridgeLibrary6 = "libnativebridge6-test-case.so";
 
 namespace android {
 
@@ -36,4 +37,3 @@ class NativeBridgeTest : public testing::Test {
 };  // namespace android
 
 #endif  // ART_LIBNATIVEBRIDGE_TESTS_NATIVEBRIDGETEST_H_
-

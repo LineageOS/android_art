@@ -46,8 +46,8 @@ extern "C" const struct android::NativeBridgeRuntimeValues* native_bridge2_getAp
 }
 
 extern "C" bool native_bridge2_is_compatible_compatible_with(uint32_t version) {
-  // For testing, allow 1 and 2, but disallow 3+.
-  return version <= 2;
+  // For testing, allow 1-3, but disallow later.
+  return version <= 3;
 }
 
 static bool native_bridge2_test_case_signal_handler(int, siginfo_t*, void*) {
@@ -73,4 +73,3 @@ android::NativeBridgeCallbacks NativeBridgeItf {
   .isCompatibleWith = &native_bridge2_is_compatible_compatible_with,
   .getSignalHandler = &native_bridge2_get_signal_handler
 };
-
