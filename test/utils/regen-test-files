@@ -617,7 +617,6 @@ class Generator:
     other_presubmit_tests = [
         "CtsJdwpTestCases",
         "BootImageProfileTest",
-        "ArtServiceTests",
     ]
     presubmit_run_tests = run_test_module_names[0:num_presubmit_run_tests]
     presubmit_tests = other_presubmit_tests + presubmit_run_tests

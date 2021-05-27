@@ -38,7 +38,7 @@ public class Main {
     boolean baseline = args.length > 1 && args[1].equals("--base");
 
     // Enable allocation tracking so we get stack traces in the heap dump.
-    DdmVmInternal.enableRecentAllocations(true);
+    DdmVmInternal.setRecentAllocationsTrackingEnabled(true);
 
     // Allocate the instance of DumpedStuff.
     stuff = new DumpedStuff(baseline);

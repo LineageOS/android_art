@@ -117,10 +117,10 @@ public class Main {
         if (klass == null) {
             throw new AssertionError("Couldn't find path class loader class");
         }
-        Method enableMethod = klass.getDeclaredMethod("enableRecentAllocations",
-                Boolean.TYPE);
+        Method enableMethod = klass.getDeclaredMethod("setRecentAllocationsTrackingEnabled",
+            boolean.class);
         if (enableMethod == null) {
-            throw new AssertionError("Couldn't find path class loader class");
+            throw new AssertionError("Couldn't find setRecentAllocationsTrackingEnabled method");
         }
         enableMethod.invoke(null, true);
         Object o = allocInDifferentLoader();

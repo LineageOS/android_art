@@ -62,16 +62,12 @@ art_runtime_base_native_shared_libs = [
     // dependencies work with APEX libraries.
     "libart",
     "libart-compiler",
-    "libartservice",
     "libdt_fd_forward",
     "libdt_socket",
     "libjdwp",
     "libnpt",
     "libopenjdkjvm",
     "libopenjdkjvmti",
-    // TODO(chriswailes): Make libarttools a dependency for another target
-    // when such a target exists
-    "libarttools",
 ]
 
 art_runtime_base_native_device_only_shared_libs = [
@@ -243,15 +239,11 @@ apex_defaults {
     compile_multilib: "both",
     manifest: "manifest-art.json",
     bootclasspath_fragments: ["art-bootclasspath-fragment"],
-    systemserverclasspath_fragments: ["art-systemserverclasspath-fragment"],
     compat_configs: ["libcore-platform-compat-config"],
     java_libs: libcore_java_libs,
     native_shared_libs: art_runtime_base_native_shared_libs +
         art_runtime_base_native_device_only_shared_libs +
         libcore_native_shared_libs,
-    binaries: [
-        "artd",
-    ],
     multilib: {
         both: {
             binaries: art_runtime_base_binaries_both +
@@ -271,7 +263,6 @@ apex_defaults {
     ],
     prebuilts: [
         "art-linker-config",
-        "com.android.art.artd.init.rc",
     ],
     // ART APEXes depend on bouncycastle which is disabled for PDK builds.
     // Since the dependency is disabled, ART APEXes can't be built either.
@@ -351,8 +342,6 @@ art_gtests = [
     "art_imgdiag_tests",
     "art_libartbase_tests",
     "art_libartpalette_tests",
-    "art_libartservice_tests",
-    "art_libarttools_tests",
     "art_libdexfile_tests",
     "art_libdexfile_support_tests",
     "art_libprofile_tests",
