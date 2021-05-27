@@ -1565,6 +1565,12 @@ class Dex2Oat final {
         LOG(ERROR) << "Missing required boot image(s) for boot image extension.";
         return dex2oat::ReturnCode::kOther;
       }
+    } else {
+      // Check that we loaded at least the primary boot image for app compilation.
+      if (runtime_->GetHeap()->GetBootImageSpaces().empty()) {
+        LOG(ERROR) << "Missing primary boot image for app compilation.";
+        return dex2oat::ReturnCode::kOther;
+      }
     }
 
     if (!compilation_reason_.empty()) {

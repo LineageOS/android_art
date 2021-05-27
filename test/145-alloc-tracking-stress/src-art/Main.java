@@ -38,10 +38,10 @@ public class Main implements Runnable {
       if (klass == null) {
           throw new AssertionError("Couldn't find DdmVmInternal class");
       }
-      enableAllocTrackingMethod = klass.getDeclaredMethod("enableRecentAllocations",
-              Boolean.TYPE);
+      enableAllocTrackingMethod = klass.getDeclaredMethod("setRecentAllocationsTrackingEnabled",
+          boolean.class);
       if (enableAllocTrackingMethod == null) {
-          throw new AssertionError("Couldn't find enableRecentAllocations method");
+          throw new AssertionError("Couldn't find setRecentAllocationsTrackingEnabled method");
       }
 
       final Thread[] threads = new Thread[numberOfThreads];
