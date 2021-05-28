@@ -49,6 +49,7 @@ static void FixUpArguments(HInvokeStaticOrDirect* invoke) {
                                          : WellKnownClasses::java_lang_Float_floatToRawIntBits;
       ArtMethod* resolved_method = jni::DecodeArtMethod(known_method);
       DCHECK(resolved_method != nullptr);
+      DCHECK(resolved_method->IsIntrinsic());
       MethodReference target_method(nullptr, 0);
       {
         ScopedObjectAccess soa(Thread::Current());
