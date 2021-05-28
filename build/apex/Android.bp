@@ -263,6 +263,7 @@ apex_defaults {
     ],
     prebuilts: [
         "art-linker-config",
+        "current_sdkinfo",
     ],
     // ART APEXes depend on bouncycastle which is disabled for PDK builds.
     // Since the dependency is disabled, ART APEXes can't be built either.
