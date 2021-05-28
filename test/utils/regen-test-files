@@ -823,11 +823,16 @@ class Generator:
         "CTS Libcore non-OJ tests", ["CtsLibcoreTestCases"], cts_libcore_tests_shard_num, 2020)
     mts_test_shards.append(cts_libcore_tests_shard)
 
-    # CTS Libcore OJ tests (`CtsLibcoreOjTestCases`) shard.
-    cts_libcore_oj_tests_shard_num = len(mts_test_shards)
-    cts_libcore_oj_tests_shard = self.create_mts_test_shard(
-        "CTS Libcore OJ tests", ["CtsLibcoreOjTestCases"], cts_libcore_oj_tests_shard_num, 2021)
-    mts_test_shards.append(cts_libcore_oj_tests_shard)
+    # Other CTS Libcore tests shard.
+    other_cts_libcore_tests_shard_num = len(mts_test_shards)
+    other_cts_libcore_tests_shard_tests = [
+        "CtsLibcoreOjTestCases",
+        "CtsLibcoreJsr166TestCases"
+    ]
+    other_cts_libcore_tests_shard = self.create_mts_test_shard(
+        "CTS Libcore OJ tests", other_cts_libcore_tests_shard_tests,
+        other_cts_libcore_tests_shard_num, 2021)
+    mts_test_shards.append(other_cts_libcore_tests_shard)
 
     for s in mts_test_shards:
       s.regen_test_plan_file()
