@@ -1265,7 +1265,8 @@ TEST_F(LoadStoreAnalysisTest, PartialEscape4) {
 // // EXIT
 // obj.field;
 TEST_F(LoadStoreAnalysisTest, PartialEscape5) {
-  VariableSizedHandleScope vshs(Thread::Current());
+  ScopedObjectAccess soa(Thread::Current());
+  VariableSizedHandleScope vshs(soa.Self());
   CreateGraph(&vshs);
   AdjacencyListGraph blks(SetupFromAdjacencyList(
       "entry",
