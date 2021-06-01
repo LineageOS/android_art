@@ -1452,9 +1452,21 @@ void Monitor::VisitLocks(StackVisitor* stack_visitor,
   // TODO: use the JNI implementation's table of explicit MonitorEnter calls and dump those too.
   if (m->IsNative()) {
     if (m->IsSynchronized()) {
-      Thread* thread = stack_visitor->GetThread();
-      jobject lock = GetGenericJniSynchronizationObject(thread, m);
-      callback(thread->DecodeJObject(lock), callback_context);
+      DCHECK(!m->IsCriticalNative());
+      DCHECK(!m->IsFastNative());
+      ObjPtr<mirror::Object> lock;
+      if (m->IsStatic()) {
+        // Static methods synchronize on the declaring class object.
+        lock = m->GetDeclaringClass();
+      } else {
+        // Instance methods synchronize on the `this` object.
+        // The `this` reference is stored in the first out vreg in the caller's frame.
+        uint8_t* sp = reinterpret_cast<uint8_t*>(stack_visitor->GetCurrentQuickFrame());
+        size_t frame_size = stack_visitor->GetCurrentQuickFrameInfo().FrameSizeInBytes();
+        lock = reinterpret_cast<StackReference<mirror::Object>*>(
+            sp + frame_size + static_cast<size_t>(kRuntimePointerSize))->AsMirrorPtr();
+      }
+      callback(lock, callback_context);
     }
     return;
   }

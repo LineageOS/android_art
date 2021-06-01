@@ -14,7 +14,15 @@
  * limitations under the License.
  */
 
+#include <sstream>
+
 #include "jni.h"
+
+#include "arch/context.h"
+#include "monitor.h"
+#include "scoped_thread_state_change-inl.h"
+#include "stack.h"
+#include "thread-current-inl.h"
 
 namespace art {
 
@@ -636,6 +644,62 @@ extern "C" JNIEXPORT jint JNICALL Java_CriticalClinitCheck_nativeMethodWithManyP
       i7, l7, f7, d7,
       i8, l8, f8, d8);
   return ok ? 42 : -1;
+}
+
+extern "C" JNIEXPORT jint JNICALL Java_Main_b189235039CallThrough(JNIEnv* env, jobject m) {
+  jclass main_klass = env->GetObjectClass(m);
+  jmethodID checkLocks = env->GetStaticMethodID(main_klass, "b189235039CheckLocks", "(ILMain;)I");
+  if (checkLocks == nullptr) {
+    return -1;
+  }
+  return env->CallStaticIntMethod(main_klass, checkLocks, 42, m);
+}
+
+extern "C" JNIEXPORT jint JNICALL Java_Main_b189235039CheckLocks(JNIEnv*,
+                                                                 jclass,
+                                                                 int arg,
+                                                                 jobject lock) {
+  // Check that we do not crash when visiting locks and that we find the right lock.
+  ScopedObjectAccess soa(Thread::Current());
+  class VisitLocks : public StackVisitor {
+   public:
+    VisitLocks(Thread* thread, Context* context, jobject expected_lock)
+        : StackVisitor(thread, context, StackWalkKind::kIncludeInlinedFrames),
+          expected_lock_(expected_lock) {
+    }
+
+    bool VisitFrame() override REQUIRES_SHARED(Locks::mutator_lock_) {
+      ArtMethod* m = GetMethod();
+
+      // Ignore runtime methods.
+      if (m == nullptr || m->IsRuntimeMethod()) {
+        return true;
+      }
+
+      if (m->IsSynchronized()) {
+        // Interesting frame.
+        Monitor::VisitLocks(this, Callback, expected_lock_);
+        return false;
+      }
+
+      return true;
+    }
+
+   private:
+    static void Callback(ObjPtr<mirror::Object> obj, void* expected_lock)
+        REQUIRES_SHARED(Locks::mutator_lock_) {
+      CHECK(obj != nullptr);
+      CHECK(obj == Thread::Current()->DecodeJObject(reinterpret_cast<jobject>(expected_lock)));
+    }
+
+    jobject expected_lock_;
+  };
+  {
+    std::unique_ptr<Context> context(Context::Create());
+    VisitLocks vl(soa.Self(), context.get(), lock);
+    vl.WalkStack();
+  }
+  return arg;
 }
 
 }  // namespace art
