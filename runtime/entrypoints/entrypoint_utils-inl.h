@@ -765,10 +765,13 @@ inline jobject GetGenericJniSynchronizationObject(Thread* self, ArtMethod* calle
   DCHECK(self->GetManagedStack()->GetTopQuickFrame() != nullptr);
   DCHECK_EQ(*self->GetManagedStack()->GetTopQuickFrame(), called);
   if (called->IsStatic()) {
+    // Static methods synchronize on the declaring class object.
     // The `jclass` is a pointer to the method's declaring class.
     return reinterpret_cast<jobject>(called->GetDeclaringClassAddressWithoutBarrier());
   } else {
+    // Instance methods synchronize on the `this` object.
     // The `this` reference is stored in the first out vreg in the caller's frame.
+    // The `jobject` is a pointer to the spill slot.
     uint8_t* sp = reinterpret_cast<uint8_t*>(self->GetManagedStack()->GetTopQuickFrame());
     size_t frame_size = RuntimeCalleeSaveFrame::GetFrameSize(CalleeSaveType::kSaveRefsAndArgs);
     return reinterpret_cast<jobject>(sp + frame_size + static_cast<size_t>(kRuntimePointerSize));
