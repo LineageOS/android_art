@@ -30,10 +30,15 @@ class ProfileSaver {
  public:
   // Starts the profile saver thread if not already started.
   // If the saver is already running it adds (output_filename, code_paths) to its tracked locations.
+  //
+  // The `ref_profile_filename` denotes the path to the reference profile which
+  // might be queried to determine if an initial save should be done earlier.
+  // It can be empty indicating there is no reference profile.
   static void Start(const ProfileSaverOptions& options,
                     const std::string& output_filename,
                     jit::JitCodeCache* jit_code_cache,
-                    const std::vector<std::string>& code_paths)
+                    const std::vector<std::string>& code_paths,
+                    const std::string& ref_profile_filename)
       REQUIRES(!Locks::profiler_lock_, !instance_->wait_lock_);
 
   // Stops the profile saver thread.
@@ -58,10 +63,7 @@ class ProfileSaver {
   class GetClassesAndMethodsHelper;
   class ScopedDefaultPriority;
 
-  ProfileSaver(const ProfileSaverOptions& options,
-               const std::string& output_filename,
-               jit::JitCodeCache* jit_code_cache,
-               const std::vector<std::string>& code_paths);
+  ProfileSaver(const ProfileSaverOptions& options, jit::JitCodeCache* jit_code_cache);
   ~ProfileSaver();
 
   static void* RunProfileSaverThread(void* arg)
@@ -78,7 +80,10 @@ class ProfileSaver {
   // written to disk.
   // If force_save is true, the saver will ignore any constraints which limit IO (e.g. will write
   // the profile to disk even if it's just one new method).
-  bool ProcessProfilingInfo(bool force_save, /*out*/uint16_t* number_of_new_methods)
+  bool ProcessProfilingInfo(
+        bool force_save,
+        bool skip_class_and_method_fetching,
+        /*out*/uint16_t* number_of_new_methods)
       REQUIRES(!Locks::profiler_lock_)
       REQUIRES(!Locks::mutator_lock_);
 
@@ -89,7 +94,8 @@ class ProfileSaver {
   bool ShuttingDown(Thread* self) REQUIRES(!Locks::profiler_lock_);
 
   void AddTrackedLocations(const std::string& output_filename,
-                           const std::vector<std::string>& code_paths)
+                           const std::vector<std::string>& code_paths,
+                           const std::string& ref_profile_filename)
       REQUIRES(Locks::profiler_lock_);
 
   // Fetches the current resolved classes and methods from the ClassLinker and stores them in the
@@ -128,6 +134,13 @@ class ProfileSaver {
   // to their realpath. The resolution is done async to minimize the time it takes for
   // someone to register a path.
   SafeMap<std::string, std::set<std::string>> tracked_dex_base_locations_to_be_resolved_
+      GUARDED_BY(Locks::profiler_lock_);
+
+  // Collection of output profiles that the profile tracks.
+  // It maps output profile locations to reference profiles, and is used
+  // to determine if any profile is non-empty at the start of the ProfileSaver.
+  // This influences the time of the first ever save.
+  SafeMap<std::string, std::string> tracked_profiles_
       GUARDED_BY(Locks::profiler_lock_);
 
   bool shutting_down_ GUARDED_BY(Locks::profiler_lock_);
