@@ -26,8 +26,15 @@ LIBARTPALETTE_1 {
     PaletteTraceIntegerValue; # apex
     PaletteAshmemCreateRegion; # apex
     PaletteAshmemSetProtRegion; # apex
-    PaletteGetHooks; # apex
     PaletteCreateOdrefreshStagingDirectory; # apex
+    PaletteShouldReportDex2oatCompilation; #apex
+    PaletteNotifyStartDex2oatCompilation; #apex
+    PaletteNotifyEndDex2oatCompilation; #apex
+    PaletteNotifyDexFileLoaded; #apex
+    PaletteNotifyOatFileLoaded; #apex
+    PaletteShouldReportJniInvocations; #apex
+    PaletteNotifyBeginJniInvocation; #apex
+    PaletteNotifyEndJniInvocation; #apex
 
   local:
     *;
