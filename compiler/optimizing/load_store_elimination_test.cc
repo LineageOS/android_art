@@ -1233,7 +1233,8 @@ TEST_F(LoadStoreEliminationTest, DefaultShadowMonitor) {
 //   return t;
 // }
 TEST_F(LoadStoreEliminationTest, ArrayLoopOverlap) {
-  VariableSizedHandleScope vshs(Thread::Current());
+  ScopedObjectAccess soa(Thread::Current());
+  VariableSizedHandleScope vshs(soa.Self());
   CreateGraph(&vshs);
   AdjacencyListGraph blocks(graph_,
                             GetAllocator(),
@@ -1361,7 +1362,8 @@ TEST_F(LoadStoreEliminationTest, ArrayLoopOverlap) {
 //   return t;
 // }
 TEST_F(LoadStoreEliminationTest, ArrayLoopOverlap2) {
-  VariableSizedHandleScope vshs(Thread::Current());
+  ScopedObjectAccess soa(Thread::Current());
+  VariableSizedHandleScope vshs(soa.Self());
   CreateGraph(&vshs);
   AdjacencyListGraph blocks(graph_,
                             GetAllocator(),
@@ -1500,7 +1502,8 @@ TEST_F(LoadStoreEliminationTest, ArrayLoopOverlap2) {
 }
 
 TEST_F(LoadStoreEliminationTest, ArrayNonLoopPhi) {
-  VariableSizedHandleScope vshs(Thread::Current());
+  ScopedObjectAccess soa(Thread::Current());
+  VariableSizedHandleScope vshs(soa.Self());
   CreateGraph(&vshs);
   AdjacencyListGraph blocks(graph_,
                             GetAllocator(),
@@ -1594,7 +1597,8 @@ TEST_F(LoadStoreEliminationTest, ArrayNonLoopPhi) {
 }
 
 TEST_F(LoadStoreEliminationTest, ArrayMergeDefault) {
-  VariableSizedHandleScope vshs(Thread::Current());
+  ScopedObjectAccess soa(Thread::Current());
+  VariableSizedHandleScope vshs(soa.Self());
   CreateGraph(&vshs);
   AdjacencyListGraph blocks(graph_,
                             GetAllocator(),
@@ -1685,7 +1689,8 @@ TEST_F(LoadStoreEliminationTest, ArrayMergeDefault) {
 // array location with index `idx + constant`. This could have led to
 // replacing the load with, for example, the default value 0.
 TEST_F(LoadStoreEliminationTest, ArrayLoopAliasing1) {
-  VariableSizedHandleScope vshs(Thread::Current());
+  ScopedObjectAccess soa(Thread::Current());
+  VariableSizedHandleScope vshs(soa.Self());
   CreateGraph(&vshs);
   AdjacencyListGraph blocks(graph_,
                             GetAllocator(),
@@ -1778,7 +1783,8 @@ TEST_F(LoadStoreEliminationTest, ArrayLoopAliasing1) {
 // loop unrolling. This gtest does not need to jump through those hoops
 // as we do not unnecessarily run those optimization passes.
 TEST_F(LoadStoreEliminationTest, ArrayLoopAliasing2) {
-  VariableSizedHandleScope vshs(Thread::Current());
+  ScopedObjectAccess soa(Thread::Current());
+  VariableSizedHandleScope vshs(soa.Self());
   CreateGraph(&vshs);
   AdjacencyListGraph blocks(graph_,
                             GetAllocator(),
@@ -2043,7 +2049,8 @@ TEST_F(LoadStoreEliminationTest, PartialUnknownMerge) {
 // EXIT
 // return PHI(foo_l, foo_r)
 TEST_F(LoadStoreEliminationTest, PartialLoadElimination) {
-  VariableSizedHandleScope vshs(Thread::Current());
+  ScopedObjectAccess soa(Thread::Current());
+  VariableSizedHandleScope vshs(soa.Self());
   CreateGraph(&vshs);
   AdjacencyListGraph blks(SetupFromAdjacencyList("entry",
                                                  "exit_REAL",
@@ -2119,7 +2126,8 @@ TEST_F(LoadStoreEliminationTest, PartialLoadElimination) {
 // return obj.field
 // This test runs with partial LSE disabled.
 TEST_F(LoadStoreEliminationTest, PartialLoadPreserved) {
-  VariableSizedHandleScope vshs(Thread::Current());
+  ScopedObjectAccess soa(Thread::Current());
+  VariableSizedHandleScope vshs(soa.Self());
   CreateGraph(&vshs);
   AdjacencyListGraph blks(SetupFromAdjacencyList("entry",
                                                  "exit_REAL",
@@ -2190,7 +2198,8 @@ TEST_F(LoadStoreEliminationTest, PartialLoadPreserved) {
 // return obj.field
 // NB This test is for non-partial LSE flow. Normally the obj.field writes will be removed
 TEST_F(LoadStoreEliminationTest, PartialLoadPreserved2) {
-  VariableSizedHandleScope vshs(Thread::Current());
+  ScopedObjectAccess soa(Thread::Current());
+  VariableSizedHandleScope vshs(soa.Self());
   CreateGraph(&vshs);
   AdjacencyListGraph blks(SetupFromAdjacencyList("entry",
                                                  "exit_REAL",
@@ -2278,7 +2287,8 @@ TEST_F(LoadStoreEliminationTest, PartialLoadPreserved2) {
 // ELIMINATE
 // return obj.field
 TEST_F(LoadStoreEliminationTest, PartialLoadElimination2) {
-  VariableSizedHandleScope vshs(Thread::Current());
+  ScopedObjectAccess soa(Thread::Current());
+  VariableSizedHandleScope vshs(soa.Self());
   CreateGraph(&vshs);
   AdjacencyListGraph blks(SetupFromAdjacencyList("entry",
                                                  "exit",
@@ -2386,7 +2396,8 @@ typename Iter::value_type FindOrNull(Iter begin, Iter end, Func func) {
 // // first = phi[out.foo, 13]
 // return first + new_inst.foo;
 TEST_F(LoadStoreEliminationTest, PartialPhiPropagation) {
-  VariableSizedHandleScope vshs(Thread::Current());
+  ScopedObjectAccess soa(Thread::Current());
+  VariableSizedHandleScope vshs(soa.Self());
   CreateGraph(&vshs);
   AdjacencyListGraph blks(SetupFromAdjacencyList("entry",
                                                  "exit",
@@ -2545,7 +2556,8 @@ TEST_F(LoadStoreEliminationTest, PartialPhiPropagation) {
 // return select(param3, obj1.foo, obj2.foo);
 // EXIT
 TEST_P(OrderDependentTestGroup, PredicatedUse) {
-  VariableSizedHandleScope vshs(Thread::Current());
+  ScopedObjectAccess soa(Thread::Current());
+  VariableSizedHandleScope vshs(soa.Self());
   CreateGraph(&vshs);
   AdjacencyListGraph blks(SetupFromAdjacencyList("entry",
                                                  "exit",
@@ -2712,7 +2724,8 @@ TEST_P(OrderDependentTestGroup, PredicatedUse) {
 // return obj1.foo + obj2.foo;
 // EXIT
 TEST_P(OrderDependentTestGroup, PredicatedEnvUse) {
-  VariableSizedHandleScope vshs(Thread::Current());
+  ScopedObjectAccess soa(Thread::Current());
+  VariableSizedHandleScope vshs(soa.Self());
   CreateGraph(&vshs);
   AdjacencyListGraph blks(SetupFromAdjacencyList("entry",
                                                  "exit",
@@ -2860,7 +2873,8 @@ TEST_P(OrderDependentTestGroup, PredicatedEnvUse) {
 // predicated-ELIMINATE
 // return obj1.field + obj2.field
 TEST_P(OrderDependentTestGroup, FieldSetOrderEnv) {
-  VariableSizedHandleScope vshs(Thread::Current());
+  ScopedObjectAccess soa(Thread::Current());
+  VariableSizedHandleScope vshs(soa.Self());
   CreateGraph(/*handles=*/&vshs);
   AdjacencyListGraph blks(SetupFromAdjacencyList("entry",
                                                  "exit",
@@ -3031,7 +3045,8 @@ TEST_P(OrderDependentTestGroup, FieldSetOrderEnv) {
 // // EXIT
 // return;
 TEST_P(OrderDependentTestGroup, MaterializationMovedUse) {
-  VariableSizedHandleScope vshs(Thread::Current());
+  ScopedObjectAccess soa(Thread::Current());
+  VariableSizedHandleScope vshs(soa.Self());
   CreateGraph(/*handles=*/&vshs);
   AdjacencyListGraph blks(SetupFromAdjacencyList("entry",
                                                  "exit",
@@ -3141,7 +3156,8 @@ INSTANTIATE_TEST_SUITE_P(LoadStoreEliminationTest,
 // } else {}
 // EXIT
 TEST_F(LoadStoreEliminationTest, MovePredicatedAlloc) {
-  VariableSizedHandleScope vshs(Thread::Current());
+  ScopedObjectAccess soa(Thread::Current());
+  VariableSizedHandleScope vshs(soa.Self());
   CreateGraph(&vshs);
   AdjacencyListGraph blks(SetupFromAdjacencyList("entry",
                                                  "exit",
@@ -3226,7 +3242,8 @@ TEST_F(LoadStoreEliminationTest, MovePredicatedAlloc) {
 // noescape();
 // return a + b + c
 TEST_F(LoadStoreEliminationTest, MutiPartialLoadStore) {
-  VariableSizedHandleScope vshs(Thread::Current());
+  ScopedObjectAccess soa(Thread::Current());
+  VariableSizedHandleScope vshs(soa.Self());
   CreateGraph(&vshs);
   AdjacencyListGraph blks(SetupFromAdjacencyList("entry",
                                                  "exit",
@@ -3385,7 +3402,8 @@ TEST_F(LoadStoreEliminationTest, MutiPartialLoadStore) {
 // EXIT
 // return a + b + c + obj.foo
 TEST_F(LoadStoreEliminationTest, MutiPartialLoadStore2) {
-  VariableSizedHandleScope vshs(Thread::Current());
+  ScopedObjectAccess soa(Thread::Current());
+  VariableSizedHandleScope vshs(soa.Self());
   CreateGraph(&vshs);
   // Need to have an actual entry block since we check env-layout and the way we
   // add constants would screw this up otherwise.
@@ -3552,7 +3570,8 @@ TEST_F(LoadStoreEliminationTest, MutiPartialLoadStore2) {
 // }
 // EXIT
 TEST_F(LoadStoreEliminationTest, MovePredicatedAlloc2) {
-  VariableSizedHandleScope vshs(Thread::Current());
+  ScopedObjectAccess soa(Thread::Current());
+  VariableSizedHandleScope vshs(soa.Self());
   CreateGraph(&vshs);
   AdjacencyListGraph blks(SetupFromAdjacencyList("entry",
                                                  "exit",
@@ -3663,7 +3682,8 @@ TEST_F(LoadStoreEliminationTest, MovePredicatedAlloc2) {
 // return obj.a;
 // EXIT
 TEST_F(LoadStoreEliminationTest, MovePredicatedAlloc3) {
-  VariableSizedHandleScope vshs(Thread::Current());
+  ScopedObjectAccess soa(Thread::Current());
+  VariableSizedHandleScope vshs(soa.Self());
   CreateGraph(&vshs);
   AdjacencyListGraph blks(SetupFromAdjacencyList("entry",
                                                  "exit",
@@ -3781,7 +3801,8 @@ TEST_F(LoadStoreEliminationTest, MovePredicatedAlloc3) {
 // return obj.a;
 // EXIT
 TEST_F(LoadStoreEliminationTest, MovePredicatedAlloc4) {
-  VariableSizedHandleScope vshs(Thread::Current());
+  ScopedObjectAccess soa(Thread::Current());
+  VariableSizedHandleScope vshs(soa.Self());
   CreateGraph(&vshs);
   // Break the critical edge between entry and set_two with the
   // set_two_critical_break node. Graph simplification would do this for us if
@@ -3913,7 +3934,8 @@ TEST_F(LoadStoreEliminationTest, MovePredicatedAlloc4) {
 // return obj.a;
 // EXIT
 TEST_F(LoadStoreEliminationTest, MovePredicatedAlloc5) {
-  VariableSizedHandleScope vshs(Thread::Current());
+  ScopedObjectAccess soa(Thread::Current());
+  VariableSizedHandleScope vshs(soa.Self());
   CreateGraph(&vshs);
   // Break the critical edge between entry and set_two with the
   // set_two_critical_break node. Graph simplification would do this for us if
@@ -4044,7 +4066,8 @@ TEST_F(LoadStoreEliminationTest, MovePredicatedAlloc5) {
 // }
 // EXIT
 TEST_F(LoadStoreEliminationTest, PartialLoadElimination3) {
-  VariableSizedHandleScope vshs(Thread::Current());
+  ScopedObjectAccess soa(Thread::Current());
+  VariableSizedHandleScope vshs(soa.Self());
   CreateGraph(&vshs);
   AdjacencyListGraph blks(SetupFromAdjacencyList(
       "entry",
@@ -4121,7 +4144,8 @@ TEST_F(LoadStoreEliminationTest, PartialLoadElimination3) {
 // }
 // EXIT
 TEST_F(LoadStoreEliminationTest, PartialLoadElimination4) {
-  VariableSizedHandleScope vshs(Thread::Current());
+  ScopedObjectAccess soa(Thread::Current());
+  VariableSizedHandleScope vshs(soa.Self());
   CreateGraph(&vshs);
   AdjacencyListGraph blks(SetupFromAdjacencyList("entry",
                                                  "exit",
@@ -4223,7 +4247,8 @@ TEST_F(LoadStoreEliminationTest, PartialLoadElimination4) {
 // ELIMINATE
 // return obj.field
 TEST_F(LoadStoreEliminationTest, PartialLoadElimination5) {
-  VariableSizedHandleScope vshs(Thread::Current());
+  ScopedObjectAccess soa(Thread::Current());
+  VariableSizedHandleScope vshs(soa.Self());
   CreateGraph(&vshs);
   AdjacencyListGraph blks(SetupFromAdjacencyList("entry",
                                                  "exit",
@@ -4306,7 +4331,8 @@ TEST_F(LoadStoreEliminationTest, PartialLoadElimination5) {
 // ELIMINATE
 // return obj.fid
 TEST_F(LoadStoreEliminationTest, PartialLoadElimination6) {
-  VariableSizedHandleScope vshs(Thread::Current());
+  ScopedObjectAccess soa(Thread::Current());
+  VariableSizedHandleScope vshs(soa.Self());
   CreateGraph(&vshs);
   AdjacencyListGraph blks(SetupFromAdjacencyList("entry",
                                                  "exit",
@@ -4398,7 +4424,8 @@ TEST_F(LoadStoreEliminationTest, PartialLoadElimination6) {
 // return obj.field;
 // EXIT
 TEST_F(LoadStoreEliminationTest, PartialLoadPreserved3) {
-  VariableSizedHandleScope vshs(Thread::Current());
+  ScopedObjectAccess soa(Thread::Current());
+  VariableSizedHandleScope vshs(soa.Self());
   CreateGraph(&vshs);
   AdjacencyListGraph blks(SetupFromAdjacencyList("entry",
                                                  "exit",
@@ -4506,7 +4533,8 @@ TEST_F(LoadStoreEliminationTest, PartialLoadPreserved3) {
 // return obj.field;
 // EXIT
 TEST_F(LoadStoreEliminationTest, PartialLoadPreserved4) {
-  VariableSizedHandleScope vshs(Thread::Current());
+  ScopedObjectAccess soa(Thread::Current());
+  VariableSizedHandleScope vshs(soa.Self());
   CreateGraph(&vshs);
   AdjacencyListGraph blks(SetupFromAdjacencyList("entry",
                                                  "exit",
@@ -4611,7 +4639,8 @@ TEST_F(LoadStoreEliminationTest, PartialLoadPreserved4) {
 // ELIMINATE
 // return obj.field
 TEST_F(LoadStoreEliminationTest, PartialLoadPreserved5) {
-  VariableSizedHandleScope vshs(Thread::Current());
+  ScopedObjectAccess soa(Thread::Current());
+  VariableSizedHandleScope vshs(soa.Self());
   CreateGraph(&vshs);
   AdjacencyListGraph blks(SetupFromAdjacencyList("entry",
                                                  "exit",
@@ -4789,7 +4818,8 @@ TEST_F(LoadStoreEliminationTest, PartialLoadPreserved6) {
 // PREDICATED GET
 // return obj.field
 TEST_P(PartialComparisonTestGroup, PartialComparisonBeforeCohort) {
-  VariableSizedHandleScope vshs(Thread::Current());
+  ScopedObjectAccess soa(Thread::Current());
+  VariableSizedHandleScope vshs(soa.Self());
   CreateGraph(/*handles=*/&vshs);
   AdjacencyListGraph blks(SetupFromAdjacencyList("entry",
                                                  "exit",
@@ -4917,7 +4947,8 @@ TEST_P(PartialComparisonTestGroup, PartialComparisonBeforeCohort) {
 // PREDICATED GET
 // return obj.field
 TEST_P(PartialComparisonTestGroup, PartialComparisonInCohortBeforeEscape) {
-  VariableSizedHandleScope vshs(Thread::Current());
+  ScopedObjectAccess soa(Thread::Current());
+  VariableSizedHandleScope vshs(soa.Self());
   CreateGraph(/*handles=*/&vshs);
   AdjacencyListGraph blks(SetupFromAdjacencyList("entry",
                                                  "exit",
@@ -5046,7 +5077,8 @@ TEST_P(PartialComparisonTestGroup, PartialComparisonInCohortBeforeEscape) {
 // PREDICATED GET
 // return obj.field
 TEST_P(PartialComparisonTestGroup, PartialComparisonAfterCohort) {
-  VariableSizedHandleScope vshs(Thread::Current());
+  ScopedObjectAccess soa(Thread::Current());
+  VariableSizedHandleScope vshs(soa.Self());
   CreateGraph(/*handles=*/&vshs);
   AdjacencyListGraph blks(SetupFromAdjacencyList("entry",
                                                  "exit",
@@ -5176,7 +5208,8 @@ TEST_P(PartialComparisonTestGroup, PartialComparisonAfterCohort) {
 // return obj.field
 TEST_P(PartialComparisonTestGroup, PartialComparisonInCohortAfterEscape) {
   PartialComparisonKind kind = GetParam();
-  VariableSizedHandleScope vshs(Thread::Current());
+  ScopedObjectAccess soa(Thread::Current());
+  VariableSizedHandleScope vshs(soa.Self());
   CreateGraph(/*handles=*/&vshs);
   AdjacencyListGraph blks(SetupFromAdjacencyList("entry",
                                                  "exit",
@@ -5335,7 +5368,8 @@ INSTANTIATE_TEST_SUITE_P(
 // predicated-ELIMINATE
 // obj.field = 3;
 TEST_F(LoadStoreEliminationTest, PredicatedStore1) {
-  VariableSizedHandleScope vshs(Thread::Current());
+  ScopedObjectAccess soa(Thread::Current());
+  VariableSizedHandleScope vshs(soa.Self());
   InitGraph(/*handles=*/&vshs);
   AdjacencyListGraph blks(SetupFromAdjacencyList("entry",
                                                  "exit",
@@ -5423,7 +5457,8 @@ TEST_F(LoadStoreEliminationTest, PredicatedStore1) {
 // predicated-ELIMINATE
 // obj.field = 4;
 TEST_F(LoadStoreEliminationTest, PredicatedStore2) {
-  VariableSizedHandleScope vshs(Thread::Current());
+  ScopedObjectAccess soa(Thread::Current());
+  VariableSizedHandleScope vshs(soa.Self());
   CreateGraph(/*handles=*/&vshs);
   AdjacencyListGraph blks(SetupFromAdjacencyList("entry",
                                                  "exit",
@@ -5534,7 +5569,8 @@ TEST_F(LoadStoreEliminationTest, PredicatedStore2) {
 // predicated-ELIMINATE
 // return obj.field
 TEST_F(LoadStoreEliminationTest, PredicatedLoad1) {
-  VariableSizedHandleScope vshs(Thread::Current());
+  ScopedObjectAccess soa(Thread::Current());
+  VariableSizedHandleScope vshs(soa.Self());
   CreateGraph(/*handles=*/&vshs);
   AdjacencyListGraph blks(SetupFromAdjacencyList("entry",
                                                  "exit",
@@ -5635,7 +5671,8 @@ TEST_F(LoadStoreEliminationTest, PredicatedLoad1) {
 // predicated-ELIMINATE
 // return obj1.field + obj2.field
 TEST_F(LoadStoreEliminationTest, MultiPredicatedLoad1) {
-  VariableSizedHandleScope vshs(Thread::Current());
+  ScopedObjectAccess soa(Thread::Current());
+  VariableSizedHandleScope vshs(soa.Self());
   CreateGraph(/*handles=*/&vshs);
   AdjacencyListGraph blks(SetupFromAdjacencyList("entry",
                                                  "exit",
@@ -5787,7 +5824,8 @@ TEST_F(LoadStoreEliminationTest, MultiPredicatedLoad1) {
 // predicated-ELIMINATE
 // return obj1.field + obj2.field
 TEST_F(LoadStoreEliminationTest, MultiPredicatedLoad2) {
-  VariableSizedHandleScope vshs(Thread::Current());
+  ScopedObjectAccess soa(Thread::Current());
+  VariableSizedHandleScope vshs(soa.Self());
   CreateGraph(/*handles=*/&vshs);
   AdjacencyListGraph blks(SetupFromAdjacencyList("entry",
                                                  "exit",
@@ -5951,7 +5989,8 @@ TEST_F(LoadStoreEliminationTest, MultiPredicatedLoad2) {
 // // allow us to entirely remove the allocation in this test.
 // return obj.foo;
 TEST_F(LoadStoreEliminationTest, MultiPredicatedLoad3) {
-  VariableSizedHandleScope vshs(Thread::Current());
+  ScopedObjectAccess soa(Thread::Current());
+  VariableSizedHandleScope vshs(soa.Self());
   CreateGraph(/*handles=*/&vshs);
   AdjacencyListGraph blks(SetupFromAdjacencyList("entry",
                                                  "exit",
@@ -6081,7 +6120,8 @@ TEST_F(LoadStoreEliminationTest, MultiPredicatedLoad3) {
 // predicated-ELIMINATE
 // return obj.field + abc
 TEST_F(LoadStoreEliminationTest, PredicatedLoad4) {
-  VariableSizedHandleScope vshs(Thread::Current());
+  ScopedObjectAccess soa(Thread::Current());
+  VariableSizedHandleScope vshs(soa.Self());
   CreateGraph(/*handles=*/&vshs);
   AdjacencyListGraph blks(SetupFromAdjacencyList("entry",
                                                  "exit",
@@ -6221,7 +6261,8 @@ TEST_F(LoadStoreEliminationTest, PredicatedLoad4) {
 // // won't be changed. The escape happens with .BAR set so this is in escaping cohort.
 // return read_bottom.foo;
 TEST_F(LoadStoreEliminationTest, MultiPredicatedLoad4) {
-  VariableSizedHandleScope vshs(Thread::Current());
+  ScopedObjectAccess soa(Thread::Current());
+  VariableSizedHandleScope vshs(soa.Self());
   CreateGraph(/*handles=*/&vshs);
   AdjacencyListGraph blks(SetupFromAdjacencyList("entry",
                                                  "exit",
@@ -6325,7 +6366,8 @@ TEST_F(LoadStoreEliminationTest, MultiPredicatedLoad4) {
 // predicated-ELIMINATE
 // return obj.field
 TEST_F(LoadStoreEliminationTest, PredicatedLoad2) {
-  VariableSizedHandleScope vshs(Thread::Current());
+  ScopedObjectAccess soa(Thread::Current());
+  VariableSizedHandleScope vshs(soa.Self());
   CreateGraph(/*handles=*/&vshs);
   AdjacencyListGraph blks(SetupFromAdjacencyList("entry",
                                                  "exit",
@@ -6462,7 +6504,8 @@ TEST_F(LoadStoreEliminationTest, PredicatedLoad2) {
 // predicated-ELIMINATE
 // return obj.field
 TEST_F(LoadStoreEliminationTest, PredicatedLoad3) {
-  VariableSizedHandleScope vshs(Thread::Current());
+  ScopedObjectAccess soa(Thread::Current());
+  VariableSizedHandleScope vshs(soa.Self());
   CreateGraph(/*handles=*/&vshs);
   AdjacencyListGraph blks(SetupFromAdjacencyList("entry",
                                                  "exit",
@@ -6589,7 +6632,8 @@ TEST_F(LoadStoreEliminationTest, PredicatedLoad3) {
 // predicated-ELIMINATE
 // return obj.field
 TEST_F(LoadStoreEliminationTest, PredicatedLoadDefaultValue) {
-  VariableSizedHandleScope vshs(Thread::Current());
+  ScopedObjectAccess soa(Thread::Current());
+  VariableSizedHandleScope vshs(soa.Self());
   CreateGraph(/*handles=*/&vshs);
   AdjacencyListGraph blks(SetupFromAdjacencyList("entry",
                                                  "exit",
@@ -6685,7 +6729,8 @@ TEST_F(LoadStoreEliminationTest, PredicatedLoadDefaultValue) {
 // // predicated-ELIMINATE
 // return obj.field
 TEST_F(LoadStoreEliminationTest, PartialLoopPhis1) {
-  VariableSizedHandleScope vshs(Thread::Current());
+  ScopedObjectAccess soa(Thread::Current());
+  VariableSizedHandleScope vshs(soa.Self());
   CreateGraph(/*handles=*/&vshs);
   AdjacencyListGraph blks(SetupFromAdjacencyList("entry",
                                                  "exit",
@@ -6871,7 +6916,8 @@ TEST_F(LoadStoreEliminationTest, PartialLoopPhis1) {
 // // predicated-ELIMINATE
 // return obj.field
 TEST_F(LoadStoreEliminationTest, PartialLoopPhis2) {
-  VariableSizedHandleScope vshs(Thread::Current());
+  ScopedObjectAccess soa(Thread::Current());
+  VariableSizedHandleScope vshs(soa.Self());
   CreateGraph(/*handles=*/&vshs);
   AdjacencyListGraph blks(SetupFromAdjacencyList("entry",
                                                  "exit",
@@ -7041,7 +7087,8 @@ TEST_F(LoadStoreEliminationTest, PartialLoopPhis2) {
 // EXIT
 // return obj.field
 TEST_F(LoadStoreEliminationTest, PartialLoopPhis3) {
-  VariableSizedHandleScope vshs(Thread::Current());
+  ScopedObjectAccess soa(Thread::Current());
+  VariableSizedHandleScope vshs(soa.Self());
   CreateGraph(/*handles=*/&vshs);
   AdjacencyListGraph blks(SetupFromAdjacencyList("entry",
                                                  "exit",
@@ -7188,7 +7235,8 @@ TEST_F(LoadStoreEliminationTest, PartialLoopPhis3) {
 // EXIT
 // return obj.field
 TEST_F(LoadStoreEliminationTest, PartialLoopPhis4) {
-  VariableSizedHandleScope vshs(Thread::Current());
+  ScopedObjectAccess soa(Thread::Current());
+  VariableSizedHandleScope vshs(soa.Self());
   CreateGraph(/*handles=*/&vshs);
   AdjacencyListGraph blks(SetupFromAdjacencyList("entry",
                                                  "exit",
@@ -7332,7 +7380,8 @@ TEST_F(LoadStoreEliminationTest, PartialLoopPhis4) {
 // EXIT
 // return obj.field
 TEST_F(LoadStoreEliminationTest, PartialLoopPhis5) {
-  VariableSizedHandleScope vshs(Thread::Current());
+  ScopedObjectAccess soa(Thread::Current());
+  VariableSizedHandleScope vshs(soa.Self());
   CreateGraph(/*handles=*/&vshs);
   AdjacencyListGraph blks(SetupFromAdjacencyList("entry",
                                                  "exit",
@@ -7490,7 +7539,8 @@ TEST_F(LoadStoreEliminationTest, PartialLoopPhis5) {
 // }
 // return obj.field
 TEST_F(LoadStoreEliminationTest, PartialLoopPhis6) {
-  VariableSizedHandleScope vshs(Thread::Current());
+  ScopedObjectAccess soa(Thread::Current());
+  VariableSizedHandleScope vshs(soa.Self());
   CreateGraph(/*handles=*/&vshs);
   AdjacencyListGraph blks(SetupFromAdjacencyList("entry",
                                                  "exit",
@@ -7649,7 +7699,8 @@ TEST_F(LoadStoreEliminationTest, PartialLoopPhis6) {
 // }
 // return obj.field;
 TEST_F(LoadStoreEliminationTest, SimplifyTest) {
-  VariableSizedHandleScope vshs(Thread::Current());
+  ScopedObjectAccess soa(Thread::Current());
+  VariableSizedHandleScope vshs(soa.Self());
   CreateGraph(&vshs);
   AdjacencyListGraph blks(SetupFromAdjacencyList("entry",
                                                  "exit",
@@ -7740,7 +7791,8 @@ TEST_F(LoadStoreEliminationTest, SimplifyTest) {
 // }
 // return obj.field;
 TEST_F(LoadStoreEliminationTest, SimplifyTest2) {
-  VariableSizedHandleScope vshs(Thread::Current());
+  ScopedObjectAccess soa(Thread::Current());
+  VariableSizedHandleScope vshs(soa.Self());
   CreateGraph(&vshs);
   AdjacencyListGraph blks(SetupFromAdjacencyList("entry",
                                                  "exit",
@@ -7843,7 +7895,8 @@ TEST_F(LoadStoreEliminationTest, SimplifyTest2) {
 // }
 // return obj.field;
 TEST_F(LoadStoreEliminationTest, SimplifyTest3) {
-  VariableSizedHandleScope vshs(Thread::Current());
+  ScopedObjectAccess soa(Thread::Current());
+  VariableSizedHandleScope vshs(soa.Self());
   CreateGraph(&vshs);
   AdjacencyListGraph blks(SetupFromAdjacencyList("entry",
                                                  "exit",
@@ -7949,7 +8002,8 @@ TEST_F(LoadStoreEliminationTest, SimplifyTest3) {
 // }
 // return obj.field;
 TEST_F(LoadStoreEliminationTest, SimplifyTest4) {
-  VariableSizedHandleScope vshs(Thread::Current());
+  ScopedObjectAccess soa(Thread::Current());
+  VariableSizedHandleScope vshs(soa.Self());
   CreateGraph(&vshs);
   AdjacencyListGraph blks(SetupFromAdjacencyList("entry",
                                                  "exit",
@@ -8061,7 +8115,8 @@ TEST_F(LoadStoreEliminationTest, SimplifyTest4) {
 // }
 // return obj.foo;
 TEST_F(LoadStoreEliminationTest, PartialIrreducibleLoop) {
-  VariableSizedHandleScope vshs(Thread::Current());
+  ScopedObjectAccess soa(Thread::Current());
+  VariableSizedHandleScope vshs(soa.Self());
   CreateGraph(&vshs);
   AdjacencyListGraph blks(SetupFromAdjacencyList("start",
                                                  "exit",
@@ -8229,7 +8284,8 @@ class UsesOrderDependentTestGroup
 // b = obj.foo;
 // return a + b;
 TEST_P(UsesOrderDependentTestGroup, RecordPredicatedReplacements1) {
-  VariableSizedHandleScope vshs(Thread::Current());
+  ScopedObjectAccess soa(Thread::Current());
+  VariableSizedHandleScope vshs(soa.Self());
   CreateGraph(&vshs);
   AdjacencyListGraph blks(SetupFromAdjacencyList("entry",
                                                  "exit",
@@ -8393,7 +8449,8 @@ TEST_P(UsesOrderDependentTestGroup, RecordPredicatedReplacements1) {
 // b = obj.foo;
 // return a + b;
 TEST_P(UsesOrderDependentTestGroup, RecordPredicatedReplacements2) {
-  VariableSizedHandleScope vshs(Thread::Current());
+  ScopedObjectAccess soa(Thread::Current());
+  VariableSizedHandleScope vshs(soa.Self());
   CreateGraph(&vshs);
   AdjacencyListGraph blks(SetupFromAdjacencyList("entry",
                                                  "exit",
@@ -8566,7 +8623,8 @@ class UsesOrderDependentTestGroupForThreeItems
 // b = obj.foo;
 // return a + b + x;
 TEST_P(UsesOrderDependentTestGroupForThreeItems, RecordPredicatedReplacements3) {
-  VariableSizedHandleScope vshs(Thread::Current());
+  ScopedObjectAccess soa(Thread::Current());
+  VariableSizedHandleScope vshs(soa.Self());
   CreateGraph(&vshs);
   AdjacencyListGraph blks(SetupFromAdjacencyList("entry",
                                                  "exit",
