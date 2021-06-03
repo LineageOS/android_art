@@ -617,10 +617,13 @@ class LSEVisitor final : private HGraphDelegateVisitor {
 
   bool IsPartialNoEscape(HBasicBlock* blk, size_t idx) {
     auto* ri = heap_location_collector_.GetHeapLocation(idx)->GetReferenceInfo();
-    auto* sg = ri->GetNoEscapeSubgraph();
-    return ri->IsPartialSingleton() &&
-           std::none_of(sg->GetExcludedCohorts().cbegin(),
-                        sg->GetExcludedCohorts().cend(),
+    if (!ri->IsPartialSingleton()) {
+      return false;
+    }
+    ArrayRef<const ExecutionSubgraph::ExcludedCohort> cohorts =
+        ri->GetNoEscapeSubgraph()->GetExcludedCohorts();
+    return std::none_of(cohorts.cbegin(),
+                        cohorts.cend(),
                         [&](const ExecutionSubgraph::ExcludedCohort& ex) -> bool {
                           // Make sure we haven't yet and never will escape.
                           return ex.PrecedesBlock(blk) ||
@@ -1096,8 +1099,6 @@ class LSEVisitor final : private HGraphDelegateVisitor {
         heap_values_for_[instruction->GetBlock()->GetBlockId()];
     for (size_t i = 0u, size = heap_values.size(); i != size; ++i) {
       ReferenceInfo* ref_info = heap_location_collector_.GetHeapLocation(i)->GetReferenceInfo();
-      ArrayRef<const ExecutionSubgraph::ExcludedCohort> cohorts =
-          ref_info->GetNoEscapeSubgraph()->GetExcludedCohorts();
       HBasicBlock* blk = instruction->GetBlock();
       // We don't need to do anything if the reference has not escaped at this point.
       // This is true if either we (1) never escape or (2) sometimes escape but
@@ -1105,14 +1106,22 @@ class LSEVisitor final : private HGraphDelegateVisitor {
       // We count being in the excluded cohort as escaping. Technically, this is
       // a bit over-conservative (since we can have multiple non-escaping calls
       // before a single escaping one) but this simplifies everything greatly.
+      auto partial_singleton_did_not_escape = [](ReferenceInfo* ref_info, HBasicBlock* blk) {
+        DCHECK(ref_info->IsPartialSingleton());
+        if (!ref_info->GetNoEscapeSubgraph()->ContainsBlock(blk)) {
+          return false;
+        }
+        ArrayRef<const ExecutionSubgraph::ExcludedCohort> cohorts =
+            ref_info->GetNoEscapeSubgraph()->GetExcludedCohorts();
+        return std::none_of(cohorts.begin(),
+                            cohorts.end(),
+                            [&](const ExecutionSubgraph::ExcludedCohort& cohort) {
+                              return cohort.PrecedesBlock(blk);
+                            });
+      };
       if (ref_info->IsSingleton() ||
           // partial and we aren't currently escaping and we haven't escaped yet.
-          (ref_info->IsPartialSingleton() && ref_info->GetNoEscapeSubgraph()->ContainsBlock(blk) &&
-           std::none_of(cohorts.begin(),
-                        cohorts.end(),
-                        [&](const ExecutionSubgraph::ExcludedCohort& cohort) {
-                          return cohort.PrecedesBlock(blk);
-                        }))) {
+          (ref_info->IsPartialSingleton() && partial_singleton_did_not_escape(ref_info, blk))) {
         // Singleton references cannot be seen by the callee.
       } else {
         if (side_effects.DoesAnyRead() || side_effects.DoesAnyWrite()) {
@@ -2901,9 +2910,9 @@ class PartialLoadStoreEliminationHelper {
                                 nullptr,
                                 alloc_->Adapter(kArenaAllocLSE)),
         first_materialization_block_id_(GetGraph()->GetBlocks().size()) {
-    heap_refs_.reserve(lse_->heap_location_collector_.GetNumberOfReferenceInfos());
-    new_ref_phis_.reserve(lse_->heap_location_collector_.GetNumberOfReferenceInfos() *
-                          GetGraph()->GetBlocks().size());
+    size_t num_partial_singletons = lse_->heap_location_collector_.CountPartialSingletons();
+    heap_refs_.reserve(num_partial_singletons);
+    new_ref_phis_.reserve(num_partial_singletons * GetGraph()->GetBlocks().size());
     CollectInterestingHeapRefs();
   }
 

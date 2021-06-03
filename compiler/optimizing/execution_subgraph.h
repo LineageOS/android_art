@@ -113,7 +113,7 @@ class BlockIdFilterThunk {
 // allocated in the entry block. This is a massively simplifying assumption but
 // means we can't partially remove objects that are repeatedly allocated in a
 // loop.
-class ExecutionSubgraph : public ArenaObject<kArenaAllocLSA> {
+class ExecutionSubgraph : public DeletableArenaObject<kArenaAllocLSA> {
  public:
   using BitVecBlockRange =
       IterationRange<TransformIterator<BitVector::IndexIterator, BlockIdToBlockTransformer>>;
@@ -222,12 +222,11 @@ class ExecutionSubgraph : public ArenaObject<kArenaAllocLSA> {
   // to have a constant branching factor.
   static constexpr uint32_t kMaxFilterableSuccessors = 8;
 
-  // Instantiate a subgraph. analysis_possible controls whether or not to even
-  // attempt partial-escape analysis. It should be false if partial-escape
-  // analysis is not desired (eg when being used for instruction scheduling) or
-  // when the branching factor in the graph is too high. This is calculated once
-  // and passed down for performance reasons.
-  ExecutionSubgraph(HGraph* graph, bool analysis_possible, ScopedArenaAllocator* allocator);
+  // Instantiate a subgraph. The subgraph can be instantiated only if partial-escape
+  // analysis is desired (eg not when being used for instruction scheduling) and
+  // when the branching factor in the graph is not too high. These conditions
+  // are determined once and passed down for performance reasons.
+  ExecutionSubgraph(HGraph* graph, ScopedArenaAllocator* allocator);
 
   void Invalidate() {
     valid_ = false;
