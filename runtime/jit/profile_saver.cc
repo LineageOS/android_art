@@ -551,19 +551,11 @@ bool ProfileSaver::ProcessProfilingInfo(bool force_save, /*out*/uint16_t* number
       total_number_of_code_cache_queries_++;
     }
     {
-      ProfileCompilationInfo info(Runtime::Current()->GetArenaPool());
+      ProfileCompilationInfo info(Runtime::Current()->GetArenaPool(),
+                                  /*for_boot_image=*/ options_.GetProfileBootClassPath());
       if (!info.Load(filename, /*clear_if_invalid=*/ true)) {
         LOG(WARNING) << "Could not forcefully load profile " << filename;
         continue;
-      }
-      if (options_.GetProfileBootClassPath() != info.IsForBootImage()) {
-        // If we enabled boot class path profiling but the profile is a regular one,
-        // (or the opposite), clear the profile. We do not support cross-version merges.
-        LOG(WARNING) << "Adjust profile version: for_boot_classpath="
-            << options_.GetProfileBootClassPath();
-        info.ClearDataAndAdjustVersion(options_.GetProfileBootClassPath());
-        // For saving to ensure we persist the new version.
-        force_save = true;
       }
       uint64_t last_save_number_of_methods = info.GetNumberOfMethods();
       uint64_t last_save_number_of_classes = info.GetNumberOfResolvedClasses();
@@ -924,19 +916,6 @@ void ProfileSaver::ForceProcessProfiles() {
   if (saver != nullptr) {
     saver->ProcessProfilingInfo(/*force_save=*/true, /*number_of_new_methods=*/nullptr);
   }
-}
-
-bool ProfileSaver::HasSeenMethod(const std::string& profile, bool hot, MethodReference ref) {
-  MutexLock mu(Thread::Current(), *Locks::profiler_lock_);
-  if (instance_ != nullptr) {
-    ProfileCompilationInfo info(Runtime::Current()->GetArenaPool());
-    if (!info.Load(profile, /*clear_if_invalid=*/false)) {
-      return false;
-    }
-    const ProfileCompilationInfo::MethodHotness hotness = info.GetMethodHotness(ref);
-    return hot ? hotness.IsHot() : hotness.IsInProfile();
-  }
-  return false;
 }
 
 void ProfileSaver::ResolveTrackedLocations() {

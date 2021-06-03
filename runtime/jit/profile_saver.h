@@ -50,10 +50,6 @@ class ProfileSaver {
   // For testing or manual purposes (SIGUSR1).
   static void ForceProcessProfiles() REQUIRES(!Locks::profiler_lock_, !Locks::mutator_lock_);
 
-  // Just for testing purposes.
-  static bool HasSeenMethod(const std::string& profile, bool hot, MethodReference ref)
-      REQUIRES(!Locks::profiler_lock_);
-
   // Notify that startup has completed.
   static void NotifyStartupCompleted() REQUIRES(!Locks::profiler_lock_, !instance_->wait_lock_);
 
