@@ -210,7 +210,7 @@ bool GenerateBootImageProfile(
 
   std::unique_ptr<FlattenProfileData> flattend_data(new FlattenProfileData());
   for (const std::string& profile_file : profile_files) {
-    ProfileCompilationInfo profile;
+    ProfileCompilationInfo profile(/*for_boot_image=*/ true);
     if (!profile.Load(profile_file, /*clear_if_invalid=*/ false)) {
       LOG(ERROR) << "Profile is not a valid: " << profile_file;
       return false;

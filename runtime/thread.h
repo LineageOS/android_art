@@ -908,16 +908,16 @@ class Thread {
   void HandleScopeVisitRoots(RootVisitor* visitor, uint32_t thread_id)
       REQUIRES_SHARED(Locks::mutator_lock_);
 
-  BaseHandleScope* GetTopHandleScope() {
+  BaseHandleScope* GetTopHandleScope() REQUIRES_SHARED(Locks::mutator_lock_) {
     return tlsPtr_.top_handle_scope;
   }
 
-  void PushHandleScope(BaseHandleScope* handle_scope) {
+  void PushHandleScope(BaseHandleScope* handle_scope) REQUIRES_SHARED(Locks::mutator_lock_) {
     DCHECK_EQ(handle_scope->GetLink(), tlsPtr_.top_handle_scope);
     tlsPtr_.top_handle_scope = handle_scope;
   }
 
-  BaseHandleScope* PopHandleScope() {
+  BaseHandleScope* PopHandleScope() REQUIRES_SHARED(Locks::mutator_lock_) {
     BaseHandleScope* handle_scope = tlsPtr_.top_handle_scope;
     DCHECK(handle_scope != nullptr);
     tlsPtr_.top_handle_scope = tlsPtr_.top_handle_scope->GetLink();
