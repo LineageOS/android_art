@@ -44,26 +44,22 @@ inline FixedSizeHandleScope<kNumReferences>::FixedSizeHandleScope(BaseHandleScop
 }
 
 template<size_t kNumReferences>
-inline FixedSizeHandleScope<kNumReferences>::FixedSizeHandleScope(BaseHandleScope* link)
-    : HandleScope(link, kNumReferences) {
-  static_assert(kNumReferences >= 1, "FixedSizeHandleScope must contain at least 1 reference");
-  DCHECK_EQ(&storage_[0], GetReferences());  // TODO: Figure out how to use a compile assert.
-  for (size_t i = 0; i < kNumReferences; ++i) {
-    SetReferenceToNull(i);
-  }
-}
-
-template<size_t kNumReferences>
 inline StackHandleScope<kNumReferences>::StackHandleScope(Thread* self,
                                                           ObjPtr<mirror::Object> fill_value)
     : FixedSizeHandleScope<kNumReferences>(self->GetTopHandleScope(), fill_value),
       self_(self) {
   DCHECK_EQ(self, Thread::Current());
+  if (kDebugLocking) {
+    Locks::mutator_lock_->AssertSharedHeld(self_);
+  }
   self_->PushHandleScope(this);
 }
 
 template<size_t kNumReferences>
 inline StackHandleScope<kNumReferences>::~StackHandleScope() {
+  if (kDebugLocking) {
+    Locks::mutator_lock_->AssertSharedHeld(self_);
+  }
   BaseHandleScope* top_handle_scope = self_->PopHandleScope();
   DCHECK_EQ(top_handle_scope, this);
 }
@@ -161,12 +157,6 @@ inline void FixedSizeHandleScope<kNumReferences>::SetReference(size_t i,
   GetReferences()[i].Assign(object);
 }
 
-template<size_t kNumReferences>
-inline void FixedSizeHandleScope<kNumReferences>::SetReferenceToNull(size_t i) {
-  DCHECK_LT(i, kNumReferences);
-  GetReferences()[i].Assign(nullptr);
-}
-
 // Number of references contained within this handle scope.
 inline uint32_t BaseHandleScope::NumberOfReferences() const {
   return LIKELY(!IsVariableSized())
@@ -227,10 +217,17 @@ inline VariableSizedHandleScope::VariableSizedHandleScope(Thread* const self)
       self_(self),
       current_scope_(&first_scope_),
       first_scope_(/*link=*/ nullptr) {
+  DCHECK_EQ(self, Thread::Current());
+  if (kDebugLocking) {
+    Locks::mutator_lock_->AssertSharedHeld(self_);
+  }
   self_->PushHandleScope(this);
 }
 
 inline VariableSizedHandleScope::~VariableSizedHandleScope() {
+  if (kDebugLocking) {
+    Locks::mutator_lock_->AssertSharedHeld(self_);
+  }
   BaseHandleScope* top_handle_scope = self_->PopHandleScope();
   DCHECK_EQ(top_handle_scope, this);
   // Don't delete first_scope_ since it is not heap allocated.
