@@ -260,7 +260,8 @@ TEST_F(ProfileCompilationInfoTest, SaveArtMethodsWithInlineCaches) {
       const ProfileMethodInfo& pmi = profile_methods_map.find(m)->second;
       ProfileCompilationInfo::MethodHotness offline_hotness = info.GetMethodHotness(method_ref);
       ASSERT_TRUE(offline_hotness.IsHot());
-      ASSERT_TRUE(ProfileTestHelper::EqualInlineCaches(pmi.inline_caches, offline_hotness, info));
+      ASSERT_TRUE(ProfileTestHelper::EqualInlineCaches(
+                      pmi.inline_caches, method_ref.dex_file, offline_hotness, info));
     }
   }
 }

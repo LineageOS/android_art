@@ -172,6 +172,24 @@ class BitMemoryRegion final : public ValueObject {
     StoreBits(bit_offset + bit, src.LoadBits(bit, num_bits), num_bits);
   }
 
+  // Or bits from other bit region.
+  ALWAYS_INLINE void OrBits(size_t bit_offset, const BitMemoryRegion& src, size_t bit_length) {
+    // TODO: Load `size_t` chunks (instead of `uint32_t`) from aligned
+    // addresses except for the leading and trailing bits. Refactor to
+    // share code with StoreBits() and maybe other functions.
+    DCHECK_LE(bit_offset, bit_size_);
+    DCHECK_LE(bit_length, bit_size_ - bit_offset);
+    size_t bit = 0;
+    constexpr size_t kNumBits = BitSizeOf<uint32_t>();
+    for (; bit + kNumBits <= bit_length; bit += kNumBits) {
+      size_t old_bits = LoadBits(bit_offset + bit, kNumBits);
+      StoreBits(bit_offset + bit, old_bits | src.LoadBits(bit, kNumBits), kNumBits);
+    }
+    size_t num_bits = bit_length - bit;
+    size_t old_bits = LoadBits(bit_offset + bit, num_bits);
+    StoreBits(bit_offset + bit, old_bits | src.LoadBits(bit, num_bits), num_bits);
+  }
+
   // Count the number of set bits within the given bit range.
   ALWAYS_INLINE size_t PopCount(size_t bit_offset, size_t bit_length) const {
     DCHECK_LE(bit_offset, bit_size_);
@@ -184,6 +202,23 @@ class BitMemoryRegion final : public ValueObject {
     }
     count += POPCOUNT(LoadBits(bit_offset + bit, bit_length - bit));
     return count;
+  }
+
+  // Check if there is any bit set within the given bit range.
+  ALWAYS_INLINE bool HasSomeBitSet(size_t bit_offset, size_t bit_length) const {
+    // TODO: Load `size_t` chunks (instead of `uint32_t`) from aligned
+    // addresses except for the leading and trailing bits. Refactor to
+    // share code with PopCount() and maybe also Compare().
+    DCHECK_LE(bit_offset, bit_size_);
+    DCHECK_LE(bit_length, bit_size_ - bit_offset);
+    size_t bit = 0;
+    constexpr size_t kNumBits = BitSizeOf<uint32_t>();
+    for (; bit + kNumBits <= bit_length; bit += kNumBits) {
+      if (LoadBits(bit_offset + bit, kNumBits) != 0u) {
+        return true;
+      }
+    }
+    return LoadBits(bit_offset + bit, bit_length - bit) != 0u;
   }
 
   static int Compare(const BitMemoryRegion& lhs, const BitMemoryRegion& rhs) {
