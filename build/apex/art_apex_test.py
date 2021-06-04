@@ -21,6 +21,7 @@ import fnmatch
 import logging
 import os
 import os.path
+import shutil
 import subprocess
 import sys
 import zipfile
@@ -57,6 +58,17 @@ def isEnvTrue(var):
   return var in os.environ and os.environ[var] == 'true'
 
 
+def extract_apex(apex_path, deapexer_path, debugfs_path, tmpdir):
+  _, apex_name = os.path.split(apex_path)
+  extract_path = os.path.join(tmpdir, apex_name)
+  if os.path.exists(extract_path):
+    shutil.rmtree(extract_path)
+  subprocess.check_call([deapexer_path, '--debugfs', debugfs_path,
+                         'extract', apex_path, extract_path],
+                        stdout=subprocess.DEVNULL)
+  return extract_path
+
+
 class FSObject:
   def __init__(self, name, is_dir, is_exec, is_symlink, size):
     self.name = name
@@ -71,83 +83,6 @@ class FSObject:
 
 
 class TargetApexProvider:
-  def __init__(self, apex, tmpdir, debugfs):
-    self._tmpdir = tmpdir
-    self._debugfs = debugfs
-    self._folder_cache = {}
-    self._payload = os.path.join(self._tmpdir, 'apex_payload.img')
-    # Extract payload to tmpdir.
-    apex_zip = zipfile.ZipFile(apex)
-    apex_zip.extract('apex_payload.img', tmpdir)
-
-  def __del__(self):
-    # Delete temps.
-    if os.path.exists(self._payload):
-      os.remove(self._payload)
-
-  def get(self, path):
-    apex_dir, name = os.path.split(path)
-    if not apex_dir:
-      apex_dir = '.'
-    apex_map = self.read_dir(apex_dir)
-    return apex_map[name] if name in apex_map else None
-
-  def read_dir(self, apex_dir):
-    if apex_dir in self._folder_cache:
-      return self._folder_cache[apex_dir]
-    # Cannot use check_output as it will annoy with stderr.
-    process = subprocess.Popen([self._debugfs, '-R', 'ls -l -p %s' % apex_dir, self._payload],
-                               stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                               universal_newlines=True)
-    stdout, _ = process.communicate()
-    res = str(stdout)
-    apex_map = {}
-    # Debugfs output looks like this:
-    #   debugfs 1.44.4 (18-Aug-2018)
-    #   /12/040755/0/2000/.//
-    #   /2/040755/1000/1000/..//
-    #   /13/100755/0/2000/dalvikvm32/28456/
-    #   /14/100755/0/2000/dexoptanalyzer/20396/
-    #   /15/100755/0/2000/linker/1152724/
-    #   /16/100755/0/2000/dex2oat/563508/
-    #   /17/100755/0/2000/linker64/1605424/
-    #   /18/100755/0/2000/profman/85304/
-    #   /19/100755/0/2000/dalvikvm64/28576/
-    #    |     |   |   |       |        |
-    #    |     |   |   #- gid  #- name  #- size
-    #    |     |   #- uid
-    #    |     #- type and permission bits
-    #    #- inode nr (?)
-    #
-    # Note: could break just on '/' to avoid names with newlines.
-    for line in res.split("\n"):
-      if not line:
-        continue
-      comps = line.split('/')
-      if len(comps) != 8:
-        logging.warning('Could not break and parse line \'%s\'', line)
-        continue
-      bits = comps[2]
-      name = comps[5]
-      size_str = comps[6]
-      # Use a negative value as an indicator of undefined/unknown size.
-      size = int(size_str) if size_str != '' else -1
-      if len(bits) != 6:
-        logging.warning('Dont understand bits \'%s\'', bits)
-        continue
-      is_dir = bits[1] == '4'
-
-      def is_exec_bit(ch):
-        return int(ch) & 1 == 1
-
-      is_exec = is_exec_bit(bits[3]) and is_exec_bit(bits[4]) and is_exec_bit(bits[5])
-      is_symlink = bits[1] == '2'
-      apex_map[name] = FSObject(name, is_dir, is_exec, is_symlink, size)
-    self._folder_cache[apex_dir] = apex_map
-    return apex_map
-
-
-class TargetFlattenedApexProvider:
   def __init__(self, apex):
     self._folder_cache = {}
     self._apex = apex
@@ -944,9 +879,13 @@ def art_apex_test_main(test_args):
   if not test_args.flattened and not test_args.tmpdir:
     logging.error("Need a tmpdir.")
     return 1
-  if not test_args.flattened and not test_args.host and not test_args.debugfs:
-    logging.error("Need debugfs.")
-    return 1
+  if not test_args.flattened and not test_args.host:
+    if not test_args.deapexer:
+      logging.error("Need deapexer.")
+      return 1
+    if not test_args.debugfs:
+      logging.error("Need debugfs.")
+      return 1
 
   if test_args.host:
     # Host APEX.
@@ -981,10 +920,13 @@ def art_apex_test_main(test_args):
     if test_args.host:
       apex_provider = HostApexProvider(test_args.apex, test_args.tmpdir)
     else:
-      if test_args.flattened:
-        apex_provider = TargetFlattenedApexProvider(test_args.apex)
-      else:
-        apex_provider = TargetApexProvider(test_args.apex, test_args.tmpdir, test_args.debugfs)
+      apex_dir = test_args.apex
+      if not test_args.flattened:
+        # Extract the apex. It would be nice to use the output from "deapexer list"
+        # to avoid this work, but it doesn't provide info about executable bits.
+        apex_dir = extract_apex(test_args.apex, test_args.deapexer, test_args.debugfs,
+                                test_args.tmpdir)
+      apex_provider = TargetApexProvider(apex_dir)
   except (zipfile.BadZipFile, zipfile.LargeZipFile) as e:
     logging.error('Failed to create provider: %s', e)
     return 1
@@ -1121,6 +1063,7 @@ if __name__ == "__main__":
   parser.add_argument('--size', help='Print file sizes', action='store_true')
 
   parser.add_argument('--tmpdir', help='Directory for temp files')
+  parser.add_argument('--deapexer', help='Path to deapexer')
   parser.add_argument('--debugfs', help='Path to debugfs')
 
   parser.add_argument('--bitness', help='Bitness to check', choices=BITNESS_ALL,

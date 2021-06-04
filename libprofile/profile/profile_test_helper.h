@@ -76,8 +76,7 @@ class ProfileTestHelper {
                        const DexFile* dex,
                        dex::TypeIndex type_index,
                        const ProfileSampleAnnotation& annotation = ProfileSampleAnnotation::kNone) {
-    std::vector<dex::TypeIndex> classes = {type_index};
-    return info->AddClassesForDex(dex, classes.begin(), classes.end(), annotation);
+    return info->AddClass(*dex, type_index, annotation);
   }
 
   static bool ProfileIndexMatchesDexFile(const ProfileCompilationInfo& info,
@@ -90,6 +89,7 @@ class ProfileTestHelper {
 
   // Compare different representations of inline caches for equality.
   static bool EqualInlineCaches(const std::vector<ProfileMethodInfo::ProfileInlineCache>& expected,
+                                const DexFile* dex_file,
                                 const ProfileCompilationInfo::MethodHotness& actual_hotness,
                                 const ProfileCompilationInfo& info) {
     CHECK(actual_hotness.IsHot());
@@ -126,14 +126,18 @@ class ProfileTestHelper {
       if (dex_pc_data.classes.size() != expected_it->classes.size()) {
         return false;
       }
-      for (const ProfileCompilationInfo::ClassReference& class_ref : dex_pc_data.classes) {
+      for (dex::TypeIndex type_index : dex_pc_data.classes) {
         if (std::none_of(expected_it->classes.begin(),
                          expected_it->classes.end(),
                          [&](const TypeReference& type_ref) {
-                           return (class_ref.type_index == type_ref.TypeIndex()) &&
-                                  ProfileIndexMatchesDexFile(info,
-                                                             class_ref.dex_profile_index,
-                                                             type_ref.dex_file);
+                           if (type_ref.dex_file == dex_file) {
+                             return type_index == type_ref.TypeIndex();
+                           } else {
+                             const char* expected_descriptor =
+                                 type_ref.dex_file->StringByTypeIdx(type_ref.TypeIndex());
+                             const char* descriptor = info.GetTypeDescriptor(dex_file, type_index);
+                             return strcmp(expected_descriptor, descriptor) == 0;
+                           }
                          })) {
           return false;
         }
@@ -151,18 +155,23 @@ class ProfileTestHelper {
                           size_t num_method_ids,
                           size_t num_class_ids = kNumSharedTypes + 1u) {
     TestDexFileBuilder builder;
-    for (size_t shared_type_index = 0; shared_type_index != kNumSharedTypes; ++shared_type_index) {
+    builder.AddType(class_descriptor);
+    CHECK_NE(num_class_ids, 0u);
+    size_t num_shared_ids = std::min(num_class_ids - 1u, kNumSharedTypes);
+    for (size_t shared_type_index = 0; shared_type_index != num_shared_ids; ++shared_type_index) {
       builder.AddType("LSharedType" + std::to_string(shared_type_index) + ";");
     }
-    builder.AddType(class_descriptor);
-    for (size_t i = kNumSharedTypes + 1u; i < num_class_ids; ++i) {
+    for (size_t i = 1u + num_shared_ids; i < num_class_ids; ++i) {
       builder.AddType("LFiller" + std::to_string(i) + ";");
     }
     for (size_t method_index = 0; method_index != num_method_ids; ++method_index) {
-      // Keep the number of protos and names low even for the maximum number of methods.
-      size_t return_type_index = method_index % kNumSharedTypes;
-      size_t arg_type_index = (method_index / kNumSharedTypes) % kNumSharedTypes;
-      size_t method_name_index = (method_index / kNumSharedTypes) / kNumSharedTypes;
+      // Some tests add the maximum number of methods (`num_method_ids` is 2^16) and we
+      // do not want to waste memory with that many unique name strings (with identical
+      // proto id). So create up to num_shared_ids^2 proto ids and only
+      // num_method_ids/num_shared_ids^2 names.
+      size_t return_type_index = method_index % num_shared_ids;
+      size_t arg_type_index = (method_index / num_shared_ids) % num_shared_ids;
+      size_t method_name_index = (method_index / num_shared_ids) / num_shared_ids;
       std::string return_type = "LSharedType" + std::to_string(return_type_index) + ";";
       std::string arg_type = "LSharedType" + std::to_string(arg_type_index) + ";";
       std::string signature = "(" + arg_type + ")" + return_type;

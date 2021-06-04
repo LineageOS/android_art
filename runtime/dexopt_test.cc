@@ -26,11 +26,14 @@
 #include "base/mem_map.h"
 #include "common_runtime_test.h"
 #include "compiler_callbacks.h"
+#include "dex/art_dex_file_loader.h"
+#include "dex/dex_file_loader.h"
 #include "dex2oat_environment_test.h"
 #include "dexopt_test.h"
 #include "gc/space/image_space.h"
 #include "hidden_api.h"
 #include "oat.h"
+#include "profile/profile_compilation_info.h"
 
 namespace art {
 void DexoptTest::SetUp() {
@@ -110,6 +113,24 @@ void DexoptTest::GenerateOatForTest(const std::string& dex_location,
 
   ScratchFile profile_file;
   if (CompilerFilter::DependsOnProfile(filter)) {
+    // Create a profile with some basic content so that dex2oat
+    // doesn't get an empty profile and changes the filter to verify.
+    std::string error_msg;
+    std::vector<std::unique_ptr<const DexFile>> dex_files;
+    const ArtDexFileLoader dex_file_loader;
+    ASSERT_TRUE(dex_file_loader.Open(
+        dex_location.c_str(), dex_location.c_str(), /*verify=*/ false, /*verify_checksum=*/ false,
+        &error_msg, &dex_files));
+    EXPECT_GE(dex_files.size(), 1U);
+    std::unique_ptr<const DexFile>& dex_file = dex_files[0];
+    ProfileCompilationInfo info;
+
+    info.AddClass(*dex_file, dex::TypeIndex(0));
+
+    ASSERT_TRUE(info.Save(profile_file.GetFd()));
+    ASSERT_EQ(0, profile_file.GetFile()->Flush());
+
+    // Set the argument
     args.push_back("--profile-file=" + profile_file.GetFilename());
   }
 

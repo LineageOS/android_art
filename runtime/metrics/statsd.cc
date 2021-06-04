@@ -41,17 +41,19 @@ constexpr std::optional<int32_t> EncodeDatumId(DatumId datum_id) {
   switch (datum_id) {
     case DatumId::kClassVerificationTotalTime:
       return std::make_optional(
-          statsd::ART_DATUM_REPORTED__KIND__ART_DATUM_CLASS_VERIFICATION_TIME);
+          statsd::ART_DATUM_REPORTED__KIND__ART_DATUM_CLASS_VERIFICATION_TIME_COUNTER_MICROS);
     case DatumId::kJitMethodCompileTime:
       return std::make_optional(
-          statsd::ART_DATUM_REPORTED__KIND__ART_DATUM_JIT_METHOD_COMPILE_TIME);
+          statsd::ART_DATUM_REPORTED__KIND__ART_DATUM_JIT_METHOD_COMPILE_TIME_HISTO_MICROS);
     case DatumId::kClassLoadingTotalTime:
-      return std::make_optional(statsd::ART_DATUM_REPORTED__KIND__ART_DATUM_CLASS_LOADING_TIME);
+      return std::make_optional(
+          statsd::ART_DATUM_REPORTED__KIND__ART_DATUM_CLASS_LOADING_TIME_COUNTER_MICROS);
     case DatumId::kClassVerificationCount:
       return std::make_optional(
           statsd::ART_DATUM_REPORTED__KIND__ART_DATUM_CLASS_VERIFICATION_COUNT);
     case DatumId::kMutatorPauseTimeDuringGC:
-      return std::make_optional(statsd::ART_DATUM_REPORTED__KIND__ART_DATUM_GC_MUTATOR_PAUSE_TIME);
+      return std::make_optional(
+          statsd::ART_DATUM_REPORTED__KIND__ART_DATUM_GC_MUTATOR_PAUSE_TIME_COUNTER_MICROS);
     case DatumId::kYoungGcCount:
       return std::make_optional(
           statsd::ART_DATUM_REPORTED__KIND__ART_DATUM_GC_YOUNG_GENERATION_COLLECTION_COUNT);
@@ -62,19 +64,23 @@ constexpr std::optional<int32_t> EncodeDatumId(DatumId datum_id) {
       return std::make_optional(
           statsd::ART_DATUM_REPORTED__KIND__ART_DATUM_GC_TOTAL_BYTES_ALLOCATED);
     case DatumId::kTotalGcMetaDataSize:
-      return std::make_optional(statsd::ART_DATUM_REPORTED__KIND__ART_DATUM_GC_TOTAL_METADATA_SIZE);
+      return std::make_optional(
+          statsd::ART_DATUM_REPORTED__KIND__ART_DATUM_GC_TOTAL_METADATA_SIZE_BYTES);
     case DatumId::kYoungGcCollectionTime:
       return std::make_optional(
-          statsd::ART_DATUM_REPORTED__KIND__ART_DATUM_GC_YOUNG_GENERATION_COLLECTION_TIME);
+          statsd::
+              ART_DATUM_REPORTED__KIND__ART_DATUM_GC_YOUNG_GENERATION_COLLECTION_TIME_HISTO_MILLIS);
     case DatumId::kFullGcCollectionTime:
       return std::make_optional(
-          statsd::ART_DATUM_REPORTED__KIND__ART_DATUM_GC_FULL_HEAP_COLLECTION_TIME);
+          statsd::ART_DATUM_REPORTED__KIND__ART_DATUM_GC_FULL_HEAP_COLLECTION_TIME_HISTO_MILLIS);
     case DatumId::kYoungGcThroughput:
       return std::make_optional(
-          statsd::ART_DATUM_REPORTED__KIND__ART_DATUM_GC_YOUNG_GENERATION_COLLECTION_THROUGHPUT);
+          statsd::
+              ART_DATUM_REPORTED__KIND__ART_DATUM_GC_YOUNG_GENERATION_COLLECTION_THROUGHPUT_MB_PER_SEC);
     case DatumId::kFullGcThroughput:
       return std::make_optional(
-          statsd::ART_DATUM_REPORTED__KIND__ART_DATUM_GC_FULL_HEAP_COLLECTION_THROUGHPUT);
+          statsd::
+              ART_DATUM_REPORTED__KIND__ART_DATUM_GC_FULL_HEAP_COLLECTION_THROUGHPUT_MB_PER_SEC);
     case DatumId::kJitMethodCompileCount:
       return std::make_optional(
           statsd::ART_DATUM_REPORTED__KIND__ART_DATUM_JIT_METHOD_COMPILE_COUNT);

@@ -2,3 +2,8 @@ SHLMain;->attemptInlineMonomorphic(LMain;)I+invalid_class
 SHLMain;->attemptInlinePolymorphic(LMain;)I+LMain;,invalid_class
 SHLMain;->invalid_method
 invalid_class
+
+# Invalid descriptor in inline cache spec causes the entire line to be rejected
+# and this test requires the methods to be present in the profile.
+SHLMain;->attemptInlineMonomorphic(LMain;)I
+SHLMain;->attemptInlinePolymorphic(LMain;)I

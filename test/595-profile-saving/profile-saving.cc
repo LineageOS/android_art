@@ -48,30 +48,38 @@ extern "C" JNIEXPORT void JNICALL Java_Main_ensureProfileProcessing(JNIEnv*, jcl
   ProfileSaver::ForceProcessProfiles();
 }
 
-extern "C" JNIEXPORT jboolean JNICALL Java_Main_presentInProfile(JNIEnv* env,
-                                                                 jclass,
-                                                                 jstring filename,
-                                                                 jobject method) {
-  ScopedUtfChars filename_chars(env, filename);
-  CHECK(filename_chars.c_str() != nullptr);
-  ScopedObjectAccess soa(env);
-  ObjPtr<mirror::Executable> exec = soa.Decode<mirror::Executable>(method);
-  ArtMethod* art_method = exec->GetArtMethod();
-  return ProfileSaver::HasSeenMethod(std::string(filename_chars.c_str()),
-                                     /*hot*/ true,
-                                     MethodReference(art_method->GetDexFile(),
-                                                     art_method->GetDexMethodIndex()));
-}
-
 extern "C" JNIEXPORT jboolean JNICALL Java_Main_isForBootImage(JNIEnv* env,
                                                                jclass,
                                                                jstring filename) {
   ScopedUtfChars filename_chars(env, filename);
   CHECK(filename_chars.c_str() != nullptr);
 
-  ProfileCompilationInfo info;
-  info.Load(std::string(filename_chars.c_str()), /*clear_if_invalid=*/ false);
-  return info.IsForBootImage();
+  ProfileCompilationInfo info(/*for_boot_image=*/ true);
+  bool result = info.Load(std::string(filename_chars.c_str()), /*clear_if_invalid=*/ false);
+  return result ? JNI_TRUE : JNI_FALSE;
+}
+
+extern "C" JNIEXPORT jboolean JNICALL Java_Main_presentInProfile(JNIEnv* env,
+                                                                 jclass c,
+                                                                 jstring filename,
+                                                                 jobject method) {
+  bool for_boot_image = Java_Main_isForBootImage(env, c, filename) == JNI_TRUE;
+  ScopedUtfChars filename_chars(env, filename);
+  CHECK(filename_chars.c_str() != nullptr);
+  ScopedObjectAccess soa(env);
+  ObjPtr<mirror::Executable> exec = soa.Decode<mirror::Executable>(method);
+  ArtMethod* art_method = exec->GetArtMethod();
+  MethodReference ref(art_method->GetDexFile(), art_method->GetDexMethodIndex());
+
+  ProfileCompilationInfo info(Runtime::Current()->GetArenaPool(), for_boot_image);
+  if (!info.Load(filename_chars.c_str(), /*clear_if_invalid=*/false)) {
+    LOG(ERROR) << "Failed to load profile from " << filename;
+    return JNI_FALSE;
+  }
+  const ProfileCompilationInfo::MethodHotness hotness = info.GetMethodHotness(ref);
+  // TODO: Why do we check `hotness.IsHot()` instead of `hotness.IsInProfile()`
+  // in a method named `presentInProfile()`?
+  return hotness.IsHot() ? JNI_TRUE : JNI_FALSE;
 }
 
 }  // namespace
