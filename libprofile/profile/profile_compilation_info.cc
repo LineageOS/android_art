@@ -696,20 +696,6 @@ dex::TypeIndex ProfileCompilationInfo::FindOrCreateTypeIndex(const DexFile& dex_
 }
 
 bool ProfileCompilationInfo::AddClass(const DexFile& dex_file,
-                                      dex::TypeIndex type_index,
-                                      const ProfileSampleAnnotation& annotation) {
-  DCHECK(type_index.IsValid());
-  DCHECK(type_index.index_ <= dex_file.NumTypeIds() ||
-         type_index.index_ - dex_file.NumTypeIds() < extra_descriptors_.size());
-  DexFileData* const data = GetOrAddDexFileData(&dex_file, annotation);
-  if (data == nullptr) {  // checksum mismatch
-    return false;
-  }
-  data->class_set.insert(type_index);
-  return true;
-}
-
-bool ProfileCompilationInfo::AddClass(const DexFile& dex_file,
                                       const char* descriptor,
                                       const ProfileSampleAnnotation& annotation) {
   DexFileData* const data = GetOrAddDexFileData(&dex_file, annotation);
@@ -885,19 +871,20 @@ static bool WriteBuffer(int fd, const void* buffer, size_t byte_count) {
  * where `extra_descriptor` is a NULL-terminated string.
  *
  * Classes contains records for any number of dex files, each consisting of:
- *    profile_index
+ *    profile_index  // Index of the dex file in DexFiles section.
  *    number_of_classes
  *    type_index_diff[number_of_classes]
  * where instead of storing plain sorted type indexes, we store their differences
  * as smaller numbers are likely to compress better.
  *
  * Methods contains records for any number of dex files, each consisting of:
- *    profile_index
+ *    profile_index  // Index of the dex file in DexFiles section.
  *    following_data_size  // For easy skipping of remaining data when dex file is filtered out.
  *    method_flags
  *    bitmap_data
  *    method_encoding[]  // Until the size indicated by `following_data_size`.
- * where `bitmap_data` contains `num_method_ids` bits for each bit set in `method_flags` other
+ * where `method_flags` is a union of flags recorded for methods in the referenced dex file,
+ * `bitmap_data` contains `num_method_ids` bits for each bit set in `method_flags` other
  * than "hot" (the size of `bitmap_data` is rounded up to whole bytes) and `method_encoding[]`
  * contains data for hot methods. The `method_encoding` is:
  *    method_index_diff
@@ -1063,7 +1050,16 @@ bool ProfileCompilationInfo::Save(int fd) {
   if (lseek64(fd, sizeof(FileHeader), SEEK_SET) != sizeof(FileHeader)) {
     return false;
   }
-  if (!WriteBuffer(fd, section_infos.data(), section_index * sizeof(FileSectionInfo))) {
+  SafeBuffer section_infos_buffer(section_index * 4u * sizeof(uint32_t));
+  for (size_t i = 0; i != section_index; ++i) {
+    const FileSectionInfo& info = section_infos[i];
+    section_infos_buffer.WriteUintAndAdvance(enum_cast<uint32_t>(info.GetType()));
+    section_infos_buffer.WriteUintAndAdvance(info.GetFileOffset());
+    section_infos_buffer.WriteUintAndAdvance(info.GetFileSize());
+    section_infos_buffer.WriteUintAndAdvance(info.GetInflatedSize());
+  }
+  DCHECK_EQ(section_infos_buffer.GetAvailableBytes(), 0u);
+  if (!WriteBuffer(fd, section_infos_buffer.Get(), section_infos_buffer.Size())) {
     return false;
   }
 

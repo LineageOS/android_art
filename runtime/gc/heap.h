@@ -834,8 +834,10 @@ class Heap {
 
   // Request asynchronous GC. Observed_gc_num is the value of GetCurrentGcNum() when we started to
   // evaluate the GC triggering condition. If a GC has been completed since then, we consider our
-  // job done. Ensures that gcs_completed_ will eventually be incremented beyond observed_gc_num.
-  void RequestConcurrentGC(Thread* self, GcCause cause, bool force_full, uint32_t observed_gc_num)
+  // job done. If we return true, then we ensured that gcs_completed_ will eventually be
+  // incremented beyond observed_gc_num. We return false only in corner cases in which we cannot
+  // ensure that.
+  bool RequestConcurrentGC(Thread* self, GcCause cause, bool force_full, uint32_t observed_gc_num)
       REQUIRES(!*pending_task_lock_);
 
   // Whether or not we may use a garbage collector, used so that we only create collectors we need.
@@ -1585,9 +1587,10 @@ class Heap {
   // Increment is guarded by gc_complete_lock_.
   Atomic<uint32_t> gcs_completed_;
 
-  // The number of garbage collections we've scheduled. Normally either gcs_complete_ or
-  // gcs_complete + 1.
-  Atomic<uint32_t> gcs_requested_;
+  // The number of the last garbage collection that has been requested.  A value of gcs_completed
+  // + 1 indicates that another collection is needed or in progress. A value of gcs_completed_ or
+  // (logically) less means that no new GC has been requested.
+  Atomic<uint32_t> max_gc_requested_;
 
   // Active tasks which we can modify (change target time, desired collector type, etc..).
   CollectorTransitionTask* pending_collector_transition_ GUARDED_BY(pending_task_lock_);

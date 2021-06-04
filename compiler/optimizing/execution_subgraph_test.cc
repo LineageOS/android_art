@@ -142,7 +142,7 @@ TEST_F(ExecutionSubgraphTest, Basic) {
       "exit",
       { { "entry", "left" }, { "entry", "right" }, { "left", "exit" }, { "right", "exit" } }));
   ASSERT_TRUE(ExecutionSubgraph::CanAnalyse(graph_));
-  ExecutionSubgraph esg(graph_, true, GetScopedAllocator());
+  ExecutionSubgraph esg(graph_, GetScopedAllocator());
   esg.RemoveBlock(blks.Get("left"));
   esg.Finalize();
   ASSERT_TRUE(esg.IsValid());
@@ -229,7 +229,7 @@ TEST_F(ExecutionSubgraphTest, Propagation) {
                                                    { "entry", "right" },
                                                    { "right", "exit" } }));
   ASSERT_TRUE(ExecutionSubgraph::CanAnalyse(graph_));
-  ExecutionSubgraph esg(graph_, /*analysis_possible=*/true, GetScopedAllocator());
+  ExecutionSubgraph esg(graph_, GetScopedAllocator());
   esg.RemoveBlock(blks.Get("l2"));
   esg.Finalize();
   ASSERT_TRUE(esg.IsValid());
@@ -292,7 +292,7 @@ TEST_F(ExecutionSubgraphTest, PropagationLoop) {
                                                    { "entry", "right" },
                                                    { "right", "exit" } }));
   ASSERT_TRUE(ExecutionSubgraph::CanAnalyse(graph_));
-  ExecutionSubgraph esg(graph_, /*analysis_possible=*/true, GetScopedAllocator());
+  ExecutionSubgraph esg(graph_, GetScopedAllocator());
   esg.RemoveBlock(blks.Get("l2"));
   esg.Finalize();
   ASSERT_TRUE(esg.IsValid());
@@ -348,7 +348,7 @@ TEST_F(ExecutionSubgraphTest, PropagationLoop2) {
                                                    { "entry", "right" },
                                                    { "right", "exit" } }));
   ASSERT_TRUE(ExecutionSubgraph::CanAnalyse(graph_));
-  ExecutionSubgraph esg(graph_, /*analysis_possible=*/true, GetScopedAllocator());
+  ExecutionSubgraph esg(graph_, GetScopedAllocator());
   esg.RemoveBlock(blks.Get("l1"));
   esg.Finalize();
   ASSERT_TRUE(esg.IsValid());
@@ -403,7 +403,7 @@ TEST_F(ExecutionSubgraphTest, PropagationLoop3) {
                                                    { "entry", "right" },
                                                    { "right", "exit" } }));
   ASSERT_TRUE(ExecutionSubgraph::CanAnalyse(graph_));
-  ExecutionSubgraph esg(graph_, /*analysis_possible=*/true, GetScopedAllocator());
+  ExecutionSubgraph esg(graph_, GetScopedAllocator());
   esg.RemoveBlock(blks.Get("l1loop"));
   esg.Finalize();
   ASSERT_TRUE(esg.IsValid());
@@ -478,7 +478,7 @@ TEST_F(ExecutionSubgraphTest, PropagationLoop4) {
                                                   {"entry", "right"},
                                                   {"right", "exit"}}));
   ASSERT_TRUE(ExecutionSubgraph::CanAnalyse(graph_));
-  ExecutionSubgraph esg(graph_, /*analysis_possible=*/true, GetScopedAllocator());
+  ExecutionSubgraph esg(graph_, GetScopedAllocator());
   esg.RemoveBlock(blks.Get("l1loop_left"));
   esg.Finalize();
   ASSERT_TRUE(esg.IsValid());
@@ -545,7 +545,7 @@ TEST_F(ExecutionSubgraphTest, PropagationLoop5) {
                                                   {"entry", "right"},
                                                   {"right", "exit"}}));
   ASSERT_TRUE(ExecutionSubgraph::CanAnalyse(graph_));
-  ExecutionSubgraph esg(graph_, /*analysis_possible=*/true, GetScopedAllocator());
+  ExecutionSubgraph esg(graph_, GetScopedAllocator());
   esg.RemoveBlock(blks.Get("l1loop_left"));
   esg.Finalize();
   ASSERT_TRUE(esg.IsValid());
@@ -575,7 +575,7 @@ TEST_F(ExecutionSubgraphTest, Invalid) {
       "exit",
       { { "entry", "left" }, { "entry", "right" }, { "left", "exit" }, { "right", "exit" } }));
   ASSERT_TRUE(ExecutionSubgraph::CanAnalyse(graph_));
-  ExecutionSubgraph esg(graph_, /*analysis_possible=*/true, GetScopedAllocator());
+  ExecutionSubgraph esg(graph_, GetScopedAllocator());
   esg.RemoveBlock(blks.Get("left"));
   esg.RemoveBlock(blks.Get("right"));
   esg.Finalize();
@@ -598,7 +598,7 @@ TEST_F(ExecutionSubgraphTest, Exclusions) {
                                                    { "b", "exit" },
                                                    { "c", "exit" } }));
   ASSERT_TRUE(ExecutionSubgraph::CanAnalyse(graph_));
-  ExecutionSubgraph esg(graph_, /*analysis_possible=*/true, GetScopedAllocator());
+  ExecutionSubgraph esg(graph_, GetScopedAllocator());
   esg.RemoveBlock(blks.Get("a"));
   esg.RemoveBlock(blks.Get("c"));
   esg.Finalize();
@@ -703,7 +703,7 @@ TEST_F(ExecutionSubgraphTest, ExclusionExtended) {
                                                    { "c_end_1", "exit" },
                                                    { "c_end_2", "exit" } }));
   ASSERT_TRUE(ExecutionSubgraph::CanAnalyse(graph_));
-  ExecutionSubgraph esg(graph_, /*analysis_possible=*/true, GetScopedAllocator());
+  ExecutionSubgraph esg(graph_, GetScopedAllocator());
   esg.RemoveBlock(blks.Get("a"));
   esg.RemoveBlock(blks.Get("c_mid"));
   esg.Finalize();
@@ -787,7 +787,7 @@ TEST_F(ExecutionSubgraphTest, InAndOutEscape) {
                                                    { "esc_bottom", "exit" } }));
 
   ASSERT_TRUE(ExecutionSubgraph::CanAnalyse(graph_));
-  ExecutionSubgraph esg(graph_, /*analysis_possible=*/true, GetScopedAllocator());
+  ExecutionSubgraph esg(graph_, GetScopedAllocator());
   esg.RemoveBlock(blks.Get("esc_top"));
   esg.RemoveBlock(blks.Get("esc_bottom"));
   esg.Finalize();
@@ -817,7 +817,7 @@ TEST_F(ExecutionSubgraphTest, BigNodes) {
   }
   AdjacencyListGraph blks(SetupFromAdjacencyList("entry", "exit", edges));
   ASSERT_TRUE(ExecutionSubgraph::CanAnalyse(graph_));
-  ExecutionSubgraph esg(graph_, /*analysis_possible=*/true, GetScopedAllocator());
+  ExecutionSubgraph esg(graph_, GetScopedAllocator());
   esg.Finalize();
   ASSERT_TRUE(esg.IsValid());
   ASSERT_TRUE(IsValidSubgraph(esg));
@@ -846,7 +846,7 @@ TEST_F(ExecutionSubgraphTest, BigNodesMissing) {
   }
   AdjacencyListGraph blks(SetupFromAdjacencyList("entry", "exit", edges));
   ASSERT_TRUE(ExecutionSubgraph::CanAnalyse(graph_));
-  ExecutionSubgraph esg(graph_, /*analysis_possible=*/true, GetScopedAllocator());
+  ExecutionSubgraph esg(graph_, GetScopedAllocator());
   esg.RemoveBlock(blks.Get("blk2"));
   esg.RemoveBlock(blks.Get("blk4"));
   esg.Finalize();
@@ -877,7 +877,7 @@ TEST_F(ExecutionSubgraphTest, BigNodesNoPath) {
   }
   AdjacencyListGraph blks(SetupFromAdjacencyList("entry", "exit", edges));
   ASSERT_TRUE(ExecutionSubgraph::CanAnalyse(graph_));
-  ExecutionSubgraph esg(graph_, /*analysis_possible=*/true, GetScopedAllocator());
+  ExecutionSubgraph esg(graph_, GetScopedAllocator());
   for (const auto& mid : mid_blocks) {
     esg.RemoveBlock(blks.Get(mid));
   }
@@ -907,7 +907,7 @@ TEST_F(ExecutionSubgraphTest, CanAnalyseBig) {
   AdjacencyListGraph blks(SetupFromAdjacencyList(mid_blocks.front(), mid_blocks.back(), edges));
   ASSERT_TRUE(ExecutionSubgraph::CanAnalyse(graph_));
 
-  ExecutionSubgraph esg(graph_, /*analysis_possible=*/true, GetScopedAllocator());
+  ExecutionSubgraph esg(graph_, GetScopedAllocator());
   esg.Finalize();
   ASSERT_TRUE(esg.IsValid());
   ASSERT_TRUE(IsValidSubgraph(esg));
@@ -937,7 +937,7 @@ TEST_F(ExecutionSubgraphTest, CanAnalyseBig2) {
   edges.emplace_back(mid_blocks.front(), mid_blocks.back());
   AdjacencyListGraph blks(SetupFromAdjacencyList(mid_blocks.front(), mid_blocks.back(), edges));
   ASSERT_TRUE(ExecutionSubgraph::CanAnalyse(graph_));
-  ExecutionSubgraph esg(graph_, /*analysis_possible=*/true, GetScopedAllocator());
+  ExecutionSubgraph esg(graph_, GetScopedAllocator());
   constexpr size_t kToRemoveIdx = kNumBlocks / 2;
   HBasicBlock* remove_implicit = blks.Get(mid_blocks[kToRemoveIdx]);
   for (HBasicBlock* pred : remove_implicit->GetPredecessors()) {

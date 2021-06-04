@@ -94,7 +94,8 @@ static bool CanBinaryOpsAlias(const HBinaryOperation* idx1,
 // Make sure we mark any writes/potential writes to heap-locations within partially
 // escaped values as escaping.
 void ReferenceInfo::PrunePartialEscapeWrites() {
-  if (!subgraph_.IsValid()) {
+  DCHECK(subgraph_ != nullptr);
+  if (!subgraph_->IsValid()) {
     // All paths escape.
     return;
   }
@@ -104,12 +105,12 @@ void ReferenceInfo::PrunePartialEscapeWrites() {
   for (const HUseListNode<HInstruction*>& use : reference_->GetUses()) {
     const HInstruction* user = use.GetUser();
     if (!additional_exclusions.IsBitSet(user->GetBlock()->GetBlockId()) &&
-        subgraph_.ContainsBlock(user->GetBlock()) &&
+        subgraph_->ContainsBlock(user->GetBlock()) &&
         (user->IsUnresolvedInstanceFieldSet() || user->IsUnresolvedStaticFieldSet() ||
          user->IsInstanceFieldSet() || user->IsStaticFieldSet() || user->IsArraySet()) &&
         (reference_ == user->InputAt(0)) &&
-        std::any_of(subgraph_.UnreachableBlocks().begin(),
-                    subgraph_.UnreachableBlocks().end(),
+        std::any_of(subgraph_->UnreachableBlocks().begin(),
+                    subgraph_->UnreachableBlocks().end(),
                     [&](const HBasicBlock* excluded) -> bool {
                       return reference_->GetBlock()->GetGraph()->PathBetween(excluded,
                                                                              user->GetBlock());
@@ -122,7 +123,7 @@ void ReferenceInfo::PrunePartialEscapeWrites() {
   }
   if (UNLIKELY(additional_exclusions.IsAnyBitSet())) {
     for (uint32_t exc : additional_exclusions.Indexes()) {
-      subgraph_.RemoveBlock(graph->GetBlocks()[exc]);
+      subgraph_->RemoveBlock(graph->GetBlocks()[exc]);
     }
   }
 }

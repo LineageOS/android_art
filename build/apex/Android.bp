@@ -437,7 +437,8 @@ python_binary_host {
 // Genrules so we can run the checker, and empty Java library so that it gets executed.
 
 art_check_apex_gen_stem = "$(location art-apex-tester)" +
-    " --debugfs $(location debugfs)" +
+    " --deapexer $(location deapexer)" +
+    " --debugfs $(location debugfs_static)" +
     " --tmpdir $(genDir)"
 
 // The non-flattened APEXes are always checked, as they are always generated
@@ -455,7 +456,8 @@ art_module_genrule_defaults {
 
     tools: [
         "art-apex-tester",
-        "debugfs",
+        "deapexer",
+        "debugfs_static",
     ],
 }
 
