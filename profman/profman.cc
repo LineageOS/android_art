@@ -1735,6 +1735,17 @@ class ProfMan final {
     bool for_boot_image = GetOutputProfileType() == OutputProfileType::kBoot;
     ProfileCompilationInfo info(for_boot_image);
 
+    if (for_boot_image) {
+      // Add all dex files to the profile. This is needed for jitzygote to indicate
+      // which dex files are part of the boot image extension to compile in memory.
+      for (const std::unique_ptr<const DexFile>& dex_file : dex_files) {
+        if (info.FindOrAddDexFile(*dex_file) == info.MaxProfileIndex()) {
+          LOG(ERROR) << "Failed to add dex file to boot image profile: " << dex_file->GetLocation();
+          return -1;
+        }
+      }
+    }
+
     for (const auto& line : *user_lines) {
       ProcessLine(dex_files, line, &info);
     }
