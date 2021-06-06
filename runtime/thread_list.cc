@@ -175,7 +175,7 @@ void ThreadList::DumpUnattachedThreads(std::ostream& os, bool dump_native_stack)
         MutexLock mu(self, *Locks::thread_list_lock_);
         thread = FindThreadByTid(tid);
       }
-      if (thread != nullptr) {
+      if (thread == nullptr) {
         DumpUnattachedThread(os, tid, dump_native_stack);
       }
     }
