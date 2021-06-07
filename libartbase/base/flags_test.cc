@@ -24,45 +24,110 @@
 
 namespace art {
 
+// Tests may be run in parallel so this helper class ensures
+// that we generate a unique test flag each time to avoid
+// tests stepping on each other
+class TestFlag {
+ public:
+  // Takes control of the tmp_file pointer.
+  explicit TestFlag(ScratchFile* tmp_file) {
+    tmp_file_.reset(tmp_file);
+
+    std::string tmp_name = tmp_file_->GetFilename();
+    size_t tmp_last_slash = tmp_name.rfind('/');
+    tmp_name = tmp_name.substr(tmp_last_slash + 1);
+
+    flag_name_ = "art.gtest." + tmp_name;
+    system_prop_name_ = "dalvik.vm." + flag_name_;
+    server_name_ = "persist.device_config.runtime_native." + flag_name_;
+    cmd_line_name_ = flag_name_;
+    std::replace(cmd_line_name_.begin(), cmd_line_name_.end(), '.', '-');
+
+    flag_.reset(new Flag<int>(flag_name_, /*default_value=*/ 42));
+  }
+
+  void AssertCmdlineValue(bool has_value, int expected) {
+    ASSERT_EQ(flag_->from_command_line_.has_value(), has_value);
+    if (has_value) {
+      ASSERT_EQ(flag_->from_command_line_.value(), expected);
+    }
+  }
+
+  void AssertSysPropValue(bool has_value, int expected) {
+    ASSERT_EQ(flag_->from_system_property_.has_value(), has_value);
+    if (has_value) {
+      ASSERT_EQ(flag_->from_system_property_.value(), expected);
+    }
+  }
+
+  void AssertServerSettingValue(bool has_value, int expected) {
+    ASSERT_EQ(flag_->from_server_setting_.has_value(), has_value);
+    if (has_value) {
+      ASSERT_EQ(flag_->from_server_setting_.value(), expected);
+    }
+  }
+
+  void AssertDefaultValue(int expected) {
+    ASSERT_EQ(flag_->default_, expected);
+  }
+
+  int Value() {
+    return (*flag_)();
+  }
+
+  std::string SystemProperty() const {
+    return system_prop_name_;
+  }
+
+  std::string ServerSetting() const {
+    return server_name_;
+  }
+
+  std::string CmdLineName() const {
+    return cmd_line_name_;
+  }
+
+ private:
+  std::unique_ptr<ScratchFile> tmp_file_;
+  std::unique_ptr<Flag<int>> flag_;
+  std::string flag_name_;
+  std::string cmd_line_name_;
+  std::string system_prop_name_;
+  std::string server_name_;
+};
+
 class FlagsTests : public CommonRuntimeTest {
  protected:
-  void assertCmdlineValue(bool has_value, int expected) {
-    ASSERT_EQ(gFlags.MyFeatureTestFlag.from_command_line_.has_value(), has_value);
-    if (has_value) {
-      ASSERT_EQ(gFlags.MyFeatureTestFlag.from_command_line_.value(), expected);
-    }
+  // We need to initialize the flag after the ScratchDir is created
+  // but before we configure the runtime options (so that we can get
+  // the right name for the config).
+  //
+  // So we do it in SetUpRuntimeOptions.
+  virtual void SetUpRuntimeOptions(RuntimeOptions* options) {
+    test_flag_.reset(new TestFlag(new ScratchFile()));
+    CommonRuntimeTest::SetUpRuntimeOptions(options);
   }
 
-  void assertSysPropValue(bool has_value, int expected) {
-    ASSERT_EQ(gFlags.MyFeatureTestFlag.from_system_property_.has_value(), has_value);
-    if (has_value) {
-      ASSERT_EQ(gFlags.MyFeatureTestFlag.from_system_property_.value(), expected);
-    }
+  virtual void TearDown() {
+    test_flag_ = nullptr;
+    CommonRuntimeTest::TearDown();
   }
 
-  void assertServerSettingValue(bool has_value, int expected) {
-    ASSERT_EQ(gFlags.MyFeatureTestFlag.from_server_setting_.has_value(), has_value);
-    if (has_value) {
-      ASSERT_EQ(gFlags.MyFeatureTestFlag.from_server_setting_.value(), expected);
-    }
-  }
-
-  void assertDefaultValue(int expected) {
-    ASSERT_EQ(gFlags.MyFeatureTestFlag.default_, expected);
-  }
+  std::unique_ptr<TestFlag> test_flag_;
 };
 
 class FlagsTestsWithCmdLine : public FlagsTests {
- public:
-  ~FlagsTestsWithCmdLine() {
-    android::base::SetProperty("dalvik.vm.my-feature-test.flag", "");
-    android::base::SetProperty("persist.device_config.runtime_native.my-feature-test.flag", "");
+ protected:
+  virtual void TearDown() {
+    // android::base::SetProperty(test_flag_->SystemProperty(), "");
+    android::base::SetProperty(test_flag_->ServerSetting(), "");
+    FlagsTests::TearDown();
   }
 
- protected:
-  void SetUpRuntimeOptions(RuntimeOptions* options) override {
-    // Disable implicit dex2oat invocations when loading image spaces.
-    options->emplace_back("-Xmy-feature-test-flag:1", nullptr);
+  virtual void SetUpRuntimeOptions(RuntimeOptions* options) {
+    test_flag_.reset(new TestFlag(new ScratchFile()));
+    std::string option = "-X" + test_flag_->CmdLineName() + ":1";
+    options->emplace_back(option.c_str(), nullptr);
   }
 };
 
@@ -71,53 +136,53 @@ class FlagsTestsWithCmdLine : public FlagsTests {
 TEST_F(FlagsTests, ValidateDefaultValue) {
   FlagBase::ReloadAllFlags("test");
 
-  assertCmdlineValue(false, 1);
-  assertSysPropValue(false, 2);
-  assertServerSettingValue(false, 3);
-  assertDefaultValue(42);
+  test_flag_->AssertCmdlineValue(false, 1);
+  test_flag_->AssertSysPropValue(false, 2);
+  test_flag_->AssertServerSettingValue(false, 3);
+  test_flag_->AssertDefaultValue(42);
 
-  ASSERT_EQ(gFlags.MyFeatureTestFlag(), 42);
+  ASSERT_EQ(test_flag_->Value(), 42);
 }
 
 // Validate that the server side config is picked when it is set.
 TEST_F(FlagsTestsWithCmdLine, FlagsTestsGetValueServerSetting) {
-  android::base::SetProperty("dalvik.vm.my-feature-test.flag", "2");
-  android::base::SetProperty("persist.device_config.runtime_native.my-feature-test.flag", "3");
+  ASSERT_TRUE(android::base::SetProperty(test_flag_->SystemProperty(), "2"));
+  ASSERT_TRUE(android::base::SetProperty(test_flag_->ServerSetting(), "3"));
 
   FlagBase::ReloadAllFlags("test");
 
-  assertCmdlineValue(true, 1);
-  assertSysPropValue(true, 2);
-  assertServerSettingValue(true, 3);
-  assertDefaultValue(42);
+  test_flag_->AssertCmdlineValue(true, 1);
+  test_flag_->AssertSysPropValue(true, 2);
+  test_flag_->AssertServerSettingValue(true, 3);
+  test_flag_->AssertDefaultValue(42);
 
-  ASSERT_EQ(gFlags.MyFeatureTestFlag(), 3);
+  ASSERT_EQ(test_flag_->Value(), 3);
 }
 
 // Validate that the system property value is picked when the server one is not set.
 TEST_F(FlagsTestsWithCmdLine, FlagsTestsGetValueSysProperty) {
-  android::base::SetProperty("dalvik.vm.my-feature-test.flag", "2");
+  ASSERT_TRUE(android::base::SetProperty(test_flag_->SystemProperty(), "2"));
 
   FlagBase::ReloadAllFlags("test");
 
-  assertCmdlineValue(true, 1);
-  assertSysPropValue(true, 2);
-  assertServerSettingValue(false, 3);
-  assertDefaultValue(42);
+  test_flag_->AssertCmdlineValue(true, 1);
+  test_flag_->AssertSysPropValue(true, 2);
+  test_flag_->AssertServerSettingValue(false, 3);
+  test_flag_->AssertDefaultValue(42);
 
-  ASSERT_EQ(gFlags.MyFeatureTestFlag(), 2);
+  ASSERT_EQ(test_flag_->Value(), 2);
 }
 
 // Validate that the cmdline value is picked when no properties are set.
 TEST_F(FlagsTestsWithCmdLine, FlagsTestsGetValueCmdline) {
   FlagBase::ReloadAllFlags("test");
 
-  assertCmdlineValue(true, 1);
-  assertSysPropValue(false, 2);
-  assertServerSettingValue(false, 3);
-  assertDefaultValue(42);
+  test_flag_->AssertCmdlineValue(true, 1);
+  test_flag_->AssertSysPropValue(false, 2);
+  test_flag_->AssertServerSettingValue(false, 3);
+  test_flag_->AssertDefaultValue(42);
 
-  ASSERT_EQ(gFlags.MyFeatureTestFlag(), 1);
+  ASSERT_EQ(test_flag_->Value(), 1);
 }
 
 }  // namespace art

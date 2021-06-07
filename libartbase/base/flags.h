@@ -140,7 +140,7 @@ class Flag : public FlagBase {
   // Create a new Flag. The name parameter is used to generate the names from the various parameter
   // sources. See the documentation on the Flags struct for an example.
   explicit Flag(const std::string& name, Value default_value = {});
-  virtual ~Flag() {}
+  virtual ~Flag();
 
 
   // Returns the flag value.
@@ -190,7 +190,7 @@ class Flag : public FlagBase {
   std::optional<Value> from_system_property_;
   std::optional<Value> from_server_setting_;
 
-  friend class FlagsTests;
+  friend class TestFlag;
 };
 
 // This struct contains the list of ART flags. Flags are parameterized by the type of value they

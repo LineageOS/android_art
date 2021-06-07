@@ -94,6 +94,11 @@ Flag<Value>::Flag(const std::string& name, Value default_value) :
 }
 
 template <typename Value>
+Flag<Value>::~Flag() {
+  ALL_FLAGS.remove(this);
+}
+
+template <typename Value>
 void Flag<Value>::Reload() {
   // The cmdline flags are loaded by the parsed_options infra.
 
