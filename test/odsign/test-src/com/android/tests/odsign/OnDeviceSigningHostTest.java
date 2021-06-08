@@ -18,14 +18,16 @@ package com.android.tests.odsign;
 
 import static com.google.common.truth.Truth.assertWithMessage;
 
+import static org.junit.Assert.assertTrue;
 import static org.junit.Assume.assumeTrue;
 
 import android.cts.install.lib.host.InstallUtilsHost;
 
-import com.android.tradefed.testtype.DeviceJUnit4ClassRunner;
 import com.android.tradefed.device.ITestDevice.ApexInfo;
+import com.android.tradefed.testtype.DeviceJUnit4ClassRunner;
 import com.android.tradefed.testtype.junit4.BaseHostJUnit4Test;
 import com.android.tradefed.testtype.junit4.DeviceTestRunOptions;
+import com.android.tradefed.util.CommandResult;
 
 import org.junit.After;
 import org.junit.Before;
@@ -33,11 +35,16 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 
 import java.time.Duration;
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.Set;
 
 @RunWith(DeviceJUnit4ClassRunner.class)
 public class OnDeviceSigningHostTest extends BaseHostJUnit4Test {
 
     private static final String APEX_FILENAME = "test_com.android.art.apex";
+    private static final String ART_APEX_DALVIK_CACHE_DIRNAME =
+            "/data/misc/apexdata/com.android.art/dalvik-cache";
 
     private static final String TEST_APP_PACKAGE_NAME = "com.android.tests.odsign";
     private static final String TEST_APP_APK = "odsign_e2e_test_app.apk";
@@ -75,6 +82,137 @@ public class OnDeviceSigningHostTest extends BaseHostJUnit4Test {
         options.setTestClassName(TEST_APP_PACKAGE_NAME + ".ArtifactsSignedTest");
         options.setTestMethodName("testGeneratesRequiredArtArtifacts");
         runDeviceTests(options);
+    }
+
+    private Set<String> getMappedArtifacts(String pid, String grepPattern) throws Exception {
+        final String grepCommand = String.format("grep \"%s\" /proc/%s/maps", grepPattern, pid);
+        CommandResult result = getDevice().executeShellV2Command(grepCommand);
+        assertTrue(result.toString(), result.getExitCode() == 0);
+        Set<String> mappedFiles = new HashSet<>();
+        for (String line : result.getStdout().split("\\R")) {
+            int start = line.indexOf(ART_APEX_DALVIK_CACHE_DIRNAME);
+            if (line.contains("[")) {
+                continue; // ignore anonymously mapped sections which are quoted in square braces.
+            }
+            mappedFiles.add(line.substring(start));
+        }
+        return mappedFiles;
+    }
+
+    private String[] getSystemServerClasspath() throws Exception {
+        String systemServerClasspath =
+                getDevice().executeShellCommand("echo $SYSTEMSERVERCLASSPATH");
+        return systemServerClasspath.split(":");
+    }
+
+    private String getSystemServerIsa(String mappedArtifact) {
+        // Artifact path for system server artifacts has the form:
+        //    ART_APEX_DALVIK_CACHE_DIRNAME + "/<arch>/system@framework@some.jar@classes.odex"
+        // `mappedArtifacts` may include other artifacts, such as boot-framework.oat that are not
+        // prefixed by the architecture.
+        String[] pathComponents = mappedArtifact.split("/");
+        return pathComponents[pathComponents.length - 2];
+    }
+
+    private void verifySystemServerLoadedArtifacts() throws Exception {
+        String[] classpathElements = getSystemServerClasspath();
+        assertTrue("SYSTEMSERVERCLASSPATH is empty", classpathElements.length > 0);
+
+        String systemServerPid = getDevice().executeShellCommand("pgrep system_server");
+        assertTrue(systemServerPid != null);
+
+        // system_server artifacts are in the APEX data dalvik cache and names all contain
+        // the word "@classes". Look for mapped files that match this pattern in the proc map for
+        // system_server.
+        final String grepPattern = ART_APEX_DALVIK_CACHE_DIRNAME + ".*@classes";
+        final Set<String> mappedArtifacts = getMappedArtifacts(systemServerPid, grepPattern);
+        assertTrue(
+                "No mapped artifacts under " + ART_APEX_DALVIK_CACHE_DIRNAME,
+                mappedArtifacts.size() > 0);
+        final String isa = getSystemServerIsa(mappedArtifacts.iterator().next());
+        final String isaCacheDirectory = String.format("%s/%s", ART_APEX_DALVIK_CACHE_DIRNAME, isa);
+
+        // Extension types for artifacts that this test looks for.
+        final String[] extensions = new String[] {".art", ".odex", ".vdex"};
+
+        // Check the non-APEX components in the system_server classpath have mapped artifacts.
+        for (String element : classpathElements) {
+            // Skip system_server classpath elements from APEXes as these are not currently
+            // compiled.
+            if (element.startsWith("/apex")) {
+                continue;
+            }
+            String escapedPath = element.substring(1).replace('/', '@');
+            for (String extension : extensions) {
+                final String fullArtifactPath =
+                        String.format("%s/%s@classes%s", isaCacheDirectory, escapedPath, extension);
+                assertTrue(
+                        "Missing " + fullArtifactPath, mappedArtifacts.contains(fullArtifactPath));
+            }
+        }
+
+        for (String mappedArtifact : mappedArtifacts) {
+            // Check no APEX JAR artifacts are mapped for system_server since if there
+            // are, then the policy around not compiling APEX jars for system_server has
+            // changed and this test needs updating here and in the system_server classpath
+            // check above.
+            assertTrue(
+                    "Unexpected mapped artifact: " + mappedArtifact,
+                    mappedArtifact.contains("/apex"));
+
+            // Check the mapped artifact has a .art, .odex or .vdex extension.
+            final boolean knownArtifactKind =
+                    Arrays.stream(extensions).anyMatch(e -> mappedArtifact.endsWith(e));
+            assertTrue("Unknown artifact kind: " + mappedArtifact, knownArtifactKind);
+        }
+    }
+
+    private void verifyZygoteLoadedArtifacts(String zygotePid) throws Exception {
+        final String bootExtensionName = "boot-framework";
+        final Set<String> mappedArtifacts = getMappedArtifacts(zygotePid, bootExtensionName);
+
+        assertTrue("Expect 3 boot-framework artifacts", mappedArtifacts.size() == 3);
+
+        // Extension types for artifacts that this test looks for.
+        final String[] extensions = new String[] {".art", ".oat", ".vdex"};
+
+        for (String extension : extensions) {
+            final String artifact = bootExtensionName + extension;
+            final boolean found = mappedArtifacts.stream().anyMatch(a -> a.endsWith(artifact));
+            assertTrue(artifact + " not found", found);
+        }
+    }
+
+    private void verifyZygotesLoadedArtifacts() throws Exception {
+        // There are potentially two zygote processes "zygote" and "zygote64". These are
+        // instances 32-bit and 64-bit unspecialized app_process processes.
+        // (frameworks/base/cmds/app_process).
+        int zygoteCount = 0;
+        for (String processName : new String[] {"zygote", "zygote64"}) {
+            final CommandResult pgrepResult =
+                    getDevice().executeShellV2Command("pgrep " + processName);
+            if (pgrepResult.getExitCode() != 0) {
+                continue;
+            }
+            final String zygotePid = pgrepResult.getStdout();
+            verifyZygoteLoadedArtifacts(zygotePid);
+            zygoteCount += 1;
+        }
+        assertTrue("No zygote processes found", zygoteCount > 0);
+    }
+
+    @Test
+    public void verifyGeneratedArtifactsLoaded() throws Exception {
+        // Checking zygote and system_server need the device have adb root to walk process maps.
+        final boolean adbEnabled = getDevice().enableAdbRoot();
+        assertTrue("ADB root failed and required to get process maps", adbEnabled);
+
+        // Check both zygote and system_server processes to see that they have loaded the
+        // artifacts compiled and signed by odrefresh and odsign. We check both here rather than
+        // having a separate test because the device reboots between each @Test method and
+        // that is an expensive use of time.
+        verifyZygotesLoadedArtifacts();
+        verifySystemServerLoadedArtifacts();
     }
 
     private void reboot() throws Exception {
