@@ -23,6 +23,7 @@
 #include <android-base/strings.h>
 
 #include "base/file_utils.h"
+#include "base/flags.h"
 #include "base/indenter.h"
 #include "base/macros.h"
 #include "base/utils.h"
@@ -463,8 +464,11 @@ std::unique_ptr<RuntimeParser> ParsedOptions::MakeParser(bool ignore_unrecognize
       .Define("-XX:PerfettoJavaHeapStackProf=_")
           .WithType<bool>()
           .WithValueMap({{"false", false}, {"true", true}})
-          .IntoKey(M::PerfettoJavaHeapStackProf)
-      .Ignore({
+          .IntoKey(M::PerfettoJavaHeapStackProf);
+
+      FlagBase::AddFlagsToCmdlineParser(parser_builder.get());
+
+      parser_builder->Ignore({
           "-ea", "-da", "-enableassertions", "-disableassertions", "--runtime-arg", "-esa",
           "-dsa", "-enablesystemassertions", "-disablesystemassertions", "-Xrs", "-Xint:_",
           "-Xdexopt:_", "-Xnoquithandler", "-Xjnigreflimit:_", "-Xgenregmap", "-Xnogenregmap",
