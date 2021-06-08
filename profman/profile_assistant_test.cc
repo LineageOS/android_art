@@ -584,6 +584,42 @@ TEST_F(ProfileAssistantTest, AdviseCompilationNonEmptyReferences) {
   CheckProfileInfo(profile2, info2);
 }
 
+TEST_F(ProfileAssistantTest, DoNotAdviseCompilationEmptyProfile) {
+  ScratchFile profile1;
+  ScratchFile profile2;
+  ScratchFile reference_profile;
+
+  std::vector<int> profile_fds({
+      GetFd(profile1),
+      GetFd(profile2)});
+  int reference_profile_fd = GetFd(reference_profile);
+
+  ProfileCompilationInfo info1;
+  SetupProfile(dex1, dex2, /*number_of_methods=*/ 0, /*number_of_classes*/ 0, profile1, &info1);
+  ProfileCompilationInfo info2;
+  SetupProfile(dex3, dex4, /*number_of_methods=*/ 0, /*number_of_classes*/ 0, profile2, &info2);
+
+  // We should not advise compilation.
+  ASSERT_EQ(ProfileAssistant::kSkipCompilationEmptyProfiles,
+            ProcessProfiles(profile_fds, reference_profile_fd));
+
+  // The information from profiles must remain the same.
+  ProfileCompilationInfo file_info1;
+  ASSERT_TRUE(file_info1.Load(GetFd(profile1)));
+  ASSERT_TRUE(file_info1.Equals(info1));
+
+  ProfileCompilationInfo file_info2;
+  ASSERT_TRUE(file_info2.Load(GetFd(profile2)));
+  ASSERT_TRUE(file_info2.Equals(info2));
+
+  // Reference profile files must remain empty.
+  ASSERT_EQ(0, reference_profile.GetFile()->GetLength());
+
+  // The information from profiles must remain the same.
+  CheckProfileInfo(profile1, info1);
+  CheckProfileInfo(profile2, info2);
+}
+
 TEST_F(ProfileAssistantTest, DoNotAdviseCompilation) {
   ScratchFile profile1;
   ScratchFile profile2;
@@ -601,7 +637,7 @@ TEST_F(ProfileAssistantTest, DoNotAdviseCompilation) {
   SetupProfile(dex3, dex4, kNumberOfMethodsToSkipCompilation, 0, profile2, &info2);
 
   // We should not advise compilation.
-  ASSERT_EQ(ProfileAssistant::kSkipCompilation,
+  ASSERT_EQ(ProfileAssistant::kSkipCompilationSmallDelta,
             ProcessProfiles(profile_fds, reference_profile_fd));
 
   // The information from profiles must remain the same.
@@ -627,7 +663,7 @@ TEST_F(ProfileAssistantTest, DoNotAdviseCompilationMethodPercentage) {
   std::vector<const std::string> extra_args({"--min-new-methods-percent-change=2"});
 
   // We should not advise compilation.
-  ASSERT_EQ(ProfileAssistant::kSkipCompilation,
+  ASSERT_EQ(ProfileAssistant::kSkipCompilationSmallDelta,
             CheckCompilationMethodPercentChange(kNumberOfMethodsInCurProfile,
                                                 kNumberOfMethodsInRefProfile,
                                                 extra_args));
@@ -650,7 +686,7 @@ TEST_F(ProfileAssistantTest, DoNotAdviseCompilationMethodPercentageWithNewMin) {
   const uint16_t kNumberOfMethodsInCurProfile = 6200;  // Threshold is 20%.
 
   // We should not advise compilation.
-  ASSERT_EQ(ProfileAssistant::kSkipCompilation,
+  ASSERT_EQ(ProfileAssistant::kSkipCompilationSmallDelta,
             CheckCompilationMethodPercentChange(kNumberOfMethodsInCurProfile,
                                                 kNumberOfMethodsInRefProfile));
 }
@@ -661,7 +697,7 @@ TEST_F(ProfileAssistantTest, DoNotAdviseCompilationClassPercentage) {
   std::vector<const std::string> extra_args({"--min-new-classes-percent-change=2"});
 
   // We should not advise compilation.
-  ASSERT_EQ(ProfileAssistant::kSkipCompilation,
+  ASSERT_EQ(ProfileAssistant::kSkipCompilationSmallDelta,
             CheckCompilationClassPercentChange(kNumberOfClassesInCurProfile,
                                                kNumberOfClassesInRefProfile,
                                                extra_args));
@@ -684,7 +720,7 @@ TEST_F(ProfileAssistantTest, DoNotAdviseCompilationClassPercentageWithNewMin) {
   const uint16_t kNumberOfClassesInCurProfile = 6200;  // Threshold is 20%.
 
   // We should not advise compilation.
-  ASSERT_EQ(ProfileAssistant::kSkipCompilation,
+  ASSERT_EQ(ProfileAssistant::kSkipCompilationSmallDelta,
             CheckCompilationClassPercentChange(kNumberOfClassesInCurProfile,
                                                kNumberOfClassesInRefProfile));
 }
