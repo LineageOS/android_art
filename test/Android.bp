@@ -925,6 +925,7 @@ filegroup {
         ":art-gtest-jars-AllFields",
         ":art-gtest-jars-DefaultMethods",
         ":art-gtest-jars-DexToDexDecompiler",
+        ":art-gtest-jars-Dex2oatVdexTestDex",
         ":art-gtest-jars-ErroneousA",
         ":art-gtest-jars-ErroneousB",
         ":art-gtest-jars-ErroneousInit",
@@ -1230,6 +1231,12 @@ java_library {
 java_library {
     name: "art-gtest-jars-XandY",
     srcs: ["XandY/**/*.java"],
+    defaults: ["art-gtest-jars-defaults"],
+}
+
+java_library {
+    name: "art-gtest-jars-Dex2oatVdexTestDex",
+    srcs: ["Dex2oatVdexTestDex/**/*.java"],
     defaults: ["art-gtest-jars-defaults"],
 }
 

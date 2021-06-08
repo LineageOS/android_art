@@ -44,6 +44,8 @@
 #include "dex/dex_file_loader.h"
 #include "dex2oat_environment_test.h"
 #include "dex2oat_return_codes.h"
+#include "elf_file.h"
+#include "elf_file_impl.h"
 #include "gc_root-inl.h"
 #include "intern_table-inl.h"
 #include "oat.h"
@@ -54,7 +56,6 @@
 
 namespace art {
 
-static constexpr bool kDebugArgs = false;
 static const char* kDisableCompactDex = "--compact-dex-level=none";
 
 using android::base::StringPrintf;
@@ -66,7 +67,6 @@ class Dex2oatTest : public Dex2oatEnvironmentTest {
 
     output_ = "";
     error_msg_ = "";
-    success_ = false;
   }
 
  protected:
@@ -100,7 +100,7 @@ class Dex2oatTest : public Dex2oatEnvironmentTest {
 
     args.insert(args.end(), extra_args.begin(), extra_args.end());
 
-    int status = Dex2Oat(args, error_msg);
+    int status = Dex2Oat(args, &output_, error_msg);
     if (oat_file != nullptr) {
       CHECK_EQ(oat_file->FlushClose(), 0) << "Could not flush and close oat file";
     }
@@ -207,58 +207,8 @@ class Dex2oatTest : public Dex2oatEnvironmentTest {
     EXPECT_EQ(expected, actual);
   }
 
-  int Dex2Oat(const std::vector<std::string>& dex2oat_args, std::string* error_msg) {
-    std::vector<std::string> argv;
-    if (!CommonRuntimeTest::StartDex2OatCommandLine(&argv, error_msg)) {
-      return false;
-    }
-
-    Runtime* runtime = Runtime::Current();
-    if (!runtime->IsVerificationEnabled()) {
-      argv.push_back("--compiler-filter=assume-verified");
-    }
-
-    if (runtime->MustRelocateIfPossible()) {
-      argv.push_back("--runtime-arg");
-      argv.push_back("-Xrelocate");
-    } else {
-      argv.push_back("--runtime-arg");
-      argv.push_back("-Xnorelocate");
-    }
-
-    if (!kIsTargetBuild) {
-      argv.push_back("--host");
-    }
-
-    argv.insert(argv.end(), dex2oat_args.begin(), dex2oat_args.end());
-
-    // We must set --android-root.
-    const char* android_root = getenv("ANDROID_ROOT");
-    CHECK(android_root != nullptr);
-    argv.push_back("--android-root=" + std::string(android_root));
-
-    if (kDebugArgs) {
-      std::string all_args;
-      for (const std::string& arg : argv) {
-        all_args += arg + " ";
-      }
-      LOG(ERROR) << all_args;
-    }
-
-    // We need dex2oat to actually log things.
-    auto post_fork_fn = []() { return setenv("ANDROID_LOG_TAGS", "*:d", 1) == 0; };
-    ForkAndExecResult res = ForkAndExec(argv, post_fork_fn, &output_);
-    if (res.stage != ForkAndExecResult::kFinished) {
-      *error_msg = strerror(errno);
-      return -1;
-    }
-    success_ = res.StandardSuccess();
-    return res.status_code;
-  }
-
   std::string output_ = "";
   std::string error_msg_ = "";
-  bool success_ = false;
 };
 
 class Dex2oatSwapTest : public Dex2oatTest {
@@ -282,7 +232,6 @@ class Dex2oatSwapTest : public Dex2oatTest {
     ASSERT_TRUE(GenerateOdexForTest(dex_location, odex_location, CompilerFilter::kSpeed, copy));
 
     CheckValidity();
-    ASSERT_TRUE(success_);
     CheckResult(expect_use);
   }
 
@@ -508,7 +457,6 @@ class Dex2oatVeryLargeTest : public Dex2oatTest {
     ASSERT_TRUE(GenerateOdexForTest(dex_location, odex_location, filter, new_args));
 
     CheckValidity();
-    ASSERT_TRUE(success_);
     CheckResult(dex_location,
                 odex_location,
                 app_image_file,
@@ -730,7 +678,6 @@ class Dex2oatLayoutTest : public Dex2oatTest {
                          /*use_fd=*/ false,
                          /*num_profile_classes=*/ 0);
       CheckValidity();
-      ASSERT_TRUE(success_);
       // Don't check the result since CheckResult relies on the class being in the profile.
       image_file_empty_profile = GetImageObjectSectionSize(app_image_file);
       EXPECT_GT(image_file_empty_profile, 0u);
@@ -743,7 +690,6 @@ class Dex2oatLayoutTest : public Dex2oatTest {
                        /*use_fd=*/ false,
                        /*num_profile_classes=*/ 1);
     CheckValidity();
-    ASSERT_TRUE(success_);
     CheckResult(dex_location, odex_location, app_image_file);
 
     if (app_image) {
@@ -789,7 +735,6 @@ class Dex2oatLayoutTest : public Dex2oatTest {
     }
     ASSERT_EQ(vdex_file1->FlushCloseOrErase(), 0) << "Could not flush and close vdex file";
     CheckValidity();
-    ASSERT_TRUE(success_);
   }
 
   void CheckResult(const std::string& dex_location,
@@ -919,7 +864,6 @@ class Dex2oatUnquickenTest : public Dex2oatTest {
     for (size_t i = 0; i != checksums1.size(); ++i) {
       EXPECT_EQ(checksums1[i], checksums2[i]) << i;
     }
-    ASSERT_TRUE(success_);
   }
 
   void RunUnquickenMultiDexCDex() {
@@ -961,7 +905,6 @@ class Dex2oatUnquickenTest : public Dex2oatTest {
     ASSERT_EQ(vdex_file1->FlushCloseOrErase(), 0) << "Could not flush and close vdex file";
     ASSERT_EQ(vdex_file2->FlushCloseOrErase(), 0) << "Could not flush and close vdex file";
     CheckResult(dex_location, odex_location2);
-    ASSERT_TRUE(success_);
   }
 
   void CheckResult(const std::string& dex_location, const std::string& odex_location) {
@@ -2063,7 +2006,6 @@ TEST_F(Dex2oatTest, QuickenedInput) {
                                     /* use_fd= */ true));
   }
   ASSERT_EQ(vdex_unquickened->Flush(), 0) << "Could not flush and close vdex file";
-  ASSERT_TRUE(success_);
   {
     // Check that hte vdex has one dex and compare it to the original one.
     std::unique_ptr<VdexFile> vdex(VdexFile::Open(vdex_location2.c_str(),
@@ -2547,6 +2489,110 @@ TEST_F(Dex2oatISAFeaturesRuntimeDetectionTest, TestCurrentRuntimeFeaturesAsDex2O
   }
 
   RunTest();
+}
+
+// Regression test for bug 179221298.
+TEST_F(Dex2oatTest, LoadOutOfDateOatFile) {
+  std::unique_ptr<const DexFile> dex(OpenTestDexFile("ManyMethods"));
+  std::string out_dir = GetScratchDir();
+  const std::string base_oat_name = out_dir + "/base.oat";
+  ASSERT_TRUE(GenerateOdexForTest(dex->GetLocation(),
+                                  base_oat_name,
+                                  CompilerFilter::Filter::kSpeed,
+                                  { "--deduplicate-code=false" },
+                                  /*expect_success=*/ true,
+                                  /*use_fd=*/ false,
+                                  /*use_zip_fd=*/ false));
+
+  // Check that we can open the oat file as executable.
+  {
+    std::string error_msg;
+    std::unique_ptr<OatFile> odex_file(OatFile::Open(/*zip_fd=*/ -1,
+                                                     base_oat_name.c_str(),
+                                                     base_oat_name.c_str(),
+                                                     /*executable=*/ true,
+                                                     /*low_4gb=*/ false,
+                                                     dex->GetLocation(),
+                                                     &error_msg));
+    ASSERT_TRUE(odex_file != nullptr) << error_msg;
+  }
+
+  // Rewrite the oat file with wrong version and bogus contents.
+  {
+    std::unique_ptr<File> file(OS::OpenFileReadWrite(base_oat_name.c_str()));
+    ASSERT_TRUE(file != nullptr);
+    // Retrieve the offset and size of the embedded oat file.
+    size_t oatdata_offset;
+    size_t oatdata_size;
+    {
+      std::string error_msg;
+      std::unique_ptr<ElfFile> elf_file(ElfFile::Open(file.get(),
+                                                      /*writable=*/ false,
+                                                      /*program_header_only=*/ true,
+                                                      /*low_4gb=*/ false,
+                                                      &error_msg));
+      ASSERT_TRUE(elf_file != nullptr) << error_msg;
+      ASSERT_TRUE(elf_file->Load(file.get(),
+                                 /*executable=*/ false,
+                                 /*low_4gb=*/ false,
+                                 /*reservation=*/ nullptr,
+                                 &error_msg)) << error_msg;
+      const uint8_t* base_address = elf_file->Is64Bit()
+          ? elf_file->GetImpl64()->GetBaseAddress()
+          : elf_file->GetImpl32()->GetBaseAddress();
+      const uint8_t* oatdata = elf_file->FindDynamicSymbolAddress("oatdata");
+      ASSERT_TRUE(oatdata != nullptr);
+      ASSERT_TRUE(oatdata > base_address);
+      // Note: We're assuming here that the virtual address offset is the same
+      // as file offset. This is currently true for all oat files we generate.
+      oatdata_offset = static_cast<size_t>(oatdata - base_address);
+      const uint8_t* oatlastword = elf_file->FindDynamicSymbolAddress("oatlastword");
+      ASSERT_TRUE(oatlastword != nullptr);
+      ASSERT_TRUE(oatlastword > oatdata);
+      oatdata_size = oatlastword - oatdata;
+    }
+
+    // Check that we have the right `oatdata_offset`.
+    int64_t length = file->GetLength();
+    ASSERT_GE(length, static_cast<ssize_t>(oatdata_offset + sizeof(OatHeader)));
+    alignas(OatHeader) uint8_t header_data[sizeof(OatHeader)];
+    ASSERT_TRUE(file->PreadFully(header_data, sizeof(header_data), oatdata_offset));
+    const OatHeader& header = reinterpret_cast<const OatHeader&>(header_data);
+    ASSERT_TRUE(header.IsValid()) << header.GetValidationErrorMessage();
+
+    // Overwrite all oat data from version onwards with bytes with value 4.
+    // (0x04040404 is not a valid version, we're using three decimal digits and '\0'.)
+    //
+    // We previously tried to find the value for key "debuggable" (bug 179221298)
+    // in the key-value store before checking the oat header. This test tries to
+    // ensure that such early processing of the key-value store shall crash.
+    // Reading 0x04040404 as the size of the key-value store yields a bit over
+    // 64MiB which should hopefully include some unmapped memory beyond the end
+    // of the loaded oat file. Overwriting the whole embedded oat file ensures
+    // that we do not match the key within the oat file but we could still
+    // accidentally match it in the additional sections of the elf file, so this
+    // approach could fail to catch similar issues. At the time of writing, this
+    // test crashed when run without the fix on 64-bit host (but not 32-bit).
+    static constexpr size_t kVersionOffset = sizeof(OatHeader::kOatMagic);
+    static_assert(kVersionOffset < sizeof(OatHeader));
+    std::vector<uint8_t> data(oatdata_size - kVersionOffset, 4u);
+    ASSERT_TRUE(file->PwriteFully(data.data(), data.size(), oatdata_offset + kVersionOffset));
+    UNUSED(oatdata_size);
+    CHECK_EQ(file->FlushClose(), 0) << "Could not flush and close oat file";
+  }
+
+  // Check that we reject the oat file without crashing.
+  {
+    std::string error_msg;
+    std::unique_ptr<OatFile> odex_file(OatFile::Open(/*zip_fd=*/ -1,
+                                                     base_oat_name.c_str(),
+                                                     base_oat_name.c_str(),
+                                                     /*executable=*/ true,
+                                                     /*low_4gb=*/ false,
+                                                     dex->GetLocation(),
+                                                     &error_msg));
+    ASSERT_FALSE(odex_file != nullptr);
+  }
 }
 
 }  // namespace art
