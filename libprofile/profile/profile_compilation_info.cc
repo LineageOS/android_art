@@ -56,8 +56,8 @@ namespace art {
 
 const uint8_t ProfileCompilationInfo::kProfileMagic[] = { 'p', 'r', 'o', '\0' };
 // Last profile version: New extensible profile format.
-const uint8_t ProfileCompilationInfo::kProfileVersion[] = { '0', '1', '3', '\0' };
-const uint8_t ProfileCompilationInfo::kProfileVersionForBootImage[] = { '0', '1', '4', '\0' };
+const uint8_t ProfileCompilationInfo::kProfileVersion[] = { '0', '1', '5', '\0' };
+const uint8_t ProfileCompilationInfo::kProfileVersionForBootImage[] = { '0', '1', '6', '\0' };
 
 static_assert(sizeof(ProfileCompilationInfo::kProfileVersion) == 4,
               "Invalid profile version size");
@@ -80,6 +80,9 @@ static constexpr char kSampleMetadataSeparator = ':';
 // Note: This used to be PATH_MAX (usually 4096) but that seems excessive
 // and we do not want to rely on that external constant anyway.
 static constexpr uint16_t kMaxDexFileKeyLength = 1024;
+
+// Extra descriptors are serialized with a `uint16_t` prefix. This defines the length limit.
+static constexpr size_t kMaxExtraDescriptorLength = std::numeric_limits<uint16_t>::max();
 
 // According to dex file specification, there can be more than 2^16 valid method indexes
 // but bytecode uses only 16 bits, so higher method indexes are not very useful (though
@@ -426,15 +429,23 @@ class ProfileCompilationInfo::SafeBuffer {
     return true;
   }
 
-  // Reads a null-terminated string as `std::string_view` and advances the current pointer.
+  // Reads a length-prefixed string as `std::string_view` and advances the current pointer.
+  // The length is `uint16_t`.
   bool ReadStringAndAdvance(/*out*/ std::string_view* value) {
-    const void* null_char = memchr(GetCurrentPtr(), 0, GetAvailableBytes());
-    if (null_char == nullptr) {
+    uint16_t length;
+    if (!ReadUintAndAdvance(&length)) {
       return false;
     }
-    size_t length = reinterpret_cast<const uint8_t*>(null_char) - GetCurrentPtr();
+    if (length > GetAvailableBytes()) {
+      return false;
+    }
+    const void* null_char = memchr(GetCurrentPtr(), 0, length);
+    if (null_char != nullptr) {
+      // Embedded nulls are invalid.
+      return false;
+    }
     *value = std::string_view(reinterpret_cast<const char*>(GetCurrentPtr()), length);
-    Advance(length + 1u);
+    Advance(length);
     return true;
   }
 
@@ -681,6 +692,10 @@ dex::TypeIndex ProfileCompilationInfo::FindOrCreateTypeIndex(const DexFile& dex_
   uint32_t num_type_ids = dex_file.NumTypeIds();
   uint32_t max_artificial_ids = DexFile::kDexNoIndex16 - num_type_ids;
   std::string_view descriptor_view(descriptor);
+  // Check descriptor length for "extra descriptor". We are using `uint16_t` as prefix.
+  if (UNLIKELY(descriptor_view.size() > kMaxExtraDescriptorLength)) {
+    return dex::TypeIndex();  // Invalid.
+  }
   auto it = extra_descriptors_indexes_.find(descriptor_view);
   if (it != extra_descriptors_indexes_.end()) {
     return (*it < max_artificial_ids) ? dex::TypeIndex(num_type_ids + *it) : dex::TypeIndex();
@@ -863,12 +878,12 @@ static bool WriteBuffer(int fd, const void* buffer, size_t byte_count) {
  * DexFiles:
  *    number_of_dex_files
  *    (checksum,num_type_ids,num_method_ids,profile_key)[number_of_dex_files]
- * where `profile_key` is a NULL-terminated string.
+ * where `profile_key` is a length-prefixed string, the length is `uint16_t`.
  *
  * ExtraDescriptors:
  *    number_of_extra_descriptors
  *    (extra_descriptor)[number_of_extra_descriptors]
- * where `extra_descriptor` is a NULL-terminated string.
+ * where `extra_descriptor` is a length-prefixed string, the length is `uint16_t`.
  *
  * Classes contains records for any number of dex files, each consisting of:
  *    profile_index  // Index of the dex file in DexFiles section.
@@ -909,7 +924,8 @@ bool ProfileCompilationInfo::Save(int fd) {
   if (!extra_descriptors_.empty()) {
     extra_descriptors_section_size += sizeof(uint16_t);  // Number of descriptors.
     for (const std::string& descriptor : extra_descriptors_) {
-      extra_descriptors_section_size += descriptor.size() + 1u;  // Null-terminated string.
+      // Length-prefixed string, the length is `uint16_t`.
+      extra_descriptors_section_size += sizeof(uint16_t) + descriptor.size();
     }
   }
   uint64_t dex_files_section_size = sizeof(ProfileIndexType);  // Number of dex files.
@@ -923,7 +939,8 @@ bool ProfileCompilationInfo::Save(int fd) {
     }
     dex_files_section_size +=
         3 * sizeof(uint32_t) +  // Checksum, num_type_ids, num_method_ids.
-        dex_data->profile_key.size() + 1u;  // Null-terminated key.
+        // Length-prefixed string, the length is `uint16_t`.
+        sizeof(uint16_t) + dex_data->profile_key.size();
     classes_section_size += dex_data->ClassesDataSize();
     methods_section_size += dex_data->MethodsDataSize();
   }
@@ -983,7 +1000,8 @@ bool ProfileCompilationInfo::Save(int fd) {
       buffer.WriteUintAndAdvance(dex_data->checksum);
       buffer.WriteUintAndAdvance(dex_data->num_type_ids);
       buffer.WriteUintAndAdvance(dex_data->num_method_ids);
-      buffer.WriteAndAdvance(dex_data->profile_key.c_str(), dex_data->profile_key.size() + 1u);
+      buffer.WriteUintAndAdvance(dchecked_integral_cast<uint16_t>(dex_data->profile_key.size()));
+      buffer.WriteAndAdvance(dex_data->profile_key.c_str(), dex_data->profile_key.size());
     }
     DCHECK_EQ(buffer.GetAvailableBytes(), 0u);
     // Write the dex files section uncompressed.
@@ -998,7 +1016,8 @@ bool ProfileCompilationInfo::Save(int fd) {
     SafeBuffer buffer(extra_descriptors_section_size);
     buffer.WriteUintAndAdvance(dchecked_integral_cast<uint16_t>(extra_descriptors_.size()));
     for (const std::string& descriptor : extra_descriptors_) {
-      buffer.WriteAndAdvance(descriptor.c_str(), descriptor.size() + 1u);
+      buffer.WriteUintAndAdvance(dchecked_integral_cast<uint16_t>(descriptor.size()));
+      buffer.WriteAndAdvance(descriptor.c_str(), descriptor.size());
     }
     if (!buffer.Deflate()) {
       return false;
@@ -1195,6 +1214,7 @@ void ProfileCompilationInfo::FindAllDexData(
 
 ProfileCompilationInfo::ExtraDescriptorIndex ProfileCompilationInfo::AddExtraDescriptor(
     std::string_view extra_descriptor) {
+  DCHECK_LE(extra_descriptor.size(), kMaxExtraDescriptorLength);
   DCHECK(extra_descriptors_indexes_.find(extra_descriptor) == extra_descriptors_indexes_.end());
   ExtraDescriptorIndex new_extra_descriptor_index = extra_descriptors_.size();
   DCHECK_LE(new_extra_descriptor_index, kMaxExtraDescriptors);
@@ -1553,13 +1573,12 @@ ProfileCompilationInfo::ProfileLoadStatus ProfileCompilationInfo::ReadExtraDescr
       std::min<size_t>(extra_descriptors_remap->size() + num_extra_descriptors,
                        std::numeric_limits<uint16_t>::max()));
   for (uint16_t i = 0; i != num_extra_descriptors; ++i) {
-    const char* descriptor = reinterpret_cast<const char*>(buffer.GetCurrentPtr());
     std::string_view extra_descriptor;
     if (!buffer.ReadStringAndAdvance(&extra_descriptor)) {
       *error += "Missing terminating null character for extra descriptor.";
       return ProfileLoadStatus::kBadData;
     }
-    if (!IsValidDescriptor(descriptor)) {
+    if (!IsValidDescriptor(std::string(extra_descriptor).c_str())) {
       *error += "Invalid extra descriptor.";
       return ProfileLoadStatus::kBadData;
     }
