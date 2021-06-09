@@ -74,9 +74,20 @@ class OdrMetrics final {
                       const std::string& metrics_file = kOdrefreshMetricsFile);
   ~OdrMetrics();
 
+  // Gets the ART APEX that metrics are being collected on behalf of.
+  int64_t GetApexVersion() const {
+    return art_apex_version_;
+  }
+
   // Sets the ART APEX that metrics are being collected on behalf of.
   void SetArtApexVersion(int64_t version) {
     art_apex_version_ = version;
+  }
+
+  // Gets the trigger for metrics collection. The trigger is the reason why odrefresh considers
+  // compilation necessary.
+  Trigger GetTrigger() const {
+    return trigger_.has_value() ? trigger_.value() : Trigger::kUnknown;
   }
 
   // Sets the trigger for metrics collection. The trigger is the reason why odrefresh considers
