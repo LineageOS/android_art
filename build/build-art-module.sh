@@ -115,11 +115,13 @@ if [ ${#MODULE_SDKS_AND_EXPORTS[*]} -gt 0 ]; then
   # dependencies, but there are no actual apps to build here.
   export TARGET_BUILD_APPS=none
 
-  # Make build-aml-prebuilts.sh set the source_build Soong config variable true.
-  export ENABLE_ART_SOURCE_BUILD=true
+  # We use force building LLVM components flag (even though we actually don't
+  # compile them) because we don't have bionic host prebuilts
+  # for them.
+  export FORCE_BUILD_LLVM_COMPONENTS=true
 
-  echo_and_run build/soong/scripts/build-aml-prebuilts.sh "${build_args[@]}" \
-    ${MODULE_SDKS_AND_EXPORTS[*]}
+  echo_and_run build/soong/scripts/build-aml-prebuilts.sh \
+    TARGET_PRODUCT=mainline_sdk "${build_args[@]}" ${MODULE_SDKS_AND_EXPORTS[*]}
 
   rm -rf ${DIST_DIR}/mainline-sdks
   mkdir -p ${DIST_DIR}
