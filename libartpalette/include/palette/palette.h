@@ -17,7 +17,6 @@
 #ifndef ART_LIBARTPALETTE_INCLUDE_PALETTE_PALETTE_H_
 #define ART_LIBARTPALETTE_INCLUDE_PALETTE_PALETTE_H_
 
-#include "palette_hooks.h"
 #include "palette_types.h"
 
 #ifdef __cplusplus

@@ -68,10 +68,7 @@ static constexpr bool kEnableAppImage = true;
 const OatFile* OatFileManager::RegisterOatFile(std::unique_ptr<const OatFile> oat_file) {
   // Use class_linker vlog to match the log for dex file registration.
   VLOG(class_linker) << "Registered oat file " << oat_file->GetLocation();
-  PaletteHooks* hooks = nullptr;
-  if (PaletteGetHooks(&hooks) == PALETTE_STATUS_OK) {
-    hooks->NotifyOatFileLoaded(oat_file->GetLocation().c_str());
-  }
+  PaletteNotifyOatFileLoaded(oat_file->GetLocation().c_str());
 
   WriterMutexLock mu(Thread::Current(), *Locks::oat_file_manager_lock_);
   CHECK(!only_use_system_oat_files_ ||
