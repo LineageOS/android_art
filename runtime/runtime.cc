@@ -56,6 +56,7 @@
 #include "base/dumpable.h"
 #include "base/enums.h"
 #include "base/file_utils.h"
+#include "base/flags.h"
 #include "base/malloc_arena_pool.h"
 #include "base/mem_map_arena_pool.h"
 #include "base/memory_tool.h"
@@ -1284,6 +1285,10 @@ void Runtime::InitializeApexVersions() {
   apex_versions_ = result;
 }
 
+void Runtime::ReloadAllFlags(const std::string& caller) {
+  FlagBase::ReloadAllFlags(caller);
+}
+
 bool Runtime::Init(RuntimeArgumentMap&& runtime_options_in) {
   // (b/30160149): protect subprocesses from modifications to LD_LIBRARY_PATH, etc.
   // Take a snapshot of the environment at the time the runtime was created, for use by Exec, etc.
@@ -1293,6 +1298,9 @@ bool Runtime::Init(RuntimeArgumentMap&& runtime_options_in) {
   Opt runtime_options(std::move(runtime_options_in));
   ScopedTrace trace(__FUNCTION__);
   CHECK_EQ(static_cast<size_t>(sysconf(_SC_PAGE_SIZE)), kPageSize);
+
+  // Reload all the flags value (from system properties and device configs).
+  ReloadAllFlags(__FUNCTION__);
 
   // Early override for logging output.
   if (runtime_options.Exists(Opt::UseStderrLogger)) {
