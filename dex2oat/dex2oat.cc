@@ -2420,8 +2420,9 @@ class Dex2Oat final {
   class ScopedDex2oatReporting {
    public:
     explicit ScopedDex2oatReporting(const Dex2Oat& dex2oat) {
-      PaletteHooks* hooks = nullptr;
-      if (PaletteGetHooks(&hooks) == PALETTE_STATUS_OK) {
+      bool should_report = false;
+      PaletteShouldReportDex2oatCompilation(&should_report);
+      if (should_report) {
         if (dex2oat.zip_fd_ != -1) {
           zip_dup_fd_.reset(DupCloexecOrError(dex2oat.zip_fd_));
           if (zip_dup_fd_ < 0) {
@@ -2443,7 +2444,7 @@ class Dex2Oat final {
         if (vdex_dup_fd_ < 0) {
           return;
         }
-        hooks->NotifyStartDex2oatCompilation(zip_dup_fd_,
+        PaletteNotifyStartDex2oatCompilation(zip_dup_fd_,
                                              image_dup_fd_,
                                              oat_dup_fd_,
                                              vdex_dup_fd_);
@@ -2452,12 +2453,15 @@ class Dex2Oat final {
     }
 
     ~ScopedDex2oatReporting() {
-      PaletteHooks* hooks = nullptr;
-      if (!error_reporting_ && (PaletteGetHooks(&hooks) == PALETTE_STATUS_OK)) {
-        hooks->NotifyEndDex2oatCompilation(zip_dup_fd_,
-                                           image_dup_fd_,
-                                           oat_dup_fd_,
-                                           vdex_dup_fd_);
+      if (!error_reporting_) {
+        bool should_report = false;
+        PaletteShouldReportDex2oatCompilation(&should_report);
+        if (should_report) {
+          PaletteNotifyEndDex2oatCompilation(zip_dup_fd_,
+                                             image_dup_fd_,
+                                             oat_dup_fd_,
+                                             vdex_dup_fd_);
+        }
       }
     }
 
