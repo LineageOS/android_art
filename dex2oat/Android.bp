@@ -412,14 +412,14 @@ art_cc_binary {
 }
 
 art_cc_library_static {
-    name: "libart-dex2oat-gtest",
-    defaults: ["libart-gtest-defaults"],
+    name: "libartd-dex2oat-gtest",
+    defaults: ["libartd-gtest-defaults"],
     srcs: [
         "common_compiler_driver_test.cc",
     ],
     shared_libs: [
-        "libart-compiler-gtest",
-        "libart-runtime-gtest",
+        "libartd-compiler-gtest",
+        "libartd-runtime-gtest",
         "libartd-compiler",
         "libartd-disassembler",
         "libbase",
@@ -519,7 +519,7 @@ art_cc_test {
         "libziparchive",
     ],
     static_libs: [
-        "libart-dex2oat-gtest",
+        "libartd-dex2oat-gtest",
         "libartd-dex2oat",
     ],
 }

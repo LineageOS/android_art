@@ -327,16 +327,16 @@ cc_defaults {
 }
 
 art_cc_library {
-    name: "libart-compiler-gtest",
-    defaults: ["libart-gtest-defaults"],
+    name: "libartd-compiler-gtest",
+    defaults: ["libartd-gtest-defaults"],
     srcs: [
         "common_compiler_test.cc",
     ],
     shared_libs: [
         "libartd-compiler",
         "libartd-disassembler",
-        "libartbase-art-gtest",
-        "libart-runtime-gtest",
+        "libartbased-art-gtest",
+        "libartd-runtime-gtest",
         "libbase",
     ],
 }

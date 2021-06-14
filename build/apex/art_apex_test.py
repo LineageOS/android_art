@@ -686,7 +686,7 @@ class TestingTargetChecker:
     self._checker.check_art_test_executable('art_sigchain_tests')
 
     # Check ART test (internal) libraries.
-    self._checker.check_native_library('libart-gtest')
+    self._checker.check_native_library('libartd-gtest')
     self._checker.check_native_library('libartd-simulator-container')
 
     # Check ART test tools.
