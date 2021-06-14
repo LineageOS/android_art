@@ -125,6 +125,7 @@ art_cc_test {
     host_supported: false,
 
     srcs: [
+        "native_loader_api_test.c",
         "native_loader_test.cpp",
     ],
     cflags: ["-DANDROID"],

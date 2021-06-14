@@ -17,9 +17,3 @@
 /* The main purpose of this test is to ensure this C header compiles in C, so
  * that no C++ features inadvertently leak into the C ABI. */
 #include "nativeloader/native_loader.h"
-
-int main(int argc, char** argv) {
-  (void)argc;
-  (void)argv;
-  return 0;
-}

@@ -107,6 +107,7 @@ cc_defaults {
     test_per_src: true,
 
     srcs: [
+        "NativeBridgeApi.c",
         "CodeCacheCreate_test.cpp",
         "CodeCacheExists_test.cpp",
         "CodeCacheStatFail_test.cpp",
@@ -151,33 +152,4 @@ cc_test {
     defaults: ["libnativebridge-tests-defaults"],
     host_supported: false,
     shared_libs: ["libnativebridge_lazy"],
-}
-
-// Build the test for the C API.
-cc_test {
-    name: "libnativebridge-api-tests",
-    defaults: [
-        "art_defaults",
-        "art_test_defaults",
-    ],
-    // TODO(mast): Split up art_gtest_defaults so that it can be used for the
-    // following without pulling in lots of libs.
-    target: {
-        linux: {
-            cflags: [
-                // gtest issue
-                "-Wno-used-but-marked-unused",
-                "-Wno-deprecated",
-                "-Wno-missing-noreturn",
-            ],
-        },
-    },
-    srcs: [
-        "NativeBridgeApi.c",
-    ],
-    header_libs: [
-        "jni_headers",
-        "libnativebridge-headers",
-    ],
-    gtest: false,
 }
