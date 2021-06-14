@@ -487,17 +487,18 @@ TEST_F(CmdlineParserTest, TestJitOptions) {
 * -Xps-*
 */
 TEST_F(CmdlineParserTest, ProfileSaverOptions) {
-  ProfileSaverOptions opt = ProfileSaverOptions(true, 1, 2, 3, 4, 5, 6, 7, "abc", true);
+  ProfileSaverOptions opt = ProfileSaverOptions(true, 1, 2, 3, 4, 5, 6, 7, 8, "abc", true);
 
   EXPECT_SINGLE_PARSE_VALUE(opt,
                             "-Xjitsaveprofilinginfo "
                             "-Xps-min-save-period-ms:1 "
-                            "-Xps-save-resolved-classes-delay-ms:2 "
-                            "-Xps-hot-startup-method-samples:3 "
-                            "-Xps-min-methods-to-save:4 "
-                            "-Xps-min-classes-to-save:5 "
-                            "-Xps-min-notification-before-wake:6 "
-                            "-Xps-max-notification-before-wake:7 "
+                            "-Xps-min-first-save-ms:2 "
+                            "-Xps-save-resolved-classes-delay-ms:3 "
+                            "-Xps-hot-startup-method-samples:4 "
+                            "-Xps-min-methods-to-save:5 "
+                            "-Xps-min-classes-to-save:6 "
+                            "-Xps-min-notification-before-wake:7 "
+                            "-Xps-max-notification-before-wake:8 "
                             "-Xps-profile-path:abc "
                             "-Xps-profile-boot-class-path",
                             M::ProfileSaverOpts);

@@ -765,6 +765,12 @@ struct CmdlineType<ProfileSaverOptions> : CmdlineTypeParser<ProfileSaverOptions>
              &ProfileSaverOptions::min_save_period_ms_,
              type_parser.Parse(suffix));
     }
+    if (android::base::StartsWith(option, "min-first-save-ms:")) {
+      CmdlineType<unsigned int> type_parser;
+      return ParseInto(existing,
+             &ProfileSaverOptions::min_first_save_ms_,
+             type_parser.Parse(suffix));
+    }
     if (android::base::StartsWith(option, "save-resolved-classes-delay-ms:")) {
       CmdlineType<unsigned int> type_parser;
       return ParseInto(existing,
