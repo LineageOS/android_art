@@ -14,12 +14,13 @@
 # limitations under the License.
 #
 
-# TODO(b/122710865): Prune these uses once the runtime APEX is complete.
+# Platform dependencies go through libnativeloader_lazy, which accesses
+# libnativeloader symbols through dlopen/dlsym. That means this list doesn't
+# have much effect, rather it's the function wrappers in native_loader_lazy.cpp
+# that defines the exported interface. Please keep in sync with this list.
 LIBNATIVELOADER_1 {
   global:
     OpenNativeLibrary;
-    InitializeNativeLoader;
-    ResetNativeLoader;
     CloseNativeLibrary;
     OpenNativeLibraryInNamespace;
     FindNamespaceByClassLoader;
