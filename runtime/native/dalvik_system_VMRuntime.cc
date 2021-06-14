@@ -372,7 +372,7 @@ static void VMRuntime_registerAppInfo(JNIEnv* env,
                                       jclass clazz ATTRIBUTE_UNUSED,
                                       jstring package_name ATTRIBUTE_UNUSED,
                                       jstring cur_profile_file,
-                                      jstring ref_profile_file ATTRIBUTE_UNUSED,
+                                      jstring ref_profile_file,
                                       jobjectArray code_paths,
                                       jint code_path_type ATTRIBUTE_UNUSED) {
   std::vector<std::string> code_paths_vec;
@@ -388,7 +388,11 @@ static void VMRuntime_registerAppInfo(JNIEnv* env,
   std::string cur_profile_file_str(raw_cur_profile_file);
   env->ReleaseStringUTFChars(cur_profile_file, raw_cur_profile_file);
 
-  Runtime::Current()->RegisterAppInfo(code_paths_vec, cur_profile_file_str);
+  const char* raw_ref_profile_file = env->GetStringUTFChars(ref_profile_file, nullptr);
+  std::string ref_profile_file_str(raw_ref_profile_file);
+  env->ReleaseStringUTFChars(ref_profile_file, raw_ref_profile_file);
+
+  Runtime::Current()->RegisterAppInfo(code_paths_vec, cur_profile_file_str, ref_profile_file_str);
 }
 
 static jboolean VMRuntime_isBootClassPathOnDisk(JNIEnv* env, jclass, jstring java_instruction_set) {

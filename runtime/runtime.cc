@@ -1004,7 +1004,12 @@ bool Runtime::Start() {
       !jit_options_->GetProfileSaverOptions().GetProfilePath().empty()) {
     std::vector<std::string> dex_filenames;
     Split(class_path_string_, ':', &dex_filenames);
-    RegisterAppInfo(dex_filenames, jit_options_->GetProfileSaverOptions().GetProfilePath());
+    // It's ok to pass "" to the ref profile filename. It indicates we don't have
+    // a reference profile.
+    RegisterAppInfo(
+        dex_filenames,
+        jit_options_->GetProfileSaverOptions().GetProfilePath(),
+        /*ref_profile_filename=*/ "");
   }
 
   return true;
@@ -2548,7 +2553,8 @@ void Runtime::ClearCalleeSaveMethods() {
 }
 
 void Runtime::RegisterAppInfo(const std::vector<std::string>& code_paths,
-                              const std::string& profile_output_filename) {
+                              const std::string& profile_output_filename,
+                              const std::string& ref_profile_filename) {
   if (jit_.get() == nullptr) {
     // We are not JITing. Nothing to do.
     return;
@@ -2556,6 +2562,7 @@ void Runtime::RegisterAppInfo(const std::vector<std::string>& code_paths,
 
   VLOG(profiler) << "Register app with " << profile_output_filename
       << " " << android::base::Join(code_paths, ':');
+  VLOG(profiler) << "Reference profile is: " << ref_profile_filename;
 
   if (profile_output_filename.empty()) {
     LOG(WARNING) << "JIT profile information will not be recorded: profile filename is empty.";
@@ -2570,7 +2577,7 @@ void Runtime::RegisterAppInfo(const std::vector<std::string>& code_paths,
     return;
   }
 
-  jit_->StartProfileSaver(profile_output_filename, code_paths);
+  jit_->StartProfileSaver(profile_output_filename, code_paths, ref_profile_filename);
 }
 
 // Transaction support.

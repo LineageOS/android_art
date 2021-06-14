@@ -335,10 +335,15 @@ class Jit {
   }
 
   // Starts the profile saver if the config options allow profile recording.
-  // The profile will be stored in the specified `filename` and will contain
+  // The profile will be stored in the specified `profile_filename` and will contain
   // information collected from the given `code_paths` (a set of dex locations).
-  void StartProfileSaver(const std::string& filename,
-                         const std::vector<std::string>& code_paths);
+  //
+  // The `ref_profile_filename` denotes the path to the reference profile which
+  // might be queried to determine if an initial save should be done earlier.
+  // It can be empty indicating there is no reference profile.
+  void StartProfileSaver(const std::string& profile_filename,
+                         const std::vector<std::string>& code_paths,
+                         const std::string& ref_profile_filename);
   void StopProfileSaver();
 
   void DumpForSigQuit(std::ostream& os) REQUIRES(!lock_);
