@@ -48,25 +48,25 @@ cc_defaults {
     cppflags: ["-fvisibility=protected"],
 }
 
-cc_library_shared {
+cc_test_library {
     name: "libnativebridge-test-case",
     srcs: ["NativeBridgeTestCase.cpp"],
     defaults: ["libnativebridge-test-case-defaults"],
 }
 
-cc_library_shared {
+cc_test_library {
     name: "libnativebridge2-test-case",
     srcs: ["NativeBridgeTestCase2.cpp"],
     defaults: ["libnativebridge-test-case-defaults"],
 }
 
-cc_library_shared {
+cc_test_library {
     name: "libnativebridge3-test-case",
     srcs: ["NativeBridgeTestCase3.cpp"],
     defaults: ["libnativebridge-test-case-defaults"],
 }
 
-cc_library_shared {
+cc_test_library {
     name: "libnativebridge6-test-case",
     srcs: ["NativeBridgeTestCase6.cpp"],
     defaults: ["libnativebridge-test-case-defaults"],
@@ -76,7 +76,7 @@ cc_library_shared {
 }
 
 // A helper library to produce test-case side effect of PreZygoteForkNativeBridge.
-cc_library_shared {
+cc_test_library {
     name: "libnativebridge6prezygotefork",
     srcs: ["NativeBridge6PreZygoteFork_lib.cpp"],
     defaults: ["libnativebridge-test-case-defaults"],
@@ -102,6 +102,10 @@ cc_defaults {
         },
     },
 
+    // native_bridge.cc doesn't support reloading the native bridge after
+    // unloading, so each test needs to be its own process.
+    test_per_src: true,
+
     srcs: [
         "CodeCacheCreate_test.cpp",
         "CodeCacheExists_test.cpp",
@@ -112,7 +116,6 @@ cc_defaults {
         "NativeBridgeVersion_test.cpp",
         "NeedsNativeBridge_test.cpp",
         "PreInitializeNativeBridge_test.cpp",
-        "PreInitializeNativeBridgeFail1_test.cpp",
         "PreInitializeNativeBridgeFail2_test.cpp",
         "ReSetupNativeBridge_test.cpp",
         "UnavailableNativeBridge_test.cpp",
@@ -129,6 +132,9 @@ cc_defaults {
     shared_libs: [
         "liblog",
         "libnativebridge-test-case",
+        "libnativebridge2-test-case",
+        "libnativebridge3-test-case",
+        "libnativebridge6-test-case",
         "libnativebridge6prezygotefork",
     ],
     header_libs: ["libbase_headers"],
@@ -173,5 +179,5 @@ cc_test {
         "jni_headers",
         "libnativebridge-headers",
     ],
-    gtest:false,
+    gtest: false,
 }
