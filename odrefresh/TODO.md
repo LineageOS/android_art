@@ -2,7 +2,7 @@
 
 ## TODO (STOPSHIP until done)
 
-1. Implement back off on trying compilation when previous attempt(s) failed.
+1. denylist for AOT artifacts.
 
 ## DONE
 
@@ -21,5 +21,6 @@
    - Unexpected error (a setup or clean-up action failed).
 6. Metrics recording for subprocess timeouts.
 7. Free space calculation and only attempting compilation if sufficient space.
+8. Implement back off on trying compilation when previous attempt(s) failed.
 
 </strike>

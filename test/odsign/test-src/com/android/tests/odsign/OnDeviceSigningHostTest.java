@@ -43,8 +43,16 @@ import java.util.Set;
 public class OnDeviceSigningHostTest extends BaseHostJUnit4Test {
 
     private static final String APEX_FILENAME = "test_com.android.art.apex";
+
     private static final String ART_APEX_DALVIK_CACHE_DIRNAME =
             "/data/misc/apexdata/com.android.art/dalvik-cache";
+
+    private static final String ODREFRESH_COMPILATION_LOG =
+            "/data/misc/odrefresh/compilation-log.txt";
+
+    private final String[] APP_ARTIFACT_EXTENSIONS = new String[] {".art", ".odex", ".vdex"};
+
+    private final String[] BCP_ARTIFACT_EXTENSIONS = new String[] {".art", ".oat", ".vdex"};
 
     private static final String TEST_APP_PACKAGE_NAME = "com.android.tests.odsign";
     private static final String TEST_APP_APK = "odsign_e2e_test_app.apk";
@@ -58,6 +66,7 @@ public class OnDeviceSigningHostTest extends BaseHostJUnit4Test {
         assumeTrue("Updating APEX is not supported", mInstallUtils.isApexUpdateSupported());
         installPackage(TEST_APP_APK);
         mInstallUtils.installApexes(APEX_FILENAME);
+        removeCompilationLogToAvoidBackoff();
         reboot();
     }
 
@@ -65,6 +74,7 @@ public class OnDeviceSigningHostTest extends BaseHostJUnit4Test {
     public void cleanup() throws Exception {
         ApexInfo apex = mInstallUtils.getApexInfo(mInstallUtils.getTestFile(APEX_FILENAME));
         getDevice().uninstallPackage(apex.name);
+        removeCompilationLogToAvoidBackoff();
         reboot();
     }
 
@@ -132,9 +142,6 @@ public class OnDeviceSigningHostTest extends BaseHostJUnit4Test {
         final String isa = getSystemServerIsa(mappedArtifacts.iterator().next());
         final String isaCacheDirectory = String.format("%s/%s", ART_APEX_DALVIK_CACHE_DIRNAME, isa);
 
-        // Extension types for artifacts that this test looks for.
-        final String[] extensions = new String[] {".art", ".odex", ".vdex"};
-
         // Check the non-APEX components in the system_server classpath have mapped artifacts.
         for (String element : classpathElements) {
             // Skip system_server classpath elements from APEXes as these are not currently
@@ -143,7 +150,7 @@ public class OnDeviceSigningHostTest extends BaseHostJUnit4Test {
                 continue;
             }
             String escapedPath = element.substring(1).replace('/', '@');
-            for (String extension : extensions) {
+            for (String extension : APP_ARTIFACT_EXTENSIONS) {
                 final String fullArtifactPath =
                         String.format("%s/%s@classes%s", isaCacheDirectory, escapedPath, extension);
                 assertTrue(
@@ -162,7 +169,8 @@ public class OnDeviceSigningHostTest extends BaseHostJUnit4Test {
 
             // Check the mapped artifact has a .art, .odex or .vdex extension.
             final boolean knownArtifactKind =
-                    Arrays.stream(extensions).anyMatch(e -> mappedArtifact.endsWith(e));
+                    Arrays.stream(APP_ARTIFACT_EXTENSIONS)
+                            .anyMatch(e -> mappedArtifact.endsWith(e));
             assertTrue("Unknown artifact kind: " + mappedArtifact, knownArtifactKind);
         }
     }
@@ -173,10 +181,7 @@ public class OnDeviceSigningHostTest extends BaseHostJUnit4Test {
 
         assertTrue("Expect 3 boot-framework artifacts", mappedArtifacts.size() == 3);
 
-        // Extension types for artifacts that this test looks for.
-        final String[] extensions = new String[] {".art", ".oat", ".vdex"};
-
-        for (String extension : extensions) {
+        for (String extension : BCP_ARTIFACT_EXTENSIONS) {
             final String artifact = bootExtensionName + extension;
             final boolean found = mappedArtifacts.stream().anyMatch(a -> a.endsWith(artifact));
             assertTrue(artifact + " not found", found);
@@ -207,12 +212,25 @@ public class OnDeviceSigningHostTest extends BaseHostJUnit4Test {
         final boolean adbEnabled = getDevice().enableAdbRoot();
         assertTrue("ADB root failed and required to get process maps", adbEnabled);
 
+        // Check there is a compilation log, we expect compilation to have occurred.
+        assertTrue("Compilation log not found", haveCompilationLog());
+
         // Check both zygote and system_server processes to see that they have loaded the
         // artifacts compiled and signed by odrefresh and odsign. We check both here rather than
         // having a separate test because the device reboots between each @Test method and
         // that is an expensive use of time.
         verifyZygotesLoadedArtifacts();
         verifySystemServerLoadedArtifacts();
+    }
+
+    private boolean haveCompilationLog() throws Exception {
+        CommandResult result =
+                getDevice().executeShellV2Command("stat " + ODREFRESH_COMPILATION_LOG);
+        return result.getExitCode() == 0;
+    }
+
+    private void removeCompilationLogToAvoidBackoff() throws Exception {
+        getDevice().executeShellCommand("rm -f " + ODREFRESH_COMPILATION_LOG);
     }
 
     private void reboot() throws Exception {
