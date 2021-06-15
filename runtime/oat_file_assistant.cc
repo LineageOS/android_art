@@ -80,12 +80,12 @@ OatFileAssistant::OatFileAssistant(const char* dex_location,
                                    const InstructionSet isa,
                                    ClassLoaderContext* context,
                                    bool load_executable,
-                                   bool only_load_system_executable)
+                                   bool only_load_trusted_executable)
     : OatFileAssistant(dex_location,
                        isa,
                        context,
                        load_executable,
-                       only_load_system_executable,
+                       only_load_trusted_executable,
                        /*vdex_fd=*/ -1,
                        /*oat_fd=*/ -1,
                        /*zip_fd=*/ -1) {}
@@ -95,14 +95,14 @@ OatFileAssistant::OatFileAssistant(const char* dex_location,
                                    const InstructionSet isa,
                                    ClassLoaderContext* context,
                                    bool load_executable,
-                                   bool only_load_system_executable,
+                                   bool only_load_trusted_executable,
                                    int vdex_fd,
                                    int oat_fd,
                                    int zip_fd)
     : context_(context),
       isa_(isa),
       load_executable_(load_executable),
-      only_load_system_executable_(only_load_system_executable),
+      only_load_trusted_executable_(only_load_trusted_executable),
       odex_(this, /*is_oat_location=*/ false),
       oat_(this, /*is_oat_location=*/ true),
       vdex_for_odex_(this, /*is_oat_location=*/ false),
@@ -453,8 +453,8 @@ OatFileAssistant::OatStatus OatFileAssistant::GivenOatFileStatus(const OatFile& 
 
   // zip_file_only_contains_uncompressed_dex_ is only set during fetching the dex checksums.
   DCHECK(required_dex_checksums_attempted_);
-  if (only_load_system_executable_ &&
-      !LocationIsOnSystem(file.GetLocation().c_str()) &&
+  if (only_load_trusted_executable_ &&
+      !LocationIsTrusted(file.GetLocation()) &&
       file.ContainsDexCode() &&
       zip_file_only_contains_uncompressed_dex_) {
     LOG(ERROR) << "Not loading "
@@ -846,8 +846,8 @@ const OatFile* OatFileAssistant::OatFileInfo::GetFile() {
                                         &error_msg));
     }
   } else {
-    if (executable && oat_file_assistant_->only_load_system_executable_) {
-      executable = LocationIsOnSystem(filename_.c_str());
+    if (executable && oat_file_assistant_->only_load_trusted_executable_) {
+      executable = LocationIsTrusted(filename_);
     }
     VLOG(oat) << "Loading " << filename_ << " with executable: " << executable;
     if (use_fd_) {

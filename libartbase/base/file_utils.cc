@@ -612,16 +612,20 @@ bool LocationIsOnApex(std::string_view full_path) {
   return android::base::StartsWith(full_path, kApexDefaultPath);
 }
 
-bool LocationIsOnSystem(const char* path) {
+bool LocationIsOnSystem(const std::string& location) {
 #ifdef _WIN32
-  UNUSED(path);
+  UNUSED(location);
   LOG(FATAL) << "LocationIsOnSystem is unsupported on Windows.";
   return false;
 #else
-  UniqueCPtr<const char[]> full_path(realpath(path, nullptr));
+  UniqueCPtr<const char[]> full_path(realpath(location.c_str(), nullptr));
   return full_path != nullptr &&
       android::base::StartsWith(full_path.get(), GetAndroidRoot().c_str());
 #endif
+}
+
+bool LocationIsTrusted(const std::string& location) {
+  return LocationIsOnSystem(location) || LocationIsOnArtApexData(location);
 }
 
 bool ArtModuleRootDistinctFromAndroidRoot() {

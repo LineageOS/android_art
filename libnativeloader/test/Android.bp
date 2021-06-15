@@ -78,17 +78,3 @@ cc_library {
         "libbase",
     ],
 }
-
-// Build the test for the C API.
-cc_test {
-    name: "libnativeloader-api-tests",
-    defaults: [
-        "art_defaults",
-        "art_test_defaults",
-    ],
-    srcs: [
-        "api_test.c",
-    ],
-    header_libs: ["libnativeloader-headers"],
-    gtest: false,
-}
