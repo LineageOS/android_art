@@ -525,7 +525,8 @@ class Runtime {
   }
 
   void RegisterAppInfo(const std::vector<std::string>& code_paths,
-                       const std::string& profile_output_filename);
+                       const std::string& profile_output_filename,
+                       const std::string& ref_profile_filename);
 
   // Transaction support.
   bool IsActiveTransaction() const;

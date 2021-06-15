@@ -48,25 +48,25 @@ cc_defaults {
     cppflags: ["-fvisibility=protected"],
 }
 
-cc_library_shared {
+cc_test_library {
     name: "libnativebridge-test-case",
     srcs: ["NativeBridgeTestCase.cpp"],
     defaults: ["libnativebridge-test-case-defaults"],
 }
 
-cc_library_shared {
+cc_test_library {
     name: "libnativebridge2-test-case",
     srcs: ["NativeBridgeTestCase2.cpp"],
     defaults: ["libnativebridge-test-case-defaults"],
 }
 
-cc_library_shared {
+cc_test_library {
     name: "libnativebridge3-test-case",
     srcs: ["NativeBridgeTestCase3.cpp"],
     defaults: ["libnativebridge-test-case-defaults"],
 }
 
-cc_library_shared {
+cc_test_library {
     name: "libnativebridge6-test-case",
     srcs: ["NativeBridgeTestCase6.cpp"],
     defaults: ["libnativebridge-test-case-defaults"],
@@ -76,13 +76,12 @@ cc_library_shared {
 }
 
 // A helper library to produce test-case side effect of PreZygoteForkNativeBridge.
-cc_library_shared {
+cc_test_library {
     name: "libnativebridge6prezygotefork",
     srcs: ["NativeBridge6PreZygoteFork_lib.cpp"],
     defaults: ["libnativebridge-test-case-defaults"],
 }
 
-// Build the unit tests.
 cc_defaults {
     name: "libnativebridge-tests-defaults",
     defaults: [
@@ -101,8 +100,18 @@ cc_defaults {
             ],
         },
     },
+}
+
+cc_test {
+    name: "libnativebridge-tests",
+    defaults: ["libnativebridge-tests-defaults"],
+
+    // native_bridge.cc doesn't support reloading the native bridge after
+    // unloading, so each test needs to be its own process.
+    test_per_src: true,
 
     srcs: [
+        "NativeBridgeApi.c",
         "CodeCacheCreate_test.cpp",
         "CodeCacheExists_test.cpp",
         "CodeCacheStatFail_test.cpp",
@@ -112,7 +121,6 @@ cc_defaults {
         "NativeBridgeVersion_test.cpp",
         "NeedsNativeBridge_test.cpp",
         "PreInitializeNativeBridge_test.cpp",
-        "PreInitializeNativeBridgeFail1_test.cpp",
         "PreInitializeNativeBridgeFail2_test.cpp",
         "ReSetupNativeBridge_test.cpp",
         "UnavailableNativeBridge_test.cpp",
@@ -128,50 +136,24 @@ cc_defaults {
 
     shared_libs: [
         "liblog",
+        "libnativebridge",
         "libnativebridge-test-case",
+        "libnativebridge2-test-case",
+        "libnativebridge3-test-case",
+        "libnativebridge6-test-case",
         "libnativebridge6prezygotefork",
     ],
     header_libs: ["libbase_headers"],
 }
 
 cc_test {
-    name: "libnativebridge-tests",
-    defaults: ["libnativebridge-tests-defaults"],
-    shared_libs: ["libnativebridge"],
-}
-
-cc_test {
     name: "libnativebridge-lazy-tests",
     defaults: ["libnativebridge-tests-defaults"],
     host_supported: false,
-    shared_libs: ["libnativebridge_lazy"],
-}
-
-// Build the test for the C API.
-cc_test {
-    name: "libnativebridge-api-tests",
-    defaults: [
-        "art_defaults",
-        "art_test_defaults",
+    test_suites: ["device-tests"],
+    static_libs: [
+        "libbase",
+        "libnativebridge_lazy",
     ],
-    // TODO(mast): Split up art_gtest_defaults so that it can be used for the
-    // following without pulling in lots of libs.
-    target: {
-        linux: {
-            cflags: [
-                // gtest issue
-                "-Wno-used-but-marked-unused",
-                "-Wno-deprecated",
-                "-Wno-missing-noreturn",
-            ],
-        },
-    },
-    srcs: [
-        "NativeBridgeApi.c",
-    ],
-    header_libs: [
-        "jni_headers",
-        "libnativebridge-headers",
-    ],
-    gtest:false,
+    srcs: ["libnativebridge_lazy_test.cpp"],
 }

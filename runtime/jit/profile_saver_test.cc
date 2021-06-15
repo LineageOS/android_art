@@ -40,13 +40,9 @@ class ProfileSaverTest : public CommonRuntimeTest {
   void PostRuntimeCreate() override {
     // Create a profile saver.
     Runtime* runtime = Runtime::Current();
-    const std::vector<std::string> code_paths;
-    const std::string fake_file = "fake_file";
     profile_saver_ = new ProfileSaver(
         runtime->GetJITOptions()->GetProfileSaverOptions(),
-        fake_file,
-        runtime->GetJitCodeCache(),
-        code_paths);
+        runtime->GetJitCodeCache());
   }
 
   ~ProfileSaverTest() {

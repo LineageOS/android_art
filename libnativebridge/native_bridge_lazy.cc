@@ -44,12 +44,6 @@ FuncPtr GetFuncPtr(const char* function_name) {
 
 }  // namespace
 
-bool LoadNativeBridge(const char* native_bridge_library_filename,
-                      const struct NativeBridgeRuntimeCallbacks* runtime_callbacks) {
-  static auto f = GET_FUNC_PTR(LoadNativeBridge);
-  return f(native_bridge_library_filename, runtime_callbacks);
-}
-
 bool NeedsNativeBridge(const char* instruction_set) {
   static auto f = GET_FUNC_PTR(NeedsNativeBridge);
   return f(instruction_set);
@@ -58,21 +52,6 @@ bool NeedsNativeBridge(const char* instruction_set) {
 bool PreInitializeNativeBridge(const char* app_data_dir, const char* instruction_set) {
   static auto f = GET_FUNC_PTR(PreInitializeNativeBridge);
   return f(app_data_dir, instruction_set);
-}
-
-void PreZygoteForkNativeBridge() {
-  static auto f = GET_FUNC_PTR(PreZygoteForkNativeBridge);
-  return f();
-}
-
-bool InitializeNativeBridge(JNIEnv* env, const char* instruction_set) {
-  static auto f = GET_FUNC_PTR(InitializeNativeBridge);
-  return f(env, instruction_set);
-}
-
-void UnloadNativeBridge() {
-  static auto f = GET_FUNC_PTR(UnloadNativeBridge);
-  return f();
 }
 
 bool NativeBridgeAvailable() {
@@ -85,85 +64,13 @@ bool NativeBridgeInitialized() {
   return f();
 }
 
-void* NativeBridgeLoadLibrary(const char* libpath, int flag) {
-  static auto f = GET_FUNC_PTR(NativeBridgeLoadLibrary);
-  return f(libpath, flag);
-}
-
 void* NativeBridgeGetTrampoline(void* handle, const char* name, const char* shorty, uint32_t len) {
   static auto f = GET_FUNC_PTR(NativeBridgeGetTrampoline);
   return f(handle, name, shorty, len);
 }
 
-bool NativeBridgeIsSupported(const char* libpath) {
-  static auto f = GET_FUNC_PTR(NativeBridgeIsSupported);
-  return f(libpath);
-}
-
-uint32_t NativeBridgeGetVersion() {
-  static auto f = GET_FUNC_PTR(NativeBridgeGetVersion);
-  return f();
-}
-
-NativeBridgeSignalHandlerFn NativeBridgeGetSignalHandler(int signal) {
-  static auto f = GET_FUNC_PTR(NativeBridgeGetSignalHandler);
-  return f(signal);
-}
-
-bool NativeBridgeError() {
-  static auto f = GET_FUNC_PTR(NativeBridgeError);
-  return f();
-}
-
-bool NativeBridgeNameAcceptable(const char* native_bridge_library_filename) {
-  static auto f = GET_FUNC_PTR(NativeBridgeNameAcceptable);
-  return f(native_bridge_library_filename);
-}
-
-int NativeBridgeUnloadLibrary(void* handle) {
-  static auto f = GET_FUNC_PTR(NativeBridgeUnloadLibrary);
-  return f(handle);
-}
-
 const char* NativeBridgeGetError() {
   static auto f = GET_FUNC_PTR(NativeBridgeGetError);
-  return f();
-}
-
-bool NativeBridgeIsPathSupported(const char* path) {
-  static auto f = GET_FUNC_PTR(NativeBridgeIsPathSupported);
-  return f(path);
-}
-
-bool NativeBridgeInitAnonymousNamespace(const char* public_ns_sonames,
-                                        const char* anon_ns_library_path) {
-  static auto f = GET_FUNC_PTR(NativeBridgeInitAnonymousNamespace);
-  return f(public_ns_sonames, anon_ns_library_path);
-}
-
-struct native_bridge_namespace_t* NativeBridgeCreateNamespace(
-    const char* name, const char* ld_library_path, const char* default_library_path, uint64_t type,
-    const char* permitted_when_isolated_path, struct native_bridge_namespace_t* parent_ns) {
-  static auto f = GET_FUNC_PTR(NativeBridgeCreateNamespace);
-  return f(name, ld_library_path, default_library_path, type, permitted_when_isolated_path,
-           parent_ns);
-}
-
-bool NativeBridgeLinkNamespaces(struct native_bridge_namespace_t* from,
-                                struct native_bridge_namespace_t* to,
-                                const char* shared_libs_sonames) {
-  static auto f = GET_FUNC_PTR(NativeBridgeLinkNamespaces);
-  return f(from, to, shared_libs_sonames);
-}
-
-void* NativeBridgeLoadLibraryExt(const char* libpath, int flag,
-                                 struct native_bridge_namespace_t* ns) {
-  static auto f = GET_FUNC_PTR(NativeBridgeLoadLibraryExt);
-  return f(libpath, flag, ns);
-}
-
-struct native_bridge_namespace_t* NativeBridgeGetVendorNamespace() {
-  static auto f = GET_FUNC_PTR(NativeBridgeGetVendorNamespace);
   return f();
 }
 

@@ -20,6 +20,7 @@
 #include <sys/resource.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <unistd.h>
 
 #include "android-base/strings.h"
 
@@ -80,10 +81,7 @@ static int GetDefaultThreadPriority() {
 #endif
 }
 
-ProfileSaver::ProfileSaver(const ProfileSaverOptions& options,
-                           const std::string& output_filename,
-                           jit::JitCodeCache* jit_code_cache,
-                           const std::vector<std::string>& code_paths)
+ProfileSaver::ProfileSaver(const ProfileSaverOptions& options, jit::JitCodeCache* jit_code_cache)
     : jit_code_cache_(jit_code_cache),
       shutting_down_(false),
       last_time_ns_saver_woke_up_(0),
@@ -101,7 +99,6 @@ ProfileSaver::ProfileSaver(const ProfileSaverOptions& options,
       total_number_of_wake_ups_(0),
       options_(options) {
   DCHECK(options_.IsEnabled());
-  AddTrackedLocations(output_filename, code_paths);
 }
 
 ProfileSaver::~ProfileSaver() {
@@ -127,6 +124,10 @@ void ProfileSaver::Run() {
   // under mutex, but should drop it.
   Locks::profiler_lock_->ExclusiveUnlock(self);
 
+  bool check_for_first_save =
+      options_.GetMinFirstSaveMs() != ProfileSaverOptions::kMinFirstSaveMsNotSet;
+  bool force_early_first_save = check_for_first_save && IsFirstSave();
+
   // Fetch the resolved classes for the app images after sleeping for
   // options_.GetSaveResolvedClassesDelayMs().
   // TODO(calin) This only considers the case of the primary profile file.
@@ -134,7 +135,10 @@ void ProfileSaver::Run() {
   // classes save (unless they started before the initial saving was done).
   {
     MutexLock mu(self, wait_lock_);
-    const uint64_t end_time = NanoTime() + MsToNs(options_.GetSaveResolvedClassesDelayMs());
+
+    const uint64_t end_time = NanoTime() + MsToNs(force_early_first_save
+      ? options_.GetMinFirstSaveMs()
+      : options_.GetSaveResolvedClassesDelayMs());
     while (!Runtime::Current()->GetStartupCompleted()) {
       const uint64_t current_time = NanoTime();
       if (current_time >= end_time) {
@@ -154,10 +158,16 @@ void ProfileSaver::Run() {
   // exponential back off policy bounded by max_wait_without_jit.
   uint32_t max_wait_without_jit = options_.GetMinSavePeriodMs() * 16;
   uint64_t cur_wait_without_jit = options_.GetMinSavePeriodMs();
+
   // Loop for the profiled methods.
   while (!ShuttingDown(self)) {
-    uint64_t sleep_start = NanoTime();
-    {
+    // Sleep only if we don't have to force an early first save configured
+    // with GetMinFirstSaveMs().
+    // If we do have to save early, move directly to the processing part
+    // since we already slept before fetching and resolving the startup
+    // classes.
+    if (!force_early_first_save) {
+      uint64_t sleep_start = NanoTime();
       uint64_t sleep_time = 0;
       {
         MutexLock mu(self, wait_lock_);
@@ -179,7 +189,7 @@ void ProfileSaver::Run() {
       // We might have been woken up by a huge number of notifications to guarantee saving.
       // If we didn't meet the minimum saving period go back to sleep (only if missed by
       // a reasonable margin).
-      uint64_t min_save_period_ns = MsToNs(options_.GetMinSavePeriodMs());
+      uint64_t min_save_period_ns = options_.GetMinSavePeriodMs();
       while (min_save_period_ns * 0.9 > sleep_time) {
         {
           MutexLock mu(self, wait_lock_);
@@ -192,8 +202,8 @@ void ProfileSaver::Run() {
         }
         total_number_of_wake_ups_++;
       }
+      total_ms_of_sleep_ += NsToMs(NanoTime() - sleep_start);
     }
-    total_ms_of_sleep_ += NsToMs(NanoTime() - sleep_start);
 
     if (ShuttingDown(self)) {
       break;
@@ -201,7 +211,16 @@ void ProfileSaver::Run() {
 
     uint16_t number_of_new_methods = 0;
     uint64_t start_work = NanoTime();
-    bool profile_saved_to_disk = ProcessProfilingInfo(/*force_save=*/false, &number_of_new_methods);
+    // If we force an early_first_save do not run FetchAndCacheResolvedClassesAndMethods
+    // again. We just did it. So pass true to skip_class_and_method_fetching.
+    bool profile_saved_to_disk = ProcessProfilingInfo(
+        /*force_save=*/ false,
+        /*skip_class_and_method_fetching=*/ force_early_first_save,
+        &number_of_new_methods);
+
+    // Reset the flag, so we can continue on the normal schedule.
+    force_early_first_save = false;
+
     // Update the notification counter based on result. Note that there might be contention on this
     // but we don't care about to be 100% precise.
     if (!profile_saved_to_disk) {
@@ -212,6 +231,53 @@ void ProfileSaver::Run() {
     }
     total_ns_of_work_ += NanoTime() - start_work;
   }
+}
+
+// Checks if the profile file is empty.
+// Return true if the size of the profile file is 0 or if there were errors when
+// trying to open the file.
+static bool IsProfileEmpty(const std::string& location) {
+  if (location.empty()) {
+    return true;
+  }
+
+  struct stat stat_buffer;
+  if (stat(location.c_str(), &stat_buffer) != 0) {
+    if (VLOG_IS_ON(profiler)) {
+      PLOG(WARNING) << "Failed to stat profile location for IsFirstUse: " << location;
+    }
+    return true;
+  }
+
+  VLOG(profiler) << "Profile " << location << " size=" << stat_buffer.st_size;
+  return stat_buffer.st_size == 0;
+}
+
+bool ProfileSaver::IsFirstSave() {
+  Thread* self = Thread::Current();
+  SafeMap<std::string, std::string> tracked_locations;
+  {
+    // Make a copy so that we don't hold the lock while doing I/O.
+    MutexLock mu(self, *Locks::profiler_lock_);
+    tracked_locations = tracked_profiles_;
+  }
+
+  for (const auto& it : tracked_locations) {
+    if (ShuttingDown(self)) {
+      return false;
+    }
+    const std::string& cur_profile = it.first;
+    const std::string& ref_profile = it.second;
+
+    // Check if any profile is non empty. If so, then this is not the first save.
+    if (!IsProfileEmpty(cur_profile) || !IsProfileEmpty(ref_profile)) {
+      return false;
+    }
+  }
+
+  // All locations are empty. Assume this is the first use.
+  VLOG(profiler) << "All profile locations are empty. This is considered to be first save";
+  return true;
 }
 
 void ProfileSaver::NotifyJitActivity() {
@@ -754,7 +820,10 @@ void ProfileSaver::FetchAndCacheResolvedClassesAndMethods(bool startup) {
                  << " in " << PrettyDuration(NanoTime() - start_time);
 }
 
-bool ProfileSaver::ProcessProfilingInfo(bool force_save, /*out*/uint16_t* number_of_new_methods) {
+bool ProfileSaver::ProcessProfilingInfo(
+        bool force_save,
+        bool skip_class_and_method_fetching,
+        /*out*/uint16_t* number_of_new_methods) {
   ScopedTrace trace(__PRETTY_FUNCTION__);
 
   // Resolve any new registered locations.
@@ -772,9 +841,11 @@ bool ProfileSaver::ProcessProfilingInfo(bool force_save, /*out*/uint16_t* number
     *number_of_new_methods = 0;
   }
 
-  // We only need to do this once, not once per dex location.
-  // TODO: Figure out a way to only do it when stuff has changed? It takes 30-50ms.
-  FetchAndCacheResolvedClassesAndMethods(/*startup=*/ false);
+  if (!skip_class_and_method_fetching) {
+    // We only need to do this once, not once per dex location.
+    // TODO: Figure out a way to only do it when stuff has changed? It takes 30-50ms.
+    FetchAndCacheResolvedClassesAndMethods(/*startup=*/ false);
+  }
 
   for (const auto& it : tracked_locations) {
     if (!force_save && ShuttingDown(Thread::Current())) {
@@ -943,9 +1014,10 @@ static bool ShouldProfileLocation(const std::string& location, bool profile_aot_
 }
 
 void  ProfileSaver::Start(const ProfileSaverOptions& options,
-                         const std::string& output_filename,
-                         jit::JitCodeCache* jit_code_cache,
-                         const std::vector<std::string>& code_paths) {
+                          const std::string& output_filename,
+                          jit::JitCodeCache* jit_code_cache,
+                          const std::vector<std::string>& code_paths,
+                          const std::string& ref_profile_filename) {
   Runtime* const runtime = Runtime::Current();
   DCHECK(options.IsEnabled());
   DCHECK(runtime->GetJit() != nullptr);
@@ -998,17 +1070,16 @@ void  ProfileSaver::Start(const ProfileSaverOptions& options,
     // apps which share the same runtime).
     DCHECK_EQ(instance_->jit_code_cache_, jit_code_cache);
     // Add the code_paths to the tracked locations.
-    instance_->AddTrackedLocations(output_filename, code_paths_to_profile);
+    instance_->AddTrackedLocations(output_filename, code_paths_to_profile, ref_profile_filename);
     return;
   }
 
   VLOG(profiler) << "Starting profile saver using output file: " << output_filename
-      << ". Tracking: " << android::base::Join(code_paths_to_profile, ':');
+      << ". Tracking: " << android::base::Join(code_paths_to_profile, ':')
+      << ". With reference profile: " << ref_profile_filename;
 
-  instance_ = new ProfileSaver(options,
-                               output_filename,
-                               jit_code_cache,
-                               code_paths_to_profile);
+  instance_ = new ProfileSaver(options, jit_code_cache);
+  instance_->AddTrackedLocations(output_filename, code_paths_to_profile, ref_profile_filename);
 
   // Create a new thread which does the saving.
   CHECK_PTHREAD_CALL(
@@ -1047,7 +1118,10 @@ void ProfileSaver::Stop(bool dump_info) {
 
   // Force save everything before destroying the thread since we want profiler_pthread_ to remain
   // valid.
-  profile_saver->ProcessProfilingInfo(/*force_save=*/true, /*number_of_new_methods=*/nullptr);
+  profile_saver->ProcessProfilingInfo(
+      /*force_ save=*/ true,
+      /*skip_class_and_method_fetching=*/ false,
+      /*number_of_new_methods=*/ nullptr);
 
   // Wait for the saver thread to stop.
   CHECK_PTHREAD_CALL(pthread_join, (profiler_pthread, nullptr), "profile saver thread shutdown");
@@ -1112,7 +1186,14 @@ static void AddTrackedLocationsToMap(const std::string& output_filename,
 }
 
 void ProfileSaver::AddTrackedLocations(const std::string& output_filename,
-                                       const std::vector<std::string>& code_paths) {
+                                       const std::vector<std::string>& code_paths,
+                                       const std::string& ref_profile_filename) {
+  // Register the output profile and its reference profile.
+  auto it = tracked_profiles_.find(output_filename);
+  if (it == tracked_profiles_.end()) {
+    tracked_profiles_.Put(output_filename, ref_profile_filename);
+  }
+
   // Add the code paths to the list of tracked location.
   AddTrackedLocationsToMap(output_filename, code_paths, &tracked_dex_base_locations_);
   // The code paths may contain symlinks which could fool the profiler.
@@ -1159,7 +1240,10 @@ void ProfileSaver::ForceProcessProfiles() {
   // but we only use this in testing when we now this won't happen.
   // Refactor the way we handle the instance so that we don't end up in this situation.
   if (saver != nullptr) {
-    saver->ProcessProfilingInfo(/*force_save=*/true, /*number_of_new_methods=*/nullptr);
+    saver->ProcessProfilingInfo(
+        /*force_save=*/ true,
+        /*skip_class_and_method_fetching=*/ false,
+        /*number_of_new_methods=*/ nullptr);
   }
 }
 

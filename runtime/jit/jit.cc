@@ -390,10 +390,15 @@ void Jit::DeleteThreadPool() {
   }
 }
 
-void Jit::StartProfileSaver(const std::string& filename,
-                            const std::vector<std::string>& code_paths) {
+void Jit::StartProfileSaver(const std::string& profile_filename,
+                            const std::vector<std::string>& code_paths,
+                            const std::string& ref_profile_filename) {
   if (options_->GetSaveProfilingInfo()) {
-    ProfileSaver::Start(options_->GetProfileSaverOptions(), filename, code_cache_, code_paths);
+    ProfileSaver::Start(options_->GetProfileSaverOptions(),
+                        profile_filename,
+                        code_cache_,
+                        code_paths,
+                        ref_profile_filename);
   }
 }
 

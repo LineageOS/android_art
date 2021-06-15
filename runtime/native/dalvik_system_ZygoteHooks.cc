@@ -144,7 +144,7 @@ enum {
   DEBUG_NATIVE_DEBUGGABLE             = 1 << 7,
   DEBUG_JAVA_DEBUGGABLE               = 1 << 8,
   DISABLE_VERIFIER                    = 1 << 9,
-  ONLY_USE_SYSTEM_OAT_FILES           = 1 << 10,
+  ONLY_USE_TRUSTED_OAT_FILES          = 1 << 10,  // Formerly ONLY_USE_SYSTEM_OAT_FILES
   DEBUG_GENERATE_MINI_DEBUG_INFO      = 1 << 11,
   HIDDEN_API_ENFORCEMENT_POLICY_MASK  = (1 << 12)
                                       | (1 << 13),
@@ -318,9 +318,9 @@ static void ZygoteHooks_nativePostForkChild(JNIEnv* env,
     runtime_flags &= ~DISABLE_VERIFIER;
   }
 
-  if ((runtime_flags & ONLY_USE_SYSTEM_OAT_FILES) != 0 || is_system_server) {
-    runtime->GetOatFileManager().SetOnlyUseSystemOatFiles();
-    runtime_flags &= ~ONLY_USE_SYSTEM_OAT_FILES;
+  if ((runtime_flags & ONLY_USE_TRUSTED_OAT_FILES) != 0 || is_system_server) {
+    runtime->GetOatFileManager().SetOnlyUseTrustedOatFiles();
+    runtime_flags &= ~ONLY_USE_TRUSTED_OAT_FILES;
   }
 
   api_enforcement_policy = hiddenapi::EnforcementPolicyFromInt(

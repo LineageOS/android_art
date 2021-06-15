@@ -138,7 +138,7 @@ bool LocationIsOnConscryptModule(std::string_view location);
 bool LocationIsOnI18nModule(std::string_view location);
 
 // Return whether the location is on system (i.e. android root).
-bool LocationIsOnSystem(const char* location);
+bool LocationIsOnSystem(const std::string& location);
 
 // Return whether the location is on system/framework (i.e. $ANDROID_ROOT/framework).
 bool LocationIsOnSystemFramework(std::string_view location);
@@ -148,6 +148,11 @@ bool LocationIsOnSystemExtFramework(std::string_view location);
 
 // Return whether the location is on /apex/.
 bool LocationIsOnApex(std::string_view location);
+
+// Returns whether the location is trusted for loading oat files. Trusted locations are protected
+// by dm-verity or fs-verity. The recognized locations are on /system or
+// /data/misc/apexdata/com.android.art.
+bool LocationIsTrusted(const std::string& location);
 
 // Compare the ART module root against android root. Returns true if they are
 // both known and distinct. This is meant to be a proxy for 'running with apex'.

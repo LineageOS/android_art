@@ -289,6 +289,7 @@ std::unique_ptr<RuntimeParser> ParsedOptions::MakeParser(bool ignore_unrecognize
       // TODO This should be redone.
       .Define({"-Xps-_",
                "-Xps-min-save-period-ms:_",
+               "-Xps-min-first-save-ms:_",
                "-Xps-save-resolved-classes-delayed-ms:_",
                "-Xps-hot-startup-method-samples:_",
                "-Xps-min-methods-to-save:_",
@@ -431,7 +432,7 @@ std::unique_ptr<RuntimeParser> ParsedOptions::MakeParser(bool ignore_unrecognize
           .WithType<unsigned int>()
           .IntoKey(M::MetricsReportingPeriod)
       .Define("-Xonly-use-system-oat-files")
-          .IntoKey(M::OnlyUseSystemOatFiles)
+          .IntoKey(M::OnlyUseTrustedOatFiles)
       .Define("-Xverifier-logging-threshold=_")
           .WithType<unsigned int>()
           .IntoKey(M::VerifierLoggingThreshold)

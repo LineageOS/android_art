@@ -116,20 +116,17 @@ cc_library_headers {
     export_header_lib_headers: ["jni_headers"],
 }
 
-art_cc_test {
-    name: "libnativeloader_test",
+cc_defaults {
+    name: "libnativeloader-test-defaults",
     defaults: [
         "art_module_source_build_defaults",
         "art_test_defaults",
     ],
     host_supported: false,
 
-    srcs: [
-        "native_loader_test.cpp",
-    ],
     cflags: ["-DANDROID"],
 
-    // The test mocks libdl_android and libnativebridge symbols, so export them
+    // The tests mock libdl_android and libnativebridge symbols, so export them
     // to override the ones loaded from their libs.
     ldflags: [
         "-Wl,--export-dynamic-symbol=android_*",
@@ -145,8 +142,30 @@ art_cc_test {
     ],
     shared_libs: [
         "libbase",
-        "libnativeloader",
     ],
 
     test_suites: ["device-tests"],
+}
+
+art_cc_test {
+    name: "libnativeloader_test",
+    defaults: ["libnativeloader-test-defaults"],
+    srcs: [
+        "native_loader_api_test.c",
+        "native_loader_test.cpp",
+    ],
+    shared_libs: [
+        "libnativeloader",
+    ],
+}
+
+art_cc_test {
+    name: "libnativeloader_lazy_test",
+    defaults: ["libnativeloader-test-defaults"],
+    srcs: [
+        "native_loader_lazy_test.cpp",
+    ],
+    static_libs: [
+        "libnativeloader_lazy",
+    ],
 }
