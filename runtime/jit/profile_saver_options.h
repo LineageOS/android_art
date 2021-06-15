@@ -21,6 +21,9 @@ namespace art {
 struct ProfileSaverOptions {
  public:
   static constexpr uint32_t kMinSavePeriodMs = 40 * 1000;  // 40 seconds
+  // Default value for the min save period on first use, indicating that the
+  // period is not configured.
+  static constexpr uint32_t kMinFirstSaveMsNotSet = 0;
   static constexpr uint32_t kSaveResolvedClassesDelayMs = 5 * 1000;  // 5 seconds
   // Minimum number of JIT samples during launch to mark a method as hot in the profile.
   static constexpr uint32_t kHotStartupMethodSamples = 1;
@@ -34,6 +37,7 @@ struct ProfileSaverOptions {
   ProfileSaverOptions() :
     enabled_(false),
     min_save_period_ms_(kMinSavePeriodMs),
+    min_first_save_ms_(kMinFirstSaveMsNotSet),
     save_resolved_classes_delay_ms_(kSaveResolvedClassesDelayMs),
     hot_startup_method_samples_(kHotStartupMethodSamplesNotSet),
     min_methods_to_save_(kMinMethodsToSave),
@@ -48,6 +52,7 @@ struct ProfileSaverOptions {
   ProfileSaverOptions(
       bool enabled,
       uint32_t min_save_period_ms,
+      uint32_t min_first_save_ms,
       uint32_t save_resolved_classes_delay_ms,
       uint32_t hot_startup_method_samples,
       uint32_t min_methods_to_save,
@@ -60,6 +65,7 @@ struct ProfileSaverOptions {
       bool wait_for_jit_notifications_to_save = true)
   : enabled_(enabled),
     min_save_period_ms_(min_save_period_ms),
+    min_first_save_ms_(min_first_save_ms),
     save_resolved_classes_delay_ms_(save_resolved_classes_delay_ms),
     hot_startup_method_samples_(hot_startup_method_samples),
     min_methods_to_save_(min_methods_to_save),
@@ -80,6 +86,9 @@ struct ProfileSaverOptions {
 
   uint32_t GetMinSavePeriodMs() const {
     return min_save_period_ms_;
+  }
+  uint32_t GetMinFirstSaveMs() const {
+    return min_first_save_ms_;
   }
   uint32_t GetSaveResolvedClassesDelayMs() const {
     return save_resolved_classes_delay_ms_;
@@ -122,6 +131,7 @@ struct ProfileSaverOptions {
   friend std::ostream & operator<<(std::ostream &os, const ProfileSaverOptions& pso) {
     os << "enabled_" << pso.enabled_
         << ", min_save_period_ms_" << pso.min_save_period_ms_
+        << ", min_first_save_ms_" << pso.min_first_save_ms_
         << ", save_resolved_classes_delay_ms_" << pso.save_resolved_classes_delay_ms_
         << ", hot_startup_method_samples_" << pso.hot_startup_method_samples_
         << ", min_methods_to_save_" << pso.min_methods_to_save_
@@ -136,6 +146,7 @@ struct ProfileSaverOptions {
 
   bool enabled_;
   uint32_t min_save_period_ms_;
+  uint32_t min_first_save_ms_;
   uint32_t save_resolved_classes_delay_ms_;
   // Do not access hot_startup_method_samples_ directly for reading since it may be set to the
   // placeholder default.

@@ -44,11 +44,6 @@ FuncPtr GetFuncPtr(const char* function_name) {
 
 }  // namespace
 
-void InitializeNativeLoader() {
-  static auto f = GET_FUNC_PTR(InitializeNativeLoader);
-  return f();
-}
-
 jstring CreateClassLoaderNamespace(JNIEnv* env, int32_t target_sdk_version, jobject class_loader,
                                    bool is_shared, jstring dex_path, jstring library_path,
                                    jstring permitted_path, jstring uses_library_list) {
@@ -90,11 +85,6 @@ void* OpenNativeLibraryInNamespace(struct NativeLoaderNamespace* ns, const char*
                                    bool* needs_native_bridge, char** error_msg) {
   static auto f = GET_FUNC_PTR(OpenNativeLibraryInNamespace);
   return f(ns, path, needs_native_bridge, error_msg);
-}
-
-void ResetNativeLoader() {
-  static auto f = GET_FUNC_PTR(ResetNativeLoader);
-  return f();
 }
 
 #undef GET_FUNC_PTR

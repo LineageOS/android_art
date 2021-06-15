@@ -14,33 +14,18 @@
 # limitations under the License.
 #
 
-# TODO(b/122710865): Most of these uses come from libnativeloader, which should be bundled
-# together with libnativebridge in the APEX. Once this happens, prune this list.
+# Platform dependencies go through libnativebridge_lazy, which accesses
+# libnativebridge symbols through dlopen/dlsym. That means this list doesn't
+# have much effect, rather it's the function wrappers in native_bridge_lazy.cpp
+# that defines the exported interface. Please keep in sync with this list.
 LIBNATIVEBRIDGE_1 {
   global:
-    NativeBridgeIsSupported;
-    NativeBridgeLoadLibrary;
-    NativeBridgeUnloadLibrary;
     NativeBridgeGetError;
-    NativeBridgeIsPathSupported;
-    NativeBridgeCreateNamespace;
-    NativeBridgeGetExportedNamespace;
-    NativeBridgeLinkNamespaces;
-    NativeBridgeLoadLibraryExt;
-    NativeBridgeInitAnonymousNamespace;
     NativeBridgeInitialized;
     NativeBridgeGetTrampoline;
-    LoadNativeBridge;
     PreInitializeNativeBridge;
-    PreZygoteForkNativeBridge;
-    InitializeNativeBridge;
-    NativeBridgeGetVersion;
-    NativeBridgeGetSignalHandler;
-    UnloadNativeBridge;
     NativeBridgeAvailable;
     NeedsNativeBridge;
-    NativeBridgeError;
-    NativeBridgeNameAcceptable;
   local:
     *;
 };

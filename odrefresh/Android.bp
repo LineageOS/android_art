@@ -29,6 +29,7 @@ cc_defaults {
     defaults: ["art_defaults"],
     srcs: [
         "odrefresh.cc",
+        "odr_compilation_log.cc",
         "odr_fs_utils.cc",
         "odr_metrics.cc",
         "odr_metrics_record.cc",
@@ -168,6 +169,8 @@ art_cc_test {
     header_libs: ["odrefresh_headers"],
     srcs: [
         "odr_artifacts_test.cc",
+        "odr_compilation_log.cc",
+        "odr_compilation_log_test.cc",
         "odr_fs_utils.cc",
         "odr_fs_utils_test.cc",
         "odr_metrics.cc",

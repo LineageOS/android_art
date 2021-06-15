@@ -846,11 +846,11 @@ class ImageSpace::Loader {
     // Use the boot image component count to calculate the checksum from
     // the appropriate number of boot image chunks.
     uint32_t boot_image_component_count = image_header.GetBootImageComponentCount();
-    size_t boot_image_spaces_size = boot_image_spaces.size();
-    if (boot_image_component_count > boot_image_spaces_size) {
+    size_t expected_image_component_count = ImageSpace::GetNumberOfComponents(boot_image_spaces);
+    if (boot_image_component_count > expected_image_component_count) {
       *error_msg = StringPrintf("Too many boot image dependencies (%u > %zu) in image %s",
                                 boot_image_component_count,
-                                boot_image_spaces_size,
+                                expected_image_component_count,
                                 image_filename);
       return false;
     }

@@ -69,6 +69,7 @@
 #include "palette/palette_types.h"
 
 #include "odr_artifacts.h"
+#include "odr_compilation_log.h"
 #include "odr_config.h"
 #include "odr_fs_utils.h"
 #include "odr_metrics.h"
@@ -1443,10 +1444,16 @@ class OnDeviceRefresh final {
         return odr.CheckArtifactsAreUpToDate(metrics);
       } else if (action == "--compile") {
         const ExitCode exit_code = odr.CheckArtifactsAreUpToDate(metrics);
-        if (exit_code == ExitCode::kCompilationRequired) {
-          return odr.Compile(metrics, /*force_compile=*/false);
+        if (exit_code != ExitCode::kCompilationRequired) {
+          return exit_code;
         }
-        return exit_code;
+        OdrCompilationLog compilation_log;
+        if (!compilation_log.ShouldAttemptCompile(metrics.GetApexVersion(), metrics.GetTrigger())) {
+          return ExitCode::kOkay;
+        }
+        ExitCode compile_result = odr.Compile(metrics, /*force_compile=*/false);
+        compilation_log.Log(metrics.GetApexVersion(), metrics.GetTrigger(), compile_result);
+        return compile_result;
       } else if (action == "--force-compile") {
         return odr.Compile(metrics, /*force_compile=*/true);
       } else if (action == "--verify") {
