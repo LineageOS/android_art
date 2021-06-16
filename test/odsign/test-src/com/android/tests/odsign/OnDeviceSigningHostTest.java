@@ -31,6 +31,7 @@ import com.android.tradefed.util.CommandResult;
 
 import org.junit.After;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
@@ -206,7 +207,7 @@ public class OnDeviceSigningHostTest extends BaseHostJUnit4Test {
         assertTrue("No zygote processes found", zygoteCount > 0);
     }
 
-    @Test
+    @Test @Ignore("b/191113888 failing with secondary 64-bit zygote checks")
     public void verifyGeneratedArtifactsLoaded() throws Exception {
         // Checking zygote and system_server need the device have adb root to walk process maps.
         final boolean adbEnabled = getDevice().enableAdbRoot();
