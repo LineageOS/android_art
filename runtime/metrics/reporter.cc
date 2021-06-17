@@ -16,6 +16,10 @@
 
 #include "reporter.h"
 
+#include <algorithm>
+
+#include <android-base/parseint.h>
+
 #include "base/flags.h"
 #include "runtime.h"
 #include "runtime_options.h"
@@ -28,25 +32,24 @@
 namespace art {
 namespace metrics {
 
-std::unique_ptr<MetricsReporter> MetricsReporter::Create(ReportingConfig config, Runtime* runtime) {
+std::unique_ptr<MetricsReporter> MetricsReporter::Create(
+    const ReportingConfig& config, Runtime* runtime) {
   // We can't use std::make_unique here because the MetricsReporter constructor is private.
   return std::unique_ptr<MetricsReporter>{new MetricsReporter{std::move(config), runtime}};
 }
 
-MetricsReporter::MetricsReporter(ReportingConfig config, Runtime* runtime)
-    : config_{std::move(config)}, runtime_{runtime} {}
+MetricsReporter::MetricsReporter(const ReportingConfig& config, Runtime* runtime)
+    : config_{config},
+      runtime_{runtime},
+      startup_reported_{false},
+      report_interval_index_{0} {}
 
 MetricsReporter::~MetricsReporter() { MaybeStopBackgroundThread(); }
 
-bool MetricsReporter::IsPeriodicReportingEnabled() const {
-  return config_.periodic_report_seconds.has_value();
-}
-
-void MetricsReporter::SetReportingPeriod(unsigned int period_seconds) {
-  DCHECK(!thread_.has_value()) << "The reporting period should not be changed after the background "
+void MetricsReporter::ReloadConfig(const ReportingConfig& config) {
+  DCHECK(!thread_.has_value()) << "The config cannot be reloaded after the background "
                                   "reporting thread is started.";
-
-  config_.periodic_report_seconds = period_seconds;
+  config_ = config;
 }
 
 bool MetricsReporter::MaybeStartBackgroundThread(SessionData session_data) {
@@ -60,6 +63,7 @@ void MetricsReporter::MaybeStopBackgroundThread() {
   if (thread_.has_value()) {
     messages_.SendMessage(ShutdownRequestedMessage{});
     thread_->join();
+    thread_.reset();
   }
 }
 
@@ -115,35 +119,37 @@ void MetricsReporter::BackgroundThreadRun() {
   while (running) {
     messages_.SwitchReceive(
         [&](BeginSessionMessage message) {
-          LOG_STREAM(DEBUG) << "Received session metadata";
           session_data_ = message.session_data;
+          LOG_STREAM(DEBUG) << "Received session metadata: " << session_data_.session_id;
         },
         [&]([[maybe_unused]] ShutdownRequestedMessage message) {
-          LOG_STREAM(DEBUG) << "Shutdown request received";
+          LOG_STREAM(DEBUG) << "Shutdown request received " << session_data_.session_id;
           running = false;
 
           ReportMetrics();
         },
         [&](RequestMetricsReportMessage message) {
-          LOG_STREAM(DEBUG) << "Explicit report request received";
+          LOG_STREAM(DEBUG) << "Explicit report request received " << session_data_.session_id;
           ReportMetrics();
           if (message.synchronous) {
             thread_to_host_messages_.SendMessage(ReportCompletedMessage{});
           }
         },
         [&]([[maybe_unused]] TimeoutExpiredMessage message) {
-          LOG_STREAM(DEBUG) << "Timer expired, reporting metrics";
+          LOG_STREAM(DEBUG) << "Timer expired, reporting metrics " << session_data_.session_id;
 
           ReportMetrics();
-
           MaybeResetTimeout();
         },
         [&]([[maybe_unused]] StartupCompletedMessage message) {
-          LOG_STREAM(DEBUG) << "App startup completed, reporting metrics";
+          LOG_STREAM(DEBUG) << "App startup completed, reporting metrics "
+              << session_data_.session_id;
           ReportMetrics();
+          startup_reported_ = true;
+          MaybeResetTimeout();
         },
         [&](CompilationInfoMessage message) {
-          LOG_STREAM(DEBUG) << "Compilation info received";
+          LOG_STREAM(DEBUG) << "Compilation info received " << session_data_.session_id;
           session_data_.compilation_reason = message.compilation_reason;
           session_data_.compiler_filter = message.compiler_filter;
         });
@@ -152,17 +158,21 @@ void MetricsReporter::BackgroundThreadRun() {
   if (attached) {
     runtime_->DetachCurrentThread();
   }
-  LOG_STREAM(DEBUG) << "Metrics reporting thread terminating";
+  LOG_STREAM(DEBUG) << "Metrics reporting thread terminating " << session_data_.session_id;
 }
 
 void MetricsReporter::MaybeResetTimeout() {
-  if (config_.periodic_report_seconds.has_value()) {
-    messages_.SetTimeout(SecondsToMs(config_.periodic_report_seconds.value()));
+  if (ShouldContinueReporting()) {
+    messages_.SetTimeout(SecondsToMs(GetNextPeriodSeconds()));
   }
 }
 
+const ArtMetrics* MetricsReporter::GetMetrics() {
+  return runtime_->GetMetrics();
+}
+
 void MetricsReporter::ReportMetrics() {
-  ArtMetrics* metrics{runtime_->GetMetrics()};
+  const ArtMetrics* metrics = GetMetrics();
 
   if (!session_started_) {
     for (auto& backend : backends_) {
@@ -176,13 +186,105 @@ void MetricsReporter::ReportMetrics() {
   }
 }
 
-ReportingConfig ReportingConfig::FromFlags() {
+bool MetricsReporter::ShouldReportAtStartup() const {
+  return config_.period_spec.has_value() &&
+      config_.period_spec->report_startup_first;
+}
+
+bool MetricsReporter::ShouldContinueReporting() const {
+  bool result =
+      // Only if we have period spec
+      config_.period_spec.has_value() &&
+      // and the periods are non empty
+      !config_.period_spec->periods_seconds.empty() &&
+      // and we already reported startup or not required to report startup
+      (startup_reported_ || !config_.period_spec->report_startup_first) &&
+      // and we still have unreported intervals or we are asked to report continuously.
+      (config_.period_spec->continuous_reporting ||
+              (report_interval_index_ < config_.period_spec->periods_seconds.size()));
+  return result;
+}
+
+uint32_t MetricsReporter::GetNextPeriodSeconds() {
+  DCHECK(ShouldContinueReporting());
+
+  // The index is either the current report_interval_index or the last index
+  // if we are in continuous mode and reached the end.
+  uint32_t index = std::min(
+      report_interval_index_,
+      static_cast<uint32_t>(config_.period_spec->periods_seconds.size() - 1));
+
+  uint32_t result = config_.period_spec->periods_seconds[index];
+
+  // Advance the index if we didn't get to the end.
+  if (report_interval_index_ < config_.period_spec->periods_seconds.size()) {
+    report_interval_index_++;
+  }
+  return result;
+}
+
+ReportingConfig ReportingConfig::FromFlags(bool is_system_server) {
+  std::optional<std::string> spec_str = is_system_server
+      ? gFlags.MetricsReportingSpecSystemServer.GetValueOptional()
+      : gFlags.MetricsReportingSpec.GetValueOptional();
+
+  std::optional<ReportingPeriodSpec> period_spec = std::nullopt;
+  if (spec_str.has_value()) {
+    std::string error;
+    period_spec = ReportingPeriodSpec::Parse(spec_str.value(), &error);
+    if (!period_spec.has_value()) {
+      LOG(ERROR) << "Failed to create metrics reporting spec from: " << spec_str.value()
+          << " with error: " << error;
+    }
+  }
   return {
       .dump_to_logcat = gFlags.WriteMetricsToLogcat(),
       .dump_to_file = gFlags.WriteMetricsToFile.GetValueOptional(),
       .dump_to_statsd = gFlags.WriteMetricsToStatsd(),
-      .periodic_report_seconds = gFlags.MetricsReportingPeriod.GetValueOptional(),
+      .period_spec = period_spec,
   };
+}
+
+std::optional<ReportingPeriodSpec> ReportingPeriodSpec::Parse(
+    const std::string& spec_str, std::string* error_msg) {
+  *error_msg = "";
+  if (spec_str.empty()) {
+    *error_msg = "Invalid empty spec.";
+    return std::nullopt;
+  }
+
+  // Split the string. Each element is separated by comma.
+  std::vector<std::string> elems;
+  Split(spec_str, ',', &elems);
+
+  // Check the startup marker (front) and the continuous one (back).
+  std::optional<ReportingPeriodSpec> spec = std::make_optional(ReportingPeriodSpec());
+  spec->spec = spec_str;
+  spec->report_startup_first = elems.front() == "S";
+  spec->continuous_reporting = elems.back() == "*";
+
+  // Compute the indices for the period values.
+  size_t start_interval_idx = spec->report_startup_first ? 1 : 0;
+  size_t end_interval_idx = spec->continuous_reporting ? (elems.size() - 1) : elems.size();
+
+  // '*' needs a numeric interval before in order to be valid.
+  if (spec->continuous_reporting &&
+      end_interval_idx == start_interval_idx) {
+    *error_msg = "Invalid period value in spec: " + spec_str;
+    return std::nullopt;
+  }
+
+  // Parse the periods.
+  for (size_t i = start_interval_idx; i < end_interval_idx; i++) {
+    uint32_t period;
+    if (!android::base::ParseUint(elems[i], &period)) {
+        *error_msg = "Invalid period value in spec: " + spec_str;
+        return std::nullopt;
+    }
+    spec->periods_seconds.push_back(period);
+  }
+
+  return spec;
 }
 
 }  // namespace metrics

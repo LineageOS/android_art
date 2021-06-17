@@ -26,9 +26,47 @@
 namespace art {
 namespace metrics {
 
+/**
+ * Encapsulates the specification of the metric reporting periods.
+ *
+ * The period spec follows the following regex: "(S,)?(\d+,)*\*?"
+ * with the following semantics:
+ *   "S"         - will only report at startup.
+ *
+ *   "S,1,1"     - will report startup, than 1 second later, then another
+ *                 second later.
+ *
+ *   "S,1,2,4  " - will report at Startup time, then 1 seconds later,
+ *                 then 2, then finally 4 seconds later. After that, the
+ *                 reporting will stop.
+ *
+ *   "S,1,2,4,*" - same as above, but after the final 4s period, the
+ *                 reporting will continue every other 4s.
+ *                 '*' is an indication we should report continuously
+ *                 every N seconds, where N is the last period.
+ *
+ *   "2,*"       - will report every 2 seconds
+ *
+ * Note that "", "*", or "S,*" are not valid specs, and 'S' can only occur
+ * in the beginning.
+ */
+struct ReportingPeriodSpec {
+  static std::optional<ReportingPeriodSpec> Parse(
+      const std::string& spec_str, std::string* error_msg);
+
+  // The original spec.
+  std::string spec;
+  // The intervals when we should report.
+  std::vector<uint32_t> periods_seconds;
+  // Whether or not the reporting is continuous (contains a '*').
+  bool continuous_reporting{false};
+  // Whether or not the reporting should start after startup event (starts with an 'S').
+  bool report_startup_first{false};
+};
+
 // Defines the set of options for how metrics reporting happens.
 struct ReportingConfig {
-  static ReportingConfig FromFlags();
+  static ReportingConfig FromFlags(bool is_system_server = false);
 
   // Causes metrics to be written to the log, which makes them show up in logcat.
   bool dump_to_logcat{false};
@@ -39,17 +77,17 @@ struct ReportingConfig {
   // If set, provides a file name to enable metrics logging to a file.
   std::optional<std::string> dump_to_file;
 
-  // If set, metrics will be reported every time this many seconds elapses.
-  std::optional<unsigned int> periodic_report_seconds;
+  // The reporting period configuration.
+  std::optional<ReportingPeriodSpec> period_spec;
 };
 
 // MetricsReporter handles periodically reporting ART metrics.
 class MetricsReporter {
  public:
   // Creates a MetricsReporter instance that matches the options selected in ReportingConfig.
-  static std::unique_ptr<MetricsReporter> Create(ReportingConfig config, Runtime* runtime);
+  static std::unique_ptr<MetricsReporter> Create(const ReportingConfig& config, Runtime* runtime);
 
-  ~MetricsReporter();
+  virtual ~MetricsReporter();
 
   // Creates and runs the background reporting thread.
   //
@@ -65,27 +103,29 @@ class MetricsReporter {
   // completes.
   void NotifyStartupCompleted();
 
-  bool IsPeriodicReportingEnabled() const;
-
-  // Changes the reporting period.
-  //
-  // This function is not thread safe and may only be called before the background reporting thread
-  // has been started.
-  void SetReportingPeriod(unsigned int period_seconds);
-
   // Requests a metrics report
   //
   // If synchronous is set to true, this function will block until the report has completed.
   void RequestMetricsReport(bool synchronous = true);
+
+  // Reloads the metrics config from the given value.
+  // Can only be called before starting the background thread.
+  void ReloadConfig(const ReportingConfig& config);
 
   void SetCompilationInfo(CompilationReason compilation_reason,
                           CompilerFilter::Filter compiler_filter);
 
   static constexpr const char* kBackgroundThreadName = "Metrics Background Reporting Thread";
 
- private:
-  MetricsReporter(ReportingConfig config, Runtime* runtime);
+ protected:
+  // Returns the metrics to be reported.
+  // This exists only for testing purposes so that we can verify reporting with minimum
+  // runtime interference.
+  virtual const ArtMetrics* GetMetrics();
 
+  MetricsReporter(const ReportingConfig& config, Runtime* runtime);
+
+ private:
   // The background reporting thread main loop.
   void BackgroundThreadRun();
 
@@ -95,10 +135,26 @@ class MetricsReporter {
   // Outputs the current state of the metrics to the destination set by config_.
   void ReportMetrics();
 
+  // Whether or not we should wait for startup before reporting for the first time.
+  bool ShouldReportAtStartup() const;
+
+  // Whether or not we should continue reporting (either because we still
+  // have periods to report, or because we are in continuous mode).
+  bool ShouldContinueReporting() const;
+
+  // Returns the next reporting period.
+  // Must be called only if ShouldContinueReporting() is true.
+  uint32_t GetNextPeriodSeconds();
+
   ReportingConfig config_;
   Runtime* runtime_;
   std::vector<std::unique_ptr<MetricsBackend>> backends_;
   std::optional<std::thread> thread_;
+  // Whether or not we reported the startup event.
+  bool startup_reported_;
+  // The index into period_spec.periods_seconds which tells the next delay in
+  // seconds for the next reporting.
+  uint32_t report_interval_index_;
 
   // A message indicating that the reporting thread should shut down.
   struct ShutdownRequestedMessage {};
@@ -139,6 +195,8 @@ class MetricsReporter {
 
   SessionData session_data_{};
   bool session_started_{false};
+
+  friend class MetricsReporterTest;
 };
 
 }  // namespace metrics
