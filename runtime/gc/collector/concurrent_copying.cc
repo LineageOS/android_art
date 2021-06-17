@@ -102,6 +102,8 @@ ConcurrentCopying::ConcurrentCopying(Heap* heap,
       copied_live_bytes_ratio_sum_(0.f),
       gc_count_(0),
       reclaimed_bytes_ratio_sum_(0.f),
+      cumulative_bytes_moved_(0),
+      cumulative_objects_moved_(0),
       skipped_blocks_lock_("concurrent copying bytes blocks lock", kMarkSweepMarkStackLock),
       measure_read_barrier_slow_path_(measure_read_barrier_slow_path),
       mark_from_read_barrier_measurements_(false),
@@ -158,10 +160,12 @@ ConcurrentCopying::ConcurrentCopying(Heap* heap,
     gc_time_histogram_ = metrics->YoungGcCollectionTime();
     metrics_gc_count_ = metrics->YoungGcCount();
     gc_throughput_histogram_ = metrics->YoungGcThroughput();
+    gc_tracing_throughput_hist_ = metrics->YoungGcTracingThroughput();
   } else {
     gc_time_histogram_ = metrics->FullGcCollectionTime();
     metrics_gc_count_ = metrics->FullGcCount();
     gc_throughput_histogram_ = metrics->FullGcThroughput();
+    gc_tracing_throughput_hist_ = metrics->FullGcTracingThroughput();
   }
 }
 
@@ -401,6 +405,7 @@ void ConcurrentCopying::InitializePhase() {
   objects_moved_.store(0, std::memory_order_relaxed);
   bytes_moved_gc_thread_ = 0;
   objects_moved_gc_thread_ = 0;
+  bytes_scanned_ = 0;
   GcCause gc_cause = GetCurrentIteration()->GetGcCause();
 
   force_evacuate_all_ = false;
@@ -2196,6 +2201,7 @@ size_t ConcurrentCopying::ProcessThreadLocalMarkStacks(bool disable_weak_ref_acc
 
 inline void ConcurrentCopying::ProcessMarkStackRef(mirror::Object* to_ref) {
   DCHECK(!region_space_->IsInFromSpace(to_ref));
+  size_t obj_size = 0;
   space::RegionSpace::RegionType rtype = region_space_->GetRegionType(to_ref);
   if (kUseBakerReadBarrier) {
     DCHECK(to_ref->GetReadBarrierState() == ReadBarrier::GrayState())
@@ -2282,10 +2288,11 @@ inline void ConcurrentCopying::ProcessMarkStackRef(mirror::Object* to_ref) {
       }
   }
   if (perform_scan) {
+    obj_size = to_ref->SizeOf<kDefaultVerifyFlags>();
     if (use_generational_cc_ && young_gen_) {
-      Scan<true>(to_ref);
+      Scan<true>(to_ref, obj_size);
     } else {
-      Scan<false>(to_ref);
+      Scan<false>(to_ref, obj_size);
     }
   }
   if (kUseBakerReadBarrier) {
@@ -2329,9 +2336,10 @@ inline void ConcurrentCopying::ProcessMarkStackRef(mirror::Object* to_ref) {
     // Add to the live bytes per unevacuated from-space. Note this code is always run by the
     // GC-running thread (no synchronization required).
     DCHECK(region_space_bitmap_->Test(to_ref));
-    size_t obj_size = to_ref->SizeOf<kDefaultVerifyFlags>();
-    size_t alloc_size = RoundUp(obj_size, space::RegionSpace::kAlignment);
-    region_space_->AddLiveBytes(to_ref, alloc_size);
+    if (obj_size == 0) {
+      obj_size = to_ref->SizeOf<kDefaultVerifyFlags>();
+    }
+    region_space_->AddLiveBytes(to_ref, RoundUp(obj_size, space::RegionSpace::kAlignment));
   }
   if (ReadBarrier::kEnableToSpaceInvariantChecks) {
     CHECK(to_ref != nullptr);
@@ -2713,9 +2721,9 @@ void ConcurrentCopying::ReclaimPhase() {
     const uint64_t unevac_from_bytes = region_space_->GetBytesAllocatedInUnevacFromSpace();
     const uint64_t unevac_from_objects = region_space_->GetObjectsAllocatedInUnevacFromSpace();
     uint64_t to_bytes = bytes_moved_.load(std::memory_order_relaxed) + bytes_moved_gc_thread_;
-    cumulative_bytes_moved_.fetch_add(to_bytes, std::memory_order_relaxed);
+    cumulative_bytes_moved_ += to_bytes;
     uint64_t to_objects = objects_moved_.load(std::memory_order_relaxed) + objects_moved_gc_thread_;
-    cumulative_objects_moved_.fetch_add(to_objects, std::memory_order_relaxed);
+    cumulative_objects_moved_ += to_objects;
     if (kEnableFromSpaceAccountingCheck) {
       CHECK_EQ(from_space_num_objects_at_first_pause_, from_objects + unevac_from_objects);
       CHECK_EQ(from_space_num_bytes_at_first_pause_, from_bytes + unevac_from_bytes);
@@ -2757,6 +2765,7 @@ void ConcurrentCopying::ReclaimPhase() {
                 << heap_->num_bytes_allocated_.load();
     }
     RecordFree(ObjectBytePair(freed_objects, freed_bytes));
+    GetCurrentIteration()->SetScannedBytes(bytes_scanned_);
     if (kVerboseMode) {
       LOG(INFO) << "(after) num_bytes_allocated="
                 << heap_->num_bytes_allocated_.load();
@@ -3135,7 +3144,7 @@ class ConcurrentCopying::RefFieldsVisitor {
 };
 
 template <bool kNoUnEvac>
-inline void ConcurrentCopying::Scan(mirror::Object* to_ref) {
+inline void ConcurrentCopying::Scan(mirror::Object* to_ref, size_t obj_size) {
   // Cannot have `kNoUnEvac` when Generational CC collection is disabled.
   DCHECK(!kNoUnEvac || use_generational_cc_);
   if (kDisallowReadBarrierDuringScan && !Runtime::Current()->IsActiveTransaction()) {
@@ -3144,6 +3153,11 @@ inline void ConcurrentCopying::Scan(mirror::Object* to_ref) {
     // trigger read barriers.
     Thread::Current()->ModifyDebugDisallowReadBarrier(1);
   }
+  if (obj_size == 0) {
+    obj_size = to_ref->SizeOf<kDefaultVerifyFlags>();
+  }
+  bytes_scanned_ += obj_size;
+
   DCHECK(!region_space_->IsInFromSpace(to_ref));
   DCHECK_EQ(Thread::Current(), thread_running_gc_);
   RefFieldsVisitor<kNoUnEvac> visitor(this, thread_running_gc_);
@@ -3841,10 +3855,8 @@ void ConcurrentCopying::DumpPerformanceInfo(std::ostream& os) {
      << (copied_live_bytes_ratio_sum_ / gc_count_) << " over " << gc_count_
      << " " << (young_gen_ ? "minor" : "major") << " GCs\n";
 
-  os << "Cumulative bytes moved "
-     << cumulative_bytes_moved_.load(std::memory_order_relaxed) << "\n";
-  os << "Cumulative objects moved "
-     << cumulative_objects_moved_.load(std::memory_order_relaxed) << "\n";
+  os << "Cumulative bytes moved " << cumulative_bytes_moved_ << "\n";
+  os << "Cumulative objects moved " << cumulative_objects_moved_ << "\n";
 
   os << "Peak regions allocated "
      << region_space_->GetMaxPeakNumNonFreeRegions() << " ("
