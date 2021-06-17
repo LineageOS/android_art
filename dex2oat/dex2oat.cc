@@ -1805,14 +1805,14 @@ class Dex2Oat final {
   }
 
   bool ShouldCompileDexFilesIndividually() const {
-    // Compile individually if we are specifically asked to, or
+    // Compile individually if we are allowed to, and
     // 1. not building an image, and
     // 2. not verifying a vdex file, and
     // 3. using multidex, and
     // 4. not doing any AOT compilation.
     // This means extract, no-vdex verify, and quicken, will use the individual compilation
     // mode (to reduce RAM used by the compiler).
-    return compile_individually_ ||
+    return compile_individually_ &&
            (!IsImage() && !update_input_vdex_ &&
             compiler_options_->dex_files_for_oat_file_.size() > 1 &&
             !CompilerFilter::IsAotCompilationEnabled(compiler_options_->GetCompilerFilter()));
