@@ -34,9 +34,8 @@ CompactDexLevel CompactDexWriter::GetCompactDexLevel() const {
   return dex_layout_->GetOptions().compact_dex_level_;
 }
 
-CompactDexWriter::Container::Container(bool dedupe_code_items)
-    : code_item_dedupe_(dedupe_code_items, &data_section_),
-      data_item_dedupe_(/*enabled=*/ true, &data_section_) {}
+CompactDexWriter::Container::Container()
+    : data_item_dedupe_(&data_section_) {}
 
 uint32_t CompactDexWriter::WriteDebugInfoOffsetTable(Stream* stream) {
   const uint32_t start_offset = stream->Tell();
@@ -117,7 +116,10 @@ CompactDexWriter::ScopedDataSectionItem::ScopedDataSectionItem(Stream* stream,
 }
 
 CompactDexWriter::ScopedDataSectionItem::~ScopedDataSectionItem() {
-  // After having written, maybe dedupe the whole code item (excluding padding).
+  if (deduper_ == nullptr) {
+    return;
+  }
+  // After having written, maybe dedupe the whole section (excluding padding).
   const uint32_t deduped_offset = deduper_->Dedupe(start_offset_,
                                                    stream_->Tell(),
                                                    item_->GetOffset());
@@ -145,7 +147,7 @@ void CompactDexWriter::WriteCodeItem(Stream* stream,
   ScopedDataSectionItem data_item(stream,
                                   code_item,
                                   CompactDexFile::CodeItem::kAlignment,
-                                  code_item_dedupe_);
+                                  /* deduper= */ nullptr);
 
   CompactDexFile::CodeItem disk_code_item;
 
@@ -209,18 +211,14 @@ void CompactDexWriter::WriteDebugInfoItem(Stream* stream, dex_ir::DebugInfoItem*
 }
 
 
-CompactDexWriter::Deduper::Deduper(bool enabled, DexContainer::Section* section)
-    : enabled_(enabled),
-      dedupe_map_(/*__n=*/ 32,
+CompactDexWriter::Deduper::Deduper(DexContainer::Section* section)
+    : dedupe_map_(/*__n=*/ 32,
                   HashedMemoryRange::HashEqual(section),
                   HashedMemoryRange::HashEqual(section)) {}
 
 uint32_t CompactDexWriter::Deduper::Dedupe(uint32_t data_start,
                                            uint32_t data_end,
                                            uint32_t item_offset) {
-  if (!enabled_) {
-    return kDidNotDedupe;
-  }
   HashedMemoryRange range {data_start, data_end - data_start};
   auto existing = dedupe_map_.emplace(range, item_offset);
   if (!existing.second) {
@@ -397,7 +395,6 @@ bool CompactDexWriter::Write(DexContainer* output, std::string* error_msg)  {
   data_stream->Seek(std::max(
       static_cast<uint32_t>(output->GetDataSection()->Size()),
       kDataSectionAlignment));
-  code_item_dedupe_ = &container->code_item_dedupe_;
   data_item_dedupe_ = &container->data_item_dedupe_;
 
   // Starting offset is right after the header.
@@ -521,17 +518,11 @@ bool CompactDexWriter::Write(DexContainer* output, std::string* error_msg)  {
     WriteHeader(main_stream);
   }
 
-  // Clear the dedupe to prevent interdex code item deduping. This does not currently work well with
-  // dex2oat's class unloading. The issue is that verification encounters quickened opcodes after
-  // the first dex gets unloaded.
-  code_item_dedupe_->Clear();
-
   return true;
 }
 
 std::unique_ptr<DexContainer> CompactDexWriter::CreateDexContainer() const {
-  return std::unique_ptr<DexContainer>(
-      new CompactDexWriter::Container(dex_layout_->GetOptions().dedupe_code_items_));
+  return std::unique_ptr<DexContainer>(new CompactDexWriter::Container());
 }
 
 }  // namespace art
