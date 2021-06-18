@@ -31,16 +31,19 @@ import com.android.tradefed.util.CommandResult;
 
 import org.junit.After;
 import org.junit.Before;
-import org.junit.Ignore;
+import org.junit.FixMethodOrder;
 import org.junit.Test;
 import org.junit.runner.RunWith;
+import org.junit.runners.MethodSorters;
 
 import java.time.Duration;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 @RunWith(DeviceJUnit4ClassRunner.class)
+@FixMethodOrder(MethodSorters.NAME_ASCENDING)
 public class OnDeviceSigningHostTest extends BaseHostJUnit4Test {
 
     private static final String APEX_FILENAME = "test_com.android.art.apex";
@@ -176,16 +179,17 @@ public class OnDeviceSigningHostTest extends BaseHostJUnit4Test {
         }
     }
 
-    private void verifyZygoteLoadedArtifacts(String zygotePid) throws Exception {
+    private void verifyZygoteLoadedArtifacts(String zygoteName, String zygotePid) throws Exception {
         final String bootExtensionName = "boot-framework";
         final Set<String> mappedArtifacts = getMappedArtifacts(zygotePid, bootExtensionName);
 
         assertTrue("Expect 3 boot-framework artifacts", mappedArtifacts.size() == 3);
 
+        String allArtifacts = mappedArtifacts.stream().collect(Collectors.joining(","));
         for (String extension : BCP_ARTIFACT_EXTENSIONS) {
             final String artifact = bootExtensionName + extension;
             final boolean found = mappedArtifacts.stream().anyMatch(a -> a.endsWith(artifact));
-            assertTrue(artifact + " not found", found);
+            assertTrue(zygoteName + " " + artifact + " not found: '" + allArtifacts + "'", found);
         }
     }
 
@@ -194,20 +198,20 @@ public class OnDeviceSigningHostTest extends BaseHostJUnit4Test {
         // instances 32-bit and 64-bit unspecialized app_process processes.
         // (frameworks/base/cmds/app_process).
         int zygoteCount = 0;
-        for (String processName : new String[] {"zygote", "zygote64"}) {
+        for (String zygoteName : new String[] {"zygote", "zygote64"}) {
             final CommandResult pgrepResult =
-                    getDevice().executeShellV2Command("pgrep " + processName);
+                    getDevice().executeShellV2Command("pgrep " + zygoteName);
             if (pgrepResult.getExitCode() != 0) {
                 continue;
             }
             final String zygotePid = pgrepResult.getStdout();
-            verifyZygoteLoadedArtifacts(zygotePid);
+            verifyZygoteLoadedArtifacts(zygoteName, zygotePid);
             zygoteCount += 1;
         }
         assertTrue("No zygote processes found", zygoteCount > 0);
     }
 
-    @Test @Ignore("b/191113888 failing with secondary 64-bit zygote checks")
+    @Test
     public void verifyGeneratedArtifactsLoaded() throws Exception {
         // Checking zygote and system_server need the device have adb root to walk process maps.
         final boolean adbEnabled = getDevice().enableAdbRoot();
