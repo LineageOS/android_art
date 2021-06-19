@@ -803,20 +803,18 @@ bool OatFileBase::Setup(int zip_fd,
     const bool valid_magic = DexFileLoader::IsMagicValid(dex_file_pointer);
     if (UNLIKELY(!valid_magic)) {
       *error_msg = StringPrintf("In oat file '%s' found OatDexFile #%zu for '%s' with invalid "
-                                    "dex file magic '%s'",
+                                    "dex file magic",
                                 GetLocation().c_str(),
                                 i,
-                                dex_file_location.c_str(),
-                                dex_file_pointer);
+                                dex_file_location.c_str());
       return false;
     }
     if (UNLIKELY(!DexFileLoader::IsVersionAndMagicValid(dex_file_pointer))) {
       *error_msg = StringPrintf("In oat file '%s' found OatDexFile #%zu for '%s' with invalid "
-                                    "dex file version '%s'",
+                                    "dex file version",
                                 GetLocation().c_str(),
                                 i,
-                                dex_file_location.c_str(),
-                                dex_file_pointer);
+                                dex_file_location.c_str());
       return false;
     }
     const DexFile::Header* header = reinterpret_cast<const DexFile::Header*>(dex_file_pointer);
@@ -1603,6 +1601,12 @@ class OatFileBackedByVdex final : public OatFileBase {
       for (const uint8_t* dex_file_start = vdex_file->GetNextDexFileData(nullptr, i);
            dex_file_start != nullptr;
            dex_file_start = vdex_file->GetNextDexFileData(dex_file_start, ++i)) {
+        if (UNLIKELY(!DexFileLoader::IsVersionAndMagicValid(dex_file_start))) {
+          *error_msg =
+              StringPrintf("In vdex file '%s' found dex file with invalid dex file version",
+                           dex_location.c_str());
+          return nullptr;
+        }
         // Create the OatDexFile and add it to the owning container.
         std::string location = DexFileLoader::GetMultiDexLocation(i, dex_location.c_str());
         std::string canonical_location = DexFileLoader::GetDexCanonicalLocation(location.c_str());
