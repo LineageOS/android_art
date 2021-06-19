@@ -32,11 +32,12 @@ class ProfileAssistant {
   enum ProcessingResult {
     kSuccess = 0,  // Generic success code for non-analysis runs.
     kCompile = 1,
-    kSkipCompilation = 2,
+    kSkipCompilationSmallDelta = 2,
     kErrorBadProfiles = 3,
     kErrorIO = 4,
     kErrorCannotLock = 5,
     kErrorDifferentVersions = 6,
+    kSkipCompilationEmptyProfiles = 7,
   };
 
   class Options {
@@ -95,10 +96,11 @@ class ProfileAssistant {
   // reference_profile will be updated with the profiling info obtain after
   // merging all profiles.
   //
-  // When the returned value is kSkipCompilation, the difference between the
-  // merge of the current profiles and the reference one is insignificant. In
-  // this case no file will be updated.
-  //
+  // When the returned value is kSkipCompilationSmallDelta, the difference between
+  // the merge of the current profiles and the reference one is insignificant. In
+  // this case no file will be updated. A variation of this code is
+  // kSkipCompilationEmptyProfiles which indicates that all the profiles are empty.
+  // This allow the caller to make fine grain decisions on the compilation strategy.
   static ProcessingResult ProcessProfiles(
       const std::vector<std::string>& profile_files,
       const std::string& reference_profile_file,

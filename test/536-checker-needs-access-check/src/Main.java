@@ -51,6 +51,11 @@ public class Main {
 
         InaccessibleClassProxy.testGetReferrersClass();
         InaccessibleClassProxy.testGetReferrersClassViaAnotherClass();
+
+        // Execute again now that classes have been initialized, and entrypoints may have been
+        // updated.
+        InaccessibleClassProxy.testGetReferrersClass();
+        InaccessibleClassProxy.testGetReferrersClassViaAnotherClass();
     }
 
     /// CHECK-START: boolean Main.testInstanceOf() register (after)

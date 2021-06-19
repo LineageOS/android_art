@@ -78,6 +78,9 @@ ProfileAssistant::ProcessingResult ProfileAssistant::ProcessProfilesInternal(
 
   // If we perform a forced merge do not analyze the difference between profiles.
   if (!options.IsForceMerge()) {
+    if (info.IsEmpty()) {
+      return kSkipCompilationEmptyProfiles;
+    }
     uint32_t min_change_in_methods_for_compilation = std::max(
         (options.GetMinNewMethodsPercentChangeForCompilation() * number_of_methods) / 100,
         kMinNewMethodsForCompilation);
@@ -88,7 +91,7 @@ ProfileAssistant::ProcessingResult ProfileAssistant::ProcessProfilesInternal(
     if (((info.GetNumberOfMethods() - number_of_methods) < min_change_in_methods_for_compilation) &&
         ((info.GetNumberOfResolvedClasses() - number_of_classes)
             < min_change_in_classes_for_compilation)) {
-      return kSkipCompilation;
+      return kSkipCompilationSmallDelta;
     }
   }
 

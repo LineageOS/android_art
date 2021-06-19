@@ -27,7 +27,8 @@ namespace art {
 class CompactDexFile : public DexFile {
  public:
   static constexpr uint8_t kDexMagic[kDexMagicSize] = { 'c', 'd', 'e', 'x' };
-  static constexpr uint8_t kDexMagicVersion[] = {'0', '0', '1', '\0'};
+  // Last change: remove code item deduping.
+  static constexpr uint8_t kDexMagicVersion[] = {'0', '0', '2', '\0'};
 
   enum class FeatureFlags : uint32_t {
     kDefaultMethods = 0x1,
