@@ -87,8 +87,8 @@ NO_RETURN static void Usage(const char *fmt, ...) {
   UsageError("  --compiler-filter=<string>: the target compiler filter to be used as reference");
   UsageError("       when deciding if the dex file needs to be optimized.");
   UsageError("");
-  UsageError("  --assume-profile-changed: assumes the profile information has changed");
-  UsageError("       when deciding if the dex file needs to be optimized.");
+  UsageError("  --profile_analysis_result=<int>: the result of the profile analysis, used in");
+  UsageError("       deciding if the dex file needs to be optimized.");
   UsageError("");
   UsageError("  --image=<filename>: optional, the image to be used to decide if the associated");
   UsageError("       oat file is up to date. Defaults to $ANDROID_ROOT/framework/boot.art.");
@@ -150,7 +150,6 @@ class DexoptAnalyzer final {
   DexoptAnalyzer() :
       only_flatten_context_(false),
       only_validate_bcp_(false),
-      assume_profile_changed_(false),
       downgrade_(false) {}
 
   void ParseArgs(int argc, char **argv) {
@@ -170,8 +169,16 @@ class DexoptAnalyzer final {
     for (int i = 0; i < argc; ++i) {
       const char* raw_option = argv[i];
       const std::string_view option(raw_option);
-      if (option == "--assume-profile-changed") {
-        assume_profile_changed_ = true;
+
+      if (StartsWith(option, "--profile-analysis-result=")) {
+        int parse_result = std::stoi(std::string(
+            option.substr(strlen("--profile-analysis-result="))), nullptr, 0);
+        if (parse_result != static_cast<int>(ProfileAnalysisResult::kOptimize) &&
+            parse_result != static_cast<int>(ProfileAnalysisResult::kDontOptimizeSmallDelta) &&
+            parse_result != static_cast<int>(ProfileAnalysisResult::kDontOptimizeEmptyProfiles)) {
+          Usage("Invalid --profile-analysis-result= %d", parse_result);
+        }
+        profile_analysis_result_ = static_cast<ProfileAnalysisResult>(parse_result);
       } else if (StartsWith(option, "--dex-file=")) {
         dex_file_ = std::string(option.substr(strlen("--dex-file=")));
       } else if (StartsWith(option, "--compiler-filter=")) {
@@ -326,8 +333,18 @@ class DexoptAnalyzer final {
       return ReturnCode::kNoDexOptNeeded;
     }
 
-    int dexoptNeeded = oat_file_assistant->GetDexOptNeeded(compiler_filter_,
-                                                           assume_profile_changed_,
+    // If the compiler filter depends on profiles but the profiles are empty,
+    // change the test filter to kVerify. It's what dex2oat also does.
+    CompilerFilter::Filter actual_compiler_filter = compiler_filter_;
+    if (CompilerFilter::DependsOnProfile(compiler_filter_) &&
+        profile_analysis_result_ == ProfileAnalysisResult::kDontOptimizeEmptyProfiles) {
+      actual_compiler_filter = CompilerFilter::kVerify;
+    }
+
+    // TODO: GetDexOptNeeded should get the raw analysis result instead of assume_profile_changed.
+    bool assume_profile_changed = profile_analysis_result_ == ProfileAnalysisResult::kOptimize;
+    int dexoptNeeded = oat_file_assistant->GetDexOptNeeded(actual_compiler_filter,
+                                                           assume_profile_changed,
                                                            downgrade_);
 
     // Convert OatFileAssistant codes to dexoptanalyzer codes.
@@ -450,7 +467,7 @@ class DexoptAnalyzer final {
   std::string context_str_;
   bool only_flatten_context_;
   bool only_validate_bcp_;
-  bool assume_profile_changed_;
+  ProfileAnalysisResult profile_analysis_result_;
   bool downgrade_;
   std::string image_;
   std::vector<const char*> runtime_args_;
