@@ -28,7 +28,7 @@ namespace metrics {
 
 // Defines the set of options for how metrics reporting happens.
 struct ReportingConfig {
-  static ReportingConfig FromRuntimeArguments(const RuntimeArgumentMap& args);
+  static ReportingConfig FromFlags();
 
   // Causes metrics to be written to the log, which makes them show up in logcat.
   bool dump_to_logcat{false};
@@ -38,11 +38,6 @@ struct ReportingConfig {
 
   // If set, provides a file name to enable metrics logging to a file.
   std::optional<std::string> dump_to_file;
-
-  // Indicates whether to report the final state of metrics on shutdown.
-  //
-  // Note that reporting only happens if some output, such as logcat, is enabled.
-  bool report_metrics_on_shutdown{true};
 
   // If set, metrics will be reported every time this many seconds elapses.
   std::optional<unsigned int> periodic_report_seconds;

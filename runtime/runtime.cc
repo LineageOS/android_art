@@ -1838,7 +1838,7 @@ bool Runtime::Init(RuntimeArgumentMap&& runtime_options_in) {
   // Class-roots are setup, we can now finish initializing the JniIdManager.
   GetJniIdManager()->Init(self);
 
-  InitMetrics(runtime_options);
+  InitMetrics();
 
   // Runtime initialization is largely done now.
   // We load plugins first since that can modify the runtime state slightly.
@@ -1938,8 +1938,8 @@ bool Runtime::Init(RuntimeArgumentMap&& runtime_options_in) {
   return true;
 }
 
-void Runtime::InitMetrics(const RuntimeArgumentMap& runtime_options) {
-  auto metrics_config = metrics::ReportingConfig::FromRuntimeArguments(runtime_options);
+void Runtime::InitMetrics() {
+  auto metrics_config = metrics::ReportingConfig::FromFlags();
   metrics_reporter_ = metrics::MetricsReporter::Create(metrics_config, this);
 }
 
