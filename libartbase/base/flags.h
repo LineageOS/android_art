@@ -43,6 +43,15 @@
 
 namespace art {
 
+// Enum representing the type of the ART flag.
+enum class FlagType {
+  // A flag that only looks at the cmdline argument to retrieve its value.
+  kCmdlineOnly,
+  // A flag that also looks at system properties and device config
+  // (phenotype properties) when retrieving its value.
+  kDeviceConfig,
+};
+
 // FlagMetaBase handles automatically adding flags to the command line parser. It is parameterized
 // by all supported flag types. In general, this should be treated as though it does not exist and
 // FlagBase, which is already specialized to the types we support, should be used instead.
@@ -51,10 +60,12 @@ class FlagMetaBase {
  public:
   FlagMetaBase(const std::string&& command_line_argument_name,
                const std::string&& system_property_name,
-               const std::string&& server_setting_name) :
+               const std::string&& server_setting_name,
+               FlagType type) :
       command_line_argument_name_(command_line_argument_name),
       system_property_name_(system_property_name),
-      server_setting_name_(server_setting_name) {}
+      server_setting_name_(server_setting_name),
+      type_(type) {}
   virtual ~FlagMetaBase() {}
 
   template <typename Builder>
@@ -124,6 +135,7 @@ class FlagMetaBase {
   const std::string command_line_argument_name_;
   const std::string system_property_name_;
   const std::string server_setting_name_;
+  FlagType type_;
 };
 
 using FlagBase = FlagMetaBase<bool, int, std::string>;
@@ -133,13 +145,21 @@ std::forward_list<FlagBase*> FlagBase::ALL_FLAGS;
 
 class FlagsTests;
 
+// Describes the possible origins of a flag value.
+enum class FlagOrigin {
+  kDefaultValue,
+  kCmdlineArg,
+  kSystemProperty,
+  kServerSetting,
+};
+
 // This class defines a flag with a value of a particular type.
 template <typename Value>
 class Flag : public FlagBase {
  public:
   // Create a new Flag. The name parameter is used to generate the names from the various parameter
   // sources. See the documentation on the Flags struct for an example.
-  explicit Flag(const std::string& name, Value default_value = {});
+  Flag(const std::string& name, Value default_value, FlagType type);
   virtual ~Flag();
 
 
@@ -151,26 +171,41 @@ class Flag : public FlagBase {
   //   3) cmdline flag
   //   4) default value
   ALWAYS_INLINE Value GetValue() const {
-    return std::get<0>(GetValueLocation());
+    return std::get<0>(GetValueAndOrigin());
   }
 
   ALWAYS_INLINE Value operator()() const {
     return GetValue();
   }
 
-  // Returns the value and the location of that value for the given flag.
-  ALWAYS_INLINE std::pair<Value, std::string> GetValueLocation() const {
+  // Return the value of the flag as optional.
+  //
+  // Returns the value of the flag if and only if the flag is set via
+  // a server side setting, system property or a cmdline arg.
+  // Otherwise it returns nullopt (meaning this never returns the default value).
+  //
+  // This is useful for properties that do not have a good default natural value
+  // (e.g. file path arguments).
+  ALWAYS_INLINE std::optional<Value> GetValueOptional() const {
+    std::pair<Value, FlagOrigin> result = GetValueAndOrigin();
+    return std::get<1>(result) == FlagOrigin::kDefaultValue
+      ? std::nullopt
+      : std::make_optional(std::get<0>(result));
+  }
+
+  // Returns the value and the origin of that value for the given flag.
+  ALWAYS_INLINE std::pair<Value, FlagOrigin> GetValueAndOrigin() const {
     DCHECK(initialized_);
     if (from_server_setting_.has_value()) {
-      return std::pair{from_server_setting_.value(), server_setting_name_};
+      return std::pair{from_server_setting_.value(), FlagOrigin::kServerSetting};
     }
     if (from_system_property_.has_value()) {
-      return std::pair{from_system_property_.value(), system_property_name_};
+      return std::pair{from_system_property_.value(), FlagOrigin::kSystemProperty};
     }
     if (from_command_line_.has_value()) {
-      return std::pair{from_command_line_.value(), command_line_argument_name_};
+      return std::pair{from_command_line_.value(), FlagOrigin::kCmdlineArg};
     }
-    return std::pair{default_, "default_value"};
+    return std::pair{default_, FlagOrigin::kDefaultValue};
   }
 
   void Dump(std::ostream& oss) const override;
@@ -199,7 +234,7 @@ class Flag : public FlagBase {
 //
 // Example:
 //
-//     Flag<int> WriteMetricsToLog{"my-feature-test.flag", 42};
+//     Flag<int> WriteMetricsToLog{"my-feature-test.flag", 42, FlagType::kDeviceConfig};
 //
 // This creates a boolean flag that can be read through gFlags.WriteMetricsToLog(). The default
 // value is false. Note that the default value can be left unspecified, in which the value of the
@@ -221,7 +256,13 @@ class Flag : public FlagBase {
 struct Flags {
   // Flag used to test the infra.
   // TODO: can be removed once we add real flags.
-  Flag<int> MyFeatureTestFlag{"my-feature-test.flag", /*default_value=*/ 42};
+  Flag<int> MyFeatureTestFlag{"my-feature-test.flag", 42, FlagType::kDeviceConfig};
+
+  // Metric infra flags.
+  Flag<bool> WriteMetricsToStatsd{ "metrics.write-to-statsd", false, FlagType::kDeviceConfig};
+  Flag<bool> WriteMetricsToLogcat{ "metrics.write-to-logcat", false, FlagType::kCmdlineOnly};
+  Flag<int> MetricsReportingPeriod{"metrics.reporting-period", 0, FlagType::kCmdlineOnly};
+  Flag<std::string> WriteMetricsToFile{"metrics.write-to-file", "", FlagType::kCmdlineOnly};
 };
 
 // This is the actual instance of all the flags.

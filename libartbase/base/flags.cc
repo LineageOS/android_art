@@ -84,10 +84,11 @@ static std::string GeneratePhenotypeName(const std::string& name) {
 }
 
 template <typename Value>
-Flag<Value>::Flag(const std::string& name, Value default_value) :
+Flag<Value>::Flag(const std::string& name, Value default_value, FlagType type) :
     FlagBase(GenerateCmdLineArgName(name),
              GenerateSysPropName(name),
-             GeneratePhenotypeName(name)),
+             GeneratePhenotypeName(name),
+             type),
     initialized_{false},
     default_{default_value} {
   ALL_FLAGS.push_front(this);
@@ -100,7 +101,12 @@ Flag<Value>::~Flag() {
 
 template <typename Value>
 void Flag<Value>::Reload() {
-  // The cmdline flags are loaded by the parsed_options infra.
+  initialized_ = true;
+
+  // The cmdline flags are loaded by the parsed_options infra. No action needed here.
+  if (type_ == FlagType::kCmdlineOnly) {
+    return;
+  }
 
   // Load system properties.
   from_system_property_ = std::nullopt;
@@ -116,8 +122,6 @@ void Flag<Value>::Reload() {
   if (server_config != kUndefinedValue) {
     ParseValue(server_config, &from_server_setting_);
   }
-
-  initialized_ = true;
 }
 
 template <typename Value>
@@ -131,8 +135,16 @@ void DumpValue(std::ostream& oss, const std::optional<Value>& val) {
 
 template <typename Value>
 void Flag<Value>::Dump(std::ostream& oss) const {
-  std::pair<Value, std::string> valueLoc = GetValueLocation();
-  oss << "value: " << std::get<0>(valueLoc) << " (from " << std::get<1>(valueLoc) << ")";
+  std::pair<Value, FlagOrigin> valueOrigin = GetValueAndOrigin();
+  std::string origin;
+  switch (std::get<1>(valueOrigin)) {
+    case FlagOrigin::kDefaultValue: origin = "default_value"; break;
+    case FlagOrigin::kCmdlineArg: origin = "cmdline_arg"; break;
+    case FlagOrigin::kSystemProperty: origin = "system_property"; break;
+    case FlagOrigin::kServerSetting: origin = "server_setting"; break;
+  }
+
+  oss << "value: " << std::get<0>(valueOrigin) << " (from " << origin << ")";
 
   oss << "\n default: " << default_;
   oss << "\n " << command_line_argument_name_ << ": ";

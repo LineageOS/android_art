@@ -39,6 +39,13 @@ enum class ReturnCode {
   kErrorUnknownDexOptNeeded = 103
 };
 
+// Accepted values for the profile analysis results.
+enum class ProfileAnalysisResult {
+  kOptimize = 1,
+  kDontOptimizeSmallDelta = 2,
+  kDontOptimizeEmptyProfiles = 3,
+};
+
 }  // namespace dexoptanalyzer
 }  // namespace art
 
