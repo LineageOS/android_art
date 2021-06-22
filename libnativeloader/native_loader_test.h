@@ -80,6 +80,11 @@ static std::unordered_map<std::string, Platform::mock_namespace_handle> namespac
   NAMESPACE_ENTRY("com_android_i18n"),
   NAMESPACE_ENTRY("com_android_neuralnetworks"),
   NAMESPACE_ENTRY("com_android_art"),
+
+  // TODO(b/191644631) This can be removed when the test becomes more test-friendly.
+  // This is added so that the test can exercise the JNI lib related behavior.
+  NAMESPACE_ENTRY("com_android_conscrypt"),
+
   NAMESPACE_ENTRY("default"),
   NAMESPACE_ENTRY("sphal"),
   NAMESPACE_ENTRY("system"),
