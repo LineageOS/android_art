@@ -258,15 +258,48 @@ struct Flags {
   // TODO: can be removed once we add real flags.
   Flag<int32_t> MyFeatureTestFlag{"my-feature-test.flag", 42, FlagType::kDeviceConfig};
 
+
   // Metric infra flags.
 
-  Flag<bool> WriteMetricsToLogcat{ "metrics.write-to-logcat", false, FlagType::kCmdlineOnly};
-  Flag<std::string> WriteMetricsToFile{"metrics.write-to-file", "", FlagType::kCmdlineOnly};
-  Flag<bool> WriteMetricsToStatsd{ "metrics.write-to-statsd", false, FlagType::kDeviceConfig};
-
+  // The reporting spec for regular apps. An example of valid value is "S,1,2,4,*".
+  // See metrics::ReportingPeriodSpec for complete docs.
   Flag<std::string> MetricsReportingSpec{"metrics.reporting-spec", "", FlagType::kDeviceConfig};
+
+  // The reporting spec for the system server. See MetricsReportingSpec as well.
   Flag<std::string> MetricsReportingSpecSystemServer{"metrics.reporting-spec-server", "",
       FlagType::kDeviceConfig};
+
+  // The mods that should report metrics. Together with MetricsReportingNumMods, they
+  // dictate what percentage of the runtime execution will report metrics.
+  // If the `session_id (a random number) % MetricsReportingNumMods < MetricsReportingMods`
+  // then the runtime session will report metrics.
+  //
+  // By default, the mods are 0, which means the reporting is disabled.
+  Flag<uint32_t> MetricsReportingMods{"metrics.reporting-mods", 0,
+      FlagType::kDeviceConfig};
+
+  // See MetricsReportingMods docs.
+  //
+  // By default the number of mods is 100, so MetricsReportingMods will naturally
+  // read as the percent of runtime sessions that will report metrics. If a finer
+  // grain unit is needed (e.g. a tenth of a percent), the num-mods can be increased.
+  Flag<uint32_t> MetricsReportingNumMods{"metrics.reporting-num-mods", 100,
+      FlagType::kDeviceConfig};
+
+  // Whether or not we should write metrics to statsd.
+  // Note that the actual write is still controlled by
+  // MetricsReportingMods and MetricsReportingNumMods.
+  Flag<bool> MetricsWriteToStatsd{ "metrics.write-to-statsd", false, FlagType::kDeviceConfig};
+
+  // Whether or not we should write metrics to logcat.
+  // Note that the actual write is still controlled by
+  // MetricsReportingMods and MetricsReportingNumMods.
+  Flag<bool> MetricsWriteToLogcat{ "metrics.write-to-logcat", false, FlagType::kCmdlineOnly};
+
+  // Whether or not we should write metrics to a file.
+  // Note that the actual write is still controlled by
+  // MetricsReportingMods and MetricsReportingNumMods.
+  Flag<std::string> MetricsWriteToFile{"metrics.write-to-file", "", FlagType::kCmdlineOnly};
 };
 
 // This is the actual instance of all the flags.
