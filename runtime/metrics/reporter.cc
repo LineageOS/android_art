@@ -16,6 +16,7 @@
 
 #include "reporter.h"
 
+#include "base/flags.h"
 #include "runtime.h"
 #include "runtime_options.h"
 #include "statsd.h"
@@ -121,10 +122,7 @@ void MetricsReporter::BackgroundThreadRun() {
           LOG_STREAM(DEBUG) << "Shutdown request received";
           running = false;
 
-          // Do one final metrics report, if enabled.
-          if (config_.report_metrics_on_shutdown) {
-            ReportMetrics();
-          }
+          ReportMetrics();
         },
         [&](RequestMetricsReportMessage message) {
           LOG_STREAM(DEBUG) << "Explicit report request received";
@@ -178,14 +176,12 @@ void MetricsReporter::ReportMetrics() {
   }
 }
 
-ReportingConfig ReportingConfig::FromRuntimeArguments(const RuntimeArgumentMap& args) {
-  using M = RuntimeArgumentMap;
+ReportingConfig ReportingConfig::FromFlags() {
   return {
-      .dump_to_logcat = args.Exists(M::WriteMetricsToLog),
-      .dump_to_statsd = args.GetOrDefault(M::WriteMetricsToStatsd),
-      .dump_to_file = args.GetOptional(M::WriteMetricsToFile),
-      .report_metrics_on_shutdown = !args.Exists(M::DisableFinalMetricsReport),
-      .periodic_report_seconds = args.GetOptional(M::MetricsReportingPeriod),
+      .dump_to_logcat = gFlags.WriteMetricsToLogcat(),
+      .dump_to_file = gFlags.WriteMetricsToFile.GetValueOptional(),
+      .dump_to_statsd = gFlags.WriteMetricsToStatsd(),
+      .periodic_report_seconds = gFlags.MetricsReportingPeriod.GetValueOptional(),
   };
 }
 

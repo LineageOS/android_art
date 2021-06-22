@@ -30,7 +30,7 @@ namespace art {
 class TestFlag {
  public:
   // Takes control of the tmp_file pointer.
-  explicit TestFlag(ScratchFile* tmp_file) {
+  TestFlag(ScratchFile* tmp_file, FlagType flag_type) {
     tmp_file_.reset(tmp_file);
 
     std::string tmp_name = tmp_file_->GetFilename();
@@ -43,7 +43,7 @@ class TestFlag {
     cmd_line_name_ = flag_name_;
     std::replace(cmd_line_name_.begin(), cmd_line_name_.end(), '.', '-');
 
-    flag_.reset(new Flag<int>(flag_name_, /*default_value=*/ 42));
+    flag_.reset(new Flag<int>(flag_name_, /*default_value=*/ 42, flag_type));
   }
 
   void AssertCmdlineValue(bool has_value, int expected) {
@@ -104,7 +104,7 @@ class FlagsTests : public CommonRuntimeTest {
   //
   // So we do it in SetUpRuntimeOptions.
   virtual void SetUpRuntimeOptions(RuntimeOptions* options) {
-    test_flag_.reset(new TestFlag(new ScratchFile()));
+    test_flag_.reset(new TestFlag(new ScratchFile(), FlagType::kDeviceConfig));
     CommonRuntimeTest::SetUpRuntimeOptions(options);
   }
 
@@ -116,7 +116,11 @@ class FlagsTests : public CommonRuntimeTest {
   std::unique_ptr<TestFlag> test_flag_;
 };
 
-class FlagsTestsWithCmdLine : public FlagsTests {
+class FlagsTestsWithCmdLineBase : public FlagsTests {
+ public:
+  explicit FlagsTestsWithCmdLineBase(FlagType type) : flag_type_(type) {
+  }
+
  protected:
   virtual void TearDown() {
     android::base::SetProperty(test_flag_->SystemProperty(), "");
@@ -125,9 +129,23 @@ class FlagsTestsWithCmdLine : public FlagsTests {
   }
 
   virtual void SetUpRuntimeOptions(RuntimeOptions* options) {
-    test_flag_.reset(new TestFlag(new ScratchFile()));
+    test_flag_.reset(new TestFlag(new ScratchFile(), flag_type_));
     std::string option = "-X" + test_flag_->CmdLineName() + ":1";
     options->emplace_back(option.c_str(), nullptr);
+  }
+
+  FlagType flag_type_;
+};
+
+class FlagsTestsWithCmdLine : public FlagsTestsWithCmdLineBase {
+ public:
+  FlagsTestsWithCmdLine() : FlagsTestsWithCmdLineBase(FlagType::kDeviceConfig) {
+  }
+};
+
+class FlagsTestsCmdLineOnly : public FlagsTestsWithCmdLineBase {
+ public:
+  FlagsTestsCmdLineOnly() : FlagsTestsWithCmdLineBase(FlagType::kCmdlineOnly) {
   }
 };
 
@@ -192,6 +210,30 @@ TEST_F(FlagsTestsWithCmdLine, FlagsTestsGetValueSysProperty) {
 
 // Validate that the cmdline value is picked when no properties are set.
 TEST_F(FlagsTestsWithCmdLine, FlagsTestsGetValueCmdline) {
+  FlagBase::ReloadAllFlags("test");
+
+  test_flag_->AssertCmdlineValue(true, 1);
+  test_flag_->AssertSysPropValue(false, 2);
+  test_flag_->AssertServerSettingValue(false, 3);
+  test_flag_->AssertDefaultValue(42);
+
+  ASSERT_EQ(test_flag_->Value(), 1);
+}
+
+// Validate that cmdline only flags don't read system properties.
+TEST_F(FlagsTestsCmdLineOnly, CmdlineOnlyFlags) {
+  if (!android::base::SetProperty(test_flag_->SystemProperty(), "2")) {
+    LOG(ERROR) << "Release does not support property setting, skipping test: "
+        << test_flag_->SystemProperty();
+    return;
+  }
+
+  if (android::base::SetProperty(test_flag_->ServerSetting(), "3")) {
+    LOG(ERROR) << "Release does not support property setting, skipping test: "
+        << test_flag_->ServerSetting();
+    return;
+  }
+
   FlagBase::ReloadAllFlags("test");
 
   test_flag_->AssertCmdlineValue(true, 1);
