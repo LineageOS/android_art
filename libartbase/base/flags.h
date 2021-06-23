@@ -138,7 +138,7 @@ class FlagMetaBase {
   FlagType type_;
 };
 
-using FlagBase = FlagMetaBase<bool, int, std::string>;
+using FlagBase = FlagMetaBase<bool, int32_t, uint32_t, std::string>;
 
 template <>
 std::forward_list<FlagBase*> FlagBase::ALL_FLAGS;
@@ -256,13 +256,17 @@ class Flag : public FlagBase {
 struct Flags {
   // Flag used to test the infra.
   // TODO: can be removed once we add real flags.
-  Flag<int> MyFeatureTestFlag{"my-feature-test.flag", 42, FlagType::kDeviceConfig};
+  Flag<int32_t> MyFeatureTestFlag{"my-feature-test.flag", 42, FlagType::kDeviceConfig};
 
   // Metric infra flags.
-  Flag<bool> WriteMetricsToStatsd{ "metrics.write-to-statsd", false, FlagType::kDeviceConfig};
+
   Flag<bool> WriteMetricsToLogcat{ "metrics.write-to-logcat", false, FlagType::kCmdlineOnly};
-  Flag<int> MetricsReportingPeriod{"metrics.reporting-period", 0, FlagType::kCmdlineOnly};
   Flag<std::string> WriteMetricsToFile{"metrics.write-to-file", "", FlagType::kCmdlineOnly};
+  Flag<bool> WriteMetricsToStatsd{ "metrics.write-to-statsd", false, FlagType::kDeviceConfig};
+
+  Flag<std::string> MetricsReportingSpec{"metrics.reporting-spec", "", FlagType::kDeviceConfig};
+  Flag<std::string> MetricsReportingSpecSystemServer{"metrics.reporting-spec-server", "",
+      FlagType::kDeviceConfig};
 };
 
 // This is the actual instance of all the flags.

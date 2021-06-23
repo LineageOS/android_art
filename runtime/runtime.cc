@@ -1088,13 +1088,12 @@ void Runtime::InitNonZygoteOrPostFork(
   GetMetrics()->Reset();
 
   if (metrics_reporter_ != nullptr) {
-    if (IsSystemServer() && !metrics_reporter_->IsPeriodicReportingEnabled()) {
-      // For system server, we don't get startup metrics, so make sure we have periodic reporting
-      // enabled.
-      //
-      // Note that this does not override the command line argument if one is given.
-      metrics_reporter_->SetReportingPeriod(kOneHourInSeconds);
-    }
+    // Now that we know if we are an app or system server, reload the metrics reporter config
+    // in case there are any difference.
+    metrics::ReportingConfig metrics_config =
+        metrics::ReportingConfig::FromFlags(is_system_server);
+
+    metrics_reporter_->ReloadConfig(metrics_config);
 
     metrics::SessionData session_data{metrics::SessionData::CreateDefault()};
     session_data.session_id = GetRandomNumber<int64_t>(0, std::numeric_limits<int64_t>::max());
@@ -1939,7 +1938,7 @@ bool Runtime::Init(RuntimeArgumentMap&& runtime_options_in) {
 }
 
 void Runtime::InitMetrics() {
-  auto metrics_config = metrics::ReportingConfig::FromFlags();
+  metrics::ReportingConfig metrics_config = metrics::ReportingConfig::FromFlags();
   metrics_reporter_ = metrics::MetricsReporter::Create(metrics_config, this);
 }
 
