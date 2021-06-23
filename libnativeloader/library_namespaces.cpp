@@ -344,15 +344,17 @@ Result<NativeLoaderNamespace*> LibraryNamespaces::Create(JNIEnv* env, uint32_t t
     }
   }
 
-  auto apex_ns_name = FindApexNamespaceName(dex_path);
-  if (apex_ns_name.ok()) {
-    const auto& jni_libs = apex_jni_libraries(*apex_ns_name);
-    if (jni_libs != "") {
-      auto apex_ns = NativeLoaderNamespace::GetExportedNamespace(*apex_ns_name, is_bridged);
-      if (apex_ns.ok()) {
-        linked = app_ns->Link(&apex_ns.value(), jni_libs);
-        if (!linked.ok()) {
-          return linked.error();
+  for (const std::string& each_jar_path : android::base::Split(dex_path, ":")) {
+    auto apex_ns_name = FindApexNamespaceName(each_jar_path);
+    if (apex_ns_name.ok()) {
+      const auto& jni_libs = apex_jni_libraries(*apex_ns_name);
+      if (jni_libs != "") {
+        auto apex_ns = NativeLoaderNamespace::GetExportedNamespace(*apex_ns_name, is_bridged);
+        if (apex_ns.ok()) {
+          linked = app_ns->Link(&apex_ns.value(), jni_libs);
+          if (!linked.ok()) {
+            return linked.error();
+          }
         }
       }
     }
