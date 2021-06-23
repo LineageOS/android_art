@@ -35,28 +35,41 @@ constexpr const char* kUndefinedValue = "";
 // The various ParseValue functions store the parsed value into *destination. If parsing fails for
 // some reason, ParseValue makes no changes to *destination.
 
-void ParseValue(const std::string_view value, std::optional<bool>* destination) {
+bool ParseValue(const std::string_view value, std::optional<bool>* destination) {
   switch (::android::base::ParseBool(value)) {
     case ::android::base::ParseBoolResult::kError:
-      return;
+      return false;
     case ::android::base::ParseBoolResult::kTrue:
       *destination = true;
-      return;
+      return true;
     case ::android::base::ParseBoolResult::kFalse:
       *destination = false;
-      return;
+      return true;
   }
 }
 
-void ParseValue(const std::string_view value, std::optional<int>* destination) {
-  int parsed_value = 0;
+bool ParseValue(const std::string_view value, std::optional<int32_t>* destination) {
+  int32_t parsed_value = 0;
   if (::android::base::ParseInt(std::string{value}, &parsed_value)) {
     *destination = parsed_value;
+    return true;
   }
+  return false;
 }
 
-void ParseValue(const std::string_view value, std::optional<std::string>* destination) {
+bool ParseValue(const std::string_view value,
+                std::optional<uint32_t>* destination) {
+  uint32_t parsed_value = 0;
+  if (::android::base::ParseUint(std::string{value}, &parsed_value)) {
+    *destination = parsed_value;
+    return true;
+  }
+  return false;
+}
+
+bool ParseValue(const std::string_view value, std::optional<std::string>* destination) {
   *destination = value;
+  return true;
 }
 
 }  // namespace
@@ -112,7 +125,9 @@ void Flag<Value>::Reload() {
   from_system_property_ = std::nullopt;
   const std::string sysprop = ::android::base::GetProperty(system_property_name_, kUndefinedValue);
   if (sysprop != kUndefinedValue) {
-    ParseValue(sysprop, &from_system_property_);
+    if (!ParseValue(sysprop, &from_system_property_)) {
+      LOG(ERROR) << "Failed to parse " << system_property_name_ << "=" << sysprop;
+    }
   }
 
   // Load the server-side configuration.
@@ -120,7 +135,9 @@ void Flag<Value>::Reload() {
   const std::string server_config =
       ::android::base::GetProperty(server_setting_name_, kUndefinedValue);
   if (server_config != kUndefinedValue) {
-    ParseValue(server_config, &from_server_setting_);
+    if (!ParseValue(server_config, &from_server_setting_)) {
+      LOG(ERROR) << "Failed to parse " << server_setting_name_ << "=" << server_config;
+    }
   }
 }
 

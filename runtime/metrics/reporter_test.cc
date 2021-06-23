@@ -105,10 +105,12 @@ class MetricsReporterTest : public CommonRuntimeTest {
 
   // Configures the metric reporting.
   void SetupReporter(const char* period_spec,
-                     uint32_t session_id = 1) {
+                     uint32_t session_id = 1,
+                     uint32_t reporting_mods = 100) {
     ReportingConfig config;
     if (period_spec != nullptr) {
       std::string error;
+      config.reporting_mods = reporting_mods;
       config.period_spec = ReportingPeriodSpec::Parse(period_spec, &error);
       ASSERT_TRUE(config.period_spec.has_value());
     }
@@ -308,6 +310,53 @@ TEST_F(MetricsReporterTest, NoMetrics) {
 
   // We should not longer report at period.
   ASSERT_FALSE(ShouldContinueReporting());
+}
+
+// Verify we don't start reporting if the sample rate is set to 0.
+TEST_F(MetricsReporterTest, SampleRateDisable) {
+  SetupReporter("1", /*session_id=*/ 1, /*reporting_mods=*/ 0);
+
+  // The background thread should not start.
+  ASSERT_FALSE(MaybeStartBackgroundThread(/*add_metrics=*/ false));
+
+  ASSERT_FALSE(ShouldReportAtStartup());
+  ASSERT_FALSE(ShouldContinueReporting());
+}
+
+// Verify we don't start reporting if the sample rate is low and the session does
+// not meet conditions.
+TEST_F(MetricsReporterTest, SampleRateDisable24) {
+  SetupReporter("1", /*session_id=*/ 125, /*reporting_mods=*/ 24);
+
+  // The background thread should not start.
+  ASSERT_FALSE(MaybeStartBackgroundThread(/*add_metrics=*/ false));
+
+  ASSERT_FALSE(ShouldReportAtStartup());
+  ASSERT_FALSE(ShouldContinueReporting());
+}
+
+// Verify we start reporting if the sample rate and the session meet
+// reporting conditions
+TEST_F(MetricsReporterTest, SampleRateEnable50) {
+  SetupReporter("1", /*session_id=*/ 125, /*reporting_mods=*/ 50);
+
+  // The background thread should not start.
+  ASSERT_TRUE(MaybeStartBackgroundThread(/*add_metrics=*/ false));
+
+  ASSERT_FALSE(ShouldReportAtStartup());
+  ASSERT_TRUE(ShouldContinueReporting());
+}
+
+// Verify we start reporting if the sample rate and the session meet
+// reporting conditions
+TEST_F(MetricsReporterTest, SampleRateEnableAll) {
+  SetupReporter("1", /*session_id=*/ 1099, /*reporting_mods=*/ 100);
+
+  // The background thread should not start.
+  ASSERT_TRUE(MaybeStartBackgroundThread(/*add_metrics=*/ false));
+
+  ASSERT_FALSE(ShouldReportAtStartup());
+  ASSERT_TRUE(ShouldContinueReporting());
 }
 
 
