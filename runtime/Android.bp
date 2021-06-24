@@ -725,6 +725,7 @@ art_cc_test {
         "jni/java_vm_ext_test.cc",
         "jni/jni_internal_test.cc",
         "method_handles_test.cc",
+        "metrics/reporter_test.cc",
         "mirror/dex_cache_test.cc",
         "mirror/method_type_test.cc",
         "mirror/object_test.cc",
