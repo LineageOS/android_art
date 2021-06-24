@@ -104,6 +104,10 @@ NO_RETURN static void Usage(const char* fmt, ...) {
   UsageError("        classpath. Multiple classpaths can be specified");
   UsageError("");
   UsageError("    --out-api-flags=<filename>: output file for a CSV file with API flags");
+  UsageError("    --fragment: the input is only a fragment of the whole bootclasspath and may");
+  UsageError("      not include a complete set of classes. That requires the tool to ignore");
+  UsageError("      missing classes and members. Specify --verbose to see the warnings.");
+  UsageError("    --verbose: output all warnings, even when --fragment is specified.");
   UsageError("");
 
   exit(EXIT_FAILURE);
@@ -453,8 +457,8 @@ class HierarchyClass final {
 
 class Hierarchy final {
  public:
-  explicit Hierarchy(ClassPath& classpath) : classpath_(classpath) {
-    BuildClassHierarchy();
+  Hierarchy(ClassPath& classpath, bool fragment, bool verbose) : classpath_(classpath) {
+    BuildClassHierarchy(fragment, verbose);
   }
 
   // Perform an operation for each member of the hierarchy which could potentially
@@ -521,7 +525,7 @@ class Hierarchy final {
     }
   }
 
-  void BuildClassHierarchy() {
+  void BuildClassHierarchy(bool fragment, bool verbose) {
     // Create one HierarchyClass entry in `classes_` per class descriptor
     // and add all DexClass objects with the same descriptor to that entry.
     classpath_.ForEachDexClass([this](const DexClass& klass) {
@@ -541,12 +545,16 @@ class Hierarchy final {
 
       auto add_extends = [&](const std::string_view& extends_desc) {
         HierarchyClass* extends = FindClass(extends_desc);
-        CHECK(extends != nullptr)
-          << "Superclass/interface " << extends_desc
-          << " of class " << dex_klass.GetDescriptor() << " from dex file \""
-          << dex_klass.GetDexFile().GetLocation() << "\" was not found. "
-          << "Either it is missing or it appears later in the classpath spec.";
-        klass.AddExtends(*extends);
+        if (extends != nullptr) {
+          klass.AddExtends(*extends);
+        } else if (!fragment || verbose) {
+          auto severity = verbose ? ::android::base::WARNING : ::android::base::FATAL;
+          LOG(severity)
+              << "Superclass/interface " << extends_desc
+              << " of class " << dex_klass.GetDescriptor() << " from dex file \""
+              << dex_klass.GetDexFile().GetLocation() << "\" was not found. "
+              << "Either it is missing or it appears later in the classpath spec.";
+        }
       };
 
       add_extends(dex_klass.GetSuperclassDescriptor());
@@ -949,6 +957,10 @@ class HiddenApi final {
                 ApiStubs::Kind::kCorePlatformApi));
           } else if (StartsWith(option, "--out-api-flags=")) {
             api_flags_path_ = std::string(option.substr(strlen("--out-api-flags=")));
+          } else if (option == "--fragment") {
+            fragment_ = true;
+          } else if (option == "--verbose") {
+            verbose_ = true;
           } else {
             Usage("Unknown argument '%s'", raw_option);
           }
@@ -1082,7 +1094,7 @@ class HiddenApi final {
     ClassPath boot_classpath(boot_dex_paths_,
                              /* open_writable= */ false,
                              /* ignore_empty= */ false);
-    Hierarchy boot_hierarchy(boot_classpath);
+    Hierarchy boot_hierarchy(boot_classpath, fragment_, verbose_);
 
     // Mark all boot dex members private.
     boot_classpath.ForEachDexMember([&](const DexMember& boot_member) {
@@ -1107,7 +1119,7 @@ class HiddenApi final {
       ClassPath stub_classpath(android::base::Split(cp_entry.first, ":"),
                                /* open_writable= */ false,
                                /* ignore_empty= */ true);
-      Hierarchy stub_hierarchy(stub_classpath);
+      Hierarchy stub_hierarchy(stub_classpath, fragment_, verbose_);
       const ApiStubs::Kind stub_api = cp_entry.second;
 
       stub_classpath.ForEachDexMember(
@@ -1131,8 +1143,10 @@ class HiddenApi final {
     }
 
     // Print errors.
-    for (const std::string& str : unresolved) {
-      LOG(WARNING) << "unresolved: " << str;
+    if (!fragment_ || verbose_) {
+      for (const std::string& str : unresolved) {
+        LOG(WARNING) << "unresolved: " << str;
+      }
     }
 
     // Write into public/private API files.
@@ -1177,6 +1191,14 @@ class HiddenApi final {
 
   // Override limit for sdk-max-* hidden APIs.
   std::string max_hiddenapi_level_;
+
+  // Whether the input is only a fragment of the whole bootclasspath and may
+  // not include a complete set of classes. That requires the tool to ignore missing
+  // classes and members.
+  bool fragment_;
+
+  // Whether to output all warnings, even when `fragment_` is set.
+  bool verbose_;
 };
 
 }  // namespace hiddenapi
