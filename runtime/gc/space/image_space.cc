@@ -3480,19 +3480,18 @@ bool ImageSpace::VerifyBootClassPathChecksums(std::string_view oat_checksums,
     oat_checksums.remove_prefix(1u);
 
     const std::string& bcp_filename = boot_class_path[bcp_pos];
-    std::vector<std::unique_ptr<const DexFile>> dex_files;
+    std::vector<uint32_t> checksums;
+    std::vector<std::string> dex_locations;
     const ArtDexFileLoader dex_file_loader;
-    if (!dex_file_loader.Open(bcp_filename.c_str(),
-                              bcp_filename,  // The location does not matter here.
-                              /*verify=*/ false,
-                              /*verify_checksum=*/ false,
-                              error_msg,
-                              &dex_files)) {
+    if (!dex_file_loader.GetMultiDexChecksums(bcp_filename.c_str(),
+                                              &checksums,
+                                              &dex_locations,
+                                              error_msg)) {
       return false;
     }
-    DCHECK(!dex_files.empty());
-    for (const std::unique_ptr<const DexFile>& dex_file : dex_files) {
-      std::string dex_file_checksum = StringPrintf("/%08x", dex_file->GetLocationChecksum());
+    DCHECK(!checksums.empty());
+    for (uint32_t checksum : checksums) {
+      std::string dex_file_checksum = StringPrintf("/%08x", checksum);
       if (!StartsWith(oat_checksums, dex_file_checksum)) {
         *error_msg = StringPrintf("Dex checksum mismatch, expected %s to start with %s",
                                   std::string(oat_checksums).c_str(),
