@@ -442,11 +442,17 @@ static void ZygoteHooks_stopZygoteNoThreadCreation(JNIEnv* env ATTRIBUTE_UNUSED,
   Runtime::Current()->SetZygoteNoThreadSection(false);
 }
 
-static jboolean ZygoteHooks_nativeZygoteJitEnabled(JNIEnv* env ATTRIBUTE_UNUSED,
-                                                   jclass klass ATTRIBUTE_UNUSED) {
+static jboolean ZygoteHooks_nativeZygoteLongSuspendOk(JNIEnv* env ATTRIBUTE_UNUSED,
+                                                    jclass klass ATTRIBUTE_UNUSED) {
+  // Indefinite thread suspensions are not OK if we're supposed to be JIT-compiling for other
+  // processes.  We only care about JIT compilation that affects other processes.  The zygote
+  // itself doesn't run appreciable amounts of Java code when running single-threaded, so
+  // suspending the JIT in non-jit-zygote mode is OK.
+  // TODO: Make this potentially return true once we're done with JIT compilation in JIT Zygote.
   // Only called in zygote. Thus static is OK here.
-  static bool result = jit::Jit::InZygoteUsingJit();
-  return result ? JNI_TRUE : JNI_FALSE;
+  static bool isJitZygote = jit::Jit::InZygoteUsingJit();
+  static bool explicitlyDisabled = Runtime::Current()->IsJavaZygoteForkLoopRequired();
+  return (isJitZygote || explicitlyDisabled) ? JNI_FALSE : JNI_TRUE;
 }
 
 
@@ -455,7 +461,7 @@ static JNINativeMethod gMethods[] = {
   NATIVE_METHOD(ZygoteHooks, nativePostZygoteFork, "()V"),
   NATIVE_METHOD(ZygoteHooks, nativePostForkSystemServer, "(I)V"),
   NATIVE_METHOD(ZygoteHooks, nativePostForkChild, "(JIZZLjava/lang/String;)V"),
-  NATIVE_METHOD(ZygoteHooks, nativeZygoteJitEnabled, "()Z"),
+  NATIVE_METHOD(ZygoteHooks, nativeZygoteLongSuspendOk, "()Z"),
   NATIVE_METHOD(ZygoteHooks, startZygoteNoThreadCreation, "()V"),
   NATIVE_METHOD(ZygoteHooks, stopZygoteNoThreadCreation, "()V"),
 };
