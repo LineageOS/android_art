@@ -2037,6 +2037,10 @@ void Runtime::InitNativeMethods() {
   // a regular JNI libraries with a regular JNI_OnLoad. Most JNI libraries can
   // just use System.loadLibrary, but libcore can't because it's the library
   // that implements System.loadLibrary!
+  //
+  // By setting calling class to java.lang.Object, the caller location for these
+  // JNI libs is core-oj.jar in the ART APEX, and hence they are loaded from the
+  // com_android_art linker namespace.
 
   // libicu_jni has to be initialized before libopenjdk{d} due to runtime dependency from
   // libopenjdk{d} to Icu4cMetadata native methods in libicu_jni. See http://b/143888405
