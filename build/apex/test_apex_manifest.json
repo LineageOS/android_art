@@ -2,29 +2,9 @@
   "name": "com.android.art",
   "version": 2147483647,
   "provideNativeLibs": [
-    "libandroidio.so",
-    "libdexfile_external.so",
-    "libdexfiled_external.so",
-    "libjdwp.so",
-    "libnativebridge.so",
-    "libnativehelper.so",
-    "libnativeloader.so",
-    "libsigchain.so"
+    "libjdwp.so"
   ],
   "requireNativeLibs": [
-    "heapprofd_client_api.so",
-    "libadbconnection_client.so",
-    "libc.so",
-    "libdl.so",
-    "libdl_android.so",
-    "libicu.so",
-    "libicuuc.so",
-    "libicui18n.so",
-    "libicu_jni.so",
-    "liblog.so",
-    "libm.so",
-    "libneuralnetworks.so",
-    "libstatssocket.so",
-    "libz.so"
+    "libicu_jni.so"
   ]
 }

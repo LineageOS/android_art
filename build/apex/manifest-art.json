@@ -5,10 +5,6 @@
     "libjdwp.so"
   ],
   "requireNativeLibs": [
-    "libicu.so",
-    "libicuuc.so",
-    "libicui18n.so",
-    "libicu_jni.so",
-    "libneuralnetworks.so"
+    "libicu_jni.so"
   ]
 }
