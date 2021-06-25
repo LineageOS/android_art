@@ -77,6 +77,11 @@ static constexpr uint64_t NsToMs(uint64_t ns) {
   return ns / 1000 / 1000;
 }
 
+// Converts the given number of nanoseconds to microseconds.
+static constexpr uint64_t NsToUs(uint64_t ns) {
+  return ns / 1000;
+}
+
 // Converts the given number of milliseconds to nanoseconds
 static constexpr uint64_t MsToNs(uint64_t ms) {
   return ms * 1000 * 1000;
