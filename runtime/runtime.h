@@ -976,6 +976,10 @@ class Runtime {
     return verifier_missing_kthrow_fatal_;
   }
 
+  bool IsJavaZygoteForkLoopRequired() const {
+    return force_java_zygote_fork_loop_;
+  }
+
   bool IsPerfettoHprofEnabled() const {
     return perfetto_hprof_enabled_;
   }
@@ -1340,6 +1344,7 @@ class Runtime {
       gc::space::ImageSpaceLoadingOrder::kSystemFirst;
 
   bool verifier_missing_kthrow_fatal_;
+  bool force_java_zygote_fork_loop_;
   bool perfetto_hprof_enabled_;
 
   // Note: See comments on GetFaultMessage.

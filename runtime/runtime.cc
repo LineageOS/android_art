@@ -1201,6 +1201,7 @@ bool Runtime::Init(RuntimeArgumentMap&& runtime_options_in) {
   MemMap::Init();
 
   verifier_missing_kthrow_fatal_ = runtime_options.GetOrDefault(Opt::VerifierMissingKThrowFatal);
+  force_java_zygote_fork_loop_ = runtime_options.GetOrDefault(Opt::ForceJavaZygoteForkLoop);
   perfetto_hprof_enabled_ = runtime_options.GetOrDefault(Opt::PerfettoHprof);
 
   // Try to reserve a dedicated fault page. This is allocated for clobbered registers and sentinels.
