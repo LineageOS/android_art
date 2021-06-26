@@ -66,8 +66,8 @@ class HiddenApiTest : public CommonRuntimeTest {
 
     std::vector<std::string> argv_str;
     argv_str.push_back(GetHiddenApiCmd());
-    argv_str.insert(argv_str.end(), extra_args.begin(), extra_args.end());
     argv_str.push_back("encode");
+    argv_str.insert(argv_str.end(), extra_args.begin(), extra_args.end());
     argv_str.push_back("--input-dex=" + in_dex.GetFilename());
     argv_str.push_back("--output-dex=" + out_dex.GetFilename());
     argv_str.push_back("--api-flags=" + flags_csv.GetFilename());
@@ -722,6 +722,60 @@ TEST_F(HiddenApiTest, InstanceFieldUnknownFlagMatch) {
       << "LMain;->ifield:I,unsupported,unknown-flag" << std::endl;
   auto dex_file = RunHiddenapiEncode(flags_csv, {}, dex);
   ASSERT_EQ(dex_file.get(), nullptr);
+}
+
+TEST_F(HiddenApiTest, InstanceFieldMaxSdkHigherThanMaxHiddenApiLevel) {
+  ScratchFile dex, flags_csv;
+  OpenStream(flags_csv)
+      << "LMain;->ifield:I,max-target-r" << std::endl;
+  auto dex_file = RunHiddenapiEncode(flags_csv, {"--max-hiddenapi-level=max-target-q"}, dex);
+  ASSERT_NE(dex_file.get(), nullptr);
+  ASSERT_EQ(hiddenapi::ApiList::Unsupported(), GetIFieldHiddenFlags(*dex_file));
+}
+
+TEST_F(HiddenApiTest, InstanceFieldMaxSdkEqualsMaxHiddenApiLevel) {
+  ScratchFile dex, flags_csv;
+  OpenStream(flags_csv)
+      << "LMain;->ifield:I,max-target-r" << std::endl;
+  auto dex_file = RunHiddenapiEncode(flags_csv, {"--max-hiddenapi-level=max-target-r"}, dex);
+  ASSERT_NE(dex_file.get(), nullptr);
+  ASSERT_EQ(hiddenapi::ApiList::MaxTargetR(), GetIFieldHiddenFlags(*dex_file));
+}
+
+TEST_F(HiddenApiTest, InstanceFieldMaxSdkLowerThanMaxHiddenApiLevel) {
+  ScratchFile dex, flags_csv;
+  OpenStream(flags_csv)
+      << "LMain;->ifield:I,max-target-q" << std::endl;
+  auto dex_file = RunHiddenapiEncode(flags_csv, {"--max-hiddenapi-level=max-target-r"}, dex);
+  ASSERT_NE(dex_file.get(), nullptr);
+  ASSERT_EQ(hiddenapi::ApiList::MaxTargetQ(), GetIFieldHiddenFlags(*dex_file));
+}
+
+TEST_F(HiddenApiTest, InstanceFieldBlockedUnchangedByMaxHiddenApiLevel) {
+  ScratchFile dex, flags_csv;
+  OpenStream(flags_csv)
+      << "LMain;->ifield:I,blocked" << std::endl;
+  auto dex_file = RunHiddenapiEncode(flags_csv, {"--max-hiddenapi-level=max-target-r"}, dex);
+  ASSERT_NE(dex_file.get(), nullptr);
+  ASSERT_EQ(hiddenapi::ApiList::Blocked(), GetIFieldHiddenFlags(*dex_file));
+}
+
+TEST_F(HiddenApiTest, InstanceFieldUnsupportedUnchangedByMaxHiddenApiLevel) {
+  ScratchFile dex, flags_csv;
+  OpenStream(flags_csv)
+      << "LMain;->ifield:I,unsupported" << std::endl;
+  auto dex_file = RunHiddenapiEncode(flags_csv, {"--max-hiddenapi-level=max-target-r"}, dex);
+  ASSERT_NE(dex_file.get(), nullptr);
+  ASSERT_EQ(hiddenapi::ApiList::Unsupported(), GetIFieldHiddenFlags(*dex_file));
+}
+
+TEST_F(HiddenApiTest, InstanceFieldSdkUnchangedByMaxHiddenApiLevel) {
+  ScratchFile dex, flags_csv;
+  OpenStream(flags_csv)
+      << "LMain;->ifield:I,sdk" << std::endl;
+  auto dex_file = RunHiddenapiEncode(flags_csv, {"--max-hiddenapi-level=max-target-r"}, dex);
+  ASSERT_NE(dex_file.get(), nullptr);
+  ASSERT_EQ(hiddenapi::ApiList::Sdk(), GetIFieldHiddenFlags(*dex_file));
 }
 
 // The following tests use this class hierarchy:
