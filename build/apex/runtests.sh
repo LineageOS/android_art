@@ -41,7 +41,12 @@ function setup_die {
 [[ -n "$ANDROID_PRODUCT_OUT" ]] || setup_die
 [[ -n "$ANDROID_HOST_OUT" ]] || setup_die
 
-flattened_apex_p=$($ANDROID_BUILD_TOP/build/soong/soong_ui.bash --dumpvar-mode TARGET_FLATTEN_APEX)\
+flattened_apex_p=$($ANDROID_BUILD_TOP/build/soong/soong_ui.bash \
+    --dumpvar-mode TARGET_FLATTEN_APEX) \
+  || setup_die
+
+compressed_apex_p=$($ANDROID_BUILD_TOP/build/soong/soong_ui.bash \
+    --dumpvar-mode PRODUCT_COMPRESSED_APEX) \
   || setup_die
 
 # Switch the build system to unbundled mode in the reduced manifest branch.
@@ -180,7 +185,12 @@ for apex_module in ${apex_modules[@]}; do
       apex_path="$ANDROID_PRODUCT_OUT/system/apex/${apex_module}"
       art_apex_test_args="$art_apex_test_args --flattened"
     else
-      apex_path="$ANDROID_PRODUCT_OUT/system/apex/${apex_module}.apex"
+      # Note: The Testing ART APEX is never built as a Compressed APEX.
+      if $compressed_apex_p && [[ $apex_module != *.testing ]]; then
+        apex_path="$ANDROID_PRODUCT_OUT/system/apex/${apex_module}.capex"
+      else
+        apex_path="$ANDROID_PRODUCT_OUT/system/apex/${apex_module}.apex"
+      fi
     fi
     if $have_deapexer_p; then
       art_apex_test_args="$art_apex_test_args --deapexer $ANDROID_HOST_OUT/bin/deapexer"
