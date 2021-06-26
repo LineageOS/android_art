@@ -31,6 +31,7 @@ namespace {
 // EncodeDatumId returns a std::optional that provides a enum value from atoms.proto if the datum is
 // one that we support logging to statsd. The list of datums that ART collects is a superset of what
 // we report to statsd. Therefore, we only have mappings for the DatumIds that statsd recognizes.
+// Also it must be noted that histograms are not handled yet by statsd yet.
 //
 // Other code can use whether the result of this function has a value to decide whether to report
 // the atom to statsd.
@@ -76,14 +77,22 @@ constexpr std::optional<int32_t> EncodeDatumId(DatumId datum_id) {
     case DatumId::kYoungGcThroughput:
       return std::make_optional(
           statsd::
-              ART_DATUM_REPORTED__KIND__ART_DATUM_GC_YOUNG_GENERATION_COLLECTION_THROUGHPUT_MB_PER_SEC);
+              ART_DATUM_REPORTED__KIND__ART_DATUM_GC_YOUNG_GENERATION_COLLECTION_THROUGHPUT_HISTO_MB_PER_SEC);
     case DatumId::kFullGcThroughput:
       return std::make_optional(
           statsd::
-              ART_DATUM_REPORTED__KIND__ART_DATUM_GC_FULL_HEAP_COLLECTION_THROUGHPUT_MB_PER_SEC);
+              ART_DATUM_REPORTED__KIND__ART_DATUM_GC_FULL_HEAP_COLLECTION_THROUGHPUT_HISTO_MB_PER_SEC);
     case DatumId::kJitMethodCompileCount:
       return std::make_optional(
           statsd::ART_DATUM_REPORTED__KIND__ART_DATUM_JIT_METHOD_COMPILE_COUNT);
+    case DatumId::kYoungGcTracingThroughput:
+      return std::make_optional(
+          statsd::
+              ART_DATUM_REPORTED__KIND__ART_DATUM_GC_YOUNG_GENERATION_TRACING_THROUGHPUT_HISTO_MB_PER_SEC);
+    case DatumId::kFullGcTracingThroughput:
+      return std::make_optional(
+          statsd::
+              ART_DATUM_REPORTED__KIND__ART_DATUM_GC_FULL_HEAP_TRACING_THROUGHPUT_HISTO_MB_PER_SEC);
   }
 }
 
