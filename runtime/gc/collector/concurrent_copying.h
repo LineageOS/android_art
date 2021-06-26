@@ -177,7 +177,7 @@ class ConcurrentCopying : public GarbageCollector {
       REQUIRES(!mark_stack_lock_, !skipped_blocks_lock_, !immune_gray_stack_lock_);
   // Scan the reference fields of object `to_ref`.
   template <bool kNoUnEvac>
-  void Scan(mirror::Object* to_ref) REQUIRES_SHARED(Locks::mutator_lock_)
+  void Scan(mirror::Object* to_ref, size_t obj_size = 0) REQUIRES_SHARED(Locks::mutator_lock_)
       REQUIRES(!mark_stack_lock_);
   // Scan the reference fields of object 'obj' in the dirty cards during
   // card-table scan. In addition to visiting the references, it also sets the
@@ -410,10 +410,6 @@ class ConcurrentCopying : public GarbageCollector {
   // bytes_moved_gc_thread_ are critical for GC triggering; the others are just informative.
   Atomic<size_t> bytes_moved_;  // Used by mutators
   Atomic<size_t> objects_moved_;  // Used by mutators
-  size_t bytes_moved_gc_thread_;  // Used by GC
-  size_t objects_moved_gc_thread_;  // Used by GC
-  Atomic<uint64_t> cumulative_bytes_moved_;
-  Atomic<uint64_t> cumulative_objects_moved_;
 
   // copied_live_bytes_ratio_sum_ is read and written by CC per GC, in
   // ReclaimPhase, and is read by DumpPerformanceInfo (potentially from another
@@ -435,6 +431,15 @@ class ConcurrentCopying : public GarbageCollector {
 
   // reclaimed_bytes_ratio = reclaimed_bytes/num_allocated_bytes per GC cycle
   float reclaimed_bytes_ratio_sum_;
+
+  // Used only by GC thread, so need not be atomic. Also, should be kept
+  // in a different cacheline than bytes/objects_moved_ (above) to avoid false
+  // cacheline sharing.
+  size_t bytes_moved_gc_thread_;
+  size_t objects_moved_gc_thread_;
+  uint64_t bytes_scanned_;
+  uint64_t cumulative_bytes_moved_;
+  uint64_t cumulative_objects_moved_;
 
   // The skipped blocks are memory blocks/chucks that were copies of
   // objects that were unused due to lost races (cas failures) at

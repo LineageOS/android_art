@@ -92,6 +92,9 @@ class GarbageCollector : public RootVisitor, public IsMarkedVisitor, public Mark
   uint64_t GetTotalFreedObjects() const {
     return total_freed_objects_;
   }
+  uint64_t GetTotalScannedBytes() const {
+    return total_scanned_bytes_;
+  }
   // Reset the cumulative timings and pause histogram.
   void ResetMeasurements() REQUIRES(!pause_histogram_lock_);
   // Returns the estimated throughput in bytes / second.
@@ -160,10 +163,12 @@ class GarbageCollector : public RootVisitor, public IsMarkedVisitor, public Mark
   metrics::MetricsBase<int64_t>* gc_time_histogram_;
   metrics::MetricsBase<uint64_t>* metrics_gc_count_;
   metrics::MetricsBase<int64_t>* gc_throughput_histogram_;
+  metrics::MetricsBase<int64_t>* gc_tracing_throughput_hist_;
   uint64_t total_thread_cpu_time_ns_;
   uint64_t total_time_ns_;
   uint64_t total_freed_objects_;
   int64_t total_freed_bytes_;
+  uint64_t total_scanned_bytes_;
   CumulativeLogger cumulative_timings_;
   mutable Mutex pause_histogram_lock_ DEFAULT_MUTEX_ACQUIRED_AFTER;
   bool is_transaction_active_;
