@@ -1195,10 +1195,10 @@ class HiddenApi final {
   // Whether the input is only a fragment of the whole bootclasspath and may
   // not include a complete set of classes. That requires the tool to ignore missing
   // classes and members.
-  bool fragment_;
+  bool fragment_ = false;
 
   // Whether to output all warnings, even when `fragment_` is set.
-  bool verbose_;
+  bool verbose_ = false;
 };
 
 }  // namespace hiddenapi
