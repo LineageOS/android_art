@@ -249,10 +249,6 @@ art_cc_library {
         // stubs, and libartd depends on this.
         "com.android.art",
     ],
-    stubs: {
-        symbol_file: "libdexfile.map.txt",
-        versions: ["1"],
-    },
 }
 
 art_cc_test {
