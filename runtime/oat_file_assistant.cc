@@ -646,14 +646,23 @@ bool OatFileAssistant::ValidateBootClassPathChecksums(const OatFile& oat_file) {
 
   Runtime* runtime = Runtime::Current();
   std::string error_msg;
-  bool result = gc::space::ImageSpace::VerifyBootClassPathChecksums(
-      oat_boot_class_path_checksums_view,
-      oat_boot_class_path_view,
-      runtime->GetImageLocation(),
-      ArrayRef<const std::string>(runtime->GetBootClassPathLocations()),
-      ArrayRef<const std::string>(runtime->GetBootClassPath()),
-      isa_,
-      &error_msg);
+  bool result = false;
+  // Fast path when the runtime boot classpath cheksums and boot classpath
+  // locations directly match.
+  if (oat_boot_class_path_checksums_view == runtime->GetBootClassPathChecksums() &&
+      isa_ == kRuntimeISA &&
+      oat_boot_class_path_view == android::base::Join(runtime->GetBootClassPathLocations(), ":")) {
+    result = true;
+  } else {
+    result = gc::space::ImageSpace::VerifyBootClassPathChecksums(
+        oat_boot_class_path_checksums_view,
+        oat_boot_class_path_view,
+        runtime->GetImageLocation(),
+        ArrayRef<const std::string>(runtime->GetBootClassPathLocations()),
+        ArrayRef<const std::string>(runtime->GetBootClassPath()),
+        isa_,
+        &error_msg);
+  }
   if (!result) {
     VLOG(oat) << "Failed to verify checksums of oat file " << oat_file.GetLocation()
         << " error: " << error_msg;

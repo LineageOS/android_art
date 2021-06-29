@@ -1787,6 +1787,14 @@ bool Runtime::Init(RuntimeArgumentMap&& runtime_options_in) {
     }
   }
 
+  // Now that the boot image space is set, cache the boot classpath checksums,
+  // to be used when validating oat files.
+  ArrayRef<gc::space::ImageSpace* const> image_spaces(GetHeap()->GetBootImageSpaces());
+  ArrayRef<const DexFile* const> bcp_dex_files(GetClassLinker()->GetBootClassPath());
+  boot_class_path_checksums_ = gc::space::ImageSpace::GetBootClassPathChecksums(image_spaces,
+                                                                                bcp_dex_files);
+
+  // Cache the apex versions.
   InitializeApexVersions();
 
   CHECK(class_linker_ != nullptr);
