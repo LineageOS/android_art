@@ -135,7 +135,7 @@ TEST_F(MetricsTest, DatumName) {
 }
 
 TEST_F(MetricsTest, SimpleHistogramTest) {
-  MetricsHistogram<DatumId::kJitMethodCompileTime, 5, 0, 100> histogram;
+  MetricsHistogram<DatumId::kYoungGcCollectionTime, 5, 0, 100> histogram;
 
   // bucket 0: 0-19
   histogram.Add(10);
@@ -168,7 +168,7 @@ TEST_F(MetricsTest, SimpleHistogramTest) {
 
 // Make sure values added outside the range of the histogram go into the first or last bucket.
 TEST_F(MetricsTest, HistogramOutOfRangeTest) {
-  MetricsHistogram<DatumId::kJitMethodCompileTime, 2, 0, 100> histogram;
+  MetricsHistogram<DatumId::kYoungGcCollectionTime, 2, 0, 100> histogram;
 
   // bucket 0: 0-49
   histogram.Add(-500);
@@ -190,7 +190,7 @@ TEST_F(MetricsTest, ArtMetricsReport) {
   static constexpr uint64_t verification_time = 42;
   metrics.ClassVerificationTotalTime()->Add(verification_time);
   // Add a negative value so we are guaranteed that it lands in the first bucket.
-  metrics.JitMethodCompileTime()->Add(-5);
+  metrics.YoungGcCollectionTime()->Add(-5);
 
   // Report and check the data
   class TestBackend : public TestBackendBase {
@@ -213,7 +213,7 @@ TEST_F(MetricsTest, ArtMetricsReport) {
                          int64_t,
                          int64_t,
                          const std::vector<uint32_t>& buckets) override {
-      if (histogram_type == DatumId::kJitMethodCompileTime) {
+      if (histogram_type == DatumId::kYoungGcCollectionTime) {
         EXPECT_EQ(buckets[0], 1u);
         for (size_t i = 1; i < buckets.size(); ++i) {
           EXPECT_EQ(buckets[i], 0u);
@@ -235,7 +235,7 @@ TEST_F(MetricsTest, ArtMetricsReport) {
 }
 
 TEST_F(MetricsTest, HistogramTimer) {
-  MetricsHistogram<DatumId::kJitMethodCompileTime, 1, 0, 100> test_histogram;
+  MetricsHistogram<DatumId::kYoungGcCollectionTime, 1, 0, 100> test_histogram;
   {
     AutoTimer timer{&test_histogram};
     // Sleep for 2µs so the counter will be greater than 0.
