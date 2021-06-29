@@ -225,11 +225,7 @@ public class OnDeviceSigningHostTest extends BaseHostJUnit4Test {
         // having a separate test because the device reboots between each @Test method and
         // that is an expensive use of time.
         verifyZygotesLoadedArtifacts();
-
-        // Temporarily disable system_server artifacts test (b/180949581).
-        if (false) {
-            verifySystemServerLoadedArtifacts();
-        }
+        verifySystemServerLoadedArtifacts();
     }
 
     private boolean haveCompilationLog() throws Exception {
