@@ -164,6 +164,8 @@ class GarbageCollector : public RootVisitor, public IsMarkedVisitor, public Mark
   metrics::MetricsBase<uint64_t>* metrics_gc_count_;
   metrics::MetricsBase<int64_t>* gc_throughput_histogram_;
   metrics::MetricsBase<int64_t>* gc_tracing_throughput_hist_;
+  metrics::MetricsBase<uint64_t>* gc_throughput_avg_;
+  metrics::MetricsBase<uint64_t>* gc_tracing_throughput_avg_;
   uint64_t total_thread_cpu_time_ns_;
   uint64_t total_time_ns_;
   uint64_t total_freed_objects_;
@@ -172,6 +174,10 @@ class GarbageCollector : public RootVisitor, public IsMarkedVisitor, public Mark
   CumulativeLogger cumulative_timings_;
   mutable Mutex pause_histogram_lock_ DEFAULT_MUTEX_ACQUIRED_AFTER;
   bool is_transaction_active_;
+  // The garbage collector algorithms will either have all the metrics pointers
+  // (above) initialized, or none of them. So instead of checking each time, we
+  // use this flag.
+  bool are_metrics_initialized_;
 
  private:
   DISALLOW_IMPLICIT_CONSTRUCTORS(GarbageCollector);

@@ -74,9 +74,12 @@ GarbageCollector::GarbageCollector(Heap* heap, const std::string& name)
       metrics_gc_count_(nullptr),
       gc_throughput_histogram_(nullptr),
       gc_tracing_throughput_hist_(nullptr),
+      gc_throughput_avg_(nullptr),
+      gc_tracing_throughput_avg_(nullptr),
       cumulative_timings_(name),
       pause_histogram_lock_("pause histogram lock", kDefaultMutexLevel, true),
-      is_transaction_active_(false) {
+      is_transaction_active_(false),
+      are_metrics_initialized_(false) {
   ResetCumulativeStatistics();
 }
 
@@ -145,10 +148,6 @@ uint64_t GarbageCollector::ExtractRssFromMincore(
   }
   rss *= kPageSize;
   rss_histogram_.AddValue(rss / KB);
-  // Add up all the GC meta-data in bytes. It doesn't make sense in itself as it
-  // cannot be accumulated over GCs. So must be divided by gc-count while
-  // reporting.
-  GetMetrics()->TotalGcMetaDataSize()->Add(rss);
 #endif
   return rss;
 }
@@ -190,10 +189,6 @@ void GarbageCollector::Run(GcCause gc_cause, bool clear_soft_references) {
     RegisterPause(duration_ns);
   }
   total_time_ns_ += duration_ns;
-  if (gc_time_histogram_ != nullptr) {
-    // Report GC time in milliseconds.
-    gc_time_histogram_->Add(NsToMs(duration_ns));
-  }
   uint64_t total_pause_time = 0;
   for (uint64_t pause_time : current_iteration->GetPauseTimes()) {
     MutexLock mu(self, pause_histogram_lock_);
@@ -202,22 +197,25 @@ void GarbageCollector::Run(GcCause gc_cause, bool clear_soft_references) {
   }
   metrics::ArtMetrics* metrics = runtime->GetMetrics();
   // Report STW pause time in microseconds.
-  metrics->MutatorPauseTimeDuringGC()->Add(total_pause_time / 1'000);
-  if (metrics_gc_count_ != nullptr) {
+  metrics->WorldStopTimeDuringGCAvg()->Add(total_pause_time / 1'000);
+  // Report total collection time of all GCs put together.
+  metrics->TotalGcCollectionTime()->Add(NsToMs(duration_ns));
+  if (are_metrics_initialized_) {
     metrics_gc_count_->Add(1);
-  }
-
-  if (gc_tracing_throughput_hist_ != nullptr) {
+    // Report GC time in milliseconds.
+    gc_time_histogram_->Add(NsToMs(duration_ns));
     // Throughput in bytes/s. Add 1us to prevent possible division by 0.
     uint64_t throughput = (current_iteration->GetScannedBytes() * 1'000'000)
             / (NsToUs(duration_ns) + 1);
     // Report in MB/s.
-    gc_tracing_throughput_hist_->Add(throughput / MB);
-  }
+    throughput /= MB;
+    gc_tracing_throughput_hist_->Add(throughput);
+    gc_tracing_throughput_avg_->Add(throughput);
 
-  if (gc_throughput_histogram_ != nullptr) {
     // Report GC throughput in MB/s.
-    gc_throughput_histogram_->Add(current_iteration->GetEstimatedThroughput() / MB);
+    throughput = current_iteration->GetEstimatedThroughput() / MB;
+    gc_throughput_histogram_->Add(throughput);
+    gc_throughput_avg_->Add(throughput);
   }
   is_transaction_active_ = false;
 }
