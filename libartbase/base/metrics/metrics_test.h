@@ -33,7 +33,7 @@ namespace test {
 // test cases to test specific behaviors.
 class TestBackendBase : public MetricsBackend {
  public:
-  void BeginSession([[maybe_unused]] const SessionData& session_data) override {}
+  void BeginOrUpdateSession([[maybe_unused]] const SessionData& session_data) override {}
 
   void BeginReport([[maybe_unused]] uint64_t timestamp_since_start_ms) override {}
 
