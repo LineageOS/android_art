@@ -126,6 +126,7 @@ art_module_sdk {
                 "legacy-art-module-platform-api-stubs-system-modules",
                 "stable-art-module-platform-api-stubs-system-modules",
                 "core-current-stubs-system-modules",
+                "core-module-lib-stubs-system-modules",
                 "legacy-core-platform-api-stubs-system-modules",
                 "stable-core-platform-api-stubs-system-modules",
             ],
