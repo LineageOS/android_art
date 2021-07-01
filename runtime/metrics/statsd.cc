@@ -52,9 +52,9 @@ constexpr std::optional<int32_t> EncodeDatumId(DatumId datum_id) {
     case DatumId::kClassVerificationCount:
       return std::make_optional(
           statsd::ART_DATUM_REPORTED__KIND__ART_DATUM_CLASS_VERIFICATION_COUNT);
-    case DatumId::kMutatorPauseTimeDuringGC:
+    case DatumId::kWorldStopTimeDuringGCAvg:
       return std::make_optional(
-          statsd::ART_DATUM_REPORTED__KIND__ART_DATUM_GC_MUTATOR_PAUSE_TIME_COUNTER_MICROS);
+          statsd::ART_DATUM_REPORTED__KIND__ART_DATUM_GC_WORLD_STOP_TIME_AVG_MICROS);
     case DatumId::kYoungGcCount:
       return std::make_optional(
           statsd::ART_DATUM_REPORTED__KIND__ART_DATUM_GC_YOUNG_GENERATION_COLLECTION_COUNT);
@@ -64,9 +64,6 @@ constexpr std::optional<int32_t> EncodeDatumId(DatumId datum_id) {
     case DatumId::kTotalBytesAllocated:
       return std::make_optional(
           statsd::ART_DATUM_REPORTED__KIND__ART_DATUM_GC_TOTAL_BYTES_ALLOCATED);
-    case DatumId::kTotalGcMetaDataSize:
-      return std::make_optional(
-          statsd::ART_DATUM_REPORTED__KIND__ART_DATUM_GC_TOTAL_METADATA_SIZE_BYTES);
     case DatumId::kYoungGcCollectionTime:
       return std::make_optional(
           statsd::
@@ -93,6 +90,21 @@ constexpr std::optional<int32_t> EncodeDatumId(DatumId datum_id) {
       return std::make_optional(
           statsd::
               ART_DATUM_REPORTED__KIND__ART_DATUM_GC_FULL_HEAP_TRACING_THROUGHPUT_HISTO_MB_PER_SEC);
+    case DatumId::kTotalGcCollectionTime:
+      return std::make_optional(
+          statsd::ART_DATUM_REPORTED__KIND__ART_DATUM_GC_TOTAL_COLLECTION_TIME_MS);
+    case DatumId::kYoungGcThroughputAvg:
+      return std::make_optional(
+          statsd::ART_DATUM_REPORTED__KIND__ART_DATUM_GC_YOUNG_GENERATION_COLLECTION_THROUGHPUT_AVG_MB_PER_SEC);
+    case DatumId::kFullGcThroughputAvg:
+      return std::make_optional(
+          statsd::ART_DATUM_REPORTED__KIND__ART_DATUM_GC_FULL_HEAP_COLLECTION_THROUGHPUT_AVG_MB_PER_SEC);
+    case DatumId::kYoungGcTracingThroughputAvg:
+      return std::make_optional(
+          statsd::ART_DATUM_REPORTED__KIND__ART_DATUM_GC_YOUNG_GENERATION_TRACING_THROUGHPUT_AVG_MB_PER_SEC);
+    case DatumId::kFullGcTracingThroughputAvg:
+      return std::make_optional(
+          statsd::ART_DATUM_REPORTED__KIND__ART_DATUM_GC_FULL_HEAP_TRACING_THROUGHPUT_AVG_MB_PER_SEC);
   }
 }
 

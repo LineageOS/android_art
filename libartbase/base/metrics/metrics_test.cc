@@ -110,6 +110,26 @@ TEST_F(MetricsTest, AccumulatorMetric) {
   EXPECT_EQ(CounterValue(accumulator), kMaxValue);
 }
 
+TEST_F(MetricsTest, AverageMetric) {
+  MetricsAverage<DatumId::kClassLoadingTotalTime, uint64_t> avg;
+
+  std::vector<std::thread> threads;
+
+  constexpr uint64_t kMaxValue = 100;
+
+  for (uint64_t i = 0; i <= kMaxValue; i++) {
+    threads.emplace_back(std::thread{[&avg, i]() {
+      avg.Add(i);
+    }});
+  }
+
+  for (auto& thread : threads) {
+    thread.join();
+  }
+
+  EXPECT_EQ(CounterValue(avg), (kMaxValue + 1) / 2);
+}
+
 TEST_F(MetricsTest, DatumName) {
   EXPECT_EQ("ClassVerificationTotalTime", DatumName(DatumId::kClassVerificationTotalTime));
 }
