@@ -188,7 +188,7 @@ bool JitCompiler::CompileMethod(
                                           : "Compiling baseline",
                                   &logger);
     JitCodeCache* const code_cache = runtime->GetJit()->GetCodeCache();
-    metrics::AutoTimer timer{runtime->GetMetrics()->JitMethodCompileTime()};
+    metrics::AutoTimer timer{runtime->GetMetrics()->JitMethodCompileTotalTime()};
     success = compiler_->JitCompile(
         self, code_cache, region, method, compilation_kind, jit_logger_.get());
     uint64_t duration_us = timer.Stop();
