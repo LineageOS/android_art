@@ -141,26 +141,6 @@ std::vector<const OatFile*> OatFileManager::GetBootOatFiles() const {
   return oat_files;
 }
 
-bool OatFileManager::GetPrimaryOatFileInfo(std::string* compilation_reason,
-                                           CompilerFilter::Filter* compiler_filter) const {
-  ReaderMutexLock mu(Thread::Current(), *Locks::oat_file_manager_lock_);
-  std::vector<const OatFile*> boot_oat_files = GetBootOatFiles();
-  if (!boot_oat_files.empty()) {
-    for (const std::unique_ptr<const OatFile>& oat_file : oat_files_) {
-      if (std::find(boot_oat_files.begin(), boot_oat_files.end(), oat_file.get()) ==
-          boot_oat_files.end()) {
-        const char* reason = oat_file->GetCompilationReason();
-        if (reason != nullptr) {
-          *compilation_reason = reason;
-        }
-        *compiler_filter = oat_file->GetCompilerFilter();
-        return true;
-      }
-    }
-  }
-  return false;
-}
-
 OatFileManager::OatFileManager()
     : only_use_system_oat_files_(false) {}
 
@@ -230,6 +210,12 @@ std::vector<std::unique_ptr<const DexFile>> OatFileManager::OpenDexFilesFromOat(
         &compilation_filter,
         &compilation_reason,
         &odex_status);
+
+    Runtime::Current()->GetAppInfo()->RegisterOdexStatus(
+        dex_location,
+        compilation_filter,
+        compilation_reason,
+        odex_status);
 
     ScopedTrace odex_loading(StringPrintf(
         "location=%s status=%s filter=%s reason=%s",
@@ -419,6 +405,10 @@ std::vector<std::unique_ptr<const DexFile>> OatFileManager::OpenDexFilesFromOat(
   if (Runtime::Current()->GetJit() != nullptr) {
     Runtime::Current()->GetJit()->RegisterDexFiles(dex_files, class_loader);
   }
+
+  // Now that we loaded the dex/odex files, notify the runtime.
+  // Note that we do this everytime we load dex files.
+  Runtime::Current()->NotifyDexFileLoaded();
 
   return dex_files;
 }

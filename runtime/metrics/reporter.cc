@@ -21,6 +21,7 @@
 #include <android-base/parseint.h>
 
 #include "base/flags.h"
+#include "oat_file_manager.h"
 #include "runtime.h"
 #include "runtime_options.h"
 #include "statsd.h"
@@ -84,6 +85,18 @@ void MetricsReporter::NotifyStartupCompleted() {
   }
 }
 
+void MetricsReporter::NotifyAppInfoUpdated(AppInfo* app_info) {
+  std::string compilation_reason;
+  std::string compiler_filter;
+
+  app_info->GetPrimaryApkOptimizationStatus(
+      &compiler_filter, &compilation_reason);
+
+  SetCompilationInfo(
+      CompilationReasonFromName(compilation_reason),
+      CompilerFilterReportingFromName(compiler_filter));
+}
+
 void MetricsReporter::RequestMetricsReport(bool synchronous) {
   if (thread_.has_value()) {
     messages_.SendMessage(RequestMetricsReportMessage{synchronous});
@@ -94,7 +107,7 @@ void MetricsReporter::RequestMetricsReport(bool synchronous) {
 }
 
 void MetricsReporter::SetCompilationInfo(CompilationReason compilation_reason,
-                                         CompilerFilter::Filter compiler_filter) {
+                                         CompilerFilterReporting compiler_filter) {
   if (thread_.has_value()) {
     messages_.SendMessage(CompilationInfoMessage{compilation_reason, compiler_filter});
   }
@@ -159,6 +172,8 @@ void MetricsReporter::BackgroundThreadRun() {
           LOG_STREAM(DEBUG) << "Compilation info received " << session_data_.session_id;
           session_data_.compilation_reason = message.compilation_reason;
           session_data_.compiler_filter = message.compiler_filter;
+
+          UpdateSessionInBackends();
         });
   }
 
@@ -183,13 +198,21 @@ void MetricsReporter::ReportMetrics() {
 
   if (!session_started_) {
     for (auto& backend : backends_) {
-      backend->BeginSession(session_data_);
+      backend->BeginOrUpdateSession(session_data_);
     }
     session_started_ = true;
   }
 
   for (auto& backend : backends_) {
     metrics->ReportAllMetrics(backend.get());
+  }
+}
+
+void MetricsReporter::UpdateSessionInBackends() {
+  if (session_started_) {
+    for (auto& backend : backends_) {
+      backend->BeginOrUpdateSession(session_data_);
+    }
   }
 }
 
