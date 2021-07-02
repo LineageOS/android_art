@@ -277,6 +277,8 @@ struct Flags {
   // By default, the mods are 0, which means the reporting is disabled.
   Flag<uint32_t> MetricsReportingMods{"metrics.reporting-mods", 0,
       FlagType::kDeviceConfig};
+  Flag<uint32_t> MetricsReportingModsServer{"metrics.reporting-mods-server", 0,
+      FlagType::kDeviceConfig};
 
   // See MetricsReportingMods docs.
   //
@@ -284,6 +286,8 @@ struct Flags {
   // read as the percent of runtime sessions that will report metrics. If a finer
   // grain unit is needed (e.g. a tenth of a percent), the num-mods can be increased.
   Flag<uint32_t> MetricsReportingNumMods{"metrics.reporting-num-mods", 100,
+      FlagType::kDeviceConfig};
+  Flag<uint32_t> MetricsReportingNumModsServer{"metrics.reporting-num-mods-server", 100,
       FlagType::kDeviceConfig};
 
   // Whether or not we should write metrics to statsd.
