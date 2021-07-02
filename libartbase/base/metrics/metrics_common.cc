@@ -51,7 +51,7 @@ SessionData SessionData::CreateDefault() {
 
   return SessionData{
     .compilation_reason = CompilationReason::kUnknown,
-    .compiler_filter = std::nullopt,
+    .compiler_filter = CompilerFilterReporting::kUnknown,
     .session_id = kInvalidSessionId,
     .uid = uid,
   };
@@ -97,7 +97,7 @@ std::string StringBackend::GetAndResetBuffer() {
   return result;
 }
 
-void StringBackend::BeginSession(const SessionData& session_data) {
+void StringBackend::BeginOrUpdateSession(const SessionData& session_data) {
   session_data_ = session_data;
 }
 
@@ -110,10 +110,7 @@ void StringBackend::BeginReport(uint64_t timestamp_since_start_ms) {
     os_ << "    uid: " << session_data_->uid << "\n";
     os_ << "    compilation_reason: " << CompilationReasonName(session_data_->compilation_reason)
         << "\n";
-    os_ << "    compiler_filter: "
-        << (session_data_->compiler_filter.has_value()
-                ? CompilerFilter::NameOfFilter(session_data_->compiler_filter.value())
-                : "(unspecified)")
+    os_ << "    compiler_filter: " << CompilerFilterReportingName(session_data_->compiler_filter)
         << "\n";
   }
   os_ << "  Metrics:\n";
