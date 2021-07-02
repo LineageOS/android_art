@@ -156,16 +156,21 @@ ConcurrentCopying::ConcurrentCopying(Heap* heap,
   // Return type of these functions are different. And even though the base class
   // is same, using ternary operator complains.
   metrics::ArtMetrics* metrics = GetMetrics();
+  are_metrics_initialized_ = true;
   if (young_gen_) {
     gc_time_histogram_ = metrics->YoungGcCollectionTime();
     metrics_gc_count_ = metrics->YoungGcCount();
     gc_throughput_histogram_ = metrics->YoungGcThroughput();
     gc_tracing_throughput_hist_ = metrics->YoungGcTracingThroughput();
+    gc_throughput_avg_ = metrics->YoungGcThroughputAvg();
+    gc_tracing_throughput_avg_ = metrics->YoungGcTracingThroughputAvg();
   } else {
     gc_time_histogram_ = metrics->FullGcCollectionTime();
     metrics_gc_count_ = metrics->FullGcCount();
     gc_throughput_histogram_ = metrics->FullGcThroughput();
     gc_tracing_throughput_hist_ = metrics->FullGcTracingThroughput();
+    gc_throughput_avg_ = metrics->FullGcThroughputAvg();
+    gc_tracing_throughput_avg_ = metrics->FullGcTracingThroughputAvg();
   }
 }
 

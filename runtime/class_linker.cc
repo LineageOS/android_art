@@ -5049,7 +5049,9 @@ ObjPtr<mirror::Class> ClassLinker::CreateProxyClass(ScopedObjectAccessAlreadyRun
     Handle<mirror::ObjectArray<mirror::Class>> h_interfaces(
         hs.NewHandle(soa.Decode<mirror::ObjectArray<mirror::Class>>(interfaces)));
     if (!LinkClass(self, descriptor, temp_klass, h_interfaces, &klass)) {
-      mirror::Class::SetStatus(temp_klass, ClassStatus::kErrorUnresolved, self);
+      if (!temp_klass->IsErroneous()) {
+        mirror::Class::SetStatus(temp_klass, ClassStatus::kErrorUnresolved, self);
+      }
       return nullptr;
     }
   }
