@@ -74,7 +74,8 @@ std::string GetArtApexData();
 std::string GetDefaultBootImageLocation(std::string* error_msg);
 
 // Returns the default boot image location, based on the passed `android_root`.
-std::string GetDefaultBootImageLocation(const std::string& android_root);
+std::string GetDefaultBootImageLocation(const std::string& android_root,
+                                        bool deny_art_apex_data_files);
 
 // Return true if we found the dalvik cache and stored it in the dalvik_cache argument.
 // `have_android_data` will be set to true if we have an ANDROID_DATA that exists,
@@ -152,7 +153,7 @@ bool LocationIsOnApex(std::string_view location);
 // Returns whether the location is trusted for loading oat files. Trusted locations are protected
 // by dm-verity or fs-verity. The recognized locations are on /system or
 // /data/misc/apexdata/com.android.art.
-bool LocationIsTrusted(const std::string& location);
+bool LocationIsTrusted(const std::string& location, bool trust_art_apex_data_files);
 
 // Compare the ART module root against android root. Returns true if they are
 // both known and distinct. This is meant to be a proxy for 'running with apex'.
