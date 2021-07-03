@@ -718,7 +718,8 @@ class Dex2Oat final {
 
     if (!IsBootImage() && boot_image_filename_.empty()) {
       DCHECK(!IsBootImageExtension());
-      boot_image_filename_ = GetDefaultBootImageLocation(android_root_);
+      boot_image_filename_ =
+          GetDefaultBootImageLocation(android_root_, /*deny_art_apex_data_files=*/false);
     }
 
     if (dex_filenames_.empty() && zip_fd_ == -1) {

@@ -287,6 +287,12 @@ class Runtime {
     return boot_class_path_locations_.empty() ? boot_class_path_ : boot_class_path_locations_;
   }
 
+  // Returns the checksums for the boot image, extensions and extra boot class path dex files,
+  // based on the image spaces and boot class path dex files loaded in memory.
+  const std::string& GetBootClassPathChecksums() const {
+    return boot_class_path_checksums_;
+  }
+
   const std::string& GetClassPathString() const {
     return class_path_string_;
   }
@@ -890,6 +896,10 @@ class Runtime {
     return result;
   }
 
+  bool DenyArtApexDataFiles() const {
+    return deny_art_apex_data_files_;
+  }
+
   // Whether or not we use MADV_RANDOM on files that are thought to have random access patterns.
   // This is beneficial for low RAM devices since it reduces page cache thrashing.
   bool MAdviseRandomAccess() const {
@@ -1114,6 +1124,7 @@ class Runtime {
 
   std::vector<std::string> boot_class_path_;
   std::vector<std::string> boot_class_path_locations_;
+  std::string boot_class_path_checksums_;
   std::string class_path_string_;
   std::vector<std::string> properties_;
 
@@ -1366,6 +1377,9 @@ class Runtime {
   // Set to false in cases where we want to directly control when jni-id
   // indirection is changed. This is intended only for testing JNI id swapping.
   bool automatically_set_jni_ids_indirection_;
+
+  // True if files in /data/misc/apexdata/com.android.art are considered untrustworthy.
+  bool deny_art_apex_data_files_;
 
   // Saved environment.
   class EnvSnapshot {

@@ -313,7 +313,8 @@ static std::string GetFirstBootClasspathExtensionJar(const std::string& android_
   return kDefaultBcpExtensionJar;
 }
 
-std::string GetDefaultBootImageLocation(const std::string& android_root) {
+std::string GetDefaultBootImageLocation(const std::string& android_root,
+                                        bool deny_art_apex_data_files) {
   constexpr static const char* kJavalibBootArt = "javalib/boot.art";
   constexpr static const char* kEtcBootImageProf = "etc/boot-image.prof";
 
@@ -321,9 +322,9 @@ std::string GetDefaultBootImageLocation(const std::string& android_root) {
   //  - the primary boot image in the ART APEX (contains the Core Libraries)
   //  - the boot image extensions (contains framework libraries) on the system partition, or
   //    in the ART APEX data directory, if an update for the ART module has been been installed.
-  if (kIsTargetBuild) {
+  if (kIsTargetBuild && !deny_art_apex_data_files) {
     // If the ART APEX has been updated, the compiled boot image extension will be in the ART APEX
-    // data directory (assuming there is space). Otherwise, for a factory installed ART APEX it is
+    // data directory (assuming there is space and we trust the artifacts there). Otherwise, for a factory installed ART APEX it is
     // under $ANDROID_ROOT/framework/.
     const std::string first_extension_jar{GetFirstBootClasspathExtensionJar(android_root)};
     const std::string boot_extension_image = GetApexDataBootImage(first_extension_jar);
@@ -354,7 +355,7 @@ std::string GetDefaultBootImageLocation(std::string* error_msg) {
   if (android_root.empty()) {
     return "";
   }
-  return GetDefaultBootImageLocation(android_root);
+  return GetDefaultBootImageLocation(android_root, /*deny_art_apex_data_files=*/false);
 }
 
 static std::string GetDalvikCacheDirectory(std::string_view root_directory,
@@ -624,8 +625,11 @@ bool LocationIsOnSystem(const std::string& location) {
 #endif
 }
 
-bool LocationIsTrusted(const std::string& location) {
-  return LocationIsOnSystem(location) || LocationIsOnArtApexData(location);
+bool LocationIsTrusted(const std::string& location, bool trust_art_apex_data_files) {
+  if (LocationIsOnSystem(location)) {
+    return true;
+  }
+  return LocationIsOnArtApexData(location) & trust_art_apex_data_files;
 }
 
 bool ArtModuleRootDistinctFromAndroidRoot() {
