@@ -44,9 +44,9 @@ constexpr std::optional<int32_t> EncodeDatumId(DatumId datum_id) {
     case DatumId::kClassVerificationTotalTime:
       return std::make_optional(
           statsd::ART_DATUM_REPORTED__KIND__ART_DATUM_CLASS_VERIFICATION_TIME_COUNTER_MICROS);
-    case DatumId::kJitMethodCompileTime:
+    case DatumId::kJitMethodCompileTotalTime:
       return std::make_optional(
-          statsd::ART_DATUM_REPORTED__KIND__ART_DATUM_JIT_METHOD_COMPILE_TIME_HISTO_MICROS);
+          statsd::ART_DATUM_REPORTED__KIND__ART_DATUM_JIT_METHOD_COMPILE_TIME_MICROS);
     case DatumId::kClassLoadingTotalTime:
       return std::make_optional(
           statsd::ART_DATUM_REPORTED__KIND__ART_DATUM_CLASS_LOADING_TIME_COUNTER_MICROS);
