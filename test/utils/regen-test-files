@@ -808,14 +808,22 @@ class Generator:
 
     mts_test_shards = []
 
-    # ART run-test shard(s).
+    # ART test (gtest & run-test) shard(s).
+    # TODO: Also handle the case of gtests requiring root access to the device
+    # (`art_gtest_eng_only_module_names`).
     art_run_test_module_names = [ART_RUN_TEST_MODULE_NAME_PREFIX + t for t in art_run_tests]
     art_run_test_shards = split_list(art_run_test_module_names, NUM_MTS_ART_RUN_TEST_SHARDS)
     for i in range(len(art_run_test_shards)):
-      art_run_test_shard = self.create_mts_test_shard(
-          "ART run-tests", art_run_test_shards[i], i, 2020,
+      art_tests_shard_i_tests = art_run_test_shards[i]
+      # Append ART gtests to the last ART run-test shard for now.
+      # If needed, consider moving them to their own shard to increase
+      # the parallelization of code coverage runs.
+      if i + 1 == len(art_run_test_shards):
+        art_tests_shard_i_tests.extend(art_gtest_user_module_names)
+      art_tests_shard_i = self.create_mts_test_shard(
+          "ART run-tests", art_tests_shard_i_tests, i, 2020,
           ["TODO(rpl): Find a way to express this list in a more concise fashion."])
-      mts_test_shards.append(art_run_test_shard)
+      mts_test_shards.append(art_tests_shard_i)
 
     # CTS Libcore non-OJ tests (`CtsLibcoreTestCases`) shard.
     cts_libcore_tests_shard_num = len(mts_test_shards)
