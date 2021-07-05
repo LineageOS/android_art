@@ -826,8 +826,11 @@ class Generator:
     # Other CTS Libcore tests shard.
     other_cts_libcore_tests_shard_num = len(mts_test_shards)
     other_cts_libcore_tests_shard_tests = [
+        "CtsLibcoreApiEvolutionTestCases",
+        "CtsLibcoreFileIOTestCases",
+        "CtsLibcoreJsr166TestCases",
+        "CtsLibcoreLegacy22TestCases",
         "CtsLibcoreOjTestCases",
-        "CtsLibcoreJsr166TestCases"
     ]
     other_cts_libcore_tests_shard = self.create_mts_test_shard(
         "CTS Libcore OJ tests", other_cts_libcore_tests_shard_tests,
