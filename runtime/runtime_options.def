@@ -176,6 +176,10 @@ RUNTIME_OPTIONS_KEY (unsigned int,        VerifierLoggingThreshold,       100)
 RUNTIME_OPTIONS_KEY (bool,                FastClassNotFoundException,     true)
 RUNTIME_OPTIONS_KEY (bool,                VerifierMissingKThrowFatal,     true)
 
+// Setting this to true causes ART to disable Zygote native fork loop. ART also
+// internally enables this if ZygoteJit is enabled.
+RUNTIME_OPTIONS_KEY (bool,                ForceJavaZygoteForkLoop,        false)
+
 // Whether to allow loading of the perfetto hprof plugin.
 // Even with this option set, we will still only actually load the plugin
 // if we are on a userdebug build or the app is debuggable or profileable.

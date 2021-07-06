@@ -991,6 +991,10 @@ class Runtime {
     return verifier_missing_kthrow_fatal_;
   }
 
+  bool IsJavaZygoteForkLoopRequired() const {
+    return force_java_zygote_fork_loop_;
+  }
+
   bool IsPerfettoHprofEnabled() const {
     return perfetto_hprof_enabled_;
   }
@@ -1413,6 +1417,7 @@ class Runtime {
   std::atomic<bool> startup_completed_ = false;
 
   bool verifier_missing_kthrow_fatal_;
+  bool force_java_zygote_fork_loop_;
   bool perfetto_hprof_enabled_;
   bool perfetto_javaheapprof_enabled_;
 
