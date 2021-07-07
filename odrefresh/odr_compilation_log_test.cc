@@ -28,8 +28,8 @@
 #include <string>
 #include <vector>
 
+#include "android-base/file.h"
 #include "base/common_art_test.h"
-
 #include "odrefresh/odrefresh.h"
 #include "odr_metrics.h"
 
@@ -41,28 +41,31 @@ const time_t kSecondsPerDay = 86'400;
 class OdrCompilationLogTest : public CommonArtTest {};
 
 TEST(OdrCompilationLogEntry, Equality) {
-  OdrCompilationLogEntry a{1, 2, 3, 4};
+  OdrCompilationLogEntry a{1, 2, 3, 4, 5};
 
-  ASSERT_EQ(a, (OdrCompilationLogEntry{1, 2, 3, 4}));
-  ASSERT_NE(a, (OdrCompilationLogEntry{9, 2, 3, 4}));
-  ASSERT_NE(a, (OdrCompilationLogEntry{1, 9, 3, 4}));
-  ASSERT_NE(a, (OdrCompilationLogEntry{1, 2, 9, 4}));
-  ASSERT_NE(a, (OdrCompilationLogEntry{2, 2, 3, 9}));
+  ASSERT_EQ(a, (OdrCompilationLogEntry{1, 2, 3, 4, 5}));
+  ASSERT_NE(a, (OdrCompilationLogEntry{9, 2, 3, 4, 5}));
+  ASSERT_NE(a, (OdrCompilationLogEntry{1, 9, 3, 4, 5}));
+  ASSERT_NE(a, (OdrCompilationLogEntry{1, 2, 9, 4, 5}));
+  ASSERT_NE(a, (OdrCompilationLogEntry{2, 2, 3, 9, 5}));
+  ASSERT_NE(a, (OdrCompilationLogEntry{2, 2, 3, 5, 9}));
 }
 
 TEST(OdrCompilationLogEntry, InputOutput) {
   const OdrCompilationLogEntry entries[] = {
-      {1, 2, 3, 4},
+      {1, 2, 3, 4, 5},
       {std::numeric_limits<int64_t>::min(),
+       std::numeric_limits<int64_t>::min(),
        std::numeric_limits<int32_t>::min(),
        std::numeric_limits<time_t>::min(),
        std::numeric_limits<int32_t>::min()},
       {std::numeric_limits<int64_t>::max(),
+       std::numeric_limits<int64_t>::max(),
        std::numeric_limits<int32_t>::max(),
        std::numeric_limits<time_t>::max(),
        std::numeric_limits<int32_t>::max()},
-       {0, 0, 0, 0},
-      {0x7fedcba9'87654321, 0x12345678, 0x2346789, 0x76543210}
+       {0, 0, 0, 0, 0},
+      {0x7fedcba9'87654321, 0x5a5a5a5a'5a5a5a5a, 0x12345678, 0x2346789, 0x76543210}
   };
   for (const auto& entry : entries) {
     std::stringstream ss;
@@ -86,12 +89,12 @@ TEST(OdrCompilationLogEntry, TruncatedInput) {
 
 TEST(OdrCompilationLogEntry, ReadMultiple) {
   std::stringstream ss;
-  ss << "1 2 3 4\n5 6 7 8\n";
+  ss << "0 1 2 3 4\n5 6 7 8 9\n";
 
   OdrCompilationLogEntry entry0, entry1;
   ss >> entry0 >> entry1;
-  ASSERT_EQ(entry0, (OdrCompilationLogEntry{1, 2, 3, 4}));
-  ASSERT_EQ(entry1, (OdrCompilationLogEntry{5, 6, 7, 8}));
+  ASSERT_EQ(entry0, (OdrCompilationLogEntry{0, 1, 2, 3, 4}));
+  ASSERT_EQ(entry1, (OdrCompilationLogEntry{5, 6, 7, 8, 9}));
 
   ASSERT_FALSE(ss.fail());
   ASSERT_FALSE(ss.bad());
@@ -100,14 +103,24 @@ TEST(OdrCompilationLogEntry, ReadMultiple) {
 TEST(OdrCompilationLog, ShouldAttemptCompile) {
   OdrCompilationLog ocl(/*compilation_log_path=*/nullptr);
 
-  ASSERT_TRUE(ocl.ShouldAttemptCompile(1, OdrMetrics::Trigger::kMissingArtifacts, 0));
+  ASSERT_TRUE(ocl.ShouldAttemptCompile(
+      /*apex_version=*/1, /*last_update_millis=*/762, OdrMetrics::Trigger::kMissingArtifacts, 0));
 
   ocl.Log(
-      /*apex_version=*/1, OdrMetrics::Trigger::kApexVersionMismatch, ExitCode::kCompilationSuccess);
-  ASSERT_TRUE(ocl.ShouldAttemptCompile(2, OdrMetrics::Trigger::kApexVersionMismatch));
-  ASSERT_FALSE(ocl.ShouldAttemptCompile(1, OdrMetrics::Trigger::kApexVersionMismatch));
-  ASSERT_TRUE(ocl.ShouldAttemptCompile(1, OdrMetrics::Trigger::kDexFilesChanged));
-  ASSERT_FALSE(ocl.ShouldAttemptCompile(1, OdrMetrics::Trigger::kUnknown));
+      /*apex_version=*/1,
+      /*last_update_millis=*/762,
+      OdrMetrics::Trigger::kApexVersionMismatch,
+      ExitCode::kCompilationSuccess);
+  ASSERT_TRUE(ocl.ShouldAttemptCompile(
+      /*apex_version=*/2, /*last_update_millis=*/762, OdrMetrics::Trigger::kApexVersionMismatch));
+  ASSERT_TRUE(ocl.ShouldAttemptCompile(
+      /*apex_version=*/1, /*last_update_millis=*/10000, OdrMetrics::Trigger::kApexVersionMismatch));
+  ASSERT_FALSE(ocl.ShouldAttemptCompile(
+      /*apex_version=*/1, /*last_update_millis=*/762, OdrMetrics::Trigger::kApexVersionMismatch));
+  ASSERT_TRUE(ocl.ShouldAttemptCompile(
+      /*apex_version=*/1, /*last_update_millis=*/762, OdrMetrics::Trigger::kDexFilesChanged));
+  ASSERT_FALSE(ocl.ShouldAttemptCompile(
+      /*apex_version=*/1, /*last_update_millis=*/762, OdrMetrics::Trigger::kUnknown));
 }
 
 TEST(OdrCompilationLog, BackOffNoHistory) {
@@ -117,63 +130,81 @@ TEST(OdrCompilationLog, BackOffNoHistory) {
   OdrCompilationLog ocl(/*compilation_log_path=*/nullptr);
 
   ASSERT_TRUE(ocl.ShouldAttemptCompile(
-      /*apex_version=*/1, OdrMetrics::Trigger::kApexVersionMismatch, start_time));
+      /*apex_version=*/1,
+      /*last_update_millis=*/0,
+      OdrMetrics::Trigger::kApexVersionMismatch,
+      start_time));
 
   // Start log
   ocl.Log(/*apex_version=*/1,
+          /*last_update_millis=*/0,
           OdrMetrics::Trigger::kApexVersionMismatch,
           start_time,
           ExitCode::kCompilationFailed);
   ASSERT_FALSE(ocl.ShouldAttemptCompile(
-      /*apex_version=*/1, OdrMetrics::Trigger::kApexVersionMismatch, start_time));
+      /*apex_version=*/1,
+      /*last_update_millis=*/0,
+      OdrMetrics::Trigger::kApexVersionMismatch,
+      start_time));
   ASSERT_FALSE(ocl.ShouldAttemptCompile(
       /*apex_version=*/1,
+      /*last_update_millis=*/0,
       OdrMetrics::Trigger::kApexVersionMismatch,
       start_time + kSecondsPerDay / 2));
   ASSERT_TRUE(ocl.ShouldAttemptCompile(
       /*apex_version=*/1,
+      /*last_update_millis=*/0,
       OdrMetrics::Trigger::kApexVersionMismatch,
       start_time + kSecondsPerDay));
 
   // Add one more log entry
   ocl.Log(/*apex_version=*/1,
+          /*last_update_millis=*/0,
           OdrMetrics::Trigger::kApexVersionMismatch,
           start_time,
           ExitCode::kCompilationFailed);
   ASSERT_FALSE(ocl.ShouldAttemptCompile(
       /*apex_version=*/1,
+      /*last_update_millis=*/0,
       OdrMetrics::Trigger::kApexVersionMismatch,
       start_time + kSecondsPerDay));
   ASSERT_TRUE(ocl.ShouldAttemptCompile(
       /*apex_version=*/1,
+      /*last_update_millis=*/0,
       OdrMetrics::Trigger::kApexVersionMismatch,
       start_time + 2 * kSecondsPerDay));
 
   // One more.
   ocl.Log(/*apex_version=*/1,
+          /*last_update_millis=*/0,
           OdrMetrics::Trigger::kApexVersionMismatch,
           start_time,
           ExitCode::kCompilationFailed);
   ASSERT_FALSE(ocl.ShouldAttemptCompile(
       /*apex_version=*/1,
+      /*last_update_millis=*/0,
       OdrMetrics::Trigger::kApexVersionMismatch,
       start_time + 3 * kSecondsPerDay));
   ASSERT_TRUE(ocl.ShouldAttemptCompile(
       /*apex_version=*/1,
+      /*last_update_millis=*/0,
       OdrMetrics::Trigger::kApexVersionMismatch,
       start_time + 4 * kSecondsPerDay));
 
   // And one for the road.
   ocl.Log(/*apex_version=*/1,
+          /*last_update_millis=*/0,
           OdrMetrics::Trigger::kApexVersionMismatch,
           start_time,
           ExitCode::kCompilationFailed);
   ASSERT_FALSE(ocl.ShouldAttemptCompile(
       /*apex_version=*/1,
+      /*last_update_millis=*/0,
       OdrMetrics::Trigger::kApexVersionMismatch,
       start_time + 7 * kSecondsPerDay));
   ASSERT_TRUE(ocl.ShouldAttemptCompile(
       /*apex_version=*/1,
+      /*last_update_millis=*/0,
       OdrMetrics::Trigger::kApexVersionMismatch,
       start_time + 8 * kSecondsPerDay));
 }
@@ -186,31 +217,40 @@ TEST(OdrCompilationLog, BackOffHappyHistory) {
 
   // Start log with a successful entry.
   ocl.Log(/*apex_version=*/1,
+          /*last_update_millis=*/0,
           OdrMetrics::Trigger::kApexVersionMismatch,
           start_time,
           ExitCode::kCompilationSuccess);
   ASSERT_FALSE(ocl.ShouldAttemptCompile(
-      /*apex_version=*/1, OdrMetrics::Trigger::kApexVersionMismatch, start_time));
+      /*apex_version=*/1,
+      /*last_update_millis=*/0,
+      OdrMetrics::Trigger::kApexVersionMismatch,
+      start_time));
   ASSERT_FALSE(ocl.ShouldAttemptCompile(
       /*apex_version=*/1,
+      /*last_update_millis=*/0,
       OdrMetrics::Trigger::kApexVersionMismatch,
       start_time + kSecondsPerDay / 4));
   ASSERT_TRUE(ocl.ShouldAttemptCompile(
       /*apex_version=*/1,
+      /*last_update_millis=*/0,
       OdrMetrics::Trigger::kApexVersionMismatch,
       start_time + kSecondsPerDay / 2));
 
-    // Add a log entry for a failed compilation.
+  // Add a log entry for a failed compilation.
   ocl.Log(/*apex_version=*/1,
+          /*last_update_millis=*/0,
           OdrMetrics::Trigger::kApexVersionMismatch,
           start_time,
           ExitCode::kCompilationFailed);
   ASSERT_FALSE(ocl.ShouldAttemptCompile(
       /*apex_version=*/1,
+      /*last_update_millis=*/0,
       OdrMetrics::Trigger::kApexVersionMismatch,
       start_time + kSecondsPerDay / 2));
   ASSERT_TRUE(ocl.ShouldAttemptCompile(
       /*apex_version=*/1,
+      /*last_update_millis=*/0,
       OdrMetrics::Trigger::kApexVersionMismatch,
       start_time + kSecondsPerDay));
 }
@@ -219,18 +259,19 @@ TEST_F(OdrCompilationLogTest, LogNumberOfEntriesAndPeek) {
   OdrCompilationLog ocl(/*compilation_log_path=*/nullptr);
 
   std::vector<OdrCompilationLogEntry> entries = {
-    { 0, 1, 2, 3 },
-    { 1, 2, 3, 4 },
-    { 2, 3, 4, 5 },
-    { 3, 4, 5, 6 },
-    { 4, 5, 6, 7 },
-    { 5, 6, 7, 8 },
-    { 6, 7, 8, 9 }
+    { 0, 1, 2, 3, 4 },
+    { 1, 2, 3, 4, 5 },
+    { 2, 3, 4, 5, 6 },
+    { 3, 4, 5, 6, 7 },
+    { 4, 5, 6, 7, 8 },
+    { 5, 6, 7, 8, 9 },
+    { 6, 7, 8, 9, 10 }
   };
 
   for (size_t i = 0; i < entries.size(); ++i) {
     OdrCompilationLogEntry& e = entries[i];
     ocl.Log(e.apex_version,
+            e.last_update_millis,
             static_cast<OdrMetrics::Trigger>(e.trigger),
             e.when,
             static_cast<ExitCode>(e.exit_code));
@@ -251,13 +292,13 @@ TEST_F(OdrCompilationLogTest, LogNumberOfEntriesAndPeek) {
 
 TEST_F(OdrCompilationLogTest, LogReadWrite) {
   std::vector<OdrCompilationLogEntry> entries = {
-    { 0, 1, 2, 3 },
-    { 1, 2, 3, 4 },
-    { 2, 3, 4, 5 },
-    { 3, 4, 5, 6 },
-    { 4, 5, 6, 7 },
-    { 5, 6, 7, 8 },
-    { 6, 7, 8, 9 }
+    { 0, 1, 2, 3, 4 },
+    { 1, 2, 3, 4, 5 },
+    { 2, 3, 4, 5, 6 },
+    { 3, 4, 5, 6, 7 },
+    { 4, 5, 6, 7, 8 },
+    { 5, 6, 7, 8, 9 },
+    { 6, 7, 8, 9, 10 }
   };
 
   ScratchFile scratch_file;
@@ -268,6 +309,7 @@ TEST_F(OdrCompilationLogTest, LogReadWrite) {
       OdrCompilationLog ocl(scratch_file.GetFilename().c_str());
       OdrCompilationLogEntry& e = entries[i];
       ocl.Log(e.apex_version,
+              e.last_update_millis,
               static_cast<OdrMetrics::Trigger>(e.trigger),
               e.when,
               static_cast<ExitCode>(e.exit_code));
@@ -303,7 +345,10 @@ TEST_F(OdrCompilationLogTest, BackoffBasedOnLog) {
     OdrCompilationLog ocl(log_path);
 
     ASSERT_TRUE(ocl.ShouldAttemptCompile(
-        /*apex_version=*/1, OdrMetrics::Trigger::kApexVersionMismatch, start_time));
+        /*apex_version=*/1,
+        /*last_update_millis=*/0,
+        OdrMetrics::Trigger::kApexVersionMismatch,
+        start_time));
   }
 
   {
@@ -311,6 +356,7 @@ TEST_F(OdrCompilationLogTest, BackoffBasedOnLog) {
 
     // Start log
     ocl.Log(/*apex_version=*/1,
+            /*last_update_millis=*/0,
             OdrMetrics::Trigger::kApexVersionMismatch,
             start_time,
             ExitCode::kCompilationFailed);
@@ -319,13 +365,18 @@ TEST_F(OdrCompilationLogTest, BackoffBasedOnLog) {
   {
     OdrCompilationLog ocl(log_path);
     ASSERT_FALSE(ocl.ShouldAttemptCompile(
-        /*apex_version=*/1, OdrMetrics::Trigger::kApexVersionMismatch, start_time));
+        /*apex_version=*/1,
+        /*last_update_millis=*/0,
+        OdrMetrics::Trigger::kApexVersionMismatch,
+        start_time));
     ASSERT_FALSE(ocl.ShouldAttemptCompile(
         /*apex_version=*/1,
+        /*last_update_millis=*/0,
         OdrMetrics::Trigger::kApexVersionMismatch,
         start_time + kSecondsPerDay / 2));
     ASSERT_TRUE(ocl.ShouldAttemptCompile(
         /*apex_version=*/1,
+        /*last_update_millis=*/0,
         OdrMetrics::Trigger::kApexVersionMismatch,
         start_time + kSecondsPerDay));
   }
@@ -334,6 +385,7 @@ TEST_F(OdrCompilationLogTest, BackoffBasedOnLog) {
     // Add one more log entry
     OdrCompilationLog ocl(log_path);
     ocl.Log(/*apex_version=*/1,
+            /*last_update_millis=*/0,
             OdrMetrics::Trigger::kApexVersionMismatch,
             start_time,
             ExitCode::kCompilationFailed);
@@ -344,10 +396,12 @@ TEST_F(OdrCompilationLogTest, BackoffBasedOnLog) {
 
     ASSERT_FALSE(ocl.ShouldAttemptCompile(
         /*apex_version=*/1,
+        /*last_update_millis=*/0,
         OdrMetrics::Trigger::kApexVersionMismatch,
         start_time + kSecondsPerDay));
     ASSERT_TRUE(ocl.ShouldAttemptCompile(
         /*apex_version=*/1,
+        /*last_update_millis=*/0,
         OdrMetrics::Trigger::kApexVersionMismatch,
         start_time + 2 * kSecondsPerDay));
   }
@@ -356,27 +410,7 @@ TEST_F(OdrCompilationLogTest, BackoffBasedOnLog) {
     // One more log entry.
     OdrCompilationLog ocl(log_path);
     ocl.Log(/*apex_version=*/1,
-          OdrMetrics::Trigger::kApexVersionMismatch,
-          start_time,
-          ExitCode::kCompilationFailed);
-  }
-
-  {
-    OdrCompilationLog ocl(log_path);
-    ASSERT_FALSE(ocl.ShouldAttemptCompile(
-        /*apex_version=*/1,
-        OdrMetrics::Trigger::kApexVersionMismatch,
-        start_time + 3 * kSecondsPerDay));
-    ASSERT_TRUE(ocl.ShouldAttemptCompile(
-        /*apex_version=*/1,
-        OdrMetrics::Trigger::kApexVersionMismatch,
-        start_time + 4 * kSecondsPerDay));
-  }
-
-  {
-    // And one for the road.
-    OdrCompilationLog ocl(log_path);
-    ocl.Log(/*apex_version=*/1,
+            /*last_update_millis=*/0,
             OdrMetrics::Trigger::kApexVersionMismatch,
             start_time,
             ExitCode::kCompilationFailed);
@@ -386,12 +420,123 @@ TEST_F(OdrCompilationLogTest, BackoffBasedOnLog) {
     OdrCompilationLog ocl(log_path);
     ASSERT_FALSE(ocl.ShouldAttemptCompile(
         /*apex_version=*/1,
+        /*last_update_millis=*/0,
+        OdrMetrics::Trigger::kApexVersionMismatch,
+        start_time + 3 * kSecondsPerDay));
+    ASSERT_TRUE(ocl.ShouldAttemptCompile(
+        /*apex_version=*/1,
+        /*last_update_millis=*/0,
+        OdrMetrics::Trigger::kApexVersionMismatch,
+        start_time + 4 * kSecondsPerDay));
+  }
+
+  {
+    // And one for the road.
+    OdrCompilationLog ocl(log_path);
+    ocl.Log(/*apex_version=*/1,
+            /*last_update_millis=*/0,
+            OdrMetrics::Trigger::kApexVersionMismatch,
+            start_time,
+            ExitCode::kCompilationFailed);
+  }
+
+  {
+    OdrCompilationLog ocl(log_path);
+    ASSERT_FALSE(ocl.ShouldAttemptCompile(
+        /*apex_version=*/1,
+        /*last_update_millis=*/0,
         OdrMetrics::Trigger::kApexVersionMismatch,
         start_time + 7 * kSecondsPerDay));
     ASSERT_TRUE(ocl.ShouldAttemptCompile(
         /*apex_version=*/1,
+        /*last_update_millis=*/0,
         OdrMetrics::Trigger::kApexVersionMismatch,
         start_time + 8 * kSecondsPerDay));
+  }
+}
+
+TEST(OdrCompilationLog, LastUpdateMillisChangeTriggersCompilation) {
+  time_t start_time;
+  time(&start_time);
+
+  OdrCompilationLog ocl(/*compilation_log_path=*/nullptr);
+
+  for (int64_t last_update_millis = 0; last_update_millis < 10000; last_update_millis += 1000) {
+    static const int64_t kApexVersion = 19999;
+    ASSERT_TRUE(ocl.ShouldAttemptCompile(
+        kApexVersion, last_update_millis, OdrMetrics::Trigger::kApexVersionMismatch, start_time));
+    ocl.Log(kApexVersion,
+            last_update_millis,
+            OdrMetrics::Trigger::kApexVersionMismatch,
+            start_time,
+            ExitCode::kCompilationSuccess);
+    ASSERT_FALSE(ocl.ShouldAttemptCompile(kApexVersion,
+                                          last_update_millis,
+                                          OdrMetrics::Trigger::kApexVersionMismatch,
+                                          start_time + 1));
+  }
+}
+
+TEST(OdrCompilationLog, ApexVersionChangeTriggersCompilation) {
+  time_t start_time;
+  time(&start_time);
+
+  OdrCompilationLog ocl(/*compilation_log_path=*/nullptr);
+
+  for (int64_t apex_version = 0; apex_version < 10000; apex_version += 1000) {
+    static const int64_t kLastUpdateMillis = 777;
+    ASSERT_TRUE(ocl.ShouldAttemptCompile(apex_version,
+                                         kLastUpdateMillis,
+                                         OdrMetrics::Trigger::kApexVersionMismatch,
+                                         start_time + 8 * kSecondsPerDay));
+    ocl.Log(apex_version,
+            kLastUpdateMillis,
+            OdrMetrics::Trigger::kApexVersionMismatch,
+            start_time,
+            ExitCode::kCompilationSuccess);
+    ASSERT_FALSE(ocl.ShouldAttemptCompile(apex_version,
+                                          kLastUpdateMillis,
+                                          OdrMetrics::Trigger::kApexVersionMismatch,
+                                          start_time + 1));
+  }
+}
+
+TEST_F(OdrCompilationLogTest, NewLogVersionTriggersCompilation) {
+  static const int64_t kApexVersion = 1066;
+  static const int64_t kLastUpdateMillis = 777;
+  time_t start_time;
+  time(&start_time);
+
+  ScratchFile scratch_file;
+  scratch_file.Close();
+
+  // Generate a compilation log.
+  {
+    OdrCompilationLog ocl(scratch_file.GetFilename().c_str());
+    for (size_t i = 0; i < OdrCompilationLog::kMaxLoggedEntries; ++i) {
+      ocl.Log(kApexVersion,
+              kLastUpdateMillis,
+              OdrMetrics::Trigger::kApexVersionMismatch,
+              start_time,
+              ExitCode::kCompilationSuccess);
+      ASSERT_FALSE(ocl.ShouldAttemptCompile(
+          kApexVersion, kLastUpdateMillis, OdrMetrics::Trigger::kApexVersionMismatch, start_time));
+    }
+  }
+
+  // Replace version string in the compilation log.
+  std::string log_text;
+  ASSERT_TRUE(android::base::ReadFileToString(scratch_file.GetFilename(), &log_text));
+  std::string new_log_version = std::string(OdrCompilationLog::kLogVersion) + "a";
+  log_text.replace(0, new_log_version.size() - 1, new_log_version);
+  ASSERT_TRUE(android::base::WriteStringToFile(log_text, scratch_file.GetFilename()));
+
+  // Read log with updated version entry, check it is treated as out-of-date.
+  {
+    OdrCompilationLog ocl(scratch_file.GetFilename().c_str());
+    ASSERT_TRUE(ocl.ShouldAttemptCompile(
+        kApexVersion, kLastUpdateMillis, OdrMetrics::Trigger::kApexVersionMismatch, start_time));
+    ASSERT_EQ(0u, ocl.NumberOfEntries());
   }
 }
 
