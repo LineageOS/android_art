@@ -615,7 +615,7 @@ TEST_F(OatFileAssistantTest, VdexUpToDateNoOdex) {
       &oat_file_assistant,
       dex_location,
       "verify",
-      "unknown",
+      "vdex",
       "up-to-date");
 }
 
@@ -889,7 +889,7 @@ TEST_F(OatFileAssistantTest, OatImageOutOfDate) {
       &oat_file_assistant,
       dex_location,
       "verify",
-      "unknown",
+      "vdex",
       "up-to-date");
 }
 
