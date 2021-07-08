@@ -1665,13 +1665,12 @@ class OatFileBackedByVdex final : public OatFileBase {
   void SetupHeader(size_t number_of_dex_files) {
     DCHECK(!IsExecutable());
 
-    // Create a fake OatHeader with a key store containing only the compiler
-    // filter (it helps debugging and is required by
-    // OatHeader::GetCompilerFilter).
+    // Create a fake OatHeader with a key store to help debugging.
     std::unique_ptr<const InstructionSetFeatures> isa_features =
         InstructionSetFeatures::FromCppDefines();
     SafeMap<std::string, std::string> store;
     store.Put(OatHeader::kCompilerFilter, CompilerFilter::NameOfFilter(CompilerFilter::kVerify));
+    store.Put(OatHeader::kCompilationReasonKey, "vdex");
     store.Put(OatHeader::kConcurrentCopying,
               kUseReadBarrier ? OatHeader::kTrueValue : OatHeader::kFalseValue);
     oat_header_.reset(OatHeader::Create(kRuntimeISA,
