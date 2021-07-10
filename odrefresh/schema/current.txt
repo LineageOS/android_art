@@ -3,8 +3,10 @@ package com.android.art {
 
   public class ArtModuleInfo {
     ctor public ArtModuleInfo();
+    method public long getLastUpdateMillis();
     method public long getVersionCode();
     method public String getVersionName();
+    method public void setLastUpdateMillis(long);
     method public void setVersionCode(long);
     method public void setVersionName(String);
   }

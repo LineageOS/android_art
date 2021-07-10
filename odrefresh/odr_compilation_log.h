@@ -32,6 +32,7 @@ namespace odrefresh {
 // OdrCompilationLogEntry represents the result of a compilation attempt by odrefresh.
 struct OdrCompilationLogEntry {
   int64_t apex_version;
+  int64_t last_update_millis;
   int32_t trigger;
   time_t when;
   int32_t exit_code;
@@ -53,6 +54,11 @@ class OdrCompilationLog {
   // directory is only used by odrefresh whereas the ART apexdata directory is also used by odsign
   // and others which may lead to the deletion (or rollback) of the log file.
   static constexpr const char* kCompilationLogFile = "/data/misc/odrefresh/compilation-log.txt";
+
+  // Version string that appears on the first line of the compilation log.
+  static constexpr const char kLogVersion[] = "CompilationLog/1.0";
+
+  // Number of log entries in the compilation log.
   static constexpr const size_t kMaxLoggedEntries = 4;
 
   explicit OdrCompilationLog(const char* compilation_log_path = kCompilationLogFile);
@@ -60,6 +66,7 @@ class OdrCompilationLog {
 
   // Applies policy to compilation log to determine whether to recompile.
   bool ShouldAttemptCompile(int64_t apex_version,
+                            int64_t last_update_millis,
                             OdrMetrics::Trigger trigger,
                             time_t now = 0) const;
 
@@ -69,9 +76,13 @@ class OdrCompilationLog {
   // Returns the entry at position `index` or nullptr if `index` is out of bounds.
   const OdrCompilationLogEntry* Peek(size_t index) const;
 
-  void Log(int64_t apex_version, OdrMetrics::Trigger trigger, ExitCode compilation_result);
+  void Log(int64_t apex_version,
+           int64_t last_update_millis,
+           OdrMetrics::Trigger trigger,
+           ExitCode compilation_result);
 
   void Log(int64_t apex_version,
+           int64_t last_update_millis,
            OdrMetrics::Trigger trigger,
            time_t when,
            ExitCode compilation_result);

@@ -41,7 +41,9 @@ std::istream& operator>>(std::istream& is, OdrCompilationLogEntry& entry) {
   auto saved_exceptions = is.exceptions();
   is.exceptions(std::ios_base::iostate {});
 
+  // Write log entry. NB update OdrCompilationLog::kLogVersion if changing the format here.
   is >> entry.apex_version >> std::ws;
+  is >> entry.last_update_millis >> std::ws;
   is >> entry.trigger >> std::ws;
   is >> entry.when >> std::ws;
   is >> entry.exit_code >> std::ws;
@@ -59,6 +61,7 @@ std::ostream& operator<<(std::ostream& os, const OdrCompilationLogEntry& entry) 
   os.exceptions(std::ios_base::iostate {});
 
   os << entry.apex_version << kSpace;
+  os << entry.last_update_millis << kSpace;
   os << entry.trigger << kSpace;
   os << entry.when << kSpace;
   os << entry.exit_code << std::endl;
@@ -69,8 +72,8 @@ std::ostream& operator<<(std::ostream& os, const OdrCompilationLogEntry& entry) 
 }
 
 bool operator==(const OdrCompilationLogEntry& lhs, const OdrCompilationLogEntry& rhs) {
-  return lhs.apex_version == rhs.apex_version && lhs.trigger == rhs.trigger &&
-         lhs.when == rhs.when && lhs.exit_code == rhs.exit_code;
+  return lhs.apex_version == rhs.apex_version && lhs.last_update_millis == rhs.last_update_millis &&
+         lhs.trigger == rhs.trigger && lhs.when == rhs.when && lhs.exit_code == rhs.exit_code;
 }
 
 bool operator!=(const OdrCompilationLogEntry& lhs, const OdrCompilationLogEntry& rhs) {
@@ -98,6 +101,12 @@ bool OdrCompilationLog::Read() {
     return false;
   }
 
+  std::string log_version;
+  ifs >> log_version >> std::ws;
+  if (log_version != kLogVersion) {
+    return false;
+  }
+
   while (!ifs.eof()) {
     OdrCompilationLogEntry entry;
     ifs >> entry;
@@ -117,6 +126,7 @@ bool OdrCompilationLog::Write() const {
     return false;
   }
 
+  ofs << kLogVersion << std::endl;
   for (const auto& entry : entries_) {
     ofs << entry;
     if (ofs.fail()) {
@@ -148,23 +158,29 @@ const OdrCompilationLogEntry* OdrCompilationLog::Peek(size_t index) const {
 }
 
 void OdrCompilationLog::Log(int64_t apex_version,
+                            int64_t last_update_millis,
                             OdrMetrics::Trigger trigger,
                             ExitCode compilation_result) {
   time_t now;
   time(&now);
-  Log(apex_version, trigger, now, compilation_result);
+  Log(apex_version, last_update_millis, trigger, now, compilation_result);
 }
 
 void OdrCompilationLog::Log(int64_t apex_version,
+                            int64_t last_update_millis,
                             OdrMetrics::Trigger trigger,
                             time_t when,
                             ExitCode compilation_result) {
-  entries_.push_back(OdrCompilationLogEntry{
-      apex_version, static_cast<int32_t>(trigger), when, static_cast<int32_t>(compilation_result)});
+  entries_.push_back(OdrCompilationLogEntry{apex_version,
+                                            last_update_millis,
+                                            static_cast<int32_t>(trigger),
+                                            when,
+                                            static_cast<int32_t>(compilation_result)});
   Truncate();
 }
 
 bool OdrCompilationLog::ShouldAttemptCompile(int64_t apex_version,
+                                             int64_t last_update_millis,
                                              OdrMetrics::Trigger trigger,
                                              time_t now) const {
   if (entries_.size() == 0) {
@@ -173,7 +189,12 @@ bool OdrCompilationLog::ShouldAttemptCompile(int64_t apex_version,
   }
 
   if (apex_version != entries_.back().apex_version) {
-    // There is a new ART APEX, we should use compile right away.
+    // There is a new ART APEX, we should compile right away.
+    return true;
+  }
+
+    if (last_update_millis != entries_.back().last_update_millis) {
+    // There is a samegrade ART APEX update, we should compile right away.
     return true;
   }
 
