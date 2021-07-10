@@ -1309,7 +1309,8 @@ void Runtime::InitializeApexVersions() {
       if (info == apex_infos.end() || info->second->getIsFactory()) {
         result += '/';
       } else {
-        android::base::StringAppendF(&result, "/%" PRIu64, info->second->getVersionCode());
+        // We use the mtime provided in the format as a version number.
+        android::base::StringAppendF(&result, "/%" PRIu64, info->second->getLastUpdateMillis());
       }
     }
 #endif

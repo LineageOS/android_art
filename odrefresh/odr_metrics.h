@@ -75,13 +75,23 @@ class OdrMetrics final {
   ~OdrMetrics();
 
   // Gets the ART APEX that metrics are being collected on behalf of.
-  int64_t GetApexVersion() const {
+  int64_t GetArtApexVersion() const {
     return art_apex_version_;
   }
 
   // Sets the ART APEX that metrics are being collected on behalf of.
   void SetArtApexVersion(int64_t version) {
     art_apex_version_ = version;
+  }
+
+  // Gets the ART APEX last update time in milliseconds.
+  int64_t GetArtApexLastUpdateMillis() const {
+    return art_apex_last_update_millis_;
+  }
+
+  // Sets the ART APEX last update time in milliseconds.
+  void SetArtApexLastUpdateMillis(int64_t last_update_millis) {
+    art_apex_last_update_millis_ = last_update_millis;
   }
 
   // Gets the trigger for metrics collection. The trigger is the reason why odrefresh considers
@@ -122,6 +132,7 @@ class OdrMetrics final {
   const std::string metrics_file_;
 
   int64_t art_apex_version_ = 0;
+  int64_t art_apex_last_update_millis_ = 0;
   std::optional<Trigger> trigger_ = {};  // metrics are only logged if compilation is triggered.
   Stage stage_ = Stage::kUnknown;
   Status status_ = Status::kUnknown;
