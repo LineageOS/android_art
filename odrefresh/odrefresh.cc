@@ -360,7 +360,10 @@ class OnDeviceRefresh final {
       LOG(ERROR) << "Could not update " << QuotePath(cache_info_filename_) << " : no ART Apex info";
       return {};
     }
-    return art_apex::ArtModuleInfo{info->getVersionCode(), info->getVersionName()};
+    // The lastUpdateMillis is an addition to ApexInfoList.xsd to support samegrade installs.
+    int64_t last_update_millis = info->hasLastUpdateMillis() ? info->getLastUpdateMillis() : 0;
+    return art_apex::ArtModuleInfo{
+        info->getVersionCode(), info->getVersionName(), last_update_millis};
   }
 
   bool CheckComponents(const std::vector<art_apex::Component>& expected_components,
@@ -530,8 +533,11 @@ class OnDeviceRefresh final {
       return cleanup_return(ExitCode::kCompilationRequired);
     }
 
-    // Record ART Apex version for metrics reporting.
+    // Record ART APEX version for metrics reporting.
     metrics.SetArtApexVersion(current_info->getVersionCode());
+
+    // Record ART APEX last update milliseconds (used in compilation log).
+    metrics.SetArtApexLastUpdateMillis(current_info->getLastUpdateMillis());
 
     // Check whether the current cache ART module info differs from the current ART module info.
     // Always check APEX version.
@@ -546,9 +552,21 @@ class OnDeviceRefresh final {
     }
 
     if (cached_info->getVersionName() != current_info->getVersionName()) {
-      LOG(INFO) << "ART APEX version code mismatch ("
+      LOG(INFO) << "ART APEX version name mismatch ("
                 << cached_info->getVersionName()
                 << " != " << current_info->getVersionName() << ").";
+      metrics.SetTrigger(OdrMetrics::Trigger::kApexVersionMismatch);
+      return cleanup_return(ExitCode::kCompilationRequired);
+    }
+
+    // Check lastUpdateMillis for samegrade installs. If `cached_info` is missing lastUpdateMillis
+    // then it is not current with the schema used by this binary so treat it as a samegrade
+    // update. Otherwise check whether the lastUpdateMillis changed.
+    if (!cached_info->hasLastUpdateMillis() ||
+        cached_info->getLastUpdateMillis() != current_info->getLastUpdateMillis()) {
+      LOG(INFO) << "ART APEX last update time mismatch ("
+                << cached_info->getLastUpdateMillis()
+                << " != " << current_info->getLastUpdateMillis() << ").";
       metrics.SetTrigger(OdrMetrics::Trigger::kApexVersionMismatch);
       return cleanup_return(ExitCode::kCompilationRequired);
     }
@@ -1449,11 +1467,16 @@ class OnDeviceRefresh final {
           return exit_code;
         }
         OdrCompilationLog compilation_log;
-        if (!compilation_log.ShouldAttemptCompile(metrics.GetApexVersion(), metrics.GetTrigger())) {
+        if (!compilation_log.ShouldAttemptCompile(metrics.GetArtApexVersion(),
+                                                  metrics.GetArtApexLastUpdateMillis(),
+                                                  metrics.GetTrigger())) {
           return ExitCode::kOkay;
         }
         ExitCode compile_result = odr.Compile(metrics, /*force_compile=*/false);
-        compilation_log.Log(metrics.GetApexVersion(), metrics.GetTrigger(), compile_result);
+        compilation_log.Log(metrics.GetArtApexVersion(),
+                            metrics.GetArtApexLastUpdateMillis(),
+                            metrics.GetTrigger(),
+                            compile_result);
         return compile_result;
       } else if (action == "--force-compile") {
         return odr.Compile(metrics, /*force_compile=*/true);

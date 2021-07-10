@@ -38,6 +38,8 @@
     <xs:attribute name="versionCode" type="xs:long" use="required" />
     <!-- Module versionName for the active ART APEX from `/apex/apex-info-list.xml`. -->
     <xs:attribute name="versionName" type="xs:string" use="required" />
+    <!-- Module lastUpdateMillis for the active ART APEX from `/apex/apex-info-list.xml`. -->
+    <xs:attribute name="lastUpdateMillis" type="xs:long" use="required" />
   </xs:complexType>
 
   <!-- Components of the `DEX2OATBOOTCLASSPATH`. -->
