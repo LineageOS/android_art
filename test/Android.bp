@@ -104,7 +104,7 @@ art_cc_defaults {
 
 art_cc_defaults {
     name: "art_gtest_defaults",
-    // These really are gtests, but the gtest library comes from libart-gtest.so
+    // These really are gtests, but the gtest library comes from `libartd-gtest.so`.
     gtest: false,
     defaults: [
         "art_test_defaults",
@@ -120,7 +120,7 @@ art_cc_defaults {
     shared_libs: [
         "libartd",
         "libartd-disassembler",
-        "libart-gtest",
+        "libartd-gtest",
         "libdexfiled",
         "libprofiled",
         "libartbased",
@@ -161,7 +161,7 @@ art_cc_defaults {
 }
 
 art_cc_defaults {
-    name: "libart-gtest-defaults",
+    name: "libartd-gtest-defaults",
     host_supported: true,
     defaults: [
         "art_debug_defaults",
@@ -207,7 +207,7 @@ art_cc_defaults {
 }
 
 art_cc_library {
-    name: "libart-gtest",
+    name: "libartd-gtest",
     host_supported: true,
     defaults: [
         "art_debug_defaults",
@@ -217,9 +217,9 @@ art_cc_library {
         "common/gtest_main.cc",
     ],
     whole_static_libs: [
-        "libart-compiler-gtest",
-        "libart-runtime-gtest",
-        "libartbase-art-gtest",
+        "libartd-compiler-gtest",
+        "libartd-runtime-gtest",
+        "libartbased-art-gtest",
         "libgtest_isolated",
     ],
     shared_libs: [

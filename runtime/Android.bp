@@ -427,7 +427,7 @@ libart_cc_defaults {
     ],
     // asm_support_gen.h (used by asm_support.h) is generated with cpp-define-generator
     generated_headers: ["cpp-define-generator-asm-support"],
-    // export our headers so the libart-gtest targets can use it as well.
+    // export our headers so the libart(d)-gtest targets can use it as well.
     export_generated_headers: ["cpp-define-generator-asm-support"],
 
     header_libs: [
@@ -630,15 +630,15 @@ art_cc_library {
 }
 
 art_cc_library {
-    name: "libart-runtime-gtest",
-    defaults: ["libart-gtest-defaults"],
+    name: "libartd-runtime-gtest",
+    defaults: ["libartd-gtest-defaults"],
     srcs: [
         "common_runtime_test.cc",
         "dexopt_test.cc",
     ],
     shared_libs: [
         "libartd",
-        "libartbase-art-gtest",
+        "libartbased-art-gtest",
         "libbase",
         "libbacktrace",
     ],

@@ -222,8 +222,8 @@ art_cc_library {
 }
 
 art_cc_library {
-    name: "libartbase-art-gtest",
-    defaults: ["libart-gtest-defaults"],
+    name: "libartbased-art-gtest",
+    defaults: ["libartd-gtest-defaults"],
     srcs: [
         "base/common_art_test.cc",
     ],
