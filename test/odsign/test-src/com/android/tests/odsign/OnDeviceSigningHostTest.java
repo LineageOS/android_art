@@ -228,6 +228,62 @@ public class OnDeviceSigningHostTest extends BaseHostJUnit4Test {
         verifySystemServerLoadedArtifacts();
     }
 
+    @Test
+    public void verifyGeneratedArtifactsLoadedForSamegradeUpdate() throws Exception {
+        // Install the same APEX effecting a samegrade update. The setUp method has installed it
+        // before us.
+        mInstallUtils.installApexes(APEX_FILENAME);
+        reboot();
+
+        final boolean adbEnabled = getDevice().enableAdbRoot();
+        assertTrue("ADB root failed and required to get odrefresh compilation log", adbEnabled);
+
+        // Check that odrefresh logged a compilation attempt due to samegrade ART APEX install.
+        String[] logLines = getDevice().pullFileContents(ODREFRESH_COMPILATION_LOG).split("\n");
+        assertTrue(
+                "Expected 3 lines in " + ODREFRESH_COMPILATION_LOG + ", found " + logLines.length,
+                logLines.length == 3);
+
+        // Check that the compilation log entries are reasonable, ie times move forward.
+        // The first line of the log is the log format version number.
+        String[] firstUpdateEntry = logLines[1].split(" ");
+        String[] secondUpdateEntry = logLines[2].split(" ");
+        final int LOG_ENTRY_FIELDS = 5;
+        assertTrue(
+                "Unexpected number of fields: " + firstUpdateEntry.length + " != " +
+                LOG_ENTRY_FIELDS,
+                firstUpdateEntry.length == LOG_ENTRY_FIELDS);
+        assertTrue(firstUpdateEntry.length == secondUpdateEntry.length);
+
+        final int LAST_UPDATE_MILLIS_INDEX = 1;
+        final int COMPILATION_TIME_INDEX = 3;
+        for (int i = 0; i < firstUpdateEntry.length; ++i) {
+            final long firstField = Long.parseLong(firstUpdateEntry[i]);
+            final long secondField = Long.parseLong(secondUpdateEntry[i]);
+            if (i == LAST_UPDATE_MILLIS_INDEX) {
+                // The second APEX lastUpdateMillis should be after the first.
+                assertTrue(
+                        "Last update time same or wrong relation" +
+                        firstField + " >= " + secondField,
+                        firstField < secondField);
+            } else if (i == COMPILATION_TIME_INDEX) {
+                // Second compilation time should be after the first compilation time.
+                assertTrue(
+                        "Compilation time same or wrong relation" +
+                        firstField + " >= " + secondField,
+                        firstField < secondField);
+            } else {
+                // The remaining fields should be the same, ie trigger for compilation, status, etc
+                assertTrue(
+                        "Compilation entries differ for position " + i + ": " +
+                        firstField + " != " + secondField,
+                        firstField == secondField);
+            }
+        }
+
+        verifyGeneratedArtifactsLoaded();
+    }
+
     private boolean haveCompilationLog() throws Exception {
         CommandResult result =
                 getDevice().executeShellV2Command("stat " + ODREFRESH_COMPILATION_LOG);
