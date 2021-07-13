@@ -39,10 +39,6 @@ class LoggingTest : public testing::Test {
   }
 };
 
-#ifdef NDEBUG
-#error Unexpected NDEBUG
-#endif
-
 class TestClass {
  public:
   DECLARE_RUNTIME_DEBUG_FLAG(kFlag);
@@ -51,7 +47,12 @@ DEFINE_RUNTIME_DEBUG_FLAG(TestClass, kFlag);
 
 TEST_F(LoggingTest, DECL_DEF) {
   SetRuntimeDebugFlagsEnabled(true);
-  EXPECT_TRUE(TestClass::kFlag);
+  if (kIsDebugBuild) {
+    EXPECT_TRUE(TestClass::kFlag);
+  } else {
+    // Runtime debug flags have a constant `false` value on non-debug builds.
+    EXPECT_FALSE(TestClass::kFlag);
+  }
 
   SetRuntimeDebugFlagsEnabled(false);
   EXPECT_FALSE(TestClass::kFlag);

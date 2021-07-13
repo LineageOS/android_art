@@ -81,11 +81,27 @@ cc_library_static {
     export_include_dirs: ["."],
 }
 
+art_cc_defaults {
+    name: "art_sigchain_tests_defaults",
+    srcs: ["sigchain_test.cc"],
+    shared_libs: ["libsigchain"],
+}
+
+// Version of ART gtest `art_sigchain_tests` bundled with the ART APEX on target.
+// TODO(b/192274705): Remove this module when the migration to standalone ART gtests is complete.
 art_cc_test {
     name: "art_sigchain_tests",
     defaults: [
         "art_gtest_defaults",
+        "art_sigchain_tests_defaults",
     ],
-    srcs: ["sigchain_test.cc"],
-    shared_libs: ["libsigchain"],
+}
+
+// Standalone version of ART gtest `art_sigchain_tests`, not bundled with the ART APEX on target.
+art_cc_test {
+    name: "art_standalone_sigchain_tests",
+    defaults: [
+        "art_standalone_gtest_defaults",
+        "art_sigchain_tests_defaults",
+    ],
 }

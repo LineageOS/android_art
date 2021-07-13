@@ -501,6 +501,21 @@ class OnDeviceRefresh final {
       return cleanup_return(ExitCode::kCompilationRequired);
     }
 
+    // Generate current module info for the current ART APEX.
+    const auto current_info = GenerateArtModuleInfo();
+    if (!current_info.has_value()) {
+      // This should never happen, further up-to-date checks are not possible if it does.
+      LOG(ERROR) << "Failed to generate cache provenance.";
+      metrics.SetTrigger(OdrMetrics::Trigger::kUnknown);
+      return cleanup_return(ExitCode::kCompilationRequired);
+    }
+
+    // Record ART APEX version for metrics reporting.
+    metrics.SetArtApexVersion(current_info->getVersionCode());
+
+    // Record ART APEX last update milliseconds (used in compilation log).
+    metrics.SetArtApexLastUpdateMillis(current_info->getLastUpdateMillis());
+
     if (apex_info->getIsFactory()) {
       // Remove any artifacts on /data as they are not necessary and no compilation is necessary.
       LOG(INFO) << "Factory APEX mounted.";
@@ -523,21 +538,6 @@ class OnDeviceRefresh final {
       metrics.SetTrigger(OdrMetrics::Trigger::kUnknown);
       return cleanup_return(ExitCode::kCompilationRequired);
     }
-
-    // Generate current module info for the current ART APEX.
-    const auto current_info = GenerateArtModuleInfo();
-    if (!current_info.has_value()) {
-      // This should never happen, further up-to-date checks are not possible if it does.
-      LOG(ERROR) << "Failed to generate cache provenance.";
-      metrics.SetTrigger(OdrMetrics::Trigger::kUnknown);
-      return cleanup_return(ExitCode::kCompilationRequired);
-    }
-
-    // Record ART APEX version for metrics reporting.
-    metrics.SetArtApexVersion(current_info->getVersionCode());
-
-    // Record ART APEX last update milliseconds (used in compilation log).
-    metrics.SetArtApexLastUpdateMillis(current_info->getLastUpdateMillis());
 
     // Check whether the current cache ART module info differs from the current ART module info.
     // Always check APEX version.

@@ -71,15 +71,31 @@ art_cc_binary {
     ],
 }
 
-art_cc_test {
-    name: "art_dexdump_tests",
-    defaults: [
-        "art_gtest_defaults",
-    ],
+art_cc_defaults {
+    name: "art_dexdump_tests_defaults",
     srcs: ["dexdump_test.cc"],
     target: {
         host: {
             required: ["dexdump"],
         },
     },
+}
+
+// Version of ART gtest `art_dexdump_tests` bundled with the ART APEX on target.
+// TODO(b/192274705): Remove this module when the migration to standalone ART gtests is complete.
+art_cc_test {
+    name: "art_dexdump_tests",
+    defaults: [
+        "art_gtest_defaults",
+        "art_dexdump_tests_defaults",
+    ],
+}
+
+// Standalone version of ART gtest `art_dexdump_tests`, not bundled with the ART APEX on target.
+art_cc_test {
+    name: "art_standalone_dexdump_tests",
+    defaults: [
+        "art_standalone_gtest_defaults",
+        "art_dexdump_tests_defaults",
+    ],
 }
