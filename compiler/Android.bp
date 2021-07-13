@@ -326,26 +326,47 @@ cc_defaults {
     whole_static_libs: ["libartd-compiler"],
 }
 
-art_cc_library {
-    name: "libart-compiler-gtest",
-    defaults: ["libart-gtest-defaults"],
+// Properties common to `libart-compiler-gtest` and `libartd-compiler-gtest`.
+art_cc_defaults {
+    name: "libart-compiler-gtest-common",
     srcs: [
         "common_compiler_test.cc",
     ],
     shared_libs: [
-        "libartd-compiler",
-        "libartd-disassembler",
-        "libartbase-art-gtest",
-        "libart-runtime-gtest",
         "libbase",
     ],
 }
 
-art_cc_test {
-    name: "art_compiler_tests",
+art_cc_library {
+    name: "libart-compiler-gtest",
     defaults: [
-        "art_gtest_defaults",
+        "libart-gtest-defaults",
+        "libart-compiler-gtest-common",
     ],
+    shared_libs: [
+        "libart-compiler",
+        "libart-disassembler",
+        "libartbase-art-gtest",
+        "libart-runtime-gtest",
+    ],
+}
+
+art_cc_library {
+    name: "libartd-compiler-gtest",
+    defaults: [
+        "libartd-gtest-defaults",
+        "libart-compiler-gtest-common",
+    ],
+    shared_libs: [
+        "libartd-compiler",
+        "libartd-disassembler",
+        "libartbased-art-gtest",
+        "libartd-runtime-gtest",
+    ],
+}
+
+art_cc_defaults {
+    name: "art_compiler_tests_defaults",
     data: [
         ":art-gtest-jars-ExceptionHandle",
         ":art-gtest-jars-Interfaces",
@@ -436,15 +457,8 @@ art_cc_test {
     ],
 
     shared_libs: [
-        "libprofiled",
-        "libartd-compiler",
-        "libartd-simulator-container",
-
         "libbacktrace",
         "libnativeloader",
-    ],
-    static_libs: [
-        "libvixld",
     ],
 
     target: {
@@ -454,6 +468,47 @@ art_cc_test {
             ],
         },
     },
+}
+
+// Version of ART gtest `art_compiler_tests` bundled with the ART APEX on target.
+// TODO(b/192274705): Remove this module when the migration to standalone ART gtests is complete.
+art_cc_test {
+    name: "art_compiler_tests",
+    defaults: [
+        "art_gtest_defaults",
+        "art_compiler_tests_defaults",
+    ],
+    shared_libs: [
+        "libprofiled",
+        "libartd-compiler",
+        "libartd-simulator-container",
+    ],
+    static_libs: [
+        "libvixld",
+    ],
+}
+
+// Standalone version of ART gtest `art_compiler_tests`, not bundled with the ART APEX on target.
+art_cc_test {
+    name: "art_standalone_compiler_tests",
+    defaults: [
+        "art_standalone_gtest_defaults",
+        "art_compiler_tests_defaults",
+    ],
+    shared_libs: [
+        "libprofile",
+        "libart-compiler",
+    ],
+    static_libs: [
+        // For now, link `libart-simulator-container` statically for simplicity,
+        // to save the added complexity to package it in test suites (along with
+        // other test artifacts) and install it on device during tests.
+        // TODO(b/192070541): Consider linking `libart-simulator-container`
+        // dynamically.
+        "libart-simulator-container",
+        "libvixl",
+    ],
+    test_config: "art_standalone_compiler_tests.xml",
 }
 
 art_cc_test {
