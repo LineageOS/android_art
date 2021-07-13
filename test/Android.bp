@@ -221,7 +221,10 @@ art_cc_defaults {
         "art_defaults",
     ],
 
-    test_suites: ["general-tests"],
+    test_suites: [
+        "general-tests",
+        "mts-art",
+    ],
 
     // Support multilib variants (using different suffix per sub-architecture), which is needed on
     // build targets with secondary architectures, as the MTS test suite packaging logic flattens
