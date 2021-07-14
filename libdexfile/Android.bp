@@ -447,6 +447,10 @@ art_cc_test {
             suffix: "64",
         },
     },
+
+    test_suites: [
+        "mts-art",
+    ],
 }
 
 cc_library_static {
