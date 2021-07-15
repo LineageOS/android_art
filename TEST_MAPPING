@@ -1128,6 +1128,57 @@
     },
     {
       "name": "art-run-test-963-default-range-smali[com.google.android.art.apex]"
+    },
+    {
+      "name": "art_standalone_cmdline_tests[com.google.android.art.apex]"
+    },
+    {
+      "name": "art_standalone_compiler_tests[com.google.android.art.apex]"
+    },
+    {
+      "name": "art_standalone_dex2oat_tests[com.google.android.art.apex]"
+    },
+    {
+      "name": "art_standalone_dexdump_tests[com.google.android.art.apex]"
+    },
+    {
+      "name": "art_standalone_dexlist_tests[com.google.android.art.apex]"
+    },
+    {
+      "name": "art_standalone_dexoptanalyzer_tests[com.google.android.art.apex]"
+    },
+    {
+      "name": "art_standalone_libartbase_tests[com.google.android.art.apex]"
+    },
+    {
+      "name": "art_standalone_libartpalette_tests[com.google.android.art.apex]"
+    },
+    {
+      "name": "art_standalone_libdexfile_support_tests[com.google.android.art.apex]"
+    },
+    {
+      "name": "art_standalone_libdexfile_tests[com.google.android.art.apex]"
+    },
+    {
+      "name": "art_standalone_libprofile_tests[com.google.android.art.apex]"
+    },
+    {
+      "name": "art_standalone_oatdump_tests[com.google.android.art.apex]"
+    },
+    {
+      "name": "art_standalone_odrefresh_tests[com.google.android.art.apex]"
+    },
+    {
+      "name": "art_standalone_profman_tests[com.google.android.art.apex]"
+    },
+    {
+      "name": "art_standalone_runtime_compiler_tests[com.google.android.art.apex]"
+    },
+    {
+      "name": "art_standalone_runtime_tests[com.google.android.art.apex]"
+    },
+    {
+      "name": "art_standalone_sigchain_tests[com.google.android.art.apex]"
     }
   ],
   "presubmit": [
@@ -2264,6 +2315,57 @@
     },
     {
       "name": "art-run-test-963-default-range-smali"
+    },
+    {
+      "name": "art_standalone_cmdline_tests"
+    },
+    {
+      "name": "art_standalone_compiler_tests"
+    },
+    {
+      "name": "art_standalone_dex2oat_tests"
+    },
+    {
+      "name": "art_standalone_dexdump_tests"
+    },
+    {
+      "name": "art_standalone_dexlist_tests"
+    },
+    {
+      "name": "art_standalone_dexoptanalyzer_tests"
+    },
+    {
+      "name": "art_standalone_libartbase_tests"
+    },
+    {
+      "name": "art_standalone_libartpalette_tests"
+    },
+    {
+      "name": "art_standalone_libdexfile_support_tests"
+    },
+    {
+      "name": "art_standalone_libdexfile_tests"
+    },
+    {
+      "name": "art_standalone_libprofile_tests"
+    },
+    {
+      "name": "art_standalone_oatdump_tests"
+    },
+    {
+      "name": "art_standalone_odrefresh_tests"
+    },
+    {
+      "name": "art_standalone_profman_tests"
+    },
+    {
+      "name": "art_standalone_runtime_compiler_tests"
+    },
+    {
+      "name": "art_standalone_runtime_tests"
+    },
+    {
+      "name": "art_standalone_sigchain_tests"
     }
   ]
 }
