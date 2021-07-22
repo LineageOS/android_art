@@ -261,19 +261,22 @@ public class OnDeviceSigningHostTest extends BaseHostJUnit4Test {
             final long firstField = Long.parseLong(firstUpdateEntry[i]);
             final long secondField = Long.parseLong(secondUpdateEntry[i]);
             if (i == LAST_UPDATE_MILLIS_INDEX) {
-                // The second APEX lastUpdateMillis should be after the first.
+                // The second APEX lastUpdateMillis should be after the first, but a clock
+                // adjustment might reverse the order so we can't assert this (b/194365586).
                 assertTrue(
-                        "Last update time same or wrong relation" +
-                        firstField + " >= " + secondField,
-                        firstField < secondField);
+                        "Last update times are expected to differ, but they are equal " +
+                        firstField + " == " + secondField,
+                        firstField != secondField);
             } else if (i == COMPILATION_TIME_INDEX) {
-                // Second compilation time should be after the first compilation time.
+                // The second compilation time should be after the first compilation time, but
+                // a clock adjustment might reverse the order so we can't assert this
+                // (b/194365586).
                 assertTrue(
-                        "Compilation time same or wrong relation" +
-                        firstField + " >= " + secondField,
-                        firstField < secondField);
+                        "Compilation times are expected to differ, but they are equal " +
+                        firstField + " == " + secondField,
+                        firstField != secondField);
             } else {
-                // The remaining fields should be the same, ie trigger for compilation, status, etc
+                // The remaining fields should be the same, ie trigger for compilation.
                 assertTrue(
                         "Compilation entries differ for position " + i + ": " +
                         firstField + " != " + secondField,
