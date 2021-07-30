@@ -870,6 +870,7 @@ class Generator:
         "CtsLibcoreLegacy22TestCases",
         "CtsLibcoreOjTestCases",
         "CtsLibcoreWycheproofBCTestCases",
+        "MtsLibcoreOkHttpTestCases",
     ]
     other_cts_libcore_tests_shard = self.create_mts_test_shard(
         "CTS Libcore OJ tests", other_cts_libcore_tests_shard_tests,
