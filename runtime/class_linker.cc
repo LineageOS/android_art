@@ -9814,16 +9814,22 @@ void ClassLinker::SetEntryPointsForObsoleteMethod(ArtMethod* method) const {
 }
 
 void ClassLinker::DumpForSigQuit(std::ostream& os) {
-  ScopedObjectAccess soa(Thread::Current());
-  ReaderMutexLock mu(soa.Self(), *Locks::classlinker_classes_lock_);
+  // Avoid a deadlock between a garbage collecting thread running a checkpoint,
+  // a thread holding the dex or classlinker lock and blocking on a condition variable for
+  // weak references access, and a thread blocking on the dex or classlinker lock and thus
+  // unable to run the checkpoint.
+  Thread* self = Thread::Current();
+  ScopedObjectAccess soa(self);
+  gc::ScopedGCCriticalSection gcs(self, gc::kGcCauseClassLinker, gc::kCollectorTypeClassLinker);
+  ReaderMutexLock mu(self, *Locks::classlinker_classes_lock_);
   os << "Zygote loaded classes=" << NumZygoteClasses() << " post zygote classes="
      << NumNonZygoteClasses() << "\n";
-  ReaderMutexLock mu2(soa.Self(), *Locks::dex_lock_);
+  ReaderMutexLock mu2(self, *Locks::dex_lock_);
   os << "Dumping registered class loaders\n";
   size_t class_loader_index = 0;
   for (const ClassLoaderData& class_loader : class_loaders_) {
     ObjPtr<mirror::ClassLoader> loader =
-        ObjPtr<mirror::ClassLoader>::DownCast(soa.Self()->DecodeJObject(class_loader.weak_root));
+        ObjPtr<mirror::ClassLoader>::DownCast(self->DecodeJObject(class_loader.weak_root));
     if (loader != nullptr) {
       os << "#" << class_loader_index++ << " " << loader->GetClass()->PrettyDescriptor() << ": [";
       bool saw_one_dex_file = false;
@@ -9842,7 +9848,7 @@ void ClassLinker::DumpForSigQuit(std::ostream& os) {
         size_t parent_index = 0;
         for (const ClassLoaderData& class_loader2 : class_loaders_) {
           ObjPtr<mirror::ClassLoader> loader2 = ObjPtr<mirror::ClassLoader>::DownCast(
-              soa.Self()->DecodeJObject(class_loader2.weak_root));
+              self->DecodeJObject(class_loader2.weak_root));
           if (loader2 == loader->GetParent()) {
             os << ", parent #" << parent_index;
             found_parent = true;
