@@ -50,8 +50,7 @@ cc_defaults {
     static_libs: ["libxml2"],
     target: {
         android: {
-            // Use the 32-bit version of odrefresh on devices.
-            compile_multilib: "prefer32",
+            compile_multilib: "first",
         },
         host: {
             shared_libs: [
@@ -160,11 +159,8 @@ cc_library_static {
     ],
 }
 
-art_cc_test {
-    name: "art_odrefresh_tests",
-    defaults: [
-        "art_gtest_defaults",
-    ],
+art_cc_defaults {
+    name: "art_odrefresh_tests_defaults",
     generated_sources: ["art-odrefresh-operator-srcs"],
     header_libs: ["odrefresh_headers"],
     srcs: [
@@ -180,6 +176,25 @@ art_cc_test {
         "odrefresh_test.cc",
     ],
     shared_libs: ["libbase"],
+}
+
+// Version of ART gtest `art_odrefresh_tests` bundled with the ART APEX on target.
+// TODO(b/192274705): Remove this module when the migration to standalone ART gtests is complete.
+art_cc_test {
+    name: "art_odrefresh_tests",
+    defaults: [
+        "art_gtest_defaults",
+        "art_odrefresh_tests_defaults",
+    ],
+}
+
+// Standalone version of ART gtest `art_odrefresh_tests`, not bundled with the ART APEX on target.
+art_cc_test {
+    name: "art_standalone_odrefresh_tests",
+    defaults: [
+        "art_standalone_gtest_defaults",
+        "art_odrefresh_tests_defaults",
+    ],
 }
 
 genrule {

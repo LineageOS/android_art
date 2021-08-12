@@ -122,10 +122,10 @@ art_module_sdk {
 
             java_system_modules: [
                 "art-module-public-api-stubs-system-modules",
+                "art-module-lib-api-stubs-system-modules",
                 "art-module-intra-core-api-stubs-system-modules",
-                "legacy-art-module-platform-api-stubs-system-modules",
-                "stable-art-module-platform-api-stubs-system-modules",
                 "core-current-stubs-system-modules",
+                "core-module-lib-stubs-system-modules",
                 "legacy-core-platform-api-stubs-system-modules",
                 "stable-core-platform-api-stubs-system-modules",
             ],

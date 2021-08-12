@@ -17,6 +17,7 @@
 #include "utils.h"
 #include "stl_util.h"
 
+#include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
 namespace art {
@@ -113,7 +114,10 @@ TEST_F(UtilsTest, Split) {
 }
 
 TEST_F(UtilsTest, GetProcessStatus) {
-  EXPECT_EQ("art_libartbase_", GetProcessStatus("Name"));
+  EXPECT_THAT(GetProcessStatus("Name"),
+              testing::AnyOf(
+                  "art_libartbase_",    // Test binary name: `art_libartbase_test`.
+                  "art_standalone_"));  // Test binary name: `art_standalone_libartbase_test`.
   EXPECT_EQ("R (running)", GetProcessStatus("State"));
   EXPECT_EQ("<unknown>", GetProcessStatus("tate"));
   EXPECT_EQ("<unknown>", GetProcessStatus("e"));

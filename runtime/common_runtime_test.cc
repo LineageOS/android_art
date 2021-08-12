@@ -132,8 +132,10 @@ void CommonRuntimeTestImpl::SetUp() {
 
   FinalizeSetup();
 
-  // Ensure that we're really running with debug checks enabled.
-  CHECK(gSlowDebugTestFlag);
+  if (kIsDebugBuild) {
+    // Ensure that we're really running with debug checks enabled.
+    CHECK(gSlowDebugTestFlag);
+  }
 }
 
 void CommonRuntimeTestImpl::FinalizeSetup() {

@@ -72,7 +72,7 @@ const OatFile* OatFileManager::RegisterOatFile(std::unique_ptr<const OatFile> oa
 
   WriterMutexLock mu(Thread::Current(), *Locks::oat_file_manager_lock_);
   CHECK(!only_use_system_oat_files_ ||
-        LocationIsTrusted(oat_file->GetLocation()) ||
+        LocationIsTrusted(oat_file->GetLocation(), !Runtime::Current()->DenyArtApexDataFiles()) ||
         !oat_file->IsExecutable())
       << "Registering a non /system oat file: " << oat_file->GetLocation();
   DCHECK(oat_file != nullptr);
@@ -139,26 +139,6 @@ std::vector<const OatFile*> OatFileManager::GetBootOatFiles() const {
     oat_files.push_back(image_space->GetOatFile());
   }
   return oat_files;
-}
-
-bool OatFileManager::GetPrimaryOatFileInfo(std::string* compilation_reason,
-                                           CompilerFilter::Filter* compiler_filter) const {
-  ReaderMutexLock mu(Thread::Current(), *Locks::oat_file_manager_lock_);
-  std::vector<const OatFile*> boot_oat_files = GetBootOatFiles();
-  if (!boot_oat_files.empty()) {
-    for (const std::unique_ptr<const OatFile>& oat_file : oat_files_) {
-      if (std::find(boot_oat_files.begin(), boot_oat_files.end(), oat_file.get()) ==
-          boot_oat_files.end()) {
-        const char* reason = oat_file->GetCompilationReason();
-        if (reason != nullptr) {
-          *compilation_reason = reason;
-        }
-        *compiler_filter = oat_file->GetCompilerFilter();
-        return true;
-      }
-    }
-  }
-  return false;
 }
 
 OatFileManager::OatFileManager()
@@ -230,6 +210,12 @@ std::vector<std::unique_ptr<const DexFile>> OatFileManager::OpenDexFilesFromOat(
         &compilation_filter,
         &compilation_reason,
         &odex_status);
+
+    Runtime::Current()->GetAppInfo()->RegisterOdexStatus(
+        dex_location,
+        compilation_filter,
+        compilation_reason,
+        odex_status);
 
     ScopedTrace odex_loading(StringPrintf(
         "location=%s status=%s filter=%s reason=%s",
@@ -419,6 +405,10 @@ std::vector<std::unique_ptr<const DexFile>> OatFileManager::OpenDexFilesFromOat(
   if (Runtime::Current()->GetJit() != nullptr) {
     Runtime::Current()->GetJit()->RegisterDexFiles(dex_files, class_loader);
   }
+
+  // Now that we loaded the dex/odex files, notify the runtime.
+  // Note that we do this everytime we load dex files.
+  Runtime::Current()->NotifyDexFileLoaded();
 
   return dex_files;
 }
@@ -766,6 +756,11 @@ void OatFileManager::RunBackgroundVerification(const std::vector<const DexFile*>
     return;
   }
 
+  if (LocationIsOnArtApexData(odex_filename) && Runtime::Current()->DenyArtApexDataFiles()) {
+    // Ignore vdex file associated with this odex file as the odex file is not trustworthy.
+    return;
+  }
+
   {
     WriterMutexLock mu(self, *Locks::oat_file_manager_lock_);
     if (verification_thread_pool_ == nullptr) {
@@ -810,7 +805,11 @@ void OatFileManager::SetOnlyUseTrustedOatFiles() {
 
   for (const std::unique_ptr<const OatFile>& oat_file : oat_files_) {
     if (boot_set.find(oat_file.get()) == boot_set.end()) {
-      if (!LocationIsTrusted(oat_file->GetLocation())) {
+      // This method is called during runtime initialization before we can call
+      // Runtime::Current()->DenyArtApexDataFiles(). Since we don't want to fail hard if
+      // the ART APEX data files are untrusted, just treat them as trusted for the check here.
+      const bool trust_art_apex_data_files = true;
+      if (!LocationIsTrusted(oat_file->GetLocation(), trust_art_apex_data_files)) {
         // When the file is not in a trusted location, we check whether the oat file has any
         // AOT or DEX code. It is a fatal error if it has.
         if (CompilerFilter::IsAotCompilationEnabled(oat_file->GetCompilerFilter()) ||

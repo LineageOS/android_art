@@ -60,6 +60,12 @@ class Iteration {
   uint64_t GetFreedRevokeBytes() const {
     return freed_bytes_revoke_;
   }
+  uint64_t GetScannedBytes() const {
+    return bytes_scanned_;
+  }
+  void SetScannedBytes(uint64_t bytes) {
+      bytes_scanned_ = bytes;
+  }
   void SetFreedRevoke(uint64_t freed) {
     freed_bytes_revoke_ = freed;
   }
@@ -84,6 +90,7 @@ class Iteration {
   GcCause gc_cause_;
   bool clear_soft_references_;
   uint64_t duration_ns_;
+  uint64_t bytes_scanned_;
   TimingLogger timings_;
   ObjectBytePair freed_;
   ObjectBytePair freed_los_;

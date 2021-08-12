@@ -35,8 +35,7 @@ cc_defaults {
 
     target: {
         android: {
-            // Use the 32-bit version of profman on devices.
-            compile_multilib: "prefer32",
+            compile_multilib: "first",
             shared_libs: [
                 "libbase",
             ],
@@ -162,21 +161,46 @@ art_cc_binary {
     },
 }
 
-art_cc_test {
-    name: "art_profman_tests",
-    defaults: [
-        "art_gtest_defaults",
-    ],
-    shared_libs: [
-        "libprofiled",
-    ],
+art_cc_defaults {
+    name: "art_profman_tests_defaults",
     data: [
         ":art-gtest-jars-ProfileTestMultiDex",
     ],
     srcs: ["profile_assistant_test.cc"],
+}
+
+// Version of ART gtest `art_profman_tests` bundled with the ART APEX on target.
+// TODO(b/192274705): Remove this module when the migration to standalone ART gtests is complete.
+art_cc_test {
+    name: "art_profman_tests",
+    defaults: [
+        "art_gtest_defaults",
+        "art_profman_tests_defaults",
+    ],
+    shared_libs: [
+        "libprofiled",
+    ],
     target: {
         host: {
             required: ["profmand"],
         },
     },
+}
+
+// Standalone version of ART gtest `art_profman_tests`, not bundled with the ART APEX on target.
+art_cc_test {
+    name: "art_standalone_profman_tests",
+    defaults: [
+        "art_standalone_gtest_defaults",
+        "art_profman_tests_defaults",
+    ],
+    shared_libs: [
+        "libprofile",
+    ],
+    target: {
+        host: {
+            required: ["profman"],
+        },
+    },
+    test_config_template: "art_standalone_profman_tests.xml",
 }

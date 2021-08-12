@@ -249,17 +249,10 @@ art_cc_library {
         // stubs, and libartd depends on this.
         "com.android.art",
     ],
-    stubs: {
-        symbol_file: "libdexfile.map.txt",
-        versions: ["1"],
-    },
 }
 
-art_cc_test {
-    name: "art_libdexfile_tests",
-    defaults: [
-        "art_gtest_defaults",
-    ],
+art_cc_defaults {
+    name: "art_libdexfile_tests_defaults",
     srcs: [
         "dex/art_dex_file_loader_test.cc",
         "dex/class_accessor_test.cc",
@@ -288,6 +281,26 @@ art_cc_test {
         "libbacktrace",
         "libziparchive",
     ],
+}
+
+// Version of ART gtest `art_libdexfile_tests` bundled with the ART APEX on target.
+// TODO(b/192274705): Remove this module when the migration to standalone ART gtests is complete.
+art_cc_test {
+    name: "art_libdexfile_tests",
+    defaults: [
+        "art_gtest_defaults",
+        "art_libdexfile_tests_defaults",
+    ],
+}
+
+// Standalone version of ART gtest `art_libdexfile_tests`, not bundled with the ART APEX on target.
+art_cc_test {
+    name: "art_standalone_libdexfile_tests",
+    defaults: [
+        "art_standalone_gtest_defaults",
+        "art_libdexfile_tests_defaults",
+    ],
+    test_config: "art_standalone_libdexfile_tests.xml",
 }
 
 cc_library_headers {
@@ -382,13 +395,11 @@ art_cc_library_static {
     min_sdk_version: "S",
 }
 
-art_cc_test {
-    name: "art_libdexfile_support_tests",
+art_cc_defaults {
+    name: "art_libdexfile_support_tests_defaults",
     defaults: [
         "art_module_source_build_defaults",
-        "art_test_defaults",
     ],
-    host_supported: true,
     test_suites: ["general-tests"],
     srcs: [
         "external/dex_file_supp_test.cc",
@@ -401,6 +412,44 @@ art_cc_test {
     ],
     static_libs: [
         "libdexfile_support",
+    ],
+}
+
+// Version of ART gtest `art_libdexfile_support_tests` bundled with the ART APEX on target.
+// TODO(b/192274705): Remove this module when the migration to standalone ART gtests is complete.
+art_cc_test {
+    name: "art_libdexfile_support_tests",
+    host_supported: true,
+    defaults: [
+        "art_test_defaults",
+        "art_libdexfile_support_tests_defaults",
+    ],
+}
+
+// Standalone version of ART gtest `art_libdexfile_support_tests`, not bundled with the ART APEX on
+// target.
+art_cc_test {
+    name: "art_standalone_libdexfile_support_tests",
+    defaults: [
+        "art_standalone_test_defaults",
+        "art_libdexfile_support_tests_defaults",
+    ],
+
+    // Support multilib variants (using different suffix per sub-architecture), which is needed on
+    // build targets with secondary architectures, as the MTS test suite packaging logic flattens
+    // all test artifacts into a single `testcases` directory.
+    compile_multilib: "both",
+    multilib: {
+        lib32: {
+            suffix: "32",
+        },
+        lib64: {
+            suffix: "64",
+        },
+    },
+
+    test_suites: [
+        "mts-art",
     ],
 }
 

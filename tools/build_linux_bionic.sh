@@ -31,7 +31,10 @@ if [ ! -d art ]; then
   exit 1
 fi
 
-soong_args=""
+# TODO(b/194433871): Set MODULE_BUILD_FROM_SOURCE to disable prebuilt modules,
+# which Soong otherwise can create duplicate install rules for in --skip-make
+# mode.
+soong_args="MODULE_BUILD_FROM_SOURCE=true"
 
 # Switch the build system to unbundled mode in the reduced manifest branch.
 if [ ! -d frameworks/base ]; then

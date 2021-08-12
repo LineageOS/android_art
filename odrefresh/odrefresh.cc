@@ -360,7 +360,10 @@ class OnDeviceRefresh final {
       LOG(ERROR) << "Could not update " << QuotePath(cache_info_filename_) << " : no ART Apex info";
       return {};
     }
-    return art_apex::ArtModuleInfo{info->getVersionCode(), info->getVersionName()};
+    // The lastUpdateMillis is an addition to ApexInfoList.xsd to support samegrade installs.
+    int64_t last_update_millis = info->hasLastUpdateMillis() ? info->getLastUpdateMillis() : 0;
+    return art_apex::ArtModuleInfo{
+        info->getVersionCode(), info->getVersionName(), last_update_millis};
   }
 
   bool CheckComponents(const std::vector<art_apex::Component>& expected_components,
@@ -498,6 +501,21 @@ class OnDeviceRefresh final {
       return cleanup_return(ExitCode::kCompilationRequired);
     }
 
+    // Generate current module info for the current ART APEX.
+    const auto current_info = GenerateArtModuleInfo();
+    if (!current_info.has_value()) {
+      // This should never happen, further up-to-date checks are not possible if it does.
+      LOG(ERROR) << "Failed to generate cache provenance.";
+      metrics.SetTrigger(OdrMetrics::Trigger::kUnknown);
+      return cleanup_return(ExitCode::kCompilationRequired);
+    }
+
+    // Record ART APEX version for metrics reporting.
+    metrics.SetArtApexVersion(current_info->getVersionCode());
+
+    // Record ART APEX last update milliseconds (used in compilation log).
+    metrics.SetArtApexLastUpdateMillis(current_info->getLastUpdateMillis());
+
     if (apex_info->getIsFactory()) {
       // Remove any artifacts on /data as they are not necessary and no compilation is necessary.
       LOG(INFO) << "Factory APEX mounted.";
@@ -521,18 +539,6 @@ class OnDeviceRefresh final {
       return cleanup_return(ExitCode::kCompilationRequired);
     }
 
-    // Generate current module info for the current ART APEX.
-    const auto current_info = GenerateArtModuleInfo();
-    if (!current_info.has_value()) {
-      // This should never happen, further up-to-date checks are not possible if it does.
-      LOG(ERROR) << "Failed to generate cache provenance.";
-      metrics.SetTrigger(OdrMetrics::Trigger::kUnknown);
-      return cleanup_return(ExitCode::kCompilationRequired);
-    }
-
-    // Record ART Apex version for metrics reporting.
-    metrics.SetArtApexVersion(current_info->getVersionCode());
-
     // Check whether the current cache ART module info differs from the current ART module info.
     // Always check APEX version.
     const auto cached_info = cache_info->getFirstArtModuleInfo();
@@ -546,9 +552,21 @@ class OnDeviceRefresh final {
     }
 
     if (cached_info->getVersionName() != current_info->getVersionName()) {
-      LOG(INFO) << "ART APEX version code mismatch ("
+      LOG(INFO) << "ART APEX version name mismatch ("
                 << cached_info->getVersionName()
                 << " != " << current_info->getVersionName() << ").";
+      metrics.SetTrigger(OdrMetrics::Trigger::kApexVersionMismatch);
+      return cleanup_return(ExitCode::kCompilationRequired);
+    }
+
+    // Check lastUpdateMillis for samegrade installs. If `cached_info` is missing lastUpdateMillis
+    // then it is not current with the schema used by this binary so treat it as a samegrade
+    // update. Otherwise check whether the lastUpdateMillis changed.
+    if (!cached_info->hasLastUpdateMillis() ||
+        cached_info->getLastUpdateMillis() != current_info->getLastUpdateMillis()) {
+      LOG(INFO) << "ART APEX last update time mismatch ("
+                << cached_info->getLastUpdateMillis()
+                << " != " << current_info->getLastUpdateMillis() << ").";
       metrics.SetTrigger(OdrMetrics::Trigger::kApexVersionMismatch);
       return cleanup_return(ExitCode::kCompilationRequired);
     }
@@ -1121,7 +1139,13 @@ class OnDeviceRefresh final {
       AddDex2OatInstructionSet(&args, isa);
       const std::string jar_name(android::base::Basename(jar));
       const std::string profile = Concatenate({GetAndroidRoot(), "/framework/", jar_name, ".prof"});
-      AddDex2OatProfileAndCompilerFilter(&args, profile);
+      std::string compiler_filter =
+          android::base::GetProperty("dalvik.vm.systemservercompilerfilter", "speed");
+      if (compiler_filter == "speed-profile") {
+        AddDex2OatProfileAndCompilerFilter(&args, profile);
+      } else {
+        args.emplace_back("--compiler-filter=" + compiler_filter);
+      }
 
       const std::string image_location = GetSystemServerImagePath(/*on_system=*/false, jar);
       const std::string install_location = android::base::Dirname(image_location);
@@ -1449,11 +1473,16 @@ class OnDeviceRefresh final {
           return exit_code;
         }
         OdrCompilationLog compilation_log;
-        if (!compilation_log.ShouldAttemptCompile(metrics.GetApexVersion(), metrics.GetTrigger())) {
+        if (!compilation_log.ShouldAttemptCompile(metrics.GetArtApexVersion(),
+                                                  metrics.GetArtApexLastUpdateMillis(),
+                                                  metrics.GetTrigger())) {
           return ExitCode::kOkay;
         }
         ExitCode compile_result = odr.Compile(metrics, /*force_compile=*/false);
-        compilation_log.Log(metrics.GetApexVersion(), metrics.GetTrigger(), compile_result);
+        compilation_log.Log(metrics.GetArtApexVersion(),
+                            metrics.GetArtApexLastUpdateMillis(),
+                            metrics.GetTrigger(),
+                            compile_result);
         return compile_result;
       } else if (action == "--force-compile") {
         return odr.Compile(metrics, /*force_compile=*/true);

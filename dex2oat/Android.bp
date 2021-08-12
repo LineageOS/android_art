@@ -420,6 +420,26 @@ art_cc_library_static {
     shared_libs: [
         "libart-compiler-gtest",
         "libart-runtime-gtest",
+        "libart-compiler",
+        "libart-disassembler",
+        "libbase",
+        "liblz4", // libart-dex2oat dependency; must be repeated here since it's a static lib.
+        "liblog",
+    ],
+    static_libs: [
+        "libart-dex2oat",
+    ],
+}
+
+art_cc_library_static {
+    name: "libartd-dex2oat-gtest",
+    defaults: ["libartd-gtest-defaults"],
+    srcs: [
+        "common_compiler_driver_test.cc",
+    ],
+    shared_libs: [
+        "libartd-compiler-gtest",
+        "libartd-runtime-gtest",
         "libartd-compiler",
         "libartd-disassembler",
         "libbase",
@@ -431,11 +451,8 @@ art_cc_library_static {
     ],
 }
 
-art_cc_test {
-    name: "art_dex2oat_tests",
-    defaults: [
-        "art_gtest_defaults",
-    ],
+art_cc_defaults {
+    name: "art_dex2oat_tests_defaults",
     data: [
         ":art-gtest-jars-AbstractMethod",
         ":art-gtest-jars-DefaultMethods",
@@ -506,20 +523,54 @@ art_cc_test {
     },
 
     shared_libs: [
-        "libartbased",
-        "libartd-compiler",
-        "libartd-dexlayout",
         "libartpalette",
         "libbase",
         "libcrypto",
-        "liblz4", // libartd-dex2oat dependency; must be repeated here since it's a static lib.
+        "liblz4", // libart(d)-dex2oat dependency; must be repeated here since it's a static lib.
         "liblog",
-        "libprofiled",
         "libsigchain",
         "libziparchive",
     ],
+}
+
+// Version of ART gtest `art_dex2oat_tests` bundled with the ART APEX on target.
+// TODO(b/192274705): Remove this module when the migration to standalone ART gtests is complete.
+art_cc_test {
+    name: "art_dex2oat_tests",
+    defaults: [
+        "art_gtest_defaults",
+        "art_dex2oat_tests_defaults",
+    ],
+    shared_libs: [
+        "libartbased",
+        "libartd-compiler",
+        "libartd-dexlayout",
+        "libprofiled",
+    ],
+    static_libs: [
+        "libartd-dex2oat-gtest",
+        "libartd-dex2oat",
+        "libvixld",
+    ],
+}
+
+// Standalone version of ART gtest `art_dex2oat_tests`, not bundled with the ART APEX on target.
+art_cc_test {
+    name: "art_standalone_dex2oat_tests",
+    defaults: [
+        "art_standalone_gtest_defaults",
+        "art_dex2oat_tests_defaults",
+    ],
+    shared_libs: [
+        "libartbase",
+        "libart-compiler",
+        "libart-dexlayout",
+        "libprofile",
+    ],
     static_libs: [
         "libart-dex2oat-gtest",
-        "libartd-dex2oat",
+        "libart-dex2oat",
+        "libvixl",
     ],
+    test_config: "art_standalone_dex2oat_tests.xml",
 }

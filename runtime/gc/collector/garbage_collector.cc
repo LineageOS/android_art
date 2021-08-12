@@ -51,6 +51,7 @@ void Iteration::Reset(GcCause gc_cause, bool clear_soft_references) {
   timings_.Reset();
   pause_times_.clear();
   duration_ns_ = 0;
+  bytes_scanned_ = 0;
   clear_soft_references_ = clear_soft_references;
   gc_cause_ = gc_cause;
   freed_ = ObjectBytePair();
@@ -72,9 +73,13 @@ GarbageCollector::GarbageCollector(Heap* heap, const std::string& name)
       gc_time_histogram_(nullptr),
       metrics_gc_count_(nullptr),
       gc_throughput_histogram_(nullptr),
+      gc_tracing_throughput_hist_(nullptr),
+      gc_throughput_avg_(nullptr),
+      gc_tracing_throughput_avg_(nullptr),
       cumulative_timings_(name),
       pause_histogram_lock_("pause histogram lock", kDefaultMutexLevel, true),
-      is_transaction_active_(false) {
+      is_transaction_active_(false),
+      are_metrics_initialized_(false) {
   ResetCumulativeStatistics();
 }
 
@@ -88,6 +93,7 @@ void GarbageCollector::ResetCumulativeStatistics() {
   total_time_ns_ = 0u;
   total_freed_objects_ = 0u;
   total_freed_bytes_ = 0;
+  total_scanned_bytes_ = 0;
   rss_histogram_.Reset();
   freed_bytes_histogram_.Reset();
   MutexLock mu(Thread::Current(), pause_histogram_lock_);
@@ -142,10 +148,6 @@ uint64_t GarbageCollector::ExtractRssFromMincore(
   }
   rss *= kPageSize;
   rss_histogram_.AddValue(rss / KB);
-  // Add up all the GC meta-data in bytes. It doesn't make sense in itself as it
-  // cannot be accumulated over GCs. So must be divided by gc-count while
-  // reporting.
-  GetMetrics()->TotalGcMetaDataSize()->Add(rss);
 #endif
   return rss;
 }
@@ -169,6 +171,7 @@ void GarbageCollector::Run(GcCause gc_cause, bool clear_soft_references) {
   // Update cumulative statistics with how many bytes the GC iteration freed.
   total_freed_objects_ += current_iteration->GetFreedObjects() +
       current_iteration->GetFreedLargeObjects();
+  total_scanned_bytes_ += current_iteration->GetScannedBytes();
   int64_t freed_bytes = current_iteration->GetFreedBytes() +
       current_iteration->GetFreedLargeObjectBytes();
   total_freed_bytes_ += freed_bytes;
@@ -177,18 +180,15 @@ void GarbageCollector::Run(GcCause gc_cause, bool clear_soft_references) {
   uint64_t end_time = NanoTime();
   uint64_t thread_cpu_end_time = ThreadCpuNanoTime();
   total_thread_cpu_time_ns_ += thread_cpu_end_time - thread_cpu_start_time;
-  current_iteration->SetDurationNs(end_time - start_time);
+  uint64_t duration_ns = end_time - start_time;
+  current_iteration->SetDurationNs(duration_ns);
   if (Locks::mutator_lock_->IsExclusiveHeld(self)) {
     // The entire GC was paused, clear the fake pauses which might be in the pause times and add
     // the whole GC duration.
     current_iteration->pause_times_.clear();
-    RegisterPause(current_iteration->GetDurationNs());
+    RegisterPause(duration_ns);
   }
-  total_time_ns_ += current_iteration->GetDurationNs();
-  if (gc_time_histogram_ != nullptr) {
-    // Report GC time in milliseconds.
-    gc_time_histogram_->Add(NsToMs(current_iteration->GetDurationNs()));
-  }
+  total_time_ns_ += duration_ns;
   uint64_t total_pause_time = 0;
   for (uint64_t pause_time : current_iteration->GetPauseTimes()) {
     MutexLock mu(self, pause_histogram_lock_);
@@ -197,13 +197,25 @@ void GarbageCollector::Run(GcCause gc_cause, bool clear_soft_references) {
   }
   metrics::ArtMetrics* metrics = runtime->GetMetrics();
   // Report STW pause time in microseconds.
-  metrics->MutatorPauseTimeDuringGC()->Add(total_pause_time / 1'000);
-  if (metrics_gc_count_ != nullptr) {
+  metrics->WorldStopTimeDuringGCAvg()->Add(total_pause_time / 1'000);
+  // Report total collection time of all GCs put together.
+  metrics->TotalGcCollectionTime()->Add(NsToMs(duration_ns));
+  if (are_metrics_initialized_) {
     metrics_gc_count_->Add(1);
-  }
-  if (gc_throughput_histogram_ != nullptr) {
+    // Report GC time in milliseconds.
+    gc_time_histogram_->Add(NsToMs(duration_ns));
+    // Throughput in bytes/s. Add 1us to prevent possible division by 0.
+    uint64_t throughput = (current_iteration->GetScannedBytes() * 1'000'000)
+            / (NsToUs(duration_ns) + 1);
+    // Report in MB/s.
+    throughput /= MB;
+    gc_tracing_throughput_hist_->Add(throughput);
+    gc_tracing_throughput_avg_->Add(throughput);
+
     // Report GC throughput in MB/s.
-    gc_throughput_histogram_->Add(current_iteration->GetEstimatedThroughput() / MB);
+    throughput = current_iteration->GetEstimatedThroughput() / MB;
+    gc_throughput_histogram_->Add(throughput);
+    gc_throughput_avg_->Add(throughput);
   }
   is_transaction_active_ = false;
 }
@@ -247,6 +259,7 @@ void GarbageCollector::ResetMeasurements() {
   total_time_ns_ = 0u;
   total_freed_objects_ = 0u;
   total_freed_bytes_ = 0;
+  total_scanned_bytes_ = 0u;
 }
 
 GarbageCollector::ScopedPause::ScopedPause(GarbageCollector* collector, bool with_reporting)
@@ -306,6 +319,7 @@ void GarbageCollector::DumpPerformanceInfo(std::ostream& os) {
   const double seconds = NsToMs(total_ns) / 1000.0;
   const uint64_t freed_bytes = GetTotalFreedBytes();
   const uint64_t freed_objects = GetTotalFreedObjects();
+  const uint64_t scanned_bytes = GetTotalScannedBytes();
   {
     MutexLock mu(Thread::Current(), pause_histogram_lock_);
     if (pause_histogram_.SampleSize() > 0) {
@@ -343,7 +357,11 @@ void GarbageCollector::DumpPerformanceInfo(std::ostream& os) {
      << PrettySize(freed_bytes / seconds) << "/s"
      << "  per cpu-time: "
      << static_cast<uint64_t>(freed_bytes / cpu_seconds) << "/s / "
-     << PrettySize(freed_bytes / cpu_seconds) << "/s\n";
+     << PrettySize(freed_bytes / cpu_seconds) << "/s\n"
+     << GetName() << " tracing throughput: "
+     << PrettySize(scanned_bytes / seconds) << "/s "
+     << " per cpu-time: "
+     << PrettySize(scanned_bytes / cpu_seconds) << "/s\n";
 }
 
 }  // namespace collector

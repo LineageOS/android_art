@@ -462,6 +462,34 @@ presubmit_tests_percentage = 100
 # This value has to be a number between 0 and 100.
 mainline_presubmit_tests_percentage = 100
 
+# ART gtests that do not need root access to the device.
+art_gtest_user_module_names = [
+    "art_standalone_cmdline_tests",
+    "art_standalone_compiler_tests",
+    "art_standalone_dex2oat_tests",
+    "art_standalone_dexdump_tests",
+    "art_standalone_dexlist_tests",
+    "art_standalone_libartbase_tests",
+    "art_standalone_libartpalette_tests",
+    "art_standalone_libdexfile_support_tests",
+    "art_standalone_libdexfile_tests",
+    "art_standalone_libprofile_tests",
+    "art_standalone_oatdump_tests",
+    "art_standalone_odrefresh_tests",
+    "art_standalone_runtime_compiler_tests",
+    "art_standalone_runtime_tests",
+    "art_standalone_sigchain_tests",
+]
+
+# ART gtests that need root access to the device.
+art_gtest_eng_only_module_names = [
+    "art_standalone_dexoptanalyzer_tests",
+    "art_standalone_profman_tests",
+]
+
+# All supported ART gtests.
+art_gtest_module_names = sorted(art_gtest_user_module_names + art_gtest_eng_only_module_names)
+
 
 # Is `run_test` a Checker test (i.e. a test containing Checker
 # assertions)?
@@ -608,10 +636,12 @@ class Generator:
     run_test_module_names = [ART_RUN_TEST_MODULE_NAME_PREFIX + t for t in art_run_tests]
 
     # Mainline presubmits.
-    mainline_presubmit_run_tests = [t + "[com.google.android.art.apex]"
-                                    for t
-                                    in run_test_module_names[0:num_mainline_presubmit_run_tests]]
-    mainline_presubmit_tests_dict = [{"name": t} for t in mainline_presubmit_run_tests]
+    mainline_presubmit_run_tests = run_test_module_names[0:num_mainline_presubmit_run_tests]
+    mainline_presubmit_tests = mainline_presubmit_run_tests + art_gtest_module_names
+    mainline_presubmit_tests_with_apex = [t + "[com.google.android.art.apex]"
+                                          for t
+                                          in mainline_presubmit_tests]
+    mainline_presubmit_tests_dict = [{"name": t} for t in mainline_presubmit_tests_with_apex]
 
     # Presubmits.
     other_presubmit_tests = [
@@ -619,7 +649,7 @@ class Generator:
         "BootImageProfileTest",
     ]
     presubmit_run_tests = run_test_module_names[0:num_presubmit_run_tests]
-    presubmit_tests = other_presubmit_tests + presubmit_run_tests
+    presubmit_tests = other_presubmit_tests + presubmit_run_tests + art_gtest_module_names
     presubmit_tests_dict = [{"name": t} for t in presubmit_tests]
 
     # Postsubmits.
@@ -808,14 +838,22 @@ class Generator:
 
     mts_test_shards = []
 
-    # ART run-test shard(s).
+    # ART test (gtest & run-test) shard(s).
+    # TODO: Also handle the case of gtests requiring root access to the device
+    # (`art_gtest_eng_only_module_names`).
     art_run_test_module_names = [ART_RUN_TEST_MODULE_NAME_PREFIX + t for t in art_run_tests]
     art_run_test_shards = split_list(art_run_test_module_names, NUM_MTS_ART_RUN_TEST_SHARDS)
     for i in range(len(art_run_test_shards)):
-      art_run_test_shard = self.create_mts_test_shard(
-          "ART run-tests", art_run_test_shards[i], i, 2020,
+      art_tests_shard_i_tests = art_run_test_shards[i]
+      # Append ART gtests to the last ART run-test shard for now.
+      # If needed, consider moving them to their own shard to increase
+      # the parallelization of code coverage runs.
+      if i + 1 == len(art_run_test_shards):
+        art_tests_shard_i_tests.extend(art_gtest_user_module_names)
+      art_tests_shard_i = self.create_mts_test_shard(
+          "ART run-tests", art_tests_shard_i_tests, i, 2020,
           ["TODO(rpl): Find a way to express this list in a more concise fashion."])
-      mts_test_shards.append(art_run_test_shard)
+      mts_test_shards.append(art_tests_shard_i)
 
     # CTS Libcore non-OJ tests (`CtsLibcoreTestCases`) shard.
     cts_libcore_tests_shard_num = len(mts_test_shards)
@@ -826,8 +864,13 @@ class Generator:
     # Other CTS Libcore tests shard.
     other_cts_libcore_tests_shard_num = len(mts_test_shards)
     other_cts_libcore_tests_shard_tests = [
+        "CtsLibcoreApiEvolutionTestCases",
+        "CtsLibcoreFileIOTestCases",
+        "CtsLibcoreJsr166TestCases",
+        "CtsLibcoreLegacy22TestCases",
         "CtsLibcoreOjTestCases",
-        "CtsLibcoreJsr166TestCases"
+        "CtsLibcoreWycheproofBCTestCases",
+        "MtsLibcoreOkHttpTestCases",
     ]
     other_cts_libcore_tests_shard = self.create_mts_test_shard(
         "CTS Libcore OJ tests", other_cts_libcore_tests_shard_tests,
@@ -897,13 +940,16 @@ class Generator:
 
     print(f"Generated TEST_MAPPING entries for {len(expected_succeeding_tests)} ART run-tests out"
           f" of {len(run_tests)} ({expected_succeeding_tests_percentage}%):")
-    for (num_tests, tests_percentage, test_group_name) in [
-        (num_mainline_presubmit_run_tests, mainline_presubmit_tests_percentage,
+    for (num_tests, test_kind, tests_percentage, test_group_name) in [
+        (num_mainline_presubmit_run_tests, "ART run-tests", mainline_presubmit_tests_percentage,
          "mainline-presubmit"),
-        (num_presubmit_run_tests, presubmit_tests_percentage, "presubmit"),
-        (num_postsubmit_tests, postsubmit_tests_percentage, "postsubmit"),
+        (len(art_gtest_module_names), "ART gtests", 100, "mainline-presubmit"),
+        (num_presubmit_run_tests, "ART run-tests", presubmit_tests_percentage, "presubmit"),
+        (len(art_gtest_module_names), "ART gtests", 100, "presubmit"),
+        (num_postsubmit_tests, "ART run-tests", postsubmit_tests_percentage, "postsubmit"),
     ]:
-      print(f"  {num_tests} tests ({tests_percentage}%) in `{test_group_name}` test group.")
+      print(
+          f"  {num_tests:3d} {test_kind} ({tests_percentage}%) in `{test_group_name}` test group.")
 
     # Regenerate ART MTS definition (optional).
     # -----------------------------------------

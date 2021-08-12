@@ -16,6 +16,7 @@
 
 #include "statsd.h"
 
+#include "arch/instruction_set.h"
 #include "base/compiler_filter.h"
 #include "base/metrics/metrics.h"
 #include "statslog_art.h"
@@ -31,6 +32,7 @@ namespace {
 // EncodeDatumId returns a std::optional that provides a enum value from atoms.proto if the datum is
 // one that we support logging to statsd. The list of datums that ART collects is a superset of what
 // we report to statsd. Therefore, we only have mappings for the DatumIds that statsd recognizes.
+// Also it must be noted that histograms are not handled yet by statsd yet.
 //
 // Other code can use whether the result of this function has a value to decide whether to report
 // the atom to statsd.
@@ -42,18 +44,18 @@ constexpr std::optional<int32_t> EncodeDatumId(DatumId datum_id) {
     case DatumId::kClassVerificationTotalTime:
       return std::make_optional(
           statsd::ART_DATUM_REPORTED__KIND__ART_DATUM_CLASS_VERIFICATION_TIME_COUNTER_MICROS);
-    case DatumId::kJitMethodCompileTime:
+    case DatumId::kJitMethodCompileTotalTime:
       return std::make_optional(
-          statsd::ART_DATUM_REPORTED__KIND__ART_DATUM_JIT_METHOD_COMPILE_TIME_HISTO_MICROS);
+          statsd::ART_DATUM_REPORTED__KIND__ART_DATUM_JIT_METHOD_COMPILE_TIME_MICROS);
     case DatumId::kClassLoadingTotalTime:
       return std::make_optional(
           statsd::ART_DATUM_REPORTED__KIND__ART_DATUM_CLASS_LOADING_TIME_COUNTER_MICROS);
     case DatumId::kClassVerificationCount:
       return std::make_optional(
           statsd::ART_DATUM_REPORTED__KIND__ART_DATUM_CLASS_VERIFICATION_COUNT);
-    case DatumId::kMutatorPauseTimeDuringGC:
+    case DatumId::kWorldStopTimeDuringGCAvg:
       return std::make_optional(
-          statsd::ART_DATUM_REPORTED__KIND__ART_DATUM_GC_MUTATOR_PAUSE_TIME_COUNTER_MICROS);
+          statsd::ART_DATUM_REPORTED__KIND__ART_DATUM_GC_WORLD_STOP_TIME_AVG_MICROS);
     case DatumId::kYoungGcCount:
       return std::make_optional(
           statsd::ART_DATUM_REPORTED__KIND__ART_DATUM_GC_YOUNG_GENERATION_COLLECTION_COUNT);
@@ -63,9 +65,6 @@ constexpr std::optional<int32_t> EncodeDatumId(DatumId datum_id) {
     case DatumId::kTotalBytesAllocated:
       return std::make_optional(
           statsd::ART_DATUM_REPORTED__KIND__ART_DATUM_GC_TOTAL_BYTES_ALLOCATED);
-    case DatumId::kTotalGcMetaDataSize:
-      return std::make_optional(
-          statsd::ART_DATUM_REPORTED__KIND__ART_DATUM_GC_TOTAL_METADATA_SIZE_BYTES);
     case DatumId::kYoungGcCollectionTime:
       return std::make_optional(
           statsd::
@@ -76,42 +75,69 @@ constexpr std::optional<int32_t> EncodeDatumId(DatumId datum_id) {
     case DatumId::kYoungGcThroughput:
       return std::make_optional(
           statsd::
-              ART_DATUM_REPORTED__KIND__ART_DATUM_GC_YOUNG_GENERATION_COLLECTION_THROUGHPUT_MB_PER_SEC);
+              ART_DATUM_REPORTED__KIND__ART_DATUM_GC_YOUNG_GENERATION_COLLECTION_THROUGHPUT_HISTO_MB_PER_SEC);
     case DatumId::kFullGcThroughput:
       return std::make_optional(
           statsd::
-              ART_DATUM_REPORTED__KIND__ART_DATUM_GC_FULL_HEAP_COLLECTION_THROUGHPUT_MB_PER_SEC);
+              ART_DATUM_REPORTED__KIND__ART_DATUM_GC_FULL_HEAP_COLLECTION_THROUGHPUT_HISTO_MB_PER_SEC);
     case DatumId::kJitMethodCompileCount:
       return std::make_optional(
           statsd::ART_DATUM_REPORTED__KIND__ART_DATUM_JIT_METHOD_COMPILE_COUNT);
+    case DatumId::kYoungGcTracingThroughput:
+      return std::make_optional(
+          statsd::
+              ART_DATUM_REPORTED__KIND__ART_DATUM_GC_YOUNG_GENERATION_TRACING_THROUGHPUT_HISTO_MB_PER_SEC);
+    case DatumId::kFullGcTracingThroughput:
+      return std::make_optional(
+          statsd::
+              ART_DATUM_REPORTED__KIND__ART_DATUM_GC_FULL_HEAP_TRACING_THROUGHPUT_HISTO_MB_PER_SEC);
+    case DatumId::kTotalGcCollectionTime:
+      return std::make_optional(
+          statsd::ART_DATUM_REPORTED__KIND__ART_DATUM_GC_TOTAL_COLLECTION_TIME_MS);
+    case DatumId::kYoungGcThroughputAvg:
+      return std::make_optional(
+          statsd::ART_DATUM_REPORTED__KIND__ART_DATUM_GC_YOUNG_GENERATION_COLLECTION_THROUGHPUT_AVG_MB_PER_SEC);
+    case DatumId::kFullGcThroughputAvg:
+      return std::make_optional(
+          statsd::ART_DATUM_REPORTED__KIND__ART_DATUM_GC_FULL_HEAP_COLLECTION_THROUGHPUT_AVG_MB_PER_SEC);
+    case DatumId::kYoungGcTracingThroughputAvg:
+      return std::make_optional(
+          statsd::ART_DATUM_REPORTED__KIND__ART_DATUM_GC_YOUNG_GENERATION_TRACING_THROUGHPUT_AVG_MB_PER_SEC);
+    case DatumId::kFullGcTracingThroughputAvg:
+      return std::make_optional(
+          statsd::ART_DATUM_REPORTED__KIND__ART_DATUM_GC_FULL_HEAP_TRACING_THROUGHPUT_AVG_MB_PER_SEC);
   }
 }
 
-constexpr int32_t EncodeCompileFilter(std::optional<CompilerFilter::Filter> filter) {
-  if (filter.has_value()) {
-    switch (filter.value()) {
-      case CompilerFilter::kAssumeVerified:
-        return statsd::ART_DATUM_REPORTED__COMPILE_FILTER__ART_COMPILATION_FILTER_ASSUMED_VERIFIED;
-      case CompilerFilter::kExtract:
-        return statsd::ART_DATUM_REPORTED__COMPILE_FILTER__ART_COMPILATION_FILTER_EXTRACT;
-      case CompilerFilter::kVerify:
-        return statsd::ART_DATUM_REPORTED__COMPILE_FILTER__ART_COMPILATION_FILTER_VERIFY;
-      case CompilerFilter::kSpaceProfile:
-        return statsd::ART_DATUM_REPORTED__COMPILE_FILTER__ART_COMPILATION_FILTER_SPACE_PROFILE;
-      case CompilerFilter::kSpace:
-        return statsd::ART_DATUM_REPORTED__COMPILE_FILTER__ART_COMPILATION_FILTER_SPACE;
-      case CompilerFilter::kSpeedProfile:
-        return statsd::ART_DATUM_REPORTED__COMPILE_FILTER__ART_COMPILATION_FILTER_SPEED_PROFILE;
-      case CompilerFilter::kSpeed:
-        return statsd::ART_DATUM_REPORTED__COMPILE_FILTER__ART_COMPILATION_FILTER_SPEED;
-      case CompilerFilter::kEverythingProfile:
-        return statsd::
-            ART_DATUM_REPORTED__COMPILE_FILTER__ART_COMPILATION_FILTER_EVERYTHING_PROFILE;
-      case CompilerFilter::kEverything:
-        return statsd::ART_DATUM_REPORTED__COMPILE_FILTER__ART_COMPILATION_FILTER_EVERYTHING;
-    }
-  } else {
-    return statsd::ART_DATUM_REPORTED__COMPILE_FILTER__ART_COMPILATION_FILTER_UNKNOWN;
+constexpr int32_t EncodeCompileFilter(CompilerFilterReporting filter) {
+  switch (filter) {
+    case CompilerFilterReporting::kAssumeVerified:
+      return statsd::ART_DATUM_REPORTED__COMPILE_FILTER__ART_COMPILATION_FILTER_ASSUMED_VERIFIED;
+    case CompilerFilterReporting::kExtract:
+      return statsd::ART_DATUM_REPORTED__COMPILE_FILTER__ART_COMPILATION_FILTER_EXTRACT;
+    case CompilerFilterReporting::kVerify:
+      return statsd::ART_DATUM_REPORTED__COMPILE_FILTER__ART_COMPILATION_FILTER_VERIFY;
+    case CompilerFilterReporting::kSpaceProfile:
+      return statsd::ART_DATUM_REPORTED__COMPILE_FILTER__ART_COMPILATION_FILTER_SPACE_PROFILE;
+    case CompilerFilterReporting::kSpace:
+      return statsd::ART_DATUM_REPORTED__COMPILE_FILTER__ART_COMPILATION_FILTER_SPACE;
+    case CompilerFilterReporting::kSpeedProfile:
+      return statsd::ART_DATUM_REPORTED__COMPILE_FILTER__ART_COMPILATION_FILTER_SPEED_PROFILE;
+    case CompilerFilterReporting::kSpeed:
+      return statsd::ART_DATUM_REPORTED__COMPILE_FILTER__ART_COMPILATION_FILTER_SPEED;
+    case CompilerFilterReporting::kEverythingProfile:
+      return statsd::
+          ART_DATUM_REPORTED__COMPILE_FILTER__ART_COMPILATION_FILTER_EVERYTHING_PROFILE;
+    case CompilerFilterReporting::kEverything:
+      return statsd::ART_DATUM_REPORTED__COMPILE_FILTER__ART_COMPILATION_FILTER_EVERYTHING;
+    case CompilerFilterReporting::kError:
+      return statsd::ART_DATUM_REPORTED__COMPILE_FILTER__ART_COMPILATION_FILTER_ERROR;
+    case CompilerFilterReporting::kUnknown:
+       return statsd::ART_DATUM_REPORTED__COMPILE_FILTER__ART_COMPILATION_FILTER_UNKNOWN;
+    case CompilerFilterReporting::kRunFromApk:
+       return statsd::ART_DATUM_REPORTED__COMPILE_FILTER__ART_COMPILATION_FILTER_FAKE_RUN_FROM_APK;
+    case CompilerFilterReporting::kRunFromApkFallback:
+       return statsd::ART_DATUM_REPORTED__COMPILE_FILTER__ART_COMPILATION_FILTER_FAKE_RUN_FROM_APK_FALLBACK;
   }
 }
 
@@ -160,9 +186,28 @@ constexpr int32_t EncodeCompilationReason(CompilationReason reason) {
   }
 }
 
+constexpr int32_t EncodeInstructionSet(InstructionSet isa) {
+  switch (isa) {
+    case InstructionSet::kArm:
+      // Fall-through.
+    case InstructionSet::kThumb2:
+      return statsd::ART_DATUM_REPORTED__ISA__ART_ISA_ARM;
+    case InstructionSet::kArm64:
+      return statsd::ART_DATUM_REPORTED__ISA__ART_ISA_ARM64;
+    case InstructionSet::kX86:
+      return statsd::ART_DATUM_REPORTED__ISA__ART_ISA_X86;
+    case InstructionSet::kX86_64:
+      return statsd::ART_DATUM_REPORTED__ISA__ART_ISA_X86_64;
+    case InstructionSet::kNone:
+      return statsd::ART_DATUM_REPORTED__ISA__ART_ISA_UNKNOWN;
+  }
+}
+
 class StatsdBackend : public MetricsBackend {
  public:
-  void BeginSession(const SessionData& session_data) override { session_data_ = session_data; }
+  void BeginOrUpdateSession(const SessionData& session_data) override {
+    session_data_ = session_data;
+  }
 
  protected:
   void BeginReport(uint64_t timestamp_since_start_ms) override {
@@ -185,7 +230,7 @@ class StatsdBackend : public MetricsBackend {
           static_cast<int64_t>(value),
           statsd::ART_DATUM_REPORTED__DEX_METADATA_TYPE__ART_DEX_METADATA_TYPE_UNKNOWN,
           statsd::ART_DATUM_REPORTED__APK_TYPE__ART_APK_TYPE_UNKNOWN,
-          statsd::ART_DATUM_REPORTED__ISA__ART_ISA_UNKNOWN);
+          EncodeInstructionSet(kRuntimeISA));
     }
   }
 

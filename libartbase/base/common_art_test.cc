@@ -277,7 +277,6 @@ void CommonArtTestImpl::SetUpAndroidRootEnvVars() {
 }
 
 void CommonArtTestImpl::SetUpAndroidDataDir(std::string& android_data) {
-  // On target, Cannot use /mnt/sdcard because it is mounted noexec, so use subdir of dalvik-cache
   if (IsHost()) {
     const char* tmpdir = getenv("TMPDIR");
     if (tmpdir != nullptr && tmpdir[0] != 0) {
@@ -286,7 +285,11 @@ void CommonArtTestImpl::SetUpAndroidDataDir(std::string& android_data) {
       android_data = "/tmp";
     }
   } else {
-    android_data = "/data/dalvik-cache";
+    // On target, we cannot use `/mnt/sdcard` because it is mounted `noexec`,
+    // nor `/data/dalvik-cache` as it is not accessible on `user` builds.
+    // Instead, use `/data/local/tmp`, which does not require any special
+    // permission.
+    android_data = "/data/local/tmp";
   }
   android_data += "/art-data-XXXXXX";
   if (mkdtemp(&android_data[0]) == nullptr) {
@@ -319,10 +322,12 @@ void CommonArtTestImpl::SetUp() {
   mkdir_result = mkdir(dalvik_cache_.c_str(), 0700);
   ASSERT_EQ(mkdir_result, 0);
 
-  static bool gSlowDebugTestFlag = false;
-  RegisterRuntimeDebugFlag(&gSlowDebugTestFlag);
-  SetRuntimeDebugFlagsEnabled(true);
-  CHECK(gSlowDebugTestFlag);
+  if (kIsDebugBuild) {
+    static bool gSlowDebugTestFlag = false;
+    RegisterRuntimeDebugFlag(&gSlowDebugTestFlag);
+    SetRuntimeDebugFlagsEnabled(true);
+    CHECK(gSlowDebugTestFlag);
+  }
 }
 
 void CommonArtTestImpl::TearDownAndroidDataDir(const std::string& android_data,
