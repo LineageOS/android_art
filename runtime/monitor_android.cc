@@ -24,6 +24,8 @@
 #include <log/log_event_list.h>
 
 #include "art_method.h"
+#include "jni/jni_env_ext.h"
+#include "palette/palette.h"
 #include "thread.h"
 
 #define EVENT_LOG_TAG_dvm_lock_sample 20003
@@ -41,14 +43,13 @@ void Monitor::LogContentionEvent(Thread* self,
   int32_t owner_line_number;
   TranslateLocation(owner_method, owner_dex_pc, &owner_filename, &owner_line_number);
 
-  // Emit the process name, <= 37 bytes.
+  // Emit the process name, <= 33 bytes.
+  char proc_name[33] = {};
   {
     int fd = open("/proc/self/cmdline", O_RDONLY  | O_CLOEXEC);
-    char procName[33];
-    memset(procName, 0, sizeof(procName));
-    read(fd, procName, sizeof(procName) - 1);
+    read(fd, proc_name, sizeof(proc_name) - 1);
     close(fd);
-    ctx << procName;
+    ctx << proc_name;
   }
 
   // Emit the sensitive thread ("main thread") status. We follow tradition that this corresponds
@@ -58,20 +59,19 @@ void Monitor::LogContentionEvent(Thread* self,
   ctx << (Thread::IsSensitiveThread() ? kIsSensitive : kIsNotSensitive);
 
   // Emit self thread name string.
-  {
-    std::string thread_name;
-    self->GetThreadName(thread_name);
-    ctx << thread_name;
-  }
+  std::string thread_name;
+  self->GetThreadName(thread_name);
+  ctx << thread_name;
 
   // Emit the wait time.
   ctx << wait_ms;
 
   const char* filename = nullptr;
+  int32_t line_number;
+  std::string method_name;
   {
     uint32_t pc;
     ArtMethod* m = self->GetCurrentMethod(&pc);
-    int32_t line_number;
     TranslateLocation(m, pc, &filename, &line_number);
 
     // Emit the source code file name.
@@ -81,7 +81,8 @@ void Monitor::LogContentionEvent(Thread* self,
     ctx << line_number;
 
     // Emit the method name.
-    ctx << ArtMethod::PrettyMethod(m);
+    method_name = ArtMethod::PrettyMethod(m);
+    ctx << method_name;
   }
 
   // Emit the lock owner source code file name.
@@ -97,12 +98,25 @@ void Monitor::LogContentionEvent(Thread* self,
   ctx << owner_line_number;
 
   // Emit the owner method name.
-  ctx << ArtMethod::PrettyMethod(owner_method);
+  std::string owner_method_name = ArtMethod::PrettyMethod(owner_method);
+  ctx << owner_method_name;
 
   // Emit the sample percentage.
   ctx << sample_percent;
 
   ctx << LOG_ID_EVENTS;
+
+  // Now report to other interested parties.
+  PaletteReportLockContention(self->GetJniEnv(),
+                              wait_ms,
+                              filename,
+                              line_number,
+                              method_name.c_str(),
+                              owner_filename,
+                              owner_line_number,
+                              owner_method_name.c_str(),
+                              proc_name,
+                              thread_name.c_str());
 }
 
 }  // namespace art
