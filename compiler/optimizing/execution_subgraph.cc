@@ -86,12 +86,6 @@ void ExecutionSubgraph::Prune() {
     ScopedArenaVector<std::bitset<kMaxFilterableSuccessors>> results(
         graph_->GetBlocks().size(), temporaries.Adapter(kArenaAllocLSA));
     unreachable_blocks_.ClearAllBits();
-    // TODO We should support infinite loops as well.
-    if (UNLIKELY(graph_->GetExitBlock() == nullptr)) {
-      // Infinite loop
-      valid_ = false;
-      return;
-    }
     // Fills up the 'results' map with what we need to add to update
     // allowed_successors in order to prune sink nodes.
     bool start_reaches_end = false;
@@ -170,8 +164,11 @@ void ExecutionSubgraph::Prune() {
             << "current path size: " << current_path.size()
             << " cur_block id: " << cur_block->GetBlockId() << " entry id "
             << graph_->GetEntryBlock()->GetBlockId();
-        DCHECK(!visiting.IsBitSet(id))
-            << "Somehow ended up in a loop! This should have been caught before now! " << id;
+        if (visiting.IsBitSet(id)) {
+          // TODO We should support infinite loops as well.
+          start_reaches_end = false;
+          break;
+        }
         std::bitset<kMaxFilterableSuccessors>& result = results[id];
         if (cur_block == graph_->GetExitBlock()) {
           start_reaches_end = true;
