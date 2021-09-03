@@ -405,7 +405,7 @@ void SignalChain::Handler(int signo, siginfo_t* siginfo, void* ucontext_raw) {
     if (handler == SIG_IGN) {
       return;
     } else if (handler == SIG_DFL) {
-      fatal("exiting due to SIG_DFL handler for signal %d", signo);
+      fatal("exiting due to SIG_DFL handler for signal %d, ucontext %p", signo, ucontext);
     } else {
       handler(signo);
     }
