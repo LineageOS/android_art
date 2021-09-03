@@ -1238,7 +1238,8 @@ void Jit::CreateThreadPool() {
       // Start with '/boot' and end with '.art' to match the pattern recognized
       // by android_os_Debug.cpp for boot images.
       const char* name = "/boot-image-methods.art";
-      unique_fd mem_fd = unique_fd(art::memfd_create(name, /* flags= */ MFD_ALLOW_SEALING));
+      unique_fd mem_fd =
+          unique_fd(art::memfd_create(name, /* flags= */ MFD_ALLOW_SEALING | MFD_CLOEXEC));
       if (mem_fd.get() == -1) {
         PLOG(WARNING) << "Could not create boot image methods file descriptor";
         return;
