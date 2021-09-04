@@ -423,7 +423,6 @@ JNIEXPORT void JVM_SetNativeThreadName(JNIEnv* env, jobject jthread, jstring jav
   art::Thread* thread;
   {
     thread = thread_list->SuspendThreadByPeer(jthread,
-                                              true,
                                               art::SuspendReason::kInternal,
                                               &timed_out);
   }

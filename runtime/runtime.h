@@ -222,7 +222,13 @@ class Runtime {
 
   bool IsShuttingDown(Thread* self);
   bool IsShuttingDownLocked() const REQUIRES(Locks::runtime_shutdown_lock_) {
-    return shutting_down_;
+    return shutting_down_.load(std::memory_order_relaxed);
+  }
+  bool IsShuttingDownUnsafe() const {
+    return shutting_down_.load(std::memory_order_relaxed);
+  }
+  void SetShuttingDown() REQUIRES(Locks::runtime_shutdown_lock_) {
+    shutting_down_.store(true, std::memory_order_relaxed);
   }
 
   size_t NumberOfThreadsBeingBorn() const REQUIRES(Locks::runtime_shutdown_lock_) {
@@ -1190,8 +1196,10 @@ class Runtime {
   // Waited upon until no threads are being born.
   std::unique_ptr<ConditionVariable> shutdown_cond_ GUARDED_BY(Locks::runtime_shutdown_lock_);
 
-  // Set when runtime shutdown is past the point that new threads may attach.
-  bool shutting_down_ GUARDED_BY(Locks::runtime_shutdown_lock_);
+  // Set when runtime shutdown is past the point that new threads may attach.  Usually
+  // GUARDED_BY(Locks::runtime_shutdown_lock_). But we need to check it in Abort without the
+  // lock, because we may already own it.
+  std::atomic<bool> shutting_down_;
 
   // The runtime is starting to shutdown but is blocked waiting on shutdown_cond_.
   bool shutting_down_started_ GUARDED_BY(Locks::runtime_shutdown_lock_);
