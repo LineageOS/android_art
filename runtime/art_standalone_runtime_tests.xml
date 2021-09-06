@@ -16,53 +16,53 @@
 <configuration description="Runs art_standalone_runtime_tests.">
     <target_preparer class="com.android.compatibility.common.tradefed.targetprep.FilePusher">
         <option name="cleanup" value="true" />
-        <option name="push" value="art_standalone_runtime_tests->/data/local/tmp/nativetest/art_standalone_runtime_tests" />
+        <option name="push" value="art_standalone_runtime_tests->/data/local/tmp/art_standalone_runtime_tests/art_standalone_runtime_tests" />
         <option name="append-bitness" value="true" />
     </target_preparer>
 
     <target_preparer class="com.android.compatibility.common.tradefed.targetprep.FilePusher">
         <option name="cleanup" value="true" />
-        <option name="push" value="art-gtest-jars-AllFields.jar->/data/local/tmp/nativetest/art-gtest-jars-AllFields.jar" />
-        <option name="push" value="art-gtest-jars-ErroneousA.jar->/data/local/tmp/nativetest/art-gtest-jars-ErroneousA.jar" />
-        <option name="push" value="art-gtest-jars-ErroneousB.jar->/data/local/tmp/nativetest/art-gtest-jars-ErroneousB.jar" />
-        <option name="push" value="art-gtest-jars-ErroneousInit.jar->/data/local/tmp/nativetest/art-gtest-jars-ErroneousInit.jar" />
-        <option name="push" value="art-gtest-jars-Extension1.jar->/data/local/tmp/nativetest/art-gtest-jars-Extension1.jar" />
-        <option name="push" value="art-gtest-jars-Extension2.jar->/data/local/tmp/nativetest/art-gtest-jars-Extension2.jar" />
-        <option name="push" value="art-gtest-jars-ForClassLoaderA.jar->/data/local/tmp/nativetest/art-gtest-jars-ForClassLoaderA.jar" />
-        <option name="push" value="art-gtest-jars-ForClassLoaderB.jar->/data/local/tmp/nativetest/art-gtest-jars-ForClassLoaderB.jar" />
-        <option name="push" value="art-gtest-jars-ForClassLoaderC.jar->/data/local/tmp/nativetest/art-gtest-jars-ForClassLoaderC.jar" />
-        <option name="push" value="art-gtest-jars-ForClassLoaderD.jar->/data/local/tmp/nativetest/art-gtest-jars-ForClassLoaderD.jar" />
-        <option name="push" value="art-gtest-jars-HiddenApiSignatures.jar->/data/local/tmp/nativetest/art-gtest-jars-HiddenApiSignatures.jar" />
-        <option name="push" value="art-gtest-jars-IMTA.jar->/data/local/tmp/nativetest/art-gtest-jars-IMTA.jar" />
-        <option name="push" value="art-gtest-jars-IMTB.jar->/data/local/tmp/nativetest/art-gtest-jars-IMTB.jar" />
-        <option name="push" value="art-gtest-jars-Instrumentation.jar->/data/local/tmp/nativetest/art-gtest-jars-Instrumentation.jar" />
-        <option name="push" value="art-gtest-jars-Interfaces.jar->/data/local/tmp/nativetest/art-gtest-jars-Interfaces.jar" />
-        <option name="push" value="art-gtest-jars-LinkageTest.dex->/data/local/tmp/nativetest/art-gtest-jars-LinkageTest.dex" />
-        <option name="push" value="art-gtest-jars-Main.jar->/data/local/tmp/nativetest/art-gtest-jars-Main.jar" />
-        <option name="push" value="art-gtest-jars-MainStripped.jar->/data/local/tmp/nativetest/art-gtest-jars-MainStripped.jar" />
-        <option name="push" value="art-gtest-jars-MainUncompressedAligned.jar->/data/local/tmp/nativetest/art-gtest-jars-MainUncompressedAligned.jar" />
-        <option name="push" value="art-gtest-jars-MethodTypes.jar->/data/local/tmp/nativetest/art-gtest-jars-MethodTypes.jar" />
-        <option name="push" value="art-gtest-jars-MultiDex.jar->/data/local/tmp/nativetest/art-gtest-jars-MultiDex.jar" />
-        <option name="push" value="art-gtest-jars-MultiDexModifiedSecondary.jar->/data/local/tmp/nativetest/art-gtest-jars-MultiDexModifiedSecondary.jar" />
-        <option name="push" value="art-gtest-jars-MultiDexUncompressedAligned.jar->/data/local/tmp/nativetest/art-gtest-jars-MultiDexUncompressedAligned.jar" />
-        <option name="push" value="art-gtest-jars-MyClass.jar->/data/local/tmp/nativetest/art-gtest-jars-MyClass.jar" />
-        <option name="push" value="art-gtest-jars-MyClassNatives.jar->/data/local/tmp/nativetest/art-gtest-jars-MyClassNatives.jar" />
-        <option name="push" value="art-gtest-jars-Nested.jar->/data/local/tmp/nativetest/art-gtest-jars-Nested.jar" />
-        <option name="push" value="art-gtest-jars-Packages.jar->/data/local/tmp/nativetest/art-gtest-jars-Packages.jar" />
-        <option name="push" value="art-gtest-jars-ProfileTestMultiDex.jar->/data/local/tmp/nativetest/art-gtest-jars-ProfileTestMultiDex.jar" />
-        <option name="push" value="art-gtest-jars-ProtoCompare.jar->/data/local/tmp/nativetest/art-gtest-jars-ProtoCompare.jar" />
-        <option name="push" value="art-gtest-jars-ProtoCompare2.jar->/data/local/tmp/nativetest/art-gtest-jars-ProtoCompare2.jar" />
-        <option name="push" value="art-gtest-jars-StaticLeafMethods.jar->/data/local/tmp/nativetest/art-gtest-jars-StaticLeafMethods.jar" />
-        <option name="push" value="art-gtest-jars-Statics.jar->/data/local/tmp/nativetest/art-gtest-jars-Statics.jar" />
-        <option name="push" value="art-gtest-jars-StaticsFromCode.jar->/data/local/tmp/nativetest/art-gtest-jars-StaticsFromCode.jar" />
-        <option name="push" value="art-gtest-jars-Transaction.jar->/data/local/tmp/nativetest/art-gtest-jars-Transaction.jar" />
-        <option name="push" value="art-gtest-jars-VerifierDeps.dex->/data/local/tmp/nativetest/art-gtest-jars-VerifierDeps.dex" />
-        <option name="push" value="art-gtest-jars-VerifierDepsMulti.dex->/data/local/tmp/nativetest/art-gtest-jars-VerifierDepsMulti.dex" />
-        <option name="push" value="art-gtest-jars-XandY.jar->/data/local/tmp/nativetest/art-gtest-jars-XandY.jar" />
+        <option name="push" value="art-gtest-jars-AllFields.jar->/data/local/tmp/art_standalone_runtime_tests/art-gtest-jars-AllFields.jar" />
+        <option name="push" value="art-gtest-jars-ErroneousA.jar->/data/local/tmp/art_standalone_runtime_tests/art-gtest-jars-ErroneousA.jar" />
+        <option name="push" value="art-gtest-jars-ErroneousB.jar->/data/local/tmp/art_standalone_runtime_tests/art-gtest-jars-ErroneousB.jar" />
+        <option name="push" value="art-gtest-jars-ErroneousInit.jar->/data/local/tmp/art_standalone_runtime_tests/art-gtest-jars-ErroneousInit.jar" />
+        <option name="push" value="art-gtest-jars-Extension1.jar->/data/local/tmp/art_standalone_runtime_tests/art-gtest-jars-Extension1.jar" />
+        <option name="push" value="art-gtest-jars-Extension2.jar->/data/local/tmp/art_standalone_runtime_tests/art-gtest-jars-Extension2.jar" />
+        <option name="push" value="art-gtest-jars-ForClassLoaderA.jar->/data/local/tmp/art_standalone_runtime_tests/art-gtest-jars-ForClassLoaderA.jar" />
+        <option name="push" value="art-gtest-jars-ForClassLoaderB.jar->/data/local/tmp/art_standalone_runtime_tests/art-gtest-jars-ForClassLoaderB.jar" />
+        <option name="push" value="art-gtest-jars-ForClassLoaderC.jar->/data/local/tmp/art_standalone_runtime_tests/art-gtest-jars-ForClassLoaderC.jar" />
+        <option name="push" value="art-gtest-jars-ForClassLoaderD.jar->/data/local/tmp/art_standalone_runtime_tests/art-gtest-jars-ForClassLoaderD.jar" />
+        <option name="push" value="art-gtest-jars-HiddenApiSignatures.jar->/data/local/tmp/art_standalone_runtime_tests/art-gtest-jars-HiddenApiSignatures.jar" />
+        <option name="push" value="art-gtest-jars-IMTA.jar->/data/local/tmp/art_standalone_runtime_tests/art-gtest-jars-IMTA.jar" />
+        <option name="push" value="art-gtest-jars-IMTB.jar->/data/local/tmp/art_standalone_runtime_tests/art-gtest-jars-IMTB.jar" />
+        <option name="push" value="art-gtest-jars-Instrumentation.jar->/data/local/tmp/art_standalone_runtime_tests/art-gtest-jars-Instrumentation.jar" />
+        <option name="push" value="art-gtest-jars-Interfaces.jar->/data/local/tmp/art_standalone_runtime_tests/art-gtest-jars-Interfaces.jar" />
+        <option name="push" value="art-gtest-jars-LinkageTest.dex->/data/local/tmp/art_standalone_runtime_tests/art-gtest-jars-LinkageTest.dex" />
+        <option name="push" value="art-gtest-jars-Main.jar->/data/local/tmp/art_standalone_runtime_tests/art-gtest-jars-Main.jar" />
+        <option name="push" value="art-gtest-jars-MainStripped.jar->/data/local/tmp/art_standalone_runtime_tests/art-gtest-jars-MainStripped.jar" />
+        <option name="push" value="art-gtest-jars-MainUncompressedAligned.jar->/data/local/tmp/art_standalone_runtime_tests/art-gtest-jars-MainUncompressedAligned.jar" />
+        <option name="push" value="art-gtest-jars-MethodTypes.jar->/data/local/tmp/art_standalone_runtime_tests/art-gtest-jars-MethodTypes.jar" />
+        <option name="push" value="art-gtest-jars-MultiDex.jar->/data/local/tmp/art_standalone_runtime_tests/art-gtest-jars-MultiDex.jar" />
+        <option name="push" value="art-gtest-jars-MultiDexModifiedSecondary.jar->/data/local/tmp/art_standalone_runtime_tests/art-gtest-jars-MultiDexModifiedSecondary.jar" />
+        <option name="push" value="art-gtest-jars-MultiDexUncompressedAligned.jar->/data/local/tmp/art_standalone_runtime_tests/art-gtest-jars-MultiDexUncompressedAligned.jar" />
+        <option name="push" value="art-gtest-jars-MyClass.jar->/data/local/tmp/art_standalone_runtime_tests/art-gtest-jars-MyClass.jar" />
+        <option name="push" value="art-gtest-jars-MyClassNatives.jar->/data/local/tmp/art_standalone_runtime_tests/art-gtest-jars-MyClassNatives.jar" />
+        <option name="push" value="art-gtest-jars-Nested.jar->/data/local/tmp/art_standalone_runtime_tests/art-gtest-jars-Nested.jar" />
+        <option name="push" value="art-gtest-jars-Packages.jar->/data/local/tmp/art_standalone_runtime_tests/art-gtest-jars-Packages.jar" />
+        <option name="push" value="art-gtest-jars-ProfileTestMultiDex.jar->/data/local/tmp/art_standalone_runtime_tests/art-gtest-jars-ProfileTestMultiDex.jar" />
+        <option name="push" value="art-gtest-jars-ProtoCompare.jar->/data/local/tmp/art_standalone_runtime_tests/art-gtest-jars-ProtoCompare.jar" />
+        <option name="push" value="art-gtest-jars-ProtoCompare2.jar->/data/local/tmp/art_standalone_runtime_tests/art-gtest-jars-ProtoCompare2.jar" />
+        <option name="push" value="art-gtest-jars-StaticLeafMethods.jar->/data/local/tmp/art_standalone_runtime_tests/art-gtest-jars-StaticLeafMethods.jar" />
+        <option name="push" value="art-gtest-jars-Statics.jar->/data/local/tmp/art_standalone_runtime_tests/art-gtest-jars-Statics.jar" />
+        <option name="push" value="art-gtest-jars-StaticsFromCode.jar->/data/local/tmp/art_standalone_runtime_tests/art-gtest-jars-StaticsFromCode.jar" />
+        <option name="push" value="art-gtest-jars-Transaction.jar->/data/local/tmp/art_standalone_runtime_tests/art-gtest-jars-Transaction.jar" />
+        <option name="push" value="art-gtest-jars-VerifierDeps.dex->/data/local/tmp/art_standalone_runtime_tests/art-gtest-jars-VerifierDeps.dex" />
+        <option name="push" value="art-gtest-jars-VerifierDepsMulti.dex->/data/local/tmp/art_standalone_runtime_tests/art-gtest-jars-VerifierDepsMulti.dex" />
+        <option name="push" value="art-gtest-jars-XandY.jar->/data/local/tmp/art_standalone_runtime_tests/art-gtest-jars-XandY.jar" />
     </target_preparer>
 
     <test class="com.android.tradefed.testtype.GTest" >
-        <option name="native-test-device-path" value="/data/local/tmp/nativetest" />
+        <option name="native-test-device-path" value="/data/local/tmp/art_standalone_runtime_tests" />
         <option name="module-name" value="art_standalone_runtime_tests" />
         <option name="ld-library-path-32" value="/apex/com.android.art/lib" />
         <option name="ld-library-path-64" value="/apex/com.android.art/lib64" />
