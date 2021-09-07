@@ -53,5 +53,15 @@
   M(PaletteShouldReportJniInvocations, bool*)                               \
   M(PaletteNotifyBeginJniInvocation, JNIEnv* env)                           \
   M(PaletteNotifyEndJniInvocation, JNIEnv* env)                             \
+  M(PaletteReportLockContention, JNIEnv* env,                               \
+                                 int32_t wait_ms,                           \
+                                 const char* filename,                      \
+                                 int32_t line_number,                       \
+                                 const char* method_name,                   \
+                                 const char* owner_filename,                \
+                                 int32_t owner_line_number,                 \
+                                 const char* owner_method_name,             \
+                                 const char* proc_name,                     \
+                                 const char* thread_name)                   \
 
 #endif  // ART_LIBARTPALETTE_INCLUDE_PALETTE_PALETTE_METHOD_LIST_H_
