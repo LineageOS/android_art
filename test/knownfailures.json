@@ -1142,6 +1142,7 @@
                   "820-vdex-multidex",
                   "821-many-args",
                   "822-hiddenapi-future",
+                  "831-unverified-bcp",
                   "999-redefine-hiddenapi",
                   "1000-non-moving-space-stress",
                   "1001-app-image-regions",

@@ -1,0 +1,2 @@
+Regression test for class resolution, where the class linker would not check if
+an exception was pending after looking up a class in the boot classpath.
