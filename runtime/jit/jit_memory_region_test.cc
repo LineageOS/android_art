@@ -492,6 +492,62 @@ class TestZygoteMemory : public testing::Test {
     munmap(addr, kPageSize);
     munmap(shared, kPageSize);
   }
+
+  // Test that a readable mapping created befire sealing future writes, can be
+  // changed into a writable mapping.
+  void TestVmMayWriteBefore() {
+    // Zygote JIT memory only works on kernels that don't segfault on flush.
+    TEST_DISABLED_FOR_KERNELS_WITH_CACHE_SEGFAULT();
+    std::string error_msg;
+    size_t size = kPageSize;
+    int32_t* addr = nullptr;
+    {
+      android::base::unique_fd fd(JitMemoryRegion::CreateZygoteMemory(size, &error_msg));
+      CHECK_NE(fd.get(), -1);
+
+      // Create a shared readable mapping.
+      addr = reinterpret_cast<int32_t*>(
+          mmap(nullptr, kPageSize, PROT_READ, MAP_SHARED, fd.get(), 0));
+      CHECK(addr != nullptr);
+      CHECK_NE(addr, MAP_FAILED);
+
+      // Protect the memory.
+      bool res = JitMemoryRegion::ProtectZygoteMemory(fd.get(), &error_msg);
+      CHECK(res);
+    }
+    // At this point, the fd has been dropped, but the memory mappings are still
+    // there.
+    int res = mprotect(addr, kPageSize, PROT_WRITE);
+    CHECK_EQ(res, 0);
+  }
+
+  // Test that we cannot create a writable mapping after sealing future writes.
+  void TestVmMayWriteAfter() {
+    // Zygote JIT memory only works on kernels that don't segfault on flush.
+    TEST_DISABLED_FOR_KERNELS_WITH_CACHE_SEGFAULT();
+    std::string error_msg;
+    size_t size = kPageSize;
+    int32_t* addr = nullptr;
+    {
+      android::base::unique_fd fd(JitMemoryRegion::CreateZygoteMemory(size, &error_msg));
+      CHECK_NE(fd.get(), -1);
+
+      // Protect the memory.
+      bool res = JitMemoryRegion::ProtectZygoteMemory(fd.get(), &error_msg);
+      CHECK(res);
+
+      // Create a shared readable mapping.
+      addr = reinterpret_cast<int32_t*>(
+          mmap(nullptr, kPageSize, PROT_READ, MAP_SHARED, fd.get(), 0));
+      CHECK(addr != nullptr);
+      CHECK_NE(addr, MAP_FAILED);
+    }
+    // At this point, the fd has been dropped, but the memory mappings are still
+    // there.
+    int res = mprotect(addr, kPageSize, PROT_WRITE);
+    CHECK_EQ(res, -1);
+    CHECK_EQ(errno, EACCES);
+  }
 };
 
 TEST_F(TestZygoteMemory, BasicTest) {
@@ -508,6 +564,14 @@ TEST_F(TestZygoteMemory, TestMadviseDontFork) {
 
 TEST_F(TestZygoteMemory, TestFromSharedToPrivate) {
   TestFromSharedToPrivate();
+}
+
+TEST_F(TestZygoteMemory, TestVmMayWriteBefore) {
+  TestVmMayWriteBefore();
+}
+
+TEST_F(TestZygoteMemory, TestVmMayWriteAfter) {
+  TestVmMayWriteAfter();
 }
 
 #endif  // defined (__BIONIC__)
