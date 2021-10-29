@@ -556,7 +556,7 @@ bool JitMemoryRegion::ProtectZygoteMemory(int fd, std::string* error_msg) {
       return false;
     }
   } else {
-    palette_status_t status = PaletteAshmemSetProtRegion(fd, PROT_READ);
+    palette_status_t status = PaletteAshmemSetProtRegion(fd, PROT_READ | PROT_EXEC);
     if (status != PALETTE_STATUS_OK) {
       CHECK_EQ(status, PALETTE_STATUS_CHECK_ERRNO);
       std::ostringstream oss;
