@@ -192,7 +192,8 @@ const uint8_t* VdexFile::GetNextTypeLookupTableData(const uint8_t* cursor,
   } else {
     const uint8_t* data = cursor + sizeof(uint32_t) + reinterpret_cast<const uint32_t*>(cursor)[0];
     // TypeLookupTables are required to be 4 byte aligned. the OatWriter makes sure they are.
-    CHECK_ALIGNED(data, 4);
+    // We don't check this here to be defensive against corrupted vdex files.
+    // Callers should check the returned value matches their expectations.
     return data;
   }
 }

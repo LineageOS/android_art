@@ -16,21 +16,21 @@
 <configuration description="Runs art_standalone_libdexfile_tests.">
     <target_preparer class="com.android.compatibility.common.tradefed.targetprep.FilePusher">
         <option name="cleanup" value="true" />
-        <option name="push" value="art_standalone_libdexfile_tests->/data/local/tmp/nativetest/art_standalone_libdexfile_tests" />
+        <option name="push" value="art_standalone_libdexfile_tests->/data/local/tmp/art_standalone_libdexfile_tests/art_standalone_libdexfile_tests" />
         <option name="append-bitness" value="true" />
     </target_preparer>
 
     <target_preparer class="com.android.compatibility.common.tradefed.targetprep.FilePusher">
         <option name="cleanup" value="true" />
-        <option name="push" value="art-gtest-jars-GetMethodSignature.jar->/data/local/tmp/nativetest/art-gtest-jars-GetMethodSignature.jar" />
-        <option name="push" value="art-gtest-jars-Lookup.jar->/data/local/tmp/nativetest/art-gtest-jars-Lookup.jar" />
-        <option name="push" value="art-gtest-jars-Main.jar->/data/local/tmp/nativetest/art-gtest-jars-Main.jar" />
-        <option name="push" value="art-gtest-jars-MultiDex.jar->/data/local/tmp/nativetest/art-gtest-jars-MultiDex.jar" />
-        <option name="push" value="art-gtest-jars-Nested.jar->/data/local/tmp/nativetest/art-gtest-jars-Nested.jar" />
+        <option name="push" value="art-gtest-jars-GetMethodSignature.jar->/data/local/tmp/art_standalone_libdexfile_tests/art-gtest-jars-GetMethodSignature.jar" />
+        <option name="push" value="art-gtest-jars-Lookup.jar->/data/local/tmp/art_standalone_libdexfile_tests/art-gtest-jars-Lookup.jar" />
+        <option name="push" value="art-gtest-jars-Main.jar->/data/local/tmp/art_standalone_libdexfile_tests/art-gtest-jars-Main.jar" />
+        <option name="push" value="art-gtest-jars-MultiDex.jar->/data/local/tmp/art_standalone_libdexfile_tests/art-gtest-jars-MultiDex.jar" />
+        <option name="push" value="art-gtest-jars-Nested.jar->/data/local/tmp/art_standalone_libdexfile_tests/art-gtest-jars-Nested.jar" />
     </target_preparer>
 
     <test class="com.android.tradefed.testtype.GTest" >
-        <option name="native-test-device-path" value="/data/local/tmp/nativetest" />
+        <option name="native-test-device-path" value="/data/local/tmp/art_standalone_libdexfile_tests" />
         <option name="module-name" value="art_standalone_libdexfile_tests" />
         <option name="ld-library-path-32" value="/apex/com.android.art/lib" />
         <option name="ld-library-path-64" value="/apex/com.android.art/lib64" />

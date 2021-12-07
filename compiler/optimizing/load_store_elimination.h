@@ -27,7 +27,7 @@ class LoadStoreElimination : public HOptimization {
  public:
   // Whether or not we should attempt partial Load-store-elimination which
   // requires additional blocks and predicated instructions.
-  static constexpr bool kEnablePartialLSE = true;
+  static constexpr bool kEnablePartialLSE = false;
 
   // Controls whether to enable VLOG(compiler) logs explaining the transforms taking place.
   static constexpr bool kVerboseLoggingMode = false;

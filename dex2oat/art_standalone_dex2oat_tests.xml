@@ -16,41 +16,41 @@
 <configuration description="Runs art_standalone_dex2oat_tests.">
     <target_preparer class="com.android.compatibility.common.tradefed.targetprep.FilePusher">
         <option name="cleanup" value="true" />
-        <option name="push" value="art_standalone_dex2oat_tests->/data/local/tmp/nativetest/art_standalone_dex2oat_tests" />
+        <option name="push" value="art_standalone_dex2oat_tests->/data/local/tmp/art_standalone_dex2oat_tests/art_standalone_dex2oat_tests" />
         <option name="append-bitness" value="true" />
     </target_preparer>
 
     <target_preparer class="com.android.compatibility.common.tradefed.targetprep.FilePusher">
         <option name="cleanup" value="true" />
-        <option name="push" value="art-gtest-jars-AbstractMethod.jar->/data/local/tmp/nativetest/art-gtest-jars-AbstractMethod.jar" />
-        <option name="push" value="art-gtest-jars-DefaultMethods.jar->/data/local/tmp/nativetest/art-gtest-jars-DefaultMethods.jar" />
-        <option name="push" value="art-gtest-jars-DexToDexDecompiler.jar->/data/local/tmp/nativetest/art-gtest-jars-DexToDexDecompiler.jar" />
-        <option name="push" value="art-gtest-jars-Dex2oatVdexPublicSdkDex.dex->/data/local/tmp/nativetest/art-gtest-jars-Dex2oatVdexPublicSdkDex.dex" />
-        <option name="push" value="art-gtest-jars-Dex2oatVdexTestDex.jar->/data/local/tmp/nativetest/art-gtest-jars-Dex2oatVdexTestDex.jar" />
-        <option name="push" value="art-gtest-jars-ImageLayoutA.jar->/data/local/tmp/nativetest/art-gtest-jars-ImageLayoutA.jar" />
-        <option name="push" value="art-gtest-jars-ImageLayoutB.jar->/data/local/tmp/nativetest/art-gtest-jars-ImageLayoutB.jar" />
-        <option name="push" value="art-gtest-jars-LinkageTest.dex->/data/local/tmp/nativetest/art-gtest-jars-LinkageTest.dex" />
-        <option name="push" value="art-gtest-jars-Main.jar->/data/local/tmp/nativetest/art-gtest-jars-Main.jar" />
-        <option name="push" value="art-gtest-jars-MainEmptyUncompressed.jar->/data/local/tmp/nativetest/art-gtest-jars-MainEmptyUncompressed.jar" />
-        <option name="push" value="art-gtest-jars-MainEmptyUncompressedAligned.jar->/data/local/tmp/nativetest/art-gtest-jars-MainEmptyUncompressedAligned.jar" />
-        <option name="push" value="art-gtest-jars-MainStripped.jar->/data/local/tmp/nativetest/art-gtest-jars-MainStripped.jar" />
-        <option name="push" value="art-gtest-jars-MainUncompressedAligned.jar->/data/local/tmp/nativetest/art-gtest-jars-MainUncompressedAligned.jar" />
-        <option name="push" value="art-gtest-jars-ManyMethods.jar->/data/local/tmp/nativetest/art-gtest-jars-ManyMethods.jar" />
-        <option name="push" value="art-gtest-jars-MultiDex.jar->/data/local/tmp/nativetest/art-gtest-jars-MultiDex.jar" />
-        <option name="push" value="art-gtest-jars-MultiDexModifiedSecondary.jar->/data/local/tmp/nativetest/art-gtest-jars-MultiDexModifiedSecondary.jar" />
-        <option name="push" value="art-gtest-jars-MyClassNatives.jar->/data/local/tmp/nativetest/art-gtest-jars-MyClassNatives.jar" />
-        <option name="push" value="art-gtest-jars-Nested.jar->/data/local/tmp/nativetest/art-gtest-jars-Nested.jar" />
-        <option name="push" value="art-gtest-jars-ProfileTestMultiDex.jar->/data/local/tmp/nativetest/art-gtest-jars-ProfileTestMultiDex.jar" />
-        <option name="push" value="art-gtest-jars-StaticLeafMethods.jar->/data/local/tmp/nativetest/art-gtest-jars-StaticLeafMethods.jar" />
-        <option name="push" value="art-gtest-jars-Statics.jar->/data/local/tmp/nativetest/art-gtest-jars-Statics.jar" />
-        <option name="push" value="art-gtest-jars-StringLiterals.jar->/data/local/tmp/nativetest/art-gtest-jars-StringLiterals.jar" />
-        <option name="push" value="art-gtest-jars-VerifierDeps.dex->/data/local/tmp/nativetest/art-gtest-jars-VerifierDeps.dex" />
-        <option name="push" value="art-gtest-jars-VerifierDepsMulti.dex->/data/local/tmp/nativetest/art-gtest-jars-VerifierDepsMulti.dex" />
-        <option name="push" value="art-gtest-jars-VerifySoftFailDuringClinit.dex->/data/local/tmp/nativetest/art-gtest-jars-VerifySoftFailDuringClinit.dex" />
+        <option name="push" value="art-gtest-jars-AbstractMethod.jar->/data/local/tmp/art_standalone_dex2oat_tests/art-gtest-jars-AbstractMethod.jar" />
+        <option name="push" value="art-gtest-jars-DefaultMethods.jar->/data/local/tmp/art_standalone_dex2oat_tests/art-gtest-jars-DefaultMethods.jar" />
+        <option name="push" value="art-gtest-jars-DexToDexDecompiler.jar->/data/local/tmp/art_standalone_dex2oat_tests/art-gtest-jars-DexToDexDecompiler.jar" />
+        <option name="push" value="art-gtest-jars-Dex2oatVdexPublicSdkDex.dex->/data/local/tmp/art_standalone_dex2oat_tests/art-gtest-jars-Dex2oatVdexPublicSdkDex.dex" />
+        <option name="push" value="art-gtest-jars-Dex2oatVdexTestDex.jar->/data/local/tmp/art_standalone_dex2oat_tests/art-gtest-jars-Dex2oatVdexTestDex.jar" />
+        <option name="push" value="art-gtest-jars-ImageLayoutA.jar->/data/local/tmp/art_standalone_dex2oat_tests/art-gtest-jars-ImageLayoutA.jar" />
+        <option name="push" value="art-gtest-jars-ImageLayoutB.jar->/data/local/tmp/art_standalone_dex2oat_tests/art-gtest-jars-ImageLayoutB.jar" />
+        <option name="push" value="art-gtest-jars-LinkageTest.dex->/data/local/tmp/art_standalone_dex2oat_tests/art-gtest-jars-LinkageTest.dex" />
+        <option name="push" value="art-gtest-jars-Main.jar->/data/local/tmp/art_standalone_dex2oat_tests/art-gtest-jars-Main.jar" />
+        <option name="push" value="art-gtest-jars-MainEmptyUncompressed.jar->/data/local/tmp/art_standalone_dex2oat_tests/art-gtest-jars-MainEmptyUncompressed.jar" />
+        <option name="push" value="art-gtest-jars-MainEmptyUncompressedAligned.jar->/data/local/tmp/art_standalone_dex2oat_tests/art-gtest-jars-MainEmptyUncompressedAligned.jar" />
+        <option name="push" value="art-gtest-jars-MainStripped.jar->/data/local/tmp/art_standalone_dex2oat_tests/art-gtest-jars-MainStripped.jar" />
+        <option name="push" value="art-gtest-jars-MainUncompressedAligned.jar->/data/local/tmp/art_standalone_dex2oat_tests/art-gtest-jars-MainUncompressedAligned.jar" />
+        <option name="push" value="art-gtest-jars-ManyMethods.jar->/data/local/tmp/art_standalone_dex2oat_tests/art-gtest-jars-ManyMethods.jar" />
+        <option name="push" value="art-gtest-jars-MultiDex.jar->/data/local/tmp/art_standalone_dex2oat_tests/art-gtest-jars-MultiDex.jar" />
+        <option name="push" value="art-gtest-jars-MultiDexModifiedSecondary.jar->/data/local/tmp/art_standalone_dex2oat_tests/art-gtest-jars-MultiDexModifiedSecondary.jar" />
+        <option name="push" value="art-gtest-jars-MyClassNatives.jar->/data/local/tmp/art_standalone_dex2oat_tests/art-gtest-jars-MyClassNatives.jar" />
+        <option name="push" value="art-gtest-jars-Nested.jar->/data/local/tmp/art_standalone_dex2oat_tests/art-gtest-jars-Nested.jar" />
+        <option name="push" value="art-gtest-jars-ProfileTestMultiDex.jar->/data/local/tmp/art_standalone_dex2oat_tests/art-gtest-jars-ProfileTestMultiDex.jar" />
+        <option name="push" value="art-gtest-jars-StaticLeafMethods.jar->/data/local/tmp/art_standalone_dex2oat_tests/art-gtest-jars-StaticLeafMethods.jar" />
+        <option name="push" value="art-gtest-jars-Statics.jar->/data/local/tmp/art_standalone_dex2oat_tests/art-gtest-jars-Statics.jar" />
+        <option name="push" value="art-gtest-jars-StringLiterals.jar->/data/local/tmp/art_standalone_dex2oat_tests/art-gtest-jars-StringLiterals.jar" />
+        <option name="push" value="art-gtest-jars-VerifierDeps.dex->/data/local/tmp/art_standalone_dex2oat_tests/art-gtest-jars-VerifierDeps.dex" />
+        <option name="push" value="art-gtest-jars-VerifierDepsMulti.dex->/data/local/tmp/art_standalone_dex2oat_tests/art-gtest-jars-VerifierDepsMulti.dex" />
+        <option name="push" value="art-gtest-jars-VerifySoftFailDuringClinit.dex->/data/local/tmp/art_standalone_dex2oat_tests/art-gtest-jars-VerifySoftFailDuringClinit.dex" />
     </target_preparer>
 
     <test class="com.android.tradefed.testtype.GTest" >
-        <option name="native-test-device-path" value="/data/local/tmp/nativetest" />
+        <option name="native-test-device-path" value="/data/local/tmp/art_standalone_dex2oat_tests" />
         <option name="module-name" value="art_standalone_dex2oat_tests" />
         <option name="ld-library-path-32" value="/apex/com.android.art/lib" />
         <option name="ld-library-path-64" value="/apex/com.android.art/lib64" />

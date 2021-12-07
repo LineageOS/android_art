@@ -1630,11 +1630,16 @@ void ConcurrentCopying::CopyingPhase() {
     // for the last time before transitioning to the shared mark stack mode, which would process new
     // refs that may have been concurrently pushed onto the mark stack during the ProcessMarkStack()
     // call above. At the same time, disable weak ref accesses using a per-thread flag. It's
-    // important to do these together in a single checkpoint so that we can ensure that mutators
-    // won't newly gray objects and push new refs onto the mark stack due to weak ref accesses and
+    // important to do these together so that we can ensure that mutators won't
+    // newly gray objects and push new refs onto the mark stack due to weak ref accesses and
     // mutators safely transition to the shared mark stack mode (without leaving unprocessed refs on
     // the thread-local mark stacks), without a race. This is why we use a thread-local weak ref
     // access flag Thread::tls32_.weak_ref_access_enabled_ instead of the global ones.
+    // We must use a stop-the-world pause to disable weak ref access. A checkpoint may lead to a
+    // deadlock if one mutator acquires a low-level mutex and then gets blocked while accessing
+    // a weak-ref (after participating in the checkpoint), and another mutator indefinitely waits
+    // for the mutex before it participates in the checkpoint. Consequently, the gc-thread blocks
+    // forever as the checkpoint never finishes (See runtime/mutator_gc_coord.md).
     SwitchToSharedMarkStackMode();
     CHECK(!self->GetWeakRefAccessEnabled());
     // Now that weak refs accesses are disabled, once we exhaust the shared mark stack again here
@@ -2044,21 +2049,36 @@ class ConcurrentCopying::AssertToSpaceInvariantFieldVisitor {
 void ConcurrentCopying::RevokeThreadLocalMarkStacks(bool disable_weak_ref_access,
                                                     Closure* checkpoint_callback) {
   Thread* self = Thread::Current();
-  RevokeThreadLocalMarkStackCheckpoint check_point(this, disable_weak_ref_access);
+  Locks::mutator_lock_->AssertSharedHeld(self);
   ThreadList* thread_list = Runtime::Current()->GetThreadList();
-  gc_barrier_->Init(self, 0);
-  size_t barrier_count = thread_list->RunCheckpoint(&check_point, checkpoint_callback);
-  // If there are no threads to wait which implys that all the checkpoint functions are finished,
-  // then no need to release the mutator lock.
-  if (barrier_count == 0) {
-    return;
+  RevokeThreadLocalMarkStackCheckpoint check_point(this, disable_weak_ref_access);
+  if (disable_weak_ref_access) {
+    // We're the only thread that could possibly ask for exclusive access here.
+    Locks::mutator_lock_->SharedUnlock(self);
+    {
+      ScopedPause pause(this);
+      MutexLock mu(self, *Locks::thread_list_lock_);
+      checkpoint_callback->Run(self);
+      for (Thread* thread : thread_list->GetList()) {
+        check_point.Run(thread);
+      }
+    }
+    Locks::mutator_lock_->SharedLock(self);
+  } else {
+    gc_barrier_->Init(self, 0);
+    size_t barrier_count = thread_list->RunCheckpoint(&check_point, checkpoint_callback);
+    // If there are no threads to wait which implys that all the checkpoint functions are finished,
+    // then no need to release the mutator lock.
+    if (barrier_count == 0) {
+      return;
+    }
+    Locks::mutator_lock_->SharedUnlock(self);
+    {
+      ScopedThreadStateChange tsc(self, kWaitingForCheckPointsToRun);
+      gc_barrier_->Increment(self, barrier_count);
+    }
+    Locks::mutator_lock_->SharedLock(self);
   }
-  Locks::mutator_lock_->SharedUnlock(self);
-  {
-    ScopedThreadStateChange tsc(self, kWaitingForCheckPointsToRun);
-    gc_barrier_->Increment(self, barrier_count);
-  }
-  Locks::mutator_lock_->SharedLock(self);
 }
 
 void ConcurrentCopying::RevokeThreadLocalMarkStack(Thread* thread) {

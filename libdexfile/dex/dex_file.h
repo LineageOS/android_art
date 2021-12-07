@@ -738,7 +738,7 @@ class DexFile {
   }
 
   // Used by oat writer.
-  void SetOatDexFile(OatDexFile* oat_dex_file) const {
+  void SetOatDexFile(const OatDexFile* oat_dex_file) const {
     oat_dex_file_ = oat_dex_file;
   }
 

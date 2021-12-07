@@ -81,7 +81,7 @@ extern "C" JNIEXPORT void JNICALL Java_Main_waitAndDeopt(JNIEnv*, jobject, jobje
   }
   bool timed_out = false;
   Thread* other = Runtime::Current()->GetThreadList()->SuspendThreadByPeer(
-      target, true, SuspendReason::kInternal, &timed_out);
+      target, SuspendReason::kInternal, &timed_out);
   CHECK(!timed_out);
   CHECK(other != nullptr);
   ScopedSuspendAll ssa(__FUNCTION__);
