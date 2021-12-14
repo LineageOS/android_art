@@ -128,3 +128,16 @@ palette_status_t PaletteNotifyBeginJniInvocation(JNIEnv* env ATTRIBUTE_UNUSED) {
 palette_status_t PaletteNotifyEndJniInvocation(JNIEnv* env ATTRIBUTE_UNUSED) {
   return PALETTE_STATUS_OK;
 }
+
+palette_status_t PaletteReportLockContention(JNIEnv* env ATTRIBUTE_UNUSED,
+                                             int32_t wait_ms ATTRIBUTE_UNUSED,
+                                             const char* filename ATTRIBUTE_UNUSED,
+                                             int32_t line_number ATTRIBUTE_UNUSED,
+                                             const char* method_name ATTRIBUTE_UNUSED,
+                                             const char* owner_filename ATTRIBUTE_UNUSED,
+                                             int32_t owner_line_number ATTRIBUTE_UNUSED,
+                                             const char* owner_method_name ATTRIBUTE_UNUSED,
+                                             const char* proc_name ATTRIBUTE_UNUSED,
+                                             const char* thread_name ATTRIBUTE_UNUSED) {
+  return PALETTE_STATUS_OK;
+}
