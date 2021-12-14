@@ -35,6 +35,7 @@ LIBARTPALETTE_1 {
     PaletteShouldReportJniInvocations; #apex
     PaletteNotifyBeginJniInvocation; #apex
     PaletteNotifyEndJniInvocation; #apex
+    PaletteReportLockContention; #apex
 
   local:
     *;

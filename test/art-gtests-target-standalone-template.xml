@@ -17,12 +17,12 @@
 <configuration description="Runs {MODULE}.">
     <target_preparer class="com.android.compatibility.common.tradefed.targetprep.FilePusher">
         <option name="cleanup" value="true" />
-        <option name="push" value="{MODULE}->/data/local/tmp/nativetest/{MODULE}" />
+        <option name="push" value="{MODULE}->/data/local/tmp/{MODULE}/{MODULE}" />
         <option name="append-bitness" value="true" />
     </target_preparer>
 
     <test class="com.android.tradefed.testtype.GTest" >
-        <option name="native-test-device-path" value="/data/local/tmp/nativetest" />
+        <option name="native-test-device-path" value="/data/local/tmp/{MODULE}" />
         <option name="module-name" value="{MODULE}" />
         <option name="ld-library-path-32" value="/apex/com.android.art/lib" />
         <option name="ld-library-path-64" value="/apex/com.android.art/lib64" />

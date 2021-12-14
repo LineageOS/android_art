@@ -4468,6 +4468,12 @@ bool Thread::IsSystemDaemon() const {
       WellKnownClasses::java_lang_Thread_systemDaemon)->GetBoolean(GetPeer());
 }
 
+std::string Thread::StateAndFlagsAsHexString() const {
+  std::stringstream result_stream;
+  result_stream << std::hex << tls32_.state_and_flags.as_atomic_int.load();
+  return result_stream.str();
+}
+
 ScopedExceptionStorage::ScopedExceptionStorage(art::Thread* self)
     : self_(self), hs_(self_), excp_(hs_.NewHandle<art::mirror::Throwable>(self_->GetException())) {
   self_->ClearException();
