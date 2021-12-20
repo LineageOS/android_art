@@ -16,6 +16,23 @@
       "message": "its fine on my legacy devices",
       "revId": "49a15f80337b76022390113120a151c75a200518",
       "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "bd3d21a2_e3b40012",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 1
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 18796
+      },
+      "writtenOn": "2021-12-20T17:16:53Z",
+      "side": 1,
+      "message": "do we need to remove flag like los17?. ",
+      "revId": "49a15f80337b76022390113120a151c75a200518",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
     }
   ]
 }
