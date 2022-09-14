@@ -504,6 +504,11 @@ MemMap* MemMap::MapFileAtAddress(uint8_t* expected_ptr,
     DCHECK(ContainedWithinExistingMap(expected_ptr, byte_count, error_msg))
         << ((error_msg != nullptr) ? *error_msg : std::string());
     flags |= MAP_FIXED;
+#if !defined(ART_TARGET)
+  } else if (expected_ptr) {
+#define MAP_FIXED_NOREPLACE 0x100000
+    flags |= MAP_FIXED_NOREPLACE;
+#endif
   } else {
     CHECK_EQ(0, flags & MAP_FIXED);
     // Don't bother checking for an overlapping region here. We'll
