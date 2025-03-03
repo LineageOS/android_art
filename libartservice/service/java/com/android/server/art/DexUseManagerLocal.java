@@ -113,6 +113,16 @@ public class DexUseManagerLocal {
      */
     @VisibleForTesting public static final long INTERVAL_MS = 15_000;
 
+    // Impose a limit on the input accepted by notifyDexContainersLoaded per owning package.
+    /** @hide */
+    @VisibleForTesting public static final int MAX_PATH_LENGTH = 4096;
+
+    /** @hide */
+    @VisibleForTesting public static final int MAX_CLASS_LOADER_CONTEXT_LENGTH = 10000;
+
+    /** @hide */
+    private static final int MAX_SECONDARY_DEX_FILES_PER_OWNER = 500;
+
     private static final Object sLock = new Object();
 
     // The static field is associated with the class and the class loader that loads it. In the
@@ -527,7 +537,7 @@ public class DexUseManagerLocal {
             }
 
             // Check remaining packages. Don't check for shared libraries because it might be too
-            // expansive to do so and the time complexity is O(n) no matter we do it or not.
+            // expensive to do so and the time complexity is O(n) no matter we do it or not.
             for (PackageState pkgState : packageStates.values()) {
                 if (visitedPackages.contains(pkgState.getPackageName())) {
                     continue;
@@ -657,16 +667,40 @@ public class DexUseManagerLocal {
     private void addSecondaryDexUse(@NonNull String owningPackageName, @NonNull String dexPath,
             @NonNull String loadingPackageName, boolean isolatedProcess,
             @NonNull String classLoaderContext, @NonNull String abiName, long lastUsedAtMs) {
+        DexLoader loader = DexLoader.create(loadingPackageName, isolatedProcess);
+        // This is to avoid a loading package from using up the SecondaryDexUse entries for another
+        // package (up to the MAX_SECONDARY_DEX_FILES_PER_OWNER limit). We don't care about the
+        // loading package messing up its own SecondaryDexUse entries.
+        // Note that we are using system_server's permission to check the existence. This is fine
+        // with the assumption that the file must be world readable to be used by other apps.
+        // We could use artd's permission to check the existence, and then there wouldn't be any
+        // permission issue, but that requires bringing up the artd service, which may be too
+        // expensive.
+        // TODO(jiakaiz): Check if the assumption is true.
+        if (isLoaderOtherApp(loader, owningPackageName) && !mInjector.pathExists(dexPath)) {
+            AsLog.w("Not recording non-existent secondary dex file '" + dexPath + "'");
+            return;
+        }
         synchronized (mLock) {
+            PackageDexUse packageDexUse = mDexUse.mPackageDexUseByOwningPackageName.computeIfAbsent(
+                    owningPackageName, k -> new PackageDexUse());
             SecondaryDexUse secondaryDexUse =
-                    mDexUse.mPackageDexUseByOwningPackageName
-                            .computeIfAbsent(owningPackageName, k -> new PackageDexUse())
-                            .mSecondaryDexUseByDexFile.computeIfAbsent(
-                                    dexPath, k -> new SecondaryDexUse());
+                    packageDexUse.mSecondaryDexUseByDexFile.computeIfAbsent(dexPath, k -> {
+                        if (packageDexUse.mSecondaryDexUseByDexFile.size()
+                                >= mInjector.getMaxSecondaryDexFilesPerOwner()) {
+                            AsLog.w("Not recording too many secondary dex use entries for "
+                                    + owningPackageName);
+                            return null;
+                        }
+                        return new SecondaryDexUse();
+                    });
+            if (secondaryDexUse == null) {
+                return;
+            }
             secondaryDexUse.mUserHandle = mInjector.getCallingUserHandle();
-            SecondaryDexUseRecord record = secondaryDexUse.mRecordByLoader.computeIfAbsent(
-                    DexLoader.create(loadingPackageName, isolatedProcess),
-                    k -> new SecondaryDexUseRecord());
+            SecondaryDexUseRecord record =
+                    secondaryDexUse.mRecordByLoader.computeIfAbsent(
+                            loader, k -> new SecondaryDexUseRecord());
             record.mClassLoaderContext = classLoaderContext;
             record.mAbiName = abiName;
             record.mLastUsedAtMs = lastUsedAtMs;
@@ -772,13 +806,23 @@ public class DexUseManagerLocal {
         }
 
         for (var entry : classLoaderContextByDexContainerFile.entrySet()) {
-            Utils.assertNonEmpty(entry.getKey());
-            String errorMsg = ArtJni.validateDexPath(entry.getKey());
+            String dexPath = entry.getKey();
+            String classLoaderContext = entry.getValue();
+            Utils.assertNonEmpty(dexPath);
+            if (dexPath.length() > MAX_PATH_LENGTH) {
+                throw new IllegalArgumentException(
+                        "Dex path too long - exceeds " + MAX_PATH_LENGTH + " chars");
+            }
+            String errorMsg = ArtJni.validateDexPath(dexPath);
             if (errorMsg != null) {
                 throw new IllegalArgumentException(errorMsg);
             }
-            Utils.assertNonEmpty(entry.getValue());
-            errorMsg = ArtJni.validateClassLoaderContext(entry.getKey(), entry.getValue());
+            Utils.assertNonEmpty(classLoaderContext);
+            if (classLoaderContext.length() > MAX_CLASS_LOADER_CONTEXT_LENGTH) {
+                throw new IllegalArgumentException("Class loader context too long - exceeds "
+                        + MAX_CLASS_LOADER_CONTEXT_LENGTH + " chars");
+            }
+            errorMsg = ArtJni.validateClassLoaderContext(dexPath, classLoaderContext);
             if (errorMsg != null) {
                 throw new IllegalArgumentException(errorMsg);
             }
@@ -1354,6 +1398,10 @@ public class DexUseManagerLocal {
             return System.currentTimeMillis();
         }
 
+        public boolean pathExists(String path) {
+            return new File(path).exists();
+        }
+
         @NonNull
         public String getFilename() {
             return FILENAME;
@@ -1399,6 +1447,10 @@ public class DexUseManagerLocal {
 
         public int getCallingUid() {
             return Binder.getCallingUid();
+        }
+
+        public int getMaxSecondaryDexFilesPerOwner() {
+            return MAX_SECONDARY_DEX_FILES_PER_OWNER;
         }
     }
 }
