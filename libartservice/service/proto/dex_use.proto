@@ -29,31 +29,31 @@ message DexUseProto {
 }
 
 message PackageDexUseProto {
-    string owning_package_name = 1;
+    string owning_package_name = 1;  // key
     repeated PrimaryDexUseProto primary_dex_use = 2;
     repeated SecondaryDexUseProto secondary_dex_use = 3;
 }
 
 message PrimaryDexUseProto {
-    string dex_file = 1;
+    string dex_file = 1;  // key
     repeated PrimaryDexUseRecordProto record = 2;
 }
 
 message PrimaryDexUseRecordProto {
-    string loading_package_name = 1;
-    bool isolated_process = 2;
+    string loading_package_name = 1;  // key
+    bool isolated_process = 2;        // key
     int64 last_used_at_ms = 3;
 }
 
 message SecondaryDexUseProto {
-    string dex_file = 1;
+    string dex_file = 1;     // key
     Int32Value user_id = 2;  // Must be explicitly set.
     repeated SecondaryDexUseRecordProto record = 3;
 }
 
 message SecondaryDexUseRecordProto {
-    string loading_package_name = 1;
-    bool isolated_process = 2;
+    string loading_package_name = 1;  // key
+    bool isolated_process = 2;        // key
     string class_loader_context = 3;
     string abi_name = 4;
     int64 last_used_at_ms = 5;
