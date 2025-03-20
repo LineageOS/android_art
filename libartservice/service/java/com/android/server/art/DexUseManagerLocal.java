@@ -67,8 +67,6 @@ import java.io.OutputStream;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.nio.file.Files;
-import java.nio.file.LinkOption;
-import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -668,23 +666,6 @@ public class DexUseManagerLocal {
             @NonNull String loadingPackageName, boolean isolatedProcess,
             @NonNull String classLoaderContext, @NonNull String abiName, long lastUsedAtMs) {
         DexLoader loader = DexLoader.create(loadingPackageName, isolatedProcess);
-        // This is to avoid a loading package from using up the SecondaryDexUse entries for another
-        // package (up to the MAX_SECONDARY_DEX_FILES_PER_OWNER limit).
-        // Note that we are using system_server's permission to check the existence. This is fine
-        // with the assumption that the file must be world readable to be used by other apps.
-        // We could use artd's permission to check the existence, and then there wouldn't be any
-        // permission issue, but that requires bringing up the artd service, which may be too
-        // expensive.
-        // TODO(jiakaiz): Check if the assumption is true.
-        // This doesn't apply to secondary dex files that aren't used by other apps, but we
-        // don't care about the loading package messing up its own SecondaryDexUse
-        // entries.
-        // Also note that the check doesn't follow symlinks because GMSCore creates symlinks to
-        // its secondary dex files, while system_server doesn't have the permission to follow them.
-        if (isLoaderOtherApp(loader, owningPackageName) && !mInjector.pathExists(dexPath)) {
-            AsLog.w("Not recording non-existent secondary dex file '" + dexPath + "'");
-            return;
-        }
         synchronized (mLock) {
             PackageDexUse packageDexUse = mDexUse.mPackageDexUseByOwningPackageName.computeIfAbsent(
                     owningPackageName, k -> new PackageDexUse());
@@ -1400,10 +1381,6 @@ public class DexUseManagerLocal {
 
         public long getCurrentTimeMillis() {
             return System.currentTimeMillis();
-        }
-
-        public boolean pathExists(String path) {
-            return Files.exists(Paths.get(path), LinkOption.NOFOLLOW_LINKS);
         }
 
         @NonNull
