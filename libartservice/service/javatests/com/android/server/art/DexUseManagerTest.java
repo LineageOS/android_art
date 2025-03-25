@@ -164,7 +164,6 @@ public class DexUseManagerTest {
 
         lenient().when(mInjector.getArtd()).thenReturn(mArtd);
         lenient().when(mInjector.getCurrentTimeMillis()).thenReturn(0l);
-        lenient().when(mInjector.pathExists(any())).thenReturn(true);
         lenient().when(mInjector.getFilename()).thenReturn(mTempFile.getPath());
         lenient()
                 .when(mInjector.createScheduledExecutor())
@@ -809,43 +808,13 @@ public class DexUseManagerTest {
     }
 
     @Test
-    public void testExistingExternalSecondaryDexPath() throws Exception {
+    public void testSecondaryDexPath() throws Exception {
         mMockClock.advanceTime(DexUseManagerLocal.INTERVAL_MS); // Save.
         long oldFileSize = mTempFile.length();
 
         String existingDexPath = mCeDir + "/foo.apk";
-        when(mInjector.pathExists(existingDexPath)).thenReturn(true);
         mDexUseManager.notifyDexContainersLoaded(
                 mSnapshot, LOADING_PKG_NAME, Map.of(existingDexPath, "PCL[]"));
-
-        mMockClock.advanceTime(DexUseManagerLocal.INTERVAL_MS); // Save.
-        assertThat(mTempFile.length()).isGreaterThan(oldFileSize);
-    }
-
-    @Test
-    public void testNonexistingExternalSecondaryDexPath() throws Exception {
-        mMockClock.advanceTime(DexUseManagerLocal.INTERVAL_MS); // Save.
-        long oldFileSize = mTempFile.length();
-
-        String nonexistingDexPath = mCeDir + "/foo.apk";
-        when(mInjector.pathExists(nonexistingDexPath)).thenReturn(false);
-        mDexUseManager.notifyDexContainersLoaded(
-                mSnapshot, LOADING_PKG_NAME, Map.of(nonexistingDexPath, "PCL[]"));
-
-        mMockClock.advanceTime(DexUseManagerLocal.INTERVAL_MS); // Save.
-        assertThat(mTempFile.length()).isEqualTo(oldFileSize);
-    }
-
-    @Test
-    public void testInternalSecondaryDexPath() throws Exception {
-        mMockClock.advanceTime(DexUseManagerLocal.INTERVAL_MS); // Save.
-        long oldFileSize = mTempFile.length();
-
-        String nonexistingDexPath = mCeDir + "/foo.apk";
-        lenient().when(mInjector.pathExists(nonexistingDexPath)).thenReturn(false);
-        mDexUseManager.notifyDexContainersLoaded(
-                mSnapshot, OWNING_PKG_NAME, Map.of(nonexistingDexPath, "PCL[]"));
-        verify(mArtd, never()).getDexFileVisibility(nonexistingDexPath);
 
         mMockClock.advanceTime(DexUseManagerLocal.INTERVAL_MS); // Save.
         assertThat(mTempFile.length()).isGreaterThan(oldFileSize);
