@@ -145,6 +145,11 @@ apex_defaults {
             ],
         },
     },
+
+    licenses: [
+        "art_license",
+        "opensourcerequest",
+    ],
 }
 
 // Default values shared by Debug and Testing ART APEXes.
