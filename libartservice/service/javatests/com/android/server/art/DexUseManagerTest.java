@@ -28,6 +28,7 @@ import static org.mockito.Mockito.argThat;
 import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.when;
 
 import android.content.BroadcastReceiver;
@@ -79,6 +80,9 @@ public class DexUseManagerTest {
     private static final String OWNING_PKG_NAME = "com.example.owningpackage";
     private static final String BASE_APK = "/somewhere/app/" + OWNING_PKG_NAME + "/base.apk";
     private static final String SPLIT_APK = "/somewhere/app/" + OWNING_PKG_NAME + "/split_0.apk";
+
+    // A reduced limit to make the test run faster.
+    private static final int MAX_SECONDARY_DEX_FILES_PER_OWNER_FOR_TESTING = 50;
 
     @Rule
     public StaticMockitoRule mockitoRule = new StaticMockitoRule(
@@ -166,6 +170,9 @@ public class DexUseManagerTest {
                 .thenAnswer(invocation -> mMockClock.createScheduledExecutor());
         lenient().when(mInjector.getContext()).thenReturn(mContext);
         lenient().when(mInjector.getAllPackageNames()).thenReturn(mPackageStates.keySet());
+        lenient()
+                .when(mInjector.getMaxSecondaryDexFilesPerOwner())
+                .thenReturn(MAX_SECONDARY_DEX_FILES_PER_OWNER_FOR_TESTING);
 
         mDexUseManager = new DexUseManagerLocal(mInjector);
         mDexUseManager.systemReady();
@@ -576,10 +583,10 @@ public class DexUseManagerTest {
 
     @Test
     public void testCheckedSecondaryDexNotFound() throws Exception {
-        when(mArtd.getDexFileVisibility(mCeDir + "/foo.apk")).thenReturn(FileVisibility.NOT_FOUND);
-
         mDexUseManager.notifyDexContainersLoaded(
                 mSnapshot, OWNING_PKG_NAME, Map.of(mCeDir + "/foo.apk", "CLC"));
+
+        when(mArtd.getDexFileVisibility(mCeDir + "/foo.apk")).thenReturn(FileVisibility.NOT_FOUND);
 
         assertThat(mDexUseManager.getCheckedSecondaryDexInfo(
                            OWNING_PKG_NAME, true /* excludeObsoleteDexesAndLoaders */))
@@ -737,10 +744,36 @@ public class DexUseManagerTest {
     }
 
     @Test(expected = IllegalArgumentException.class)
+    public void testTooLongDexPath() throws Exception {
+        mDexUseManager.notifyDexContainersLoaded(mSnapshot, OWNING_PKG_NAME,
+                Map.of("/" + "X".repeat(DexUseManagerLocal.MAX_PATH_LENGTH), "CLC"));
+    }
+
+    @Test
+    public void testMaxLengthDexPath() throws Exception {
+        mDexUseManager.notifyDexContainersLoaded(mSnapshot, OWNING_PKG_NAME,
+                Map.of("/" + "X".repeat(DexUseManagerLocal.MAX_PATH_LENGTH - 1), "CLC"));
+    }
+
+    @Test(expected = IllegalArgumentException.class)
     public void testInvalidDexPath() throws Exception {
         lenient().when(ArtJni.validateDexPath(any())).thenReturn("invalid");
         mDexUseManager.notifyDexContainersLoaded(
                 mSnapshot, OWNING_PKG_NAME, Map.of("/a/b.jar", "PCL[]"));
+    }
+
+    @Test(expected = IllegalArgumentException.class)
+    public void testTooLongClassLoaderContext() throws Exception {
+        mDexUseManager.notifyDexContainersLoaded(mSnapshot, OWNING_PKG_NAME,
+                Map.of(mCeDir + "/foo.apk",
+                        "X".repeat(DexUseManagerLocal.MAX_CLASS_LOADER_CONTEXT_LENGTH + 1)));
+    }
+
+    @Test
+    public void testMaxLengthClassLoaderContext() throws Exception {
+        mDexUseManager.notifyDexContainersLoaded(mSnapshot, OWNING_PKG_NAME,
+                Map.of(mCeDir + "/foo.apk",
+                        "X".repeat(DexUseManagerLocal.MAX_CLASS_LOADER_CONTEXT_LENGTH)));
     }
 
     @Test(expected = IllegalArgumentException.class)
@@ -772,6 +805,57 @@ public class DexUseManagerTest {
                         "CLC", Set.of("armeabi-v7a"),
                         Set.of(DexLoader.create(LOADING_PKG_NAME, false /* isolatedProcess */)),
                         true /* isUsedByOtherApps */, mDefaultFileVisibility));
+    }
+
+    @Test
+    public void testSecondaryDexPath() throws Exception {
+        mMockClock.advanceTime(DexUseManagerLocal.INTERVAL_MS); // Save.
+        long oldFileSize = mTempFile.length();
+
+        String existingDexPath = mCeDir + "/foo.apk";
+        mDexUseManager.notifyDexContainersLoaded(
+                mSnapshot, LOADING_PKG_NAME, Map.of(existingDexPath, "PCL[]"));
+
+        mMockClock.advanceTime(DexUseManagerLocal.INTERVAL_MS); // Save.
+        assertThat(mTempFile.length()).isGreaterThan(oldFileSize);
+    }
+
+    @Test
+    public void testLimitSecondaryDexFiles() throws Exception {
+        for (int n = 0; n < MAX_SECONDARY_DEX_FILES_PER_OWNER_FOR_TESTING - 1; ++n) {
+            mDexUseManager.notifyDexContainersLoaded(mSnapshot, LOADING_PKG_NAME,
+                    Map.of(String.format("%s/%04d/foo.apk", mCeDir, n), "CLC"));
+        }
+        mMockClock.advanceTime(DexUseManagerLocal.INTERVAL_MS); // Save.
+        long oldFileSize = mTempFile.length();
+
+        mDexUseManager.notifyDexContainersLoaded(
+                mSnapshot, LOADING_PKG_NAME, Map.of(mCeDir + "/9998/foo.apk", "CLC"));
+        mMockClock.advanceTime(DexUseManagerLocal.INTERVAL_MS); // Save.
+        assertThat(mTempFile.length()).isGreaterThan(oldFileSize);
+
+        oldFileSize = mTempFile.length();
+        mDexUseManager.notifyDexContainersLoaded(
+                mSnapshot, LOADING_PKG_NAME, Map.of(mCeDir + "/9999/foo.apk", "CLC"));
+        mMockClock.advanceTime(DexUseManagerLocal.INTERVAL_MS); // Save.
+        assertThat(mTempFile.length()).isEqualTo(oldFileSize);
+
+        // Can still add loading packages to existing entries after the limit is reached.
+        mDexUseManager.notifyDexContainersLoaded(
+                mSnapshot, OWNING_PKG_NAME, Map.of(mCeDir + "/9998/foo.apk", "CLC"));
+        mMockClock.advanceTime(DexUseManagerLocal.INTERVAL_MS); // Save.
+        assertThat(mTempFile.length()).isGreaterThan(oldFileSize);
+    }
+
+    @Test
+    public void testLimitSecondaryDexFilesSingleCall() throws Exception {
+        Map<String, String> clcByDexFile = new HashMap<>();
+        for (int n = 0; n < MAX_SECONDARY_DEX_FILES_PER_OWNER_FOR_TESTING + 1; ++n) {
+            clcByDexFile.put(String.format("%s/%04d/foo.apk", mCeDir, n), "CLC");
+        }
+        mDexUseManager.notifyDexContainersLoaded(mSnapshot, LOADING_PKG_NAME, clcByDexFile);
+        assertThat(mDexUseManager.getSecondaryDexInfo(OWNING_PKG_NAME))
+                .hasSize(MAX_SECONDARY_DEX_FILES_PER_OWNER_FOR_TESTING);
     }
 
     private AndroidPackage createPackage(String packageName) {
