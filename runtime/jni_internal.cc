@@ -652,6 +652,13 @@ class JNI {
     if (c == nullptr) {
       return nullptr;
     }
+    if (UNLIKELY(!c->IsInstantiable())) {
+      soa.Self()->ThrowNewExceptionF(
+          "Ljava/lang/InstantiationException;", "Can't instantiate %s %s",
+          c->IsInterface() ? "interface" : "abstract class",
+          PrettyDescriptor(c).c_str());
+      return nullptr;
+    }
     if (c->IsStringClass()) {
       gc::AllocatorType allocator_type = Runtime::Current()->GetHeap()->GetCurrentAllocator();
       mirror::SetStringCountVisitor visitor(0);
@@ -679,6 +686,13 @@ class JNI {
     if (c == nullptr) {
       return nullptr;
     }
+    if (UNLIKELY(!c->IsInstantiable())) {
+      soa.Self()->ThrowNewExceptionF(
+          "Ljava/lang/InstantiationException;", "Can't instantiate %s %s",
+          c->IsInterface() ? "interface" : "abstract class",
+          PrettyDescriptor(c).c_str());
+      return nullptr;
+    }
     if (c->IsStringClass()) {
       // Replace calls to String.<init> with equivalent StringFactory call.
       jmethodID sf_mid = WellKnownClasses::StringInitToStringFactoryMethodID(mid);
@@ -702,6 +716,13 @@ class JNI {
     ScopedObjectAccess soa(env);
     mirror::Class* c = EnsureInitialized(soa.Self(), soa.Decode<mirror::Class*>(java_class));
     if (c == nullptr) {
+      return nullptr;
+    }
+    if (UNLIKELY(!c->IsInstantiable())) {
+      soa.Self()->ThrowNewExceptionF(
+          "Ljava/lang/InstantiationException;", "Can't instantiate %s %s",
+          c->IsInterface() ? "interface" : "abstract class",
+          PrettyDescriptor(c).c_str());
       return nullptr;
     }
     if (c->IsStringClass()) {
