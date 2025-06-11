@@ -747,10 +747,10 @@ class ScopedCheck {
     return true;
   }
 
-  bool CheckInstantiableNonArray(ScopedObjectAccess& soa, jclass jc)
+  bool CheckNonArray(ScopedObjectAccess& soa, jclass jc)
       REQUIRES_SHARED(Locks::mutator_lock_) {
     ObjPtr<mirror::Class> c = soa.Decode<mirror::Class>(jc);
-    if (!c->IsInstantiableNonArray()) {
+    if (c->IsArrayClass()) {
       AbortF("can't make objects of type %s: %p", c->PrettyDescriptor().c_str(), c.Ptr());
       return false;
     }
@@ -2195,7 +2195,7 @@ class CheckJNI {
     ScopedObjectAccess soa(env);
     ScopedCheck sc(kFlag_Default, __FUNCTION__);
     JniValueType args[2] = {{.E = env}, {.c = c}};
-    if (sc.Check(soa, true, "Ec", args) && sc.CheckInstantiableNonArray(soa, c)) {
+    if (sc.Check(soa, true, "Ec", args) && sc.CheckNonArray(soa, c)) {
       JniValueType result;
       result.L = baseEnv(env)->AllocObject(env, c);
       if (sc.Check(soa, false, "L", &result)) {
@@ -2211,7 +2211,7 @@ class CheckJNI {
     ScopedCheck sc(kFlag_Default, __FUNCTION__);
     VarArgs rest(mid, vargs);
     JniValueType args[4] = {{.E = env}, {.c = c}, {.m = mid}, {.va = &rest}};
-    if (sc.Check(soa, true, "Ecm.", args) && sc.CheckInstantiableNonArray(soa, c) &&
+    if (sc.Check(soa, true, "Ecm.", args) && sc.CheckNonArray(soa, c) &&
         sc.CheckConstructor(mid)) {
       JniValueType result;
       result.L = baseEnv(env)->NewObjectV(env, c, mid, vargs);
@@ -2237,7 +2237,7 @@ class CheckJNI {
     ScopedCheck sc(kFlag_Default, __FUNCTION__);
     VarArgs rest(mid, vargs);
     JniValueType args[4] = {{.E = env}, {.c = c}, {.m = mid}, {.va = &rest}};
-    if (sc.Check(soa, true, "Ecm.", args) && sc.CheckInstantiableNonArray(soa, c) &&
+    if (sc.Check(soa, true, "Ecm.", args) && sc.CheckNonArray(soa, c) &&
         sc.CheckConstructor(mid)) {
       JniValueType result;
       result.L = baseEnv(env)->NewObjectA(env, c, mid, vargs);
