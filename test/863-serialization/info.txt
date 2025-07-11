@@ -1,0 +1,2 @@
+Regression test for JNI::NewObject where we forgot to check if a class is
+instantiable.
